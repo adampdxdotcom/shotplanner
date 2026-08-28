@@ -39,7 +39,7 @@ export default function App() {
   const [expandedPrompt, setExpandedPrompt] = useState<string>("");
 
   // UI Navigation & Code Modal
-  const [activeSection, setActiveSection] = useState<string>("workflow");
+  const [activeSection, setActiveSection] = useState<string>("assets");
   const [isCodeModalOpen, setIsCodeModalOpen] = useState<boolean>(false);
 
   // Project Save/Load State

@@ -77,3 +77,8 @@ async def save_workflow_json(filename: str, content: Dict[str, Any]) -> str:
     async with aiofiles.open(file_path, "w", encoding="utf-8") as f:
         await f.write(json.dumps(content, indent=2))
     return filename
+
+PROJECTS_DIR = ASSETS_DIR / "project_jsons"
+TMP_UPLOAD_DIR = ASSETS_DIR / "tmp_uploads"
+PROJECTS_DIR.mkdir(parents=True, exist_ok=True)
+TMP_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
