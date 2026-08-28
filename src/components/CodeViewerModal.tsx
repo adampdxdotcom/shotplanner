@@ -180,7 +180,7 @@ See README.md in root for complete instructions and setup guide.`
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6">
-      <div className="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-4xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+      <div className="bg-zinc-950 border-2 border-zinc-700 rounded-2xl w-full max-w-4xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="px-5 py-4 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/60">
           <div className="flex items-center gap-2.5">

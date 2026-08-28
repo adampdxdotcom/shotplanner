@@ -16,12 +16,17 @@ const ROOT_DIR = process.cwd();
 const ASSETS_DIR = path.join(ROOT_DIR, "assets");
 const WORKFLOWS_DIR = path.join(ASSETS_DIR, "workflows");
 const UPLOADS_DIR = path.join(ASSETS_DIR, "uploads");
+const PROJECTS_DIR = path.join(ASSETS_DIR, "project_jsons");
 
 if (!fs.existsSync(WORKFLOWS_DIR)) fs.mkdirSync(WORKFLOWS_DIR, { recursive: true });
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+if (!fs.existsSync(PROJECTS_DIR)) fs.mkdirSync(PROJECTS_DIR, { recursive: true });
 
-// Setup multer for file uploads
-const upload = multer({ dest: path.join(UPLOADS_DIR, "tmp") });
+// Setup multer for file uploads (use ephemeral /tmp directory for scratch files)
+import os from "os";
+const TMP_UPLOAD_DIR = path.join(os.tmpdir(), "comfyui-uploads-tmp");
+if (!fs.existsSync(TMP_UPLOAD_DIR)) fs.mkdirSync(TMP_UPLOAD_DIR, { recursive: true });
+const upload = multer({ dest: TMP_UPLOAD_DIR });
 
 // In-memory asset list to persist across sessions
 interface AssetRecord {
@@ -48,7 +53,78 @@ function sanitizeSlug(str: string): string {
 // API ROUTES
 // ----------------------------------------------------
 
-// 1. List workflows
+const GEMINI_CONFIG_FILE = path.join(ASSETS_DIR, "gemini_config.json");
+
+function getStoredGeminiKey(): string {
+  if (fs.existsSync(GEMINI_CONFIG_FILE)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(GEMINI_CONFIG_FILE, "utf-8"));
+      if (data.gemini_api_key && typeof data.gemini_api_key === "string" && data.gemini_api_key.trim()) {
+        return data.gemini_api_key.trim();
+      }
+    } catch (e) {}
+  }
+  return (process.env.GEMINI_API_KEY || "").trim();
+}
+
+function saveGeminiKey(key: string): boolean {
+  try {
+    fs.writeFileSync(GEMINI_CONFIG_FILE, JSON.stringify({ gemini_api_key: key.trim() }, null, 2), "utf-8");
+    process.env.GEMINI_API_KEY = key.trim();
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+async function generateWithGeminiAPI(apiKey: string, promptText: string): Promise<{ text: string; modelUsed: string }> {
+  const ai = new GoogleGenAI({ apiKey });
+  // Primary model gemini-3.6-flash, followed by fallback candidate models
+  const candidateModels = ["gemini-3.6-flash", "gemini-3.7-flash", "gemini-2.5-flash"];
+  let lastErr: any = null;
+
+  for (const model of candidateModels) {
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: promptText,
+      });
+      const text = response.text?.trim() || "";
+      if (text) {
+        return { text, modelUsed: model };
+      }
+    } catch (err: any) {
+      lastErr = err;
+    }
+  }
+  throw lastErr || new Error("Failed to generate prompt with Gemini API");
+}
+
+// Gemini Settings API
+app.get("/api/settings/gemini", (req: Request, res: Response) => {
+  const key = getStoredGeminiKey();
+  if (!key) {
+    return res.json({ configured: false, masked_key: "" });
+  }
+  const masked = key.length > 8 ? `${key.slice(0, 4)}...${key.slice(-4)}` : "***";
+  res.json({ configured: true, masked_key: masked });
+});
+
+app.post("/api/settings/gemini", (req: Request, res: Response) => {
+  const { api_key } = req.body;
+  if (!api_key || typeof api_key !== "string" || !api_key.trim()) {
+    return res.status(400).json({ error: "Gemini API key is required." });
+  }
+  const success = saveGeminiKey(api_key);
+  if (!success) {
+    return res.status(500).json({ error: "Failed to save Gemini API key." });
+  }
+  res.json({
+    success: true,
+    message: "Gemini API key saved to persistent storage.",
+    configured: true
+  });
+});
 app.get("/api/workflows", (req: Request, res: Response) => {
   try {
     const files = fs.readdirSync(WORKFLOWS_DIR).filter(f => f.endsWith(".json"));
@@ -234,13 +310,55 @@ app.delete("/api/assets/:filename", (req: Request, res: Response) => {
   res.json({ success: true, message: `Deleted ${filename}` });
 });
 
+// --- Projects (Save/Load Shots) ---
+app.get("/api/projects", (req: Request, res: Response) => {
+  try {
+    const files = fs.readdirSync(PROJECTS_DIR).filter(f => f.endsWith(".json"));
+    res.json({ projects: files });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/projects/:filename", (req: Request, res: Response) => {
+  try {
+    const safeFilename = req.params.filename.endsWith(".json") ? req.params.filename : `${req.params.filename}.json`;
+    const filePath = path.join(PROJECTS_DIR, safeFilename);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ error: "Project not found" });
+    const data = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+    res.json(data);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/projects", (req: Request, res: Response) => {
+  try {
+    const { filename, data } = req.body;
+    if (!filename || !data) return res.status(400).json({ error: "Filename and data are required" });
+    
+    // Sanitize filename and enforce json extension
+    const sanitizedName = filename.replace(/[^a-zA-Z0-9_-]/g, "_");
+    const finalFilename = sanitizedName.endsWith("_json") ? sanitizedName.replace("_json", ".json") : (sanitizedName.endsWith(".json") ? sanitizedName : `${sanitizedName}.json`);
+    const filePath = path.join(PROJECTS_DIR, finalFilename);
+    
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+    res.json({ success: true, filename: finalFilename });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 7. LM Studio Prompt Expansion ("Generate from Stub")
 app.post("/api/generate-prompt", async (req: Request, res: Response) => {
   try {
-    const { basic_stub, assets = [], lm_studio_url = "http://localhost:1234/v1", model } = req.body;
+    const { basic_stub, assets = [], lm_studio_url = "http://localhost:1234/v1", model, provider = "auto" } = req.body;
 
     if (!basic_stub) {
       return res.status(400).json({ error: "Basic prompt stub is required" });
+    }
+    if (assets.length === 0) {
+      return res.status(400).json({ error: "At least one uploaded asset is required to generate a prompt." });
     }
 
     // Format asset definitions header
@@ -318,56 +436,69 @@ ${definitionsHeader || "No reference assets provided."}
 
 Please expand this basic stub into a structured MiniMax-H3 prompt. Begin with the "Global Subject Definitions:" header defined above, followed by alignment instructions (if applicable), integrated_multimodal_description, overall_soundscape, and non_diegetic_music.`;
 
-    // Try calling LM Studio endpoint if provided
     let generatedPrompt = "";
     let providerUsed = "Local LM Studio";
 
-    try {
-      let endpoint = lm_studio_url.trim().replace(/\/$/, "");
-      if (!endpoint.endsWith("/chat/completions")) {
-        if (!endpoint.endsWith("/v1")) endpoint = `${endpoint}/v1`;
-        endpoint = `${endpoint}/chat/completions`;
+    const storedGeminiKey = getStoredGeminiKey();
+
+    // If explicit Gemini provider requested, prioritize Gemini 3.6 Flash
+    if (provider === "gemini") {
+      if (!storedGeminiKey) {
+        return res.status(400).json({ error: "Gemini API key is not configured. Please save your API key in Settings." });
       }
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
-
-      const lmRes = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: model || "local-model",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userMessage }
-          ],
-          temperature: 0.7,
-          max_tokens: 1000
-        }),
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
-
-      if (lmRes.ok) {
-        const data = await lmRes.json();
-        generatedPrompt = data.choices?.[0]?.message?.content?.trim() || "";
-      }
-    } catch (e) {
-      // LM Studio offline / unreachable from sandboxed container
-    }
-
-    // If LM Studio is not accessible in cloud container, check Gemini API Key
-    if (!generatedPrompt && process.env.GEMINI_API_KEY) {
       try {
-        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-        const geminiRes = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
-          contents: `${systemPrompt}\n\n${userMessage}`,
+        const fullPrompt = `${systemPrompt}\n\n${userMessage}`;
+        const result = await generateWithGeminiAPI(storedGeminiKey, fullPrompt);
+        generatedPrompt = result.text;
+        providerUsed = `Gemini (${result.modelUsed})`;
+      } catch (geminiErr: any) {
+        return res.status(500).json({ error: `Gemini API Error: ${geminiErr.message || geminiErr}` });
+      }
+    } else {
+      // Try calling LM Studio endpoint if provided
+      try {
+        let endpoint = lm_studio_url.trim().replace(/\/$/, "");
+        if (!endpoint.endsWith("/chat/completions")) {
+          if (!endpoint.endsWith("/v1")) endpoint = `${endpoint}/v1`;
+          endpoint = `${endpoint}/chat/completions`;
+        }
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+        const lmRes = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: model || "local-model",
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userMessage }
+            ],
+            temperature: 0.7,
+            max_tokens: 1000
+          }),
+          signal: controller.signal
         });
-        generatedPrompt = geminiRes.text?.trim() || "";
-        providerUsed = "Gemini Cloud Fallback";
-      } catch (geminiErr) {
-        // fallback
+        clearTimeout(timeoutId);
+
+        if (lmRes.ok) {
+          const data = await lmRes.json();
+          generatedPrompt = data.choices?.[0]?.message?.content?.trim() || "";
+          providerUsed = "Local LM Studio";
+        }
+      } catch (e) {
+        // LM Studio offline
+      }
+
+      // If LM Studio failed and Gemini key exists, fallback to Gemini
+      if (!generatedPrompt && storedGeminiKey) {
+        try {
+          const fullPrompt = `${systemPrompt}\n\n${userMessage}`;
+          const result = await generateWithGeminiAPI(storedGeminiKey, fullPrompt);
+          generatedPrompt = result.text;
+          providerUsed = `Gemini (${result.modelUsed} Fallback)`;
+        } catch (geminiErr) {}
       }
     }
 

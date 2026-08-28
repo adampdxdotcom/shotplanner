@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { AppConfig } from "../types";
 import { 
   Server, 
@@ -9,20 +9,75 @@ import {
   AlertCircle, 
   RefreshCw,
   Info,
-  ShieldCheck
+  ShieldCheck,
+  Sparkles,
+  Save,
+  FileCode2
 } from "lucide-react";
 
 interface ConfigSectionProps {
   config: AppConfig;
   onChange: (newConfig: AppConfig) => void;
+  onOpenCodeViewer?: () => void;
 }
 
-export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange }) => {
+export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange, onOpenCodeViewer }) => {
   const [testingSSH, setTestingSSH] = useState(false);
   const [testResult, setTestResult] = useState<{ success?: boolean; message?: string } | null>(null);
 
+  // Gemini API Key state
+  const [geminiKeyInput, setGeminiKeyInput] = useState("");
+  const [isGeminiConfigured, setIsGeminiConfigured] = useState(false);
+  const [maskedGeminiKey, setMaskedGeminiKey] = useState("");
+  const [savingGemini, setSavingGemini] = useState(false);
+  const [geminiFeedback, setGeminiFeedback] = useState<{ success?: boolean; message?: string } | null>(null);
+
+  // Check Gemini Status on mount
+  useEffect(() => {
+    fetch("/api/settings/gemini")
+      .then(res => res.json())
+      .then(data => {
+        if (data.configured) {
+          setIsGeminiConfigured(true);
+          setMaskedGeminiKey(data.masked_key);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const handleInputChange = (field: keyof AppConfig, value: any) => {
     onChange({ ...config, [field]: value });
+  };
+
+  const handleSaveGeminiKey = async () => {
+    if (!geminiKeyInput.trim()) {
+      setGeminiFeedback({ success: false, message: "Please enter a valid Gemini API Key." });
+      return;
+    }
+
+    setSavingGemini(true);
+    setGeminiFeedback(null);
+    try {
+      const res = await fetch("/api/settings/gemini", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ api_key: geminiKeyInput })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setIsGeminiConfigured(true);
+        setMaskedGeminiKey(geminiKeyInput.length > 8 ? `${geminiKeyInput.slice(0, 4)}...${geminiKeyInput.slice(-4)}` : "***");
+        setGeminiKeyInput("");
+        setGeminiFeedback({ success: true, message: "Gemini API key saved to persistent storage!" });
+        onChange({ ...config, gemini_api_key: geminiKeyInput });
+      } else {
+        setGeminiFeedback({ success: false, message: data.error || data.detail || "Failed to save API key." });
+      }
+    } catch (e: any) {
+      setGeminiFeedback({ success: false, message: e.message });
+    } finally {
+      setSavingGemini(false);
+    }
   };
 
   const handleTestSSH = async () => {
@@ -50,26 +105,37 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange }
   };
 
   return (
-    <div id="config-section" className="bg-zinc-900/60 border border-zinc-800/80 rounded-xl p-5 shadow-sm space-y-5">
+    <div id="config-section" className="bg-zinc-900/60 border-2 border-zinc-700 rounded-xl p-5 shadow-sm space-y-6">
       <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
         <div className="flex items-center gap-2.5">
           <div className="p-1.5 rounded-md bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
             <Server className="w-4 h-4" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-zinc-100">1. Infrastructure &amp; Remote Credentials</h2>
+            <h2 className="text-sm font-semibold text-zinc-100">5. Infrastructure &amp; Remote Credentials</h2>
             <p className="text-xs text-zinc-400">Configure RunPod SSH instance, ComfyUI API endpoint, and local LM Studio server.</p>
           </div>
         </div>
-
-        <button
-          onClick={handleTestSSH}
-          disabled={testingSSH || !config.runpod_ip}
-          className="px-3 py-1.5 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-zinc-200 border border-zinc-700 rounded-lg transition-colors flex items-center gap-1.5"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${testingSSH ? "animate-spin text-indigo-400" : ""}`} />
-          {testingSSH ? "Testing SSH..." : "Test RunPod SSH"}
-        </button>
+        <div className="flex items-center gap-2">
+          {onOpenCodeViewer && (
+            <button
+              onClick={onOpenCodeViewer}
+              className="px-3 py-1.5 text-xs font-medium text-zinc-300 bg-zinc-800 hover:bg-zinc-700 hover:text-white rounded-lg border border-zinc-700 transition-all flex items-center gap-1.5 shadow-xs"
+              title="View Python FastAPI & Docker files"
+            >
+              <FileCode2 className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Backend &amp; Docker Code</span>
+            </button>
+          )}
+          <button
+            onClick={handleTestSSH}
+            disabled={testingSSH || !config.runpod_ip}
+            className="px-3 py-1.5 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-zinc-200 border border-zinc-700 rounded-lg transition-colors flex items-center gap-1.5"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${testingSSH ? "animate-spin text-indigo-400" : ""}`} />
+            {testingSSH ? "Testing SSH..." : "Test RunPod SSH"}
+          </button>
+        </div>
       </div>
 
       {testResult && (
@@ -98,7 +164,7 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange }
             placeholder="194.26.196.xxx"
             value={config.runpod_ip}
             onChange={(e) => handleInputChange("runpod_ip", e.target.value)}
-            className="w-full bg-zinc-950 border border-zinc-800 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
+            className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
           />
         </div>
 
@@ -111,7 +177,7 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange }
               placeholder="22"
               value={config.ssh_port}
               onChange={(e) => handleInputChange("ssh_port", parseInt(e.target.value) || 22)}
-              className="w-full bg-zinc-950 border border-zinc-800 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
+              className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
             />
           </div>
           <div className="space-y-1.5">
@@ -121,7 +187,7 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange }
               placeholder="root"
               value={config.ssh_username}
               onChange={(e) => handleInputChange("ssh_username", e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-800 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
+              className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
             />
           </div>
         </div>
@@ -137,7 +203,7 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange }
             placeholder="Pod password or /root/.ssh/id_ed25519"
             value={config.ssh_password}
             onChange={(e) => handleInputChange("ssh_password", e.target.value)}
-            className="w-full bg-zinc-950 border border-zinc-800 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
+            className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
           />
         </div>
 
@@ -152,7 +218,7 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange }
             placeholder="http://localhost:1234/v1"
             value={config.lm_studio_url}
             onChange={(e) => handleInputChange("lm_studio_url", e.target.value)}
-            className="w-full bg-zinc-950 border border-zinc-800 focus:border-amber-500 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
+            className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-amber-500 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
           />
         </div>
       </div>
@@ -169,7 +235,7 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange }
             placeholder="http://127.0.0.1:8188 or https://pod-8188.proxy.runpod.net"
             value={config.comfyui_api_url}
             onChange={(e) => handleInputChange("comfyui_api_url", e.target.value)}
-            className="w-full bg-zinc-950 border border-zinc-800 focus:border-emerald-500 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
+            className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-emerald-500 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
           />
         </div>
 
@@ -184,12 +250,65 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange }
             placeholder="Bearer token if using RunPod proxy endpoint"
             value={config.runpod_api_token}
             onChange={(e) => handleInputChange("runpod_api_token", e.target.value)}
-            className="w-full bg-zinc-950 border border-zinc-800 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
+            className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
           />
         </div>
       </div>
 
-      <div className="text-[11px] text-zinc-400 bg-zinc-950/40 p-2.5 rounded-lg border border-zinc-800/60 flex items-center gap-2">
+      {/* --- New Gemini API Section --- */}
+      <div className="border-t border-zinc-800 pt-5 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="p-1 rounded-md bg-purple-500/10 text-purple-400 border border-purple-500/20">
+              <Sparkles className="w-3.5 h-3.5" />
+            </div>
+            <div>
+              <h3 className="text-xs font-semibold text-zinc-200">Gemini API</h3>
+              <p className="text-[11px] text-zinc-400">Configure Google GenAI client (gemini-3.6-flash) for cloud-based prompt expansion.</p>
+            </div>
+          </div>
+
+          {isGeminiConfigured && (
+            <span className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 px-2.5 py-1 rounded-full">
+              <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+              Active ({maskedGeminiKey})
+            </span>
+          )}
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+          <div className="relative flex-1">
+            <input
+              type="password"
+              placeholder={isGeminiConfigured ? "Enter new API key to update..." : "AIzaSy..."}
+              value={geminiKeyInput}
+              onChange={(e) => setGeminiKeyInput(e.target.value)}
+              className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-purple-500 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
+            />
+          </div>
+          <button
+            onClick={handleSaveGeminiKey}
+            disabled={savingGemini || !geminiKeyInput.trim()}
+            className="px-4 py-2 text-xs font-medium bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white rounded-lg transition-colors flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
+          >
+            <Save className={`w-3.5 h-3.5 ${savingGemini ? "animate-spin" : ""}`} />
+            {savingGemini ? "Saving..." : "Save Config"}
+          </button>
+        </div>
+
+        {geminiFeedback && (
+          <div className={`p-2.5 rounded-lg border text-xs flex items-center gap-2 ${
+            geminiFeedback.success 
+              ? "bg-emerald-950/30 border-emerald-800/40 text-emerald-300" 
+              : "bg-red-950/30 border-red-800/40 text-red-300"
+          }`}>
+            {geminiFeedback.success ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" /> : <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />}
+            <span>{geminiFeedback.message}</span>
+          </div>
+        )}
+      </div>
+
+      <div className="text-[11px] text-zinc-400 bg-zinc-950/40 p-2.5 rounded-lg border-2 border-zinc-700/60 flex items-center gap-2">
         <Info className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
         <span>During execution, media assets are pushed via Paramiko SCP into <code className="text-zinc-200 bg-zinc-800 px-1 py-0.5 rounded">/workspace/ComfyUI/input/</code>, and modified JSON graphs are submitted to <code className="text-zinc-200 bg-zinc-800 px-1 py-0.5 rounded">/prompt</code>.</span>
       </div>

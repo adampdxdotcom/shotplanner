@@ -7,6 +7,7 @@ export interface AppConfig {
   comfyui_api_url: string;
   runpod_api_token: string;
   lm_studio_url: string;
+  gemini_api_key?: string;
 }
 
 export type AssetType = 

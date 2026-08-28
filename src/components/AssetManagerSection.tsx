@@ -30,8 +30,8 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
   
   // Metadata state for next upload
   const [assetType, setAssetType] = useState<string>("Headshot");
-  const [subjectName, setSubjectName] = useState<string>("jackie");
-  const [description, setDescription] = useState<string>("Close-up portrait of Jackie with natural lighting and sharp facial contours");
+  const [subjectName, setSubjectName] = useState<string>("");
+  const [description, setDescription] = useState<string>("");
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
@@ -47,6 +47,9 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
   const currentCount = activeTab === "image" ? images.length : activeTab === "audio" ? audios.length : videos.length;
   const currentMax = activeTab === "image" ? MAX_IMAGES : activeTab === "audio" ? MAX_AUDIOS : MAX_VIDEOS;
   const isLimitReached = currentCount >= currentMax;
+  
+  const isMetadataIncomplete = !subjectName.trim() || !description.trim();
+  const isUploadDisabled = uploading || isLimitReached || isMetadataIncomplete;
 
   // File Renaming Strategy preview
   const sanitize = (s: string) => s.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_").replace(/_+/g, "_");
@@ -58,6 +61,11 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
 
     if (isLimitReached) {
       setUploadError(`Maximum limit of ${currentMax} ${activeTab}(s) reached.`);
+      return;
+    }
+    
+    if (isMetadataIncomplete) {
+      setUploadError("Please enter a subject name and description before uploading.");
       return;
     }
 
@@ -101,7 +109,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
   };
 
   return (
-    <div id="assets-section" className="bg-zinc-900/60 border border-zinc-800/80 rounded-xl p-5 shadow-sm space-y-5">
+    <div id="assets-section" className="bg-zinc-900/60 border-2 border-zinc-700 rounded-xl p-5 shadow-sm space-y-5">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
         <div className="flex items-center gap-2.5">
@@ -109,13 +117,13 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
             <HardDrive className="w-4 h-4" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-zinc-100">3. Segmented Asset Management &amp; Metadata</h2>
+            <h2 className="text-sm font-semibold text-zinc-100">1. Segmented Asset Management &amp; Metadata</h2>
             <p className="text-xs text-zinc-400">Configure semantic tags, subject name, and LLM context prior to upload. Auto-renames to format <code className="text-zinc-300">{`{type}_{name}_{timestamp}.ext`}</code>.</p>
           </div>
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex items-center gap-1 bg-zinc-950 p-1 rounded-lg border border-zinc-800">
+        <div className="flex items-center gap-1 bg-zinc-950 p-1 rounded-lg border-2 border-zinc-700">
           <button
             onClick={() => {
               setActiveTab("image");
@@ -173,7 +181,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
       {/* Metadata & Upload Form */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         {/* Left: Metadata Inputs (Required before upload) */}
-        <div className="lg:col-span-7 bg-zinc-950/50 p-4 rounded-xl border border-zinc-800/80 space-y-3.5">
+        <div className="lg:col-span-7 bg-zinc-950/50 p-4 rounded-xl border-2 border-zinc-700/80 space-y-3.5">
           <div className="flex items-center justify-between border-b border-zinc-800/60 pb-2">
             <span className="text-xs font-semibold text-zinc-200 flex items-center gap-1.5">
               <Tag className="w-3.5 h-3.5 text-amber-400" />
@@ -194,7 +202,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
                 <select
                   value={assetType}
                   onChange={(e) => setAssetType(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-800 focus:border-amber-500 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 outline-none"
+                  className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-amber-500 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 outline-none"
                 >
                   <option value="Headshot">Headshot</option>
                   <option value="Body Reference">Body Reference</option>
@@ -206,7 +214,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
                 <select
                   value={assetType}
                   onChange={(e) => setAssetType(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-800 focus:border-emerald-500 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 outline-none"
+                  className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-emerald-500 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 outline-none"
                 >
                   <option value="Voiceover Audio">Voiceover Audio</option>
                   <option value="Soundtrack / BGM">Soundtrack / BGM</option>
@@ -216,7 +224,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
                 <select
                   value={assetType}
                   onChange={(e) => setAssetType(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-800 focus:border-indigo-500 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 outline-none"
+                  className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-indigo-500 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 outline-none"
                 >
                   <option value="Motion Reference Video">Motion Reference Video</option>
                   <option value="Style Reference Video">Style Reference Video</option>
@@ -235,7 +243,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
                 placeholder="e.g. jackie, cyberpunk_car, tavern"
                 value={subjectName}
                 onChange={(e) => setSubjectName(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-800 focus:border-amber-500 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 placeholder-zinc-600 outline-none"
+                className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-amber-500 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 placeholder-zinc-600 outline-none"
               />
             </div>
           </div>
@@ -256,12 +264,12 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
               placeholder="Describe wardrobe, lighting, identity, angles, key attributes..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-800 focus:border-amber-500 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 placeholder-zinc-600 outline-none resize-none"
+              className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-amber-500 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 placeholder-zinc-600 outline-none resize-none"
             />
           </div>
 
           {/* File Renaming Format Visualizer */}
-          <div className="bg-zinc-900/90 px-3 py-2 rounded-lg border border-zinc-800 text-[11px] flex items-center justify-between">
+          <div className="bg-zinc-900/90 px-3 py-2 rounded-lg border-2 border-zinc-700 text-[11px] flex items-center justify-between">
             <span className="text-zinc-400">Renamed File Strategy:</span>
             <span className="font-mono text-amber-300 font-medium truncate max-w-[280px]">
               {previewFilename}
@@ -271,10 +279,10 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
 
         {/* Right: Upload Dropzone */}
         <div className="lg:col-span-5 flex flex-col">
-          <label className={`flex-1 flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-xl transition-all cursor-pointer ${
-            isLimitReached 
+          <label className={`flex-1 flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-xl transition-all ${
+            isUploadDisabled
               ? "opacity-50 cursor-not-allowed border-zinc-800 bg-zinc-950/30" 
-              : "border-zinc-700 hover:border-amber-500/80 bg-zinc-950/40 hover:bg-zinc-900/60"
+              : "border-zinc-700 hover:border-amber-500/80 bg-zinc-950/40 hover:bg-zinc-900/60 cursor-pointer"
           }`}>
             <UploadCloud className={`w-8 h-8 mb-2 ${isLimitReached ? "text-zinc-600" : "text-amber-400 animate-pulse"}`} />
             <p className="text-xs font-semibold text-zinc-200 text-center">
@@ -283,13 +291,15 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
             <p className="text-[11px] text-zinc-400 text-center mt-1">
               {isLimitReached 
                 ? `Max ${currentMax} ${activeTab}(s) reached` 
+                : isMetadataIncomplete
+                ? "Enter subject name & description first"
                 : `Click or drop ${activeTab} file (Slot ${currentCount + 1} of ${currentMax})`}
             </p>
             <input
               type="file"
               accept={activeTab === "image" ? "image/*" : activeTab === "audio" ? "audio/*" : "video/*"}
               onChange={handleFileSelect}
-              disabled={uploading || isLimitReached}
+              disabled={isUploadDisabled}
               className="hidden"
             />
           </label>
@@ -306,7 +316,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
         </div>
 
         {currentCount === 0 ? (
-          <div className="p-6 rounded-xl border border-zinc-800/60 bg-zinc-950/30 text-center text-xs text-zinc-500">
+          <div className="p-6 rounded-xl border-2 border-zinc-700/60 bg-zinc-950/30 text-center text-xs text-zinc-500">
             No {activeTab} assets uploaded yet. Fill in the metadata and upload above.
           </div>
         ) : (
@@ -314,7 +324,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
             {(activeTab === "image" ? images : activeTab === "audio" ? audios : videos).map((asset, idx) => (
               <div 
                 key={asset.filename} 
-                className="bg-zinc-950 p-3 rounded-xl border border-zinc-800 hover:border-zinc-700 transition-all space-y-2 relative group"
+                className="bg-zinc-950 p-3 rounded-xl border-2 border-zinc-700 hover:border-zinc-700 transition-all space-y-2 relative group"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2">
@@ -349,7 +359,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
 
                 {/* LLM Description preview */}
                 {asset.description && (
-                  <p className="text-[11px] text-zinc-400 line-clamp-2 italic bg-zinc-900/70 p-1.5 rounded border border-zinc-800/50">
+                  <p className="text-[11px] text-zinc-400 line-clamp-2 italic bg-zinc-900/70 p-1.5 rounded border-2 border-zinc-700/50">
                     "{asset.description}"
                   </p>
                 )}

@@ -134,6 +134,9 @@ async def generate_prompt_endpoint(req: LLMGenerateRequest):
     """
     Call LM Studio to expand basic prompt stub with structured asset metadata.
     """
+    if not req.assets:
+        raise HTTPException(status_code=400, detail="At least one uploaded asset is required to generate a prompt.")
+    
     expanded = await expand_prompt_with_llm(
         basic_stub=req.basic_stub,
         assets=req.assets,

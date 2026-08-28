@@ -89,7 +89,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
   const audioNodes = parsedWorkflow?.nodes_info?.audio_loader_nodes || [];
 
   return (
-    <div id="workflow-section" className="bg-zinc-900/60 border border-zinc-800/80 rounded-xl p-5 shadow-sm space-y-5">
+    <div id="workflow-section" className="bg-zinc-900/60 border-2 border-zinc-700 rounded-xl p-5 shadow-sm space-y-5">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
         <div className="flex items-center gap-2.5">
@@ -119,7 +119,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
           {parsedWorkflow && (
             <button
               onClick={() => setShowRawJson(!showRawJson)}
-              className="px-2.5 py-1.5 text-xs text-zinc-400 hover:text-zinc-200 bg-zinc-950 border border-zinc-800 rounded-lg transition-colors flex items-center gap-1"
+              className="px-2.5 py-1.5 text-xs text-zinc-400 hover:text-zinc-200 bg-zinc-950 border-2 border-zinc-700 rounded-lg transition-colors flex items-center gap-1"
               title="Inspect flat dictionary JSON"
             >
               <Code className="w-3.5 h-3.5" />
@@ -147,7 +147,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
             <select
               value={selectedWorkflowFile}
               onChange={(e) => onSelectWorkflow(e.target.value)}
-              className="flex-1 bg-zinc-950 border border-zinc-800 focus:border-amber-500 rounded-lg px-3 py-2 text-xs text-zinc-100 outline-none transition-colors"
+              className="flex-1 bg-zinc-950 border-2 border-zinc-700 focus:border-amber-500 rounded-lg px-3 py-2 text-xs text-zinc-100 outline-none transition-colors"
             >
               {workflows.length === 0 && <option value="">No workflows found in /assets/workflows</option>}
               {workflows.map((wf) => (
@@ -159,7 +159,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
 
             <button
               onClick={onRefreshWorkflows}
-              className="p-2 text-zinc-400 hover:text-zinc-200 bg-zinc-950 border border-zinc-800 rounded-lg transition-colors"
+              className="p-2 text-zinc-400 hover:text-zinc-200 bg-zinc-950 border-2 border-zinc-700 rounded-lg transition-colors"
               title="Refresh workflows list"
             >
               <RefreshCw className="w-3.5 h-3.5" />
@@ -168,7 +168,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
         </div>
 
         {/* Missing Asset Bypass Toggle */}
-        <div className="bg-zinc-950/50 p-2.5 rounded-lg border border-zinc-800/80 space-y-1">
+        <div className="bg-zinc-950/50 p-2.5 rounded-lg border-2 border-zinc-700/80 space-y-1">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-zinc-300">Missing Asset Bypass</span>
             <input
@@ -187,12 +187,12 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
 
       {/* Raw JSON inspection collapsible */}
       {showRawJson && parsedWorkflow && (
-        <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800 text-xs space-y-1.5">
+        <div className="p-3 rounded-lg bg-zinc-950 border-2 border-zinc-700 text-xs space-y-1.5">
           <div className="flex items-center justify-between text-zinc-400 border-b border-zinc-800/60 pb-1.5">
             <span className="font-mono">Flat Dictionary Graph ({Object.keys(parsedWorkflow.raw_json).length} total nodes)</span>
             <span className="text-[11px]">workflow_api.json structure</span>
           </div>
-          <pre className="max-h-56 overflow-auto font-mono text-[11px] text-zinc-300 bg-zinc-900/60 p-2.5 rounded border border-zinc-800/50">
+          <pre className="max-h-56 overflow-auto font-mono text-[11px] text-zinc-300 bg-zinc-900/60 p-2.5 rounded border-2 border-zinc-700/50">
             {JSON.stringify(parsedWorkflow.raw_json, null, 2)}
           </pre>
         </div>
@@ -202,7 +202,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
       {parsedWorkflow && (
         <div className="space-y-4 pt-1">
           {/* 1. Prompt Text Node Target */}
-          <div className="bg-zinc-950/40 p-3.5 rounded-lg border border-zinc-800/70 space-y-2">
+          <div className="bg-zinc-950/40 p-3.5 rounded-lg border-2 border-zinc-700/70 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-zinc-200 flex items-center gap-1.5">
                 <Type className="w-3.5 h-3.5 text-indigo-400" />
@@ -261,7 +261,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
               {imageNodes.map((node) => {
                 const assignedFile = nodeMappings[node.id] || "";
                 return (
-                  <div key={node.id} className="bg-zinc-950/60 p-3 rounded-lg border border-zinc-800 space-y-2">
+                  <div key={node.id} className="bg-zinc-950/60 p-3 rounded-lg border-2 border-zinc-700 space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <div className="p-1 rounded bg-amber-500/10 text-amber-400">
@@ -279,7 +279,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
                       <select
                         value={assignedFile}
                         onChange={(e) => onUpdateMapping(node.id, e.target.value)}
-                        className="flex-1 bg-zinc-900 border border-zinc-800 focus:border-amber-500 rounded-md px-2.5 py-1.5 text-xs text-zinc-200 outline-none"
+                        className="flex-1 bg-zinc-900 border-2 border-zinc-700 focus:border-amber-500 rounded-md px-2.5 py-1.5 text-xs text-zinc-200 outline-none"
                       >
                         <option value="">-- Assign Uploaded Asset (or Use Bypass) --</option>
                         {uploadedAssets.map((asset) => (
@@ -297,7 +297,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
               {videoNodes.map((node) => {
                 const assignedFile = nodeMappings[node.id] || "";
                 return (
-                  <div key={node.id} className="bg-zinc-950/60 p-3 rounded-lg border border-zinc-800 space-y-2">
+                  <div key={node.id} className="bg-zinc-950/60 p-3 rounded-lg border-2 border-zinc-700 space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <div className="p-1 rounded bg-indigo-500/10 text-indigo-400">
@@ -315,7 +315,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
                       <select
                         value={assignedFile}
                         onChange={(e) => onUpdateMapping(node.id, e.target.value)}
-                        className="flex-1 bg-zinc-900 border border-zinc-800 focus:border-indigo-500 rounded-md px-2.5 py-1.5 text-xs text-zinc-200 outline-none"
+                        className="flex-1 bg-zinc-900 border-2 border-zinc-700 focus:border-indigo-500 rounded-md px-2.5 py-1.5 text-xs text-zinc-200 outline-none"
                       >
                         <option value="">-- Assign Uploaded Video --</option>
                         {uploadedAssets.filter(a => a.media_type === "video").map((asset) => (
@@ -333,7 +333,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
               {audioNodes.map((node) => {
                 const assignedFile = nodeMappings[node.id] || "";
                 return (
-                  <div key={node.id} className="bg-zinc-950/60 p-3 rounded-lg border border-zinc-800 space-y-2">
+                  <div key={node.id} className="bg-zinc-950/60 p-3 rounded-lg border-2 border-zinc-700 space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <div className="p-1 rounded bg-emerald-500/10 text-emerald-400">
@@ -351,7 +351,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
                       <select
                         value={assignedFile}
                         onChange={(e) => onUpdateMapping(node.id, e.target.value)}
-                        className="flex-1 bg-zinc-900 border border-zinc-800 focus:border-emerald-500 rounded-md px-2.5 py-1.5 text-xs text-zinc-200 outline-none"
+                        className="flex-1 bg-zinc-900 border-2 border-zinc-700 focus:border-emerald-500 rounded-md px-2.5 py-1.5 text-xs text-zinc-200 outline-none"
                       >
                         <option value="">-- Assign Uploaded Audio --</option>
                         {uploadedAssets.filter(a => a.media_type === "audio").map((asset) => (

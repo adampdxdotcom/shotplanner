@@ -7,6 +7,7 @@ import { AssetManagerSection } from "./components/AssetManagerSection";
 import { LLMSection } from "./components/LLMSection";
 import { ExecutionSection } from "./components/ExecutionSection";
 import { CodeViewerModal } from "./components/CodeViewerModal";
+import { SaveProjectModal, LoadProjectModal } from "./components/ProjectModals";
 import { Sparkles, ArrowDown, HelpCircle, Terminal } from "lucide-react";
 
 export default function App() {
@@ -34,16 +35,84 @@ export default function App() {
   const [assets, setAssets] = useState<MediaAsset[]>([]);
 
   // 4. LLM Prompt Expansion State
-  const [basicStub, setBasicStub] = useState<string>(
-    "Jackie walking through a rainy neon cyberpunk alleyway, turning towards the camera with a subtle smirk as holographic advertisements reflect on her leather jacket."
-  );
-  const [expandedPrompt, setExpandedPrompt] = useState<string>(
-    "Cinematic 4K shot based on Jackie walking through a rainy neon cyberpunk alleyway. Featuring <Picture 1> with authentic facial contours and sharp focus. Dynamic camera dolly-in, reflections on wet asphalt, volumetric cyan and magenta rim lighting, photorealistic 8k render."
-  );
+  const [basicStub, setBasicStub] = useState<string>("");
+  const [expandedPrompt, setExpandedPrompt] = useState<string>("");
 
   // UI Navigation & Code Modal
   const [activeSection, setActiveSection] = useState<string>("workflow");
   const [isCodeModalOpen, setIsCodeModalOpen] = useState<boolean>(false);
+
+  // Project Save/Load State
+  const [isDirty, setIsDirty] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  const [isLoadModalOpen, setIsLoadModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (isInitialLoad) {
+      setIsInitialLoad(false);
+      return;
+    }
+    setIsDirty(true);
+  }, [config, selectedWorkflowFile, selectedPromptNodeId, nodeMappings, bypassMissing, basicStub, expandedPrompt]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isDirty]);
+
+  const handleSaveProject = async (filename: string) => {
+    const payload = {
+      config,
+      selectedWorkflowFile,
+      selectedPromptNodeId,
+      nodeMappings,
+      bypassMissing,
+      basicStub,
+      expandedPrompt
+    };
+    
+    const res = await fetch("/api/projects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filename, data: payload })
+    });
+    
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || "Failed to save project.");
+    }
+    
+    setIsDirty(false);
+  };
+
+  const handleLoadProject = async (filename: string) => {
+    const res = await fetch(`/api/projects/${filename}`);
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || "Failed to load project.");
+    }
+    const data = await res.json();
+    
+    setConfig(data.config || config);
+    setSelectedWorkflowFile(data.selectedWorkflowFile || "");
+    setSelectedPromptNodeId(data.selectedPromptNodeId || "");
+    setNodeMappings(data.nodeMappings || {});
+    setBypassMissing(data.bypassMissing ?? true);
+    setBasicStub(data.basicStub || "");
+    setExpandedPrompt(data.expandedPrompt || "");
+    
+    await fetchWorkflows();
+    await fetchAssets();
+    
+    setTimeout(() => setIsDirty(false), 100);
+  };
 
   // Fetch workflows and assets on initial mount
   const fetchWorkflows = async () => {
@@ -152,25 +221,22 @@ export default function App() {
 
   const scrollToSection = (sectionId: string) => {
     setActiveSection(sectionId);
-    const el = document.getElementById(`${sectionId}-section`);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
   };
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans selection:bg-indigo-500 selection:text-white">
       {/* Top Navbar */}
       <Navbar 
-        onOpenCodeViewer={() => setIsCodeModalOpen(true)}
         activeSection={activeSection}
         onNavigate={scrollToSection}
+        onSaveProject={() => setIsSaveModalOpen(true)}
+        onLoadProject={() => setIsLoadModalOpen(true)}
       />
 
       {/* Main Workspace Layout */}
       <main className="max-w-7xl mx-auto px-4 lg:px-8 py-6 space-y-6">
         {/* Quick Pipeline Status Banner */}
-        <div className="bg-gradient-to-r from-zinc-900 via-zinc-900/90 to-indigo-950/40 border border-zinc-800/90 rounded-2xl p-5 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="bg-gradient-to-r from-zinc-900 via-zinc-900/90 to-indigo-950/40 border-2 border-zinc-700 rounded-2xl p-5 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
@@ -201,60 +267,80 @@ export default function App() {
           </div>
         </div>
 
-        {/* Section 1: Configuration */}
-        <ConfigSection 
-          config={config} 
-          onChange={setConfig} 
-        />
+        {/* Tab Content Rendering */}
+        {activeSection === "assets" && (
+          <AssetManagerSection
+            assets={assets}
+            onAssetUploaded={handleAssetUploaded}
+            onAssetDeleted={handleAssetDeleted}
+          />
+        )}
 
-        {/* Section 2: Workflow Management & Dynamic Mapping */}
-        <WorkflowSection
-          workflows={workflows}
-          selectedWorkflowFile={selectedWorkflowFile}
-          onSelectWorkflow={setSelectedWorkflowFile}
-          onRefreshWorkflows={fetchWorkflows}
-          parsedWorkflow={parsedWorkflow}
-          selectedPromptNodeId={selectedPromptNodeId}
-          onSelectPromptNodeId={setSelectedPromptNodeId}
-          nodeMappings={nodeMappings}
-          onUpdateMapping={handleUpdateMapping}
-          uploadedAssets={assets}
-          bypassMissing={bypassMissing}
-          onToggleBypass={setBypassMissing}
-        />
+        {activeSection === "workflow" && (
+          <WorkflowSection
+            workflows={workflows}
+            selectedWorkflowFile={selectedWorkflowFile}
+            onSelectWorkflow={setSelectedWorkflowFile}
+            onRefreshWorkflows={fetchWorkflows}
+            parsedWorkflow={parsedWorkflow}
+            selectedPromptNodeId={selectedPromptNodeId}
+            onSelectPromptNodeId={setSelectedPromptNodeId}
+            nodeMappings={nodeMappings}
+            onUpdateMapping={handleUpdateMapping}
+            uploadedAssets={assets}
+            bypassMissing={bypassMissing}
+            onToggleBypass={setBypassMissing}
+          />
+        )}
 
-        {/* Section 3: Segmented Asset Management */}
-        <AssetManagerSection
-          assets={assets}
-          onAssetUploaded={handleAssetUploaded}
-          onAssetDeleted={handleAssetDeleted}
-        />
+        {activeSection === "llm" && (
+          <LLMSection
+            basicStub={basicStub}
+            onChangeBasicStub={setBasicStub}
+            expandedPrompt={expandedPrompt}
+            onChangeExpandedPrompt={setExpandedPrompt}
+            assets={assets}
+            lmStudioUrl={config.lm_studio_url}
+            geminiApiKey={config.gemini_api_key}
+          />
+        )}
 
-        {/* Section 4: LLM Prompt Expansion */}
-        <LLMSection
-          basicStub={basicStub}
-          onChangeBasicStub={setBasicStub}
-          expandedPrompt={expandedPrompt}
-          onChangeExpandedPrompt={setExpandedPrompt}
-          assets={assets}
-          lmStudioUrl={config.lm_studio_url}
-        />
+        {activeSection === "execute" && (
+          <ExecutionSection
+            config={config}
+            workflowFilename={selectedWorkflowFile}
+            promptNodeId={selectedPromptNodeId}
+            expandedPrompt={expandedPrompt}
+            nodeMappings={nodeMappings}
+            bypassMissing={bypassMissing}
+          />
+        )}
 
-        {/* Section 5: Master Pipeline Execution */}
-        <ExecutionSection
-          config={config}
-          workflowFilename={selectedWorkflowFile}
-          promptNodeId={selectedPromptNodeId}
-          expandedPrompt={expandedPrompt}
-          nodeMappings={nodeMappings}
-          bypassMissing={bypassMissing}
-        />
+        {activeSection === "config" && (
+          <ConfigSection 
+            config={config} 
+            onChange={setConfig} 
+            onOpenCodeViewer={() => setIsCodeModalOpen(true)}
+          />
+        )}
       </main>
 
       {/* Code Inspector Modal */}
       <CodeViewerModal
         isOpen={isCodeModalOpen}
         onClose={() => setIsCodeModalOpen(false)}
+      />
+
+      <SaveProjectModal
+        isOpen={isSaveModalOpen}
+        onClose={() => setIsSaveModalOpen(false)}
+        onSave={handleSaveProject}
+      />
+
+      <LoadProjectModal
+        isOpen={isLoadModalOpen}
+        onClose={() => setIsLoadModalOpen(false)}
+        onLoad={handleLoadProject}
       />
 
       {/* Footer */}
