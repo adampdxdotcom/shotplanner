@@ -1,0 +1,72 @@
+{
+  "10": {
+    "inputs": {
+      "value": "Cinematic portrait of a warrior, slow motion cinematic camera pan, high fidelity 4k"
+    },
+    "class_type": "PrimitiveStringMultiline",
+    "_meta": {
+      "title": "Master LLM Prompt Input"
+    }
+  },
+  "20": {
+    "inputs": {
+      "image": "headshot_default.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Headshot Reference (Node 20)"
+    }
+  },
+  "21": {
+    "inputs": {
+      "image": "scene_bg_default.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Scene Background Reference (Node 21)"
+    }
+  },
+  "22": {
+    "inputs": {
+      "audio": "voiceover_default.mp3"
+    },
+    "class_type": "LoadAudio",
+    "_meta": {
+      "title": "Audio Voiceover Track (Node 22)"
+    }
+  },
+  "23": {
+    "inputs": {
+      "video": "motion_reference.mp4"
+    },
+    "class_type": "LoadVideo",
+    "_meta": {
+      "title": "Motion Reference Video (Node 23)"
+    }
+  },
+  "50": {
+    "inputs": {
+      "prompt": ["10", 0],
+      "image_ref_1": ["20", 0],
+      "image_ref_2": ["21", 0],
+      "audio_track": ["22", 0],
+      "motion_clip": ["23", 0],
+      "fps": 24,
+      "steps": 25
+    },
+    "class_type": "WanMultimodalVideoSampler",
+    "_meta": {
+      "title": "Wan 2.1 Multimodal Video Engine"
+    }
+  },
+  "60": {
+    "inputs": {
+      "filename_prefix": "Wan2_Result",
+      "video": ["50", 0]
+    },
+    "class_type": "SaveVideo",
+    "_meta": {
+      "title": "Output Video"
+    }
+  }
+}

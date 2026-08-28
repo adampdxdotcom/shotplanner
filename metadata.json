@@ -1,0 +1,6 @@
+{
+  "name": "ComfyUI Bridge & RunPod Orchestrator",
+  "description": "Local web bridge connecting local media assets, LM Studio LLM prompt expansion, and remote RunPod ComfyUI instances via SSH and API payload injection.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
