@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from "react";
+import fs from 'fs';
+
+const code = `import React, { useState, useEffect } from "react";
 import { X, Save, FolderOpen, AlertCircle, Download, Upload } from "lucide-react";
 
 interface SaveProjectModalProps {
@@ -49,7 +51,7 @@ export const SaveProjectModal: React.FC<SaveProjectModalProps> = ({ isOpen, onCl
       setError("Please save the project first before exporting.");
       return;
     }
-    window.location.href = `/api/projects/${currentProjectName}/export`;
+    window.location.href = \`/api/projects/\${currentProjectName}/export\`;
   };
 
   const handleSave = async () => {
@@ -273,3 +275,6 @@ export const LoadProjectModal: React.FC<LoadProjectModalProps> = ({ isOpen, onCl
     </div>
   );
 };
+`;
+
+fs.writeFileSync('src/components/ProjectModals.tsx', code);

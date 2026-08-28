@@ -84,20 +84,21 @@ export const Navbar: React.FC<NavbarProps> = ({ activeSection, onNavigate, onSav
           <Cpu className="w-3.5 h-3.5" />
           4. Execute
         </button>
-        <button
-          onClick={() => onNavigate("config")}
-          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
-            activeSection === "config" 
-              ? "bg-zinc-800 text-zinc-100 shadow-xs" 
-              : "text-zinc-400 hover:text-zinc-200"
-          }`}
-        >
-          <Server className="w-3.5 h-3.5" />
-          5. Config
-        </button>
       </nav>
 
       <div className="flex items-center gap-2">
+        <button
+          onClick={() => onNavigate("config")}
+          className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all flex items-center gap-1.5 shadow-xs ${
+            activeSection === "config" 
+              ? "bg-zinc-800 border-zinc-600 text-white" 
+              : "bg-zinc-800/80 border-zinc-700/80 text-zinc-300 hover:bg-zinc-700 hover:text-white"
+          }`}
+          title="Server Configuration"
+        >
+          <Server className="w-3.5 h-3.5" />
+          <span>Config</span>
+        </button>
         <button
           onClick={onLoadProject}
           className="px-3 py-1.5 text-xs font-medium text-zinc-300 bg-zinc-800/80 hover:bg-zinc-700 hover:text-white rounded-lg border border-zinc-700/80 transition-all flex items-center gap-1.5 shadow-xs"

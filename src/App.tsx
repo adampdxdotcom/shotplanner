@@ -47,6 +47,7 @@ export default function App() {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isLoadModalOpen, setIsLoadModalOpen] = useState(false);
+  const [currentProjectName, setCurrentProjectName] = useState<string>("");
 
   useEffect(() => {
     if (isInitialLoad) {
@@ -89,6 +90,7 @@ export default function App() {
       throw new Error(err.error || "Failed to save project.");
     }
     
+    setCurrentProjectName(filename.replace(".json", ""));
     setIsDirty(false);
   };
 
@@ -107,6 +109,7 @@ export default function App() {
     setBypassMissing(data.bypassMissing ?? true);
     setBasicStub(data.basicStub || "");
     setExpandedPrompt(data.expandedPrompt || "");
+    setCurrentProjectName(filename.replace(".json", ""));
     
     await fetchWorkflows();
     await fetchAssets();
@@ -335,6 +338,7 @@ export default function App() {
         isOpen={isSaveModalOpen}
         onClose={() => setIsSaveModalOpen(false)}
         onSave={handleSaveProject}
+        currentProjectName={currentProjectName}
       />
 
       <LoadProjectModal
