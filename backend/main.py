@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from backend.routes.api import router as api_router
-from backend.utils.file_handlers import ASSETS_DIR
+from backend.utils.file_handlers import ASSETS_DIR, UPLOADS_DIR
 
 app = FastAPI(
     title="ComfyUI Bridge & RunPod Orchestrator API",
@@ -24,7 +24,9 @@ app.add_middleware(
 # Mount API routes
 app.include_router(api_router)
 
-# Mount static asset files
+# Mount static uploaded media files
+app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
+app.mount("/api/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="api_uploads")
 app.mount("/assets", StaticFiles(directory=str(ASSETS_DIR)), name="assets")
 
 @app.get("/health")

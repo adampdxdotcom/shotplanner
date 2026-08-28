@@ -569,8 +569,10 @@ app.post("/api/execute", async (req: Request, res: Response) => {
   }
 });
 
-// Serve assets statically
-app.use("/assets", express.static(ASSETS_DIR));
+// Serve user uploaded media statically
+app.use("/uploads", express.static(UPLOADS_DIR));
+app.use("/api/uploads", express.static(UPLOADS_DIR));
+app.use("/user_assets", express.static(ASSETS_DIR));
 
 // Setup Vite middleware
 async function startServer() {
