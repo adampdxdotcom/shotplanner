@@ -79,37 +79,68 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
     formData.append("subject_name", subjectName || "subject");
     formData.append("description", description || "");
 
+    const CHUNK_SIZE = 1024 * 1024; // 1MB chunks to safely bypass NGINX limits
+    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+    const uploadId = Date.now().toString() + "_" + Math.random().toString(36).substring(2);
+
     try {
-      const res = await fetch("/api/assets/upload", {
-        method: "POST",
-        body: formData
-      });
-      
-      const contentType = res.headers.get("content-type");
-      let data;
-      if (contentType && contentType.includes("application/json")) {
-        data = await res.json();
-      } else {
-        const text = await res.text();
-        if (res.status === 413) {
-          throw new Error("File is too large. Please try an image under 1MB.");
+      let finalData = null;
+      for (let i = 0; i < totalChunks; i++) {
+        const chunk = file.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+        const formData = new FormData();
+        formData.append("file", chunk);
+        formData.append("upload_id", uploadId);
+        formData.append("chunk_index", i.toString());
+        formData.append("total_chunks", totalChunks.toString());
+        formData.append("original_name", file.name);
+        
+        // Always send metadata on the final chunk so the server knows what to do
+        if (i === totalChunks - 1) {
+          formData.append("media_type", activeTab);
+          formData.append("type", assetType);
+          formData.append("subject_name", subjectName || "subject");
+          formData.append("description", description || "");
         }
-        throw new Error(`Server returned an unexpected response (${res.status}). Ensure the file isn't too large.`);
+
+        const res = await fetch("/api/assets/upload_chunk", {
+          method: "POST",
+          body: formData
+        });
+        
+        const contentType = res.headers.get("content-type");
+        let data;
+        if (contentType && contentType.includes("application/json")) {
+          data = await res.json();
+        } else {
+          await res.text();
+          if (res.status === 413) {
+            throw new Error("A chunk was too large for the network proxy. Chunk size is 1MB, which should be safe.");
+          }
+          throw new Error(`Server returned an unexpected response (${res.status}). Ensure the network allows this upload.`);
+        }
+
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to upload file chunk.");
+        }
+
+        if (i === totalChunks - 1) {
+          finalData = data;
+        }
       }
 
-      if (res.ok && data.asset) {
-        onAssetUploaded(data.asset);
+      if (finalData && finalData.asset) {
+        onAssetUploaded(finalData.asset);
       } else {
-        setUploadError(data.error || "Failed to upload media file.");
+        throw new Error("Completed all chunks, but no final asset was returned.");
       }
     } catch (err: any) {
-      setUploadError(err.message);
+      setUploadError(err.message || "Failed to upload asset");
     } finally {
       setUploading(false);
-      e.target.value = "";
+      // Reset input so the same file can be selected again if needed
+      e.target.value = '';
     }
   };
-
   const handleDelete = async (filename: string) => {
     try {
       await fetch(`/api/assets/${filename}`, { method: "DELETE" });
