@@ -147,7 +147,7 @@ app.get("/api/workflows", (req: Request, res: Response) => {
     });
     res.json({ workflows });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: err ? (err.message || String(err)) : "Unknown error" });
   }
 });
 
@@ -416,7 +416,7 @@ app.post("/api/assets/upload_chunk", upload.single("file"), (req: Request, res: 
 
   } catch (err: any) {
     console.error("Chunk upload error:", err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: err ? (err.message || String(err)) : "Unknown chunk error" });
   }
 });
 

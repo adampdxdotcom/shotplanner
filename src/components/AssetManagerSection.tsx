@@ -88,7 +88,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
       for (let i = 0; i < totalChunks; i++) {
         const chunk = file.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
         const formData = new FormData();
-        formData.append("file", chunk);
+        formData.append("file", chunk, file.name);
         formData.append("upload_id", uploadId);
         formData.append("chunk_index", i.toString());
         formData.append("total_chunks", totalChunks.toString());
@@ -120,7 +120,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
         }
 
         if (!res.ok) {
-          throw new Error(data.error || "Failed to upload file chunk.");
+          throw new Error(data.error || data.message || data.err || `Failed to upload chunk. Server responded with ${res.status}: ${JSON.stringify(data)}`);
         }
 
         if (i === totalChunks - 1) {
