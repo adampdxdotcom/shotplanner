@@ -84,7 +84,19 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
         method: "POST",
         body: formData
       });
-      const data = await res.json();
+      
+      const contentType = res.headers.get("content-type");
+      let data;
+      if (contentType && contentType.includes("application/json")) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        if (res.status === 413) {
+          throw new Error("File is too large. Please try an image under 1MB.");
+        }
+        throw new Error(`Server returned an unexpected response (${res.status}). Ensure the file isn't too large.`);
+      }
+
       if (res.ok && data.asset) {
         onAssetUploaded(data.asset);
       } else {
