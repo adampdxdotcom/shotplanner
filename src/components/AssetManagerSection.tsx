@@ -79,7 +79,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
     formData.append("subject_name", subjectName || "subject");
     formData.append("description", description || "");
 
-    const CHUNK_SIZE = 1024 * 1024; // 1MB chunks to safely bypass NGINX limits
+    const CHUNK_SIZE = 512 * 1024; // 512KB chunks to safely account for FormData overhead underneath NGINX 1MB limits
     const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
     const uploadId = Date.now().toString() + "_" + Math.random().toString(36).substring(2);
 
@@ -114,7 +114,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
         } else {
           await res.text();
           if (res.status === 413) {
-            throw new Error("A chunk was too large for the network proxy. Chunk size is 1MB, which should be safe.");
+            throw new Error("A chunk was too large for the network proxy. Chunk size is 512KB, which should be safe.");
           }
           throw new Error(`Server returned an unexpected response (${res.status}). Ensure the network allows this upload.`);
         }
