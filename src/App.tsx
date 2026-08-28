@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { AppConfig, MediaAsset, WorkflowItem, ParsedWorkflow } from "./types";
+import { AppConfig, MediaAsset, WorkflowItem, ParsedWorkflow, ToastMessage } from "./types";
 import { Navbar } from "./components/Navbar";
 import { ConfigSection } from "./components/ConfigSection";
 import { WorkflowSection } from "./components/WorkflowSection";
@@ -49,6 +49,16 @@ export default function App() {
   const [isLoadModalOpen, setIsLoadModalOpen] = useState(false);
   const [currentProjectName, setCurrentProjectName] = useState<string>("");
 
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  const addToast = (text: string, type: "success" | "error" | "info" = "info") => {
+    const id = Date.now().toString(36) + Math.random().toString(36).substr(2);
+    setToasts(prev => [...prev, { id, text, type }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 4000);
+  };
+
   useEffect(() => {
     if (isInitialLoad) {
       setIsInitialLoad(false);
@@ -92,6 +102,7 @@ export default function App() {
     
     setCurrentProjectName(filename.replace(".json", ""));
     setIsDirty(false);
+    addToast(`Project "${filename}" saved successfully.`, "success");
   };
 
   const handleLoadProject = async (filename: string) => {
@@ -115,6 +126,7 @@ export default function App() {
     await fetchAssets();
     
     setTimeout(() => setIsDirty(false), 100);
+    addToast(`Project "${filename}" loaded successfully.`, "success");
   };
 
   // Fetch workflows and assets on initial mount
@@ -206,6 +218,20 @@ export default function App() {
     }
   };
 
+  const handleAssetUpdated = (oldFilename: string, newAsset: MediaAsset) => {
+    setAssets(prev => prev.map(a => a.filename === oldFilename ? newAsset : a));
+    // Update nodeMappings if the filename changed
+    if (oldFilename !== newAsset.filename) {
+      setNodeMappings(prev => {
+        const next = { ...prev };
+        for (const key of Object.keys(next)) {
+          if (next[key] === oldFilename) next[key] = newAsset.filename;
+        }
+        return next;
+      });
+    }
+  };
+
   const handleAssetDeleted = (filename: string) => {
     setAssets(prev => prev.filter(a => a.filename !== filename));
     // Clear mappings referencing this deleted asset
@@ -234,6 +260,8 @@ export default function App() {
         onNavigate={scrollToSection}
         onSaveProject={() => setIsSaveModalOpen(true)}
         onLoadProject={() => setIsLoadModalOpen(true)}
+        toasts={toasts}
+        onDismissToast={(id) => setToasts(prev => prev.filter(t => t.id !== id))}
       />
 
       {/* Main Workspace Layout */}
@@ -276,6 +304,7 @@ export default function App() {
             assets={assets}
             onAssetUploaded={handleAssetUploaded}
             onAssetDeleted={handleAssetDeleted}
+            onAssetUpdated={handleAssetUpdated}
           />
         )}
 

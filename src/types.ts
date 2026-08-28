@@ -1,3 +1,9 @@
+export interface ToastMessage {
+  id: string;
+  text: string;
+  type: "success" | "error" | "info";
+}
+
 export interface AppConfig {
   runpod_ip: string;
   ssh_port: number;

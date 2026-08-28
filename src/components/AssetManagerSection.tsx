@@ -1,6 +1,9 @@
 import React, { useState } from "react";
 import { MediaAsset, AssetType } from "../types";
 import { 
+  Edit3,
+  Maximize,
+  X,
   HardDrive, 
   Image as ImageIcon, 
   Music, 
@@ -12,19 +15,22 @@ import {
   Tag, 
   User, 
   AlignLeft,
-  AlertCircle
+  AlertCircle,
+  Loader2
 } from "lucide-react";
 
 interface AssetManagerSectionProps {
   assets: MediaAsset[];
   onAssetUploaded: (asset: MediaAsset) => void;
   onAssetDeleted: (filename: string) => void;
+  onAssetUpdated: (oldFilename: string, newAsset: MediaAsset) => void;
 }
 
 export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
   assets,
   onAssetUploaded,
-  onAssetDeleted
+  onAssetDeleted,
+  onAssetUpdated
 }) => {
   const [activeTab, setActiveTab] = useState<"image" | "audio" | "video">("image");
   
@@ -33,7 +39,100 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
   const [subjectName, setSubjectName] = useState<string>("");
   const [description, setDescription] = useState<string>("");
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const [lightboxAsset, setLightboxAsset] = useState<MediaAsset | null>(null);
+  
+  const [editingAsset, setEditingAsset] = useState<MediaAsset | null>(null);
+  const [editSubjectName, setEditSubjectName] = useState<string>("");
+  const [editDescription, setEditDescription] = useState<string>("");
+  const [editType, setEditType] = useState<string>("");
+  const [editFile, setEditFile] = useState<File | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  const openEditModal = (asset: MediaAsset) => {
+    setEditingAsset(asset);
+    setEditSubjectName(asset.subject_name);
+    setEditDescription(asset.description);
+    setEditType(asset.type);
+    setEditFile(null);
+    setEditError(null);
+  };
+
+  const closeEditModal = () => {
+    setEditingAsset(null);
+    setEditFile(null);
+  };
+
+  const submitEdit = async () => {
+    if (!editingAsset) return;
+    setIsEditing(true);
+    setEditError(null);
+
+    try {
+      if (editFile) {
+        // Upload new file chunks
+        const CHUNK_SIZE = 512 * 1024;
+        const totalChunks = Math.ceil(editFile.size / CHUNK_SIZE);
+        const uploadId = Date.now().toString() + "_" + Math.random().toString(36).substring(2);
+        
+        let finalData = null;
+        for (let i = 0; i < totalChunks; i++) {
+          const chunk = editFile.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+          const formData = new FormData();
+          formData.append("file", chunk, editFile.name);
+          formData.append("upload_id", uploadId);
+          formData.append("chunk_index", i.toString());
+          formData.append("total_chunks", totalChunks.toString());
+          formData.append("original_name", editFile.name);
+          formData.append("replace_filename", editingAsset.filename);
+          
+          if (i === totalChunks - 1) {
+            formData.append("media_type", editingAsset.media_type);
+            formData.append("type", editType);
+            formData.append("subject_name", editSubjectName || "subject");
+            formData.append("description", editDescription || "");
+          }
+          
+          const res = await fetch("/api/assets/upload_chunk", {
+            method: "POST",
+            body: formData
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Failed to upload replacement chunk.");
+          if (i === totalChunks - 1) finalData = data;
+        }
+        
+        if (finalData && finalData.asset) {
+          onAssetUpdated(editingAsset.filename, finalData.asset);
+        } else {
+          throw new Error("Failed to get updated asset.");
+        }
+      } else {
+        // Just update metadata
+        const res = await fetch(`/api/assets/${editingAsset.filename}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: editType,
+            subject_name: editSubjectName,
+            description: editDescription
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to update asset.");
+        onAssetUpdated(editingAsset.filename, data.asset);
+      }
+      closeEditModal();
+    } catch (err: any) {
+      setEditError(err.message || "Failed to save edits.");
+    } finally {
+      setIsEditing(false);
+    }
+  };
+
 
   const images = assets.filter(a => a.media_type === "image");
   const audios = assets.filter(a => a.media_type === "audio");
@@ -70,6 +169,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
     }
 
     setUploading(true);
+    setUploadProgress(0);
     setUploadError(null);
 
     const formData = new FormData();
@@ -123,6 +223,8 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
           throw new Error(data.error || data.message || data.err || `Failed to upload chunk. Server responded with ${res.status}: ${JSON.stringify(data)}`);
         }
 
+        setUploadProgress(Math.round(((i + 1) / totalChunks) * 100));
+
         if (i === totalChunks - 1) {
           finalData = data;
         }
@@ -137,6 +239,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
       setUploadError(err.message || "Failed to upload asset");
     } finally {
       setUploading(false);
+      setUploadProgress(0);
       // Reset input so the same file can be selected again if needed
       e.target.value = '';
     }
@@ -322,22 +425,39 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
 
         {/* Right: Upload Dropzone */}
         <div className="lg:col-span-5 flex flex-col">
-          <label className={`flex-1 flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-xl transition-all ${
+          <label className={`relative flex-1 flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-xl transition-all ${
             isUploadDisabled
               ? "opacity-50 cursor-not-allowed border-zinc-800 bg-zinc-950/30" 
               : "border-zinc-700 hover:border-amber-500/80 bg-zinc-950/40 hover:bg-zinc-900/60 cursor-pointer"
           }`}>
-            <UploadCloud className={`w-8 h-8 mb-2 ${isLimitReached ? "text-zinc-600" : "text-amber-400 animate-pulse"}`} />
-            <p className="text-xs font-semibold text-zinc-200 text-center">
-              {uploading ? "Uploading & Renaming..." : `Upload ${activeTab.toUpperCase()}`}
-            </p>
-            <p className="text-[11px] text-zinc-400 text-center mt-1">
-              {isLimitReached 
-                ? `Max ${currentMax} ${activeTab}(s) reached` 
-                : isMetadataIncomplete
-                ? "Enter subject name & description first"
-                : `Click or drop ${activeTab} file (Slot ${currentCount + 1} of ${currentMax})`}
-            </p>
+            {uploading ? (
+              <>
+                <Loader2 className="w-8 h-8 mb-2 text-amber-400 animate-spin" />
+                <p className="text-xs font-semibold text-zinc-200 text-center mb-2">
+                  Uploading... {uploadProgress}%
+                </p>
+                <div className="w-full max-w-[200px] bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+                  <div 
+                    className="bg-amber-400 h-1.5 transition-all duration-300 ease-out" 
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <UploadCloud className={`w-8 h-8 mb-2 ${isLimitReached ? "text-zinc-600" : "text-amber-400 animate-pulse"}`} />
+                <p className="text-xs font-semibold text-zinc-200 text-center">
+                  Upload {activeTab.toUpperCase()}
+                </p>
+                <p className="text-[11px] text-zinc-400 text-center mt-1">
+                  {isLimitReached 
+                    ? `Max ${currentMax} ${activeTab}(s) reached` 
+                    : isMetadataIncomplete
+                    ? "Enter subject name & description first"
+                    : `Click or drop ${activeTab} file (Slot ${currentCount + 1} of ${currentMax})`}
+                </p>
+              </>
+            )}
             <input
               type="file"
               accept={activeTab === "image" ? "image/*" : activeTab === "audio" ? "audio/*" : "video/*"}
@@ -367,7 +487,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
             {(activeTab === "image" ? images : activeTab === "audio" ? audios : videos).map((asset, idx) => (
               <div 
                 key={asset.filename} 
-                className="bg-zinc-950 p-3 rounded-xl border-2 border-zinc-700 hover:border-zinc-700 transition-all space-y-2 relative group"
+                className="bg-zinc-950 p-3 rounded-xl border-2 border-zinc-700 hover:border-zinc-700 transition-all space-y-2 relative group flex flex-col"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2">
@@ -380,15 +500,36 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
                       </span>
                     </div>
                   </div>
-
-                  <button
-                    onClick={() => handleDelete(asset.filename)}
-                    className="text-zinc-500 hover:text-red-400 p-1 rounded transition-colors"
-                    title="Delete asset"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => openEditModal(asset)}
+                      className="text-zinc-500 hover:text-indigo-400 p-1 rounded transition-colors"
+                      title="Edit asset"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(asset.filename)}
+                      className="text-zinc-500 hover:text-red-400 p-1 rounded transition-colors"
+                      title="Delete asset"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
+
+                {asset.media_type === "image" && asset.preview_url && (
+                  <div 
+                    className="relative w-full aspect-square bg-zinc-900 rounded-lg overflow-hidden cursor-pointer group/img border border-zinc-800"
+                    onClick={() => setLightboxAsset(asset)}
+                  >
+                    <img src={asset.preview_url} alt={asset.subject_name} className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
+                      <Maximize className="w-6 h-6 text-white" />
+                    </div>
+                  </div>
+                )}
+
 
                 {/* Subject Name & Filename */}
                 <div>
@@ -418,6 +559,118 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
           </div>
         )}
       </div>
+
+      {/* Edit Modal */}
+      {editingAsset && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-zinc-900 border-2 border-zinc-700 rounded-xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-zinc-800 bg-zinc-950/50">
+              <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
+                <Edit3 className="w-4 h-4 text-indigo-400" />
+                Edit Asset
+              </h3>
+              <button onClick={closeEditModal} className="text-zinc-400 hover:text-white transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div className="p-4 space-y-4 overflow-y-auto max-h-[70vh]">
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1">Asset Type</label>
+                <input
+                  type="text"
+                  value={editType}
+                  onChange={(e) => setEditType(e.target.value)}
+                  className="w-full bg-zinc-950 border-2 border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:border-indigo-500 transition-colors outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1">Subject Name</label>
+                <input
+                  type="text"
+                  value={editSubjectName}
+                  onChange={(e) => setEditSubjectName(e.target.value)}
+                  className="w-full bg-zinc-950 border-2 border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:border-indigo-500 transition-colors outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1">Description</label>
+                <textarea
+                  rows={3}
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  className="w-full bg-zinc-950 border-2 border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:border-indigo-500 transition-colors outline-none resize-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1">Replace File (Optional)</label>
+                <input
+                  type="file"
+                  accept={editingAsset.media_type === "image" ? "image/*" : editingAsset.media_type === "audio" ? "audio/*" : "video/*"}
+                  onChange={(e) => setEditFile(e.target.files?.[0] || null)}
+                  className="w-full bg-zinc-950 border-2 border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-200 file:mr-3 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:bg-zinc-800 file:text-zinc-300 hover:file:bg-zinc-700"
+                />
+              </div>
+              
+              {editError && (
+                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                  <p className="text-xs text-red-400">{editError}</p>
+                </div>
+              )}
+            </div>
+            
+            <div className="p-4 border-t border-zinc-800 bg-zinc-950/30 flex justify-end gap-3">
+              <button onClick={closeEditModal} className="px-4 py-2 text-xs font-medium text-zinc-400 hover:text-white transition-colors">
+                Cancel
+              </button>
+              <button 
+                onClick={submitEdit} 
+                disabled={isEditing}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold rounded-lg transition-colors flex items-center gap-2"
+              >
+                {isEditing ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox */}
+      {lightboxAsset && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 md:p-12 cursor-zoom-out"
+          onClick={() => setLightboxAsset(null)}
+        >
+          <div className="relative max-w-full max-h-full flex flex-col items-center justify-center">
+            <button 
+              className="absolute -top-10 right-0 text-white/70 hover:text-white bg-black/50 p-2 rounded-full transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                setLightboxAsset(null);
+              }}
+            >
+              <X className="w-6 h-6" />
+            </button>
+            {lightboxAsset.media_type === "image" && lightboxAsset.preview_url && (
+              <img 
+                src={lightboxAsset.preview_url} 
+                alt={lightboxAsset.subject_name} 
+                className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl border border-white/10"
+                onClick={(e) => e.stopPropagation()}
+              />
+            )}
+            <div 
+              className="mt-4 text-center bg-black/50 px-4 py-2 rounded-xl backdrop-blur-md border border-white/10"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-sm font-semibold text-white">{lightboxAsset.subject_name}</h3>
+              <p className="text-xs text-zinc-400 mt-1 max-w-lg">{lightboxAsset.description}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
