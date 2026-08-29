@@ -110,7 +110,7 @@ export default function SceneProjectHub({
 
   const getAssetFilenameForSlot = (slotIndex: number) => {
     // 1. Check shot-level overrides first
-    return activeShot?.assigned_slots[slotIndex] || activeShot?.assigned_slots[slotIndex + 1] || project.shared_assets.find(a => a.slot_index === slotIndex)?.filename || "";
+    return activeShot?.assigned_slots[slotIndex] || activeShot?.assigned_slots[slotIndex + 1] || "";
   };
 
   const getAssetForSlot = (slotIndex: number) => {
@@ -131,11 +131,7 @@ export default function SceneProjectHub({
        } as any;
     }
 
-    // 2. If no shot override, check the project shared library for an asset inherently assigned to this slot index
-    const libraryAsset = assets.find(a => a.slot_index === slotIndex);
-    if (libraryAsset) {
-        return { ...libraryAsset, preview_url: getAssetMediaUrl(libraryAsset) };
-    }
+    // 2. Removed global fallback to prevent new shots from bleeding Shot 1\'s assets
 
     return null;
   };
@@ -166,12 +162,7 @@ export default function SceneProjectHub({
           filename = shot.assigned_slots[0] || shot.assigned_slots[1];
       }
 
-      // 5. Fallback to first available image in the project
-      if (!filename && assets.length > 0) {
-          // Filter out videos/audio to ensure it's an image
-          const imageAsset = assets.find(a => !a.filename.match(/\.(mp4|webm|mov|mp3|wav)$/i));
-          if (imageAsset) filename = imageAsset.filename;
-      }
+      // 5. Removed fallback to random project images so empty shots look empty
 
       return getAssetMediaUrl(filename);
   };
