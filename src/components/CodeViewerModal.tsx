@@ -93,23 +93,12 @@ router = APIRouter(prefix="/api", tags=["ComfyUI Bridge API"])
     "services/ssh_service.py": {
       lang: "python",
       path: "/backend/services/ssh_service.py",
-      desc: "Paramiko & SCP client pushing local assets to RunPod /workspace/ComfyUI/input/ with robust Ed25519/RSA key auth",
+      desc: "Paramiko SFTP client pushing all mapped slot assets sequentially to /workspace/runpod-slim/ComfyUI/input/ with remote existence check (sftp.stat)",
       content: `import os
 import io
 import paramiko
-from scp import SCPClient
 from pathlib import Path
 from typing import List, Dict, Any, Optional
-
-def load_private_key(key_string: str, passphrase: Optional[str] = None):
-    key_file = io.StringIO(key_string.strip())
-    for key_class in (paramiko.Ed25519Key, paramiko.RSAKey, paramiko.ECDSAKey):
-        key_file.seek(0)
-        try:
-            return key_class.from_private_key(key_file, password=passphrase)
-        except (paramiko.SSHException, ValueError, Exception):
-            continue
-    raise ValueError("Unable to parse private key. Ensure it is a valid RSA or Ed25519 key.")
 
 class RunPodSSHService:
     def __init__(self, host: str, port: int = 22, username: str = "root", password: Optional[str] = None, key_path: Optional[str] = None, private_key: Optional[str] = None):
@@ -117,28 +106,34 @@ class RunPodSSHService:
         self.port = int(port)
         self.username = username.strip() or "root"
         self.password = password
-        self.key_path = key_path.strip() if key_path else None
         self.private_key = private_key.strip() if private_key else None
 
-    def connect(self) -> paramiko.SSHClient:
-        client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        
-        # Explicit publickey authentication (Ed25519 / RSA)
-        if self.private_key:
-            pkey = load_private_key(self.private_key, passphrase=self.password)
-            client.connect(
-                hostname=self.host,
-                port=self.port,
-                username=self.username,
-                pkey=pkey,
-                look_for_keys=False,
-                allow_agent=False,
-                timeout=10
-            )
-            return client
-        # Fallback to password or file path...
-        return client`
+    def transfer_files_to_runpod(self, local_files: List[Path], remote_dir: str = "/workspace/runpod-slim/ComfyUI/input", overwrite: bool = False):
+        client = self.connect()
+        clean_remote_dir = remote_dir.rstrip("/")
+        client.exec_command(f"mkdir -p {clean_remote_dir}")
+        sftp = client.open_sftp()
+        uploaded_files, skipped_files = [], []
+
+        for file_path in local_files:
+            remote_path = f"{clean_remote_dir}/{file_path.name}"
+            file_exists = False
+            if not overwrite:
+                try:
+                    sftp.stat(remote_path)
+                    file_exists = True
+                except (IOError, FileNotFoundError):
+                    file_exists = False
+
+            if file_exists and not overwrite:
+                skipped_files.append(file_path.name)
+            else:
+                sftp.put(str(file_path), remote_path)
+                uploaded_files.append(file_path.name)
+
+        sftp.close()
+        client.close()
+        return { "transferred_count": len(uploaded_files), "skipped_count": len(skipped_files) }`
     },
     "services/workflow_service.py": {
       lang: "python",

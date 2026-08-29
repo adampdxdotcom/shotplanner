@@ -124,43 +124,92 @@ class RunPodSSHService:
         self,
         local_files: List[Path],
         remote_dir: str = "/workspace/runpod-slim/ComfyUI/input",
+        overwrite: bool = False,
         progress_callback: Optional[Callable[[str, int, int], None]] = None
-    ) -> List[Dict[str, Any]]:
+    ) -> Dict[str, Any]:
         """
-        Step A: Push all mapped, renamed media assets from local /assets/uploads
-        directly to the RunPod remote /workspace/runpod-slim/ComfyUI/input/ directory via SCP.
+        Step A: Push all mapped media assets sequentially to RunPod remote input directory via SFTP.
+        Performs remote existence check (sftp.stat) to skip files that already exist unless overwrite=True.
         """
         results = []
+        uploaded_files = []
+        skipped_files = []
+        clean_remote_dir = remote_dir.rstrip("/")
+        
         client = self.connect()
 
         try:
-            # Ensure remote directory exists
-            client.exec_command(f"mkdir -p {remote_dir}")
+            # Ensure remote directory exists on host
+            client.exec_command(f"mkdir -p {clean_remote_dir}")
 
-            def scp_progress(filename, size, sent):
-                if progress_callback:
-                    progress_callback(filename.decode() if isinstance(filename, bytes) else str(filename), size, sent)
-
-            with SCPClient(client.get_transport(), progress=scp_progress) as scp:
+            sftp = client.open_sftp()
+            try:
                 for file_path in local_files:
+                    filename = file_path.name
                     if not file_path.exists():
                         results.append({
-                            "file": file_path.name,
-                            "status": "error",
+                            "filename": filename,
+                            "file": filename,
+                            "status": "missing_locally",
+                            "size_bytes": 0,
                             "message": "Local file not found"
                         })
                         continue
 
-                    # Upload to remote directory
-                    scp.put(str(file_path), remote_path=f"{remote_dir}/{file_path.name}")
-                    results.append({
-                        "file": file_path.name,
-                        "status": "transferred",
-                        "size_bytes": file_path.stat().st_size,
-                        "remote_path": f"{remote_dir}/{file_path.name}"
-                    })
+                    remote_file_path = f"{clean_remote_dir}/{filename}"
+                    file_exists_remotely = False
+
+                    # Check if file already exists remotely
+                    if not overwrite:
+                        try:
+                            remote_stat = sftp.stat(remote_file_path)
+                            file_exists_remotely = True
+                        except (IOError, FileNotFoundError, Exception):
+                            file_exists_remotely = False
+
+                    if file_exists_remotely and not overwrite:
+                        skipped_files.append(filename)
+                        results.append({
+                            "filename": filename,
+                            "file": filename,
+                            "status": "skipped_existing",
+                            "size_bytes": file_path.stat().st_size,
+                            "remote_path": remote_file_path,
+                            "message": "File already exists in remote input directory. Skipped upload."
+                        })
+                    else:
+                        # Upload file sequentially via SFTP
+                        def sftp_callback(transferred: int, total: int):
+                            if progress_callback:
+                                progress_callback(filename, total, transferred)
+
+                        sftp.put(str(file_path), remote_file_path, callback=sftp_callback if progress_callback else None)
+                        uploaded_files.append(filename)
+                        results.append({
+                            "filename": filename,
+                            "file": filename,
+                            "status": "transferred",
+                            "size_bytes": file_path.stat().st_size,
+                            "remote_path": remote_file_path,
+                            "message": "Transferred successfully via SFTP."
+                        })
+            finally:
+                sftp.close()
 
         finally:
             client.close()
 
-        return results
+        summary_msg = f"Transferred {len(uploaded_files)} new file(s), skipped {len(skipped_files)} already present in {clean_remote_dir}."
+
+        return {
+            "success": True,
+            "remote_dir": clean_remote_dir,
+            "transferred_count": len(uploaded_files),
+            "skipped_count": len(skipped_files),
+            "total_checked": len(local_files),
+            "uploaded_files": uploaded_files,
+            "skipped_files": skipped_files,
+            "files": results,
+            "message": summary_msg
+        }
+

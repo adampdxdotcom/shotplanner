@@ -87,14 +87,24 @@ export interface ExecutionResult {
   error?: string;
 }
 
+export interface TransferredFileItem {
+  filename: string;
+  file?: string;
+  size_bytes?: number;
+  status: "transferred" | "skipped_existing" | "missing_locally" | "error" | string;
+  remote_path?: string;
+  message?: string;
+}
+
 export interface TransferResult {
   success: boolean;
   remote_dir: string;
-  transferred_files: Array<{
-    filename: string;
-    size_bytes: number;
-    status: string;
-  }>;
+  transferred_count?: number;
+  skipped_count?: number;
+  total_checked?: number;
+  uploaded_files?: string[];
+  skipped_files?: string[];
+  transferred_files: TransferredFileItem[];
   message: string;
   error?: string;
 }

@@ -181,34 +181,49 @@ async def test_ssh_connection(req: SSHTestRequest):
 async def transfer_assets_only(req: SSHTransferRequest):
     """
     Decoupled Asset Transfer Endpoint:
-    Runs only Step A (SSH/SCP file staging to the remote ComfyUI input directory).
-    Validates file existence without parsing or submitting the ComfyUI workflow graph.
+    Runs only Step A (SSH/SFTP file staging to the remote ComfyUI input directory).
+    Iterates over all assigned shot input slots, checks remote existence via sftp.stat,
+    and returns a detailed count of new files transferred vs existing files skipped.
     """
     if not req.runpod_ip:
         raise HTTPException(status_code=400, detail="RunPod Host/IP is required for remote transfer.")
 
     files_to_transfer: List[Path] = []
-    file_names = set(req.filenames)
-    for node_id, filename in req.node_mappings.items():
-        if filename:
-            file_names.add(filename)
+    seen_files = set()
 
-    if not file_names and UPLOADS_DIR.exists():
+    # 1. Collect all non-empty asset filenames mapped across all active shot input slots
+    for node_id, filename in req.node_mappings.items():
+        if filename and filename.strip() and filename.strip() not in seen_files:
+            seen_files.add(filename.strip())
+            local_file = UPLOADS_DIR / filename.strip()
+            if local_file.exists():
+                files_to_transfer.append(local_file)
+
+    # 2. Also check any explicitly requested filenames
+    for fname in req.filenames:
+        if fname and fname.strip() and fname.strip() not in seen_files:
+            seen_files.add(fname.strip())
+            local_file = UPLOADS_DIR / fname.strip()
+            if local_file.exists():
+                files_to_transfer.append(local_file)
+
+    # 3. Fallback to all local uploads if no mappings or filenames were specified
+    if not seen_files and UPLOADS_DIR.exists():
         for f in UPLOADS_DIR.iterdir():
             if f.is_file() and not f.name.startswith("."):
                 files_to_transfer.append(f)
-    else:
-        for fname in file_names:
-            local_file = UPLOADS_DIR / fname
-            if local_file.exists():
-                files_to_transfer.append(local_file)
 
     if not files_to_transfer:
         return {
             "success": True,
             "remote_dir": req.remote_input_dir,
+            "transferred_count": 0,
+            "skipped_count": 0,
+            "total_checked": 0,
+            "uploaded_files": [],
+            "skipped_files": [],
             "transferred_files": [],
-            "message": f"No active assets found locally to transfer to {req.remote_input_dir}."
+            "message": f"No active assets found to transfer into {req.remote_input_dir}. Assign assets to input slots in Step 2."
         }
 
     try:
@@ -222,13 +237,19 @@ async def transfer_assets_only(req: SSHTransferRequest):
         )
         transfer_results = ssh_service.transfer_files_to_runpod(
             local_files=files_to_transfer,
-            remote_dir=req.remote_input_dir
+            remote_dir=req.remote_input_dir,
+            overwrite=False
         )
         return {
             "success": True,
-            "remote_dir": req.remote_input_dir,
-            "transferred_files": transfer_results,
-            "message": f"Successfully transferred {len(transfer_results)} asset(s) via SSH into remote directory {req.remote_input_dir}. ComfyUI workflow graph and API untouched."
+            "remote_dir": transfer_results["remote_dir"],
+            "transferred_count": transfer_results["transferred_count"],
+            "skipped_count": transfer_results["skipped_count"],
+            "total_checked": transfer_results["total_checked"],
+            "uploaded_files": transfer_results.get("uploaded_files", []),
+            "skipped_files": transfer_results.get("skipped_files", []),
+            "transferred_files": transfer_results.get("files", []),
+            "message": transfer_results["message"]
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"SSH Asset Transfer Failed: {str(e)}")
@@ -237,7 +258,7 @@ async def transfer_assets_only(req: SSHTransferRequest):
 async def execute_workflow(req: ExecuteWorkflowRequest):
     """
     The Master Execution Pipeline:
-    Step A: SSH/SCP transfer of mapped assets to RunPod remote input directory
+    Step A: Sequential SFTP transfer of all mapped shot assets with remote existence check
     Step B: Load user-selected workflow_api.json
     Step C: Inject expanded prompt and asset filenames (with bypass placeholder logic)
     Step D: Send modified JSON payload to RunPod ComfyUI /prompt endpoint
@@ -281,18 +302,18 @@ async def execute_workflow(req: ExecuteWorkflowRequest):
             "modified_workflow": modified_workflow
         }
 
-    # 3. SSH File Transfer (Step A)
-    transfer_results = []
+    # 3. SSH File Transfer (Step A): Iterate over all assigned slot assets
     files_to_transfer = []
+    seen_files = set()
     
-    # Collect files mentioned in node mappings + safe placeholder if needed
     for node_id, filename in req.node_mappings.items():
-        if filename:
-            local_file = UPLOADS_DIR / filename
+        if filename and filename.strip() and filename.strip() not in seen_files:
+            seen_files.add(filename.strip())
+            local_file = UPLOADS_DIR / filename.strip()
             if local_file.exists():
                 files_to_transfer.append(local_file)
 
-    # Transfer via SSH/SCP
+    # Transfer via SSH/SFTP with remote existence check
     if files_to_transfer and req.runpod_ip:
         try:
             ssh_service = RunPodSSHService(
@@ -303,30 +324,34 @@ async def execute_workflow(req: ExecuteWorkflowRequest):
                 key_path=req.ssh_key_path,
                 private_key=req.ssh_private_key
             )
-            transfer_results = ssh_service.transfer_files_to_runpod(
+            transfer_res = ssh_service.transfer_files_to_runpod(
                 local_files=files_to_transfer,
-                remote_dir=req.remote_input_dir
+                remote_dir=req.remote_input_dir,
+                overwrite=False
             )
             steps_log.append({
                 "step": "A",
-                "title": "SSH File Transfer Completed",
+                "title": "SSH Asset Sync Completed",
                 "status": "success",
-                "detail": f"Transferred {len(transfer_results)} asset files to remote {req.remote_input_dir}.",
-                "files": transfer_results
+                "detail": transfer_res["message"],
+                "transferred_count": transfer_res["transferred_count"],
+                "skipped_count": transfer_res["skipped_count"],
+                "total_checked": transfer_res["total_checked"],
+                "files": transfer_res.get("files", [])
             })
         except Exception as e:
             steps_log.append({
                 "step": "A",
                 "title": "SSH File Transfer Note",
                 "status": "warning",
-                "detail": f"SSH transfer skipped or failed ({str(e)}). Proceeding with ComfyUI API dispatch."
+                "detail": f"SSH transfer note ({str(e)}). Proceeding with ComfyUI API dispatch."
             })
     else:
         steps_log.append({
             "step": "A",
             "title": "SSH File Transfer Skipped",
             "status": "info",
-            "detail": "No local files required transfer or RunPod IP not provided."
+            "detail": "No mapped slot files required transfer or RunPod IP not provided."
         })
 
     # 4. ComfyUI /prompt HTTP Dispatch (Step D)
