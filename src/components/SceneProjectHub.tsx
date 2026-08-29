@@ -107,18 +107,86 @@ export default function SceneProjectHub({
     }
   };
 
+  const getPreviewUrl = (assetOrFilename: MediaAsset | string | null | undefined): string => {
+    if (!assetOrFilename) return "";
+    
+    // If it's already an asset object with a valid preview URL that uses our endpoints
+    if (typeof assetOrFilename === "object" && assetOrFilename.preview_url?.startsWith("/api/assets/file/")) {
+        return assetOrFilename.preview_url;
+    }
+
+    const filename = typeof assetOrFilename === "string" ? assetOrFilename : assetOrFilename.filename;
+    if (!filename) return "";
+    
+    return `/api/assets/file/${encodeURIComponent(filename)}`;
+  };
+
   const getAssetFilenameForSlot = (slotIndex: number) => {
+    // 1. Check shot-level overrides first
     return activeShot?.assigned_slots[slotIndex] || activeShot?.assigned_slots[slotIndex + 1] || project.shared_assets.find(a => a.slot_index === slotIndex)?.filename || "";
   };
 
   const getAssetForSlot = (slotIndex: number) => {
-    const filename = getAssetFilenameForSlot(slotIndex);
-    if (!filename) return null;
-    return assets.find(a => a.filename === filename || a.name === filename) || {
-      filename,
-      preview_url: `/api/assets/preview/${filename}`,
-      label: `Slot ${slotIndex + 1}`
-    } as any;
+    // 1. Check if the shot overrides this slot specifically
+    const shotFilenameOverride = activeShot?.assigned_slots[slotIndex] || activeShot?.assigned_slots[slotIndex + 1];
+    
+    if (shotFilenameOverride) {
+       // Look up the full asset by filename
+       const matchedAsset = assets.find(a => a.filename === shotFilenameOverride || a.name === shotFilenameOverride);
+       if (matchedAsset) {
+           return { ...matchedAsset, preview_url: getPreviewUrl(matchedAsset) };
+       }
+       // Fallback for missing asset metadata but assigned filename
+       return {
+         filename: shotFilenameOverride,
+         preview_url: getPreviewUrl(shotFilenameOverride),
+         label: `Slot ${slotIndex + 1}`
+       } as any;
+    }
+
+    // 2. If no shot override, check the project shared library for an asset inherently assigned to this slot index
+    const libraryAsset = assets.find(a => a.slot_index === slotIndex);
+    if (libraryAsset) {
+        return { ...libraryAsset, preview_url: getPreviewUrl(libraryAsset) };
+    }
+
+    return null;
+  };
+
+  const getShotThumbnailUrl = (shot: ShotItem) => {
+      // 1. Explicit shot assignment to Slot 9 (Location)
+      let filename = shot.assigned_slots[8] || shot.assigned_slots[9];
+      
+      // 2. Project asset with type "Scene Reference" or slot index 8
+      if (!filename) {
+          const locAsset = assets.find(a => a.type === "Scene Reference" || a.slot_index === 8);
+          if (locAsset) filename = locAsset.filename;
+      }
+
+      // 3. Heuristics on asset type or subject name
+      if (!filename) {
+          const locAsset = assets.find(a => {
+             const t = (a.type || "").toLowerCase();
+             const n = (a.subject_name || "").toLowerCase();
+             return t.includes("scene") || t.includes("location") || t.includes("environment") ||
+                    n.includes("scene") || n.includes("location") || n.includes("environment");
+          });
+          if (locAsset) filename = locAsset.filename;
+      }
+
+      // 4. Fallback to shot's Slot 1
+      if (!filename) {
+          filename = shot.assigned_slots[0] || shot.assigned_slots[1];
+      }
+
+      // 5. Fallback to first available image in the project
+      if (!filename && assets.length > 0) {
+          // Filter out videos/audio to ensure it's an image
+          const imageAsset = assets.find(a => !a.filename.match(/\.(mp4|webm|mov|mp3|wav)$/i));
+          if (imageAsset) filename = imageAsset.filename;
+      }
+
+      return getPreviewUrl(filename);
   };
 
   const handleClearSlot = (slotIndex: number) => {
@@ -207,8 +275,7 @@ export default function SceneProjectHub({
           className="flex flex-1 gap-4 overflow-x-auto snap-x snap-mandatory hide-scrollbar px-2"
         >
           {project.shots.map((shot, idx) => {
-            const locAssetFilename = shot.assigned_slots[8] || shot.assigned_slots[9] || project.shared_assets.find(a => a.slot_index === 8)?.filename || shot.assigned_slots[0] || shot.assigned_slots[1] || project.shared_assets.find(a => a.slot_index === 0)?.filename;
-            const locAsset = locAssetFilename ? (assets.find(a => a.filename === locAssetFilename || a.name === locAssetFilename) || { preview_url: `/api/assets/preview/${locAssetFilename}` } as any) : null;
+            const thumbnailUrl = getShotThumbnailUrl(shot);
             
             return (
               <div
@@ -223,8 +290,8 @@ export default function SceneProjectHub({
                 }`}
               >
                 {/* Background Image */}
-                {locAsset && locAsset.preview_url ? (
-                  <img src={locAsset.preview_url} className="absolute inset-0 w-full h-full object-cover opacity-60" alt="" />
+                {thumbnailUrl ? (
+                  <img src={thumbnailUrl} className="absolute inset-0 w-full h-full object-cover opacity-60" alt="" />
                 ) : (
                   <div className="absolute inset-0 bg-zinc-800 flex items-center justify-center">
                     <span className="text-zinc-600 text-sm">No Location</span>
