@@ -54,87 +54,106 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
   const [editError, setEditError] = useState<string | null>(null);
 
 
-  const renderAssetCard = (asset: MediaAsset, idx: number, type: string) => (
-    <div 
-      key={asset.filename} 
-      className="bg-zinc-950 p-3 rounded-xl border-2 border-zinc-700 hover:border-zinc-700 transition-all space-y-2 relative group flex flex-col"
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span className="w-5 h-5 rounded-full bg-zinc-800 text-zinc-300 text-[10px] font-mono font-bold flex items-center justify-center">
-            {idx + 1}
-          </span>
-          <div>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/20">
-              {asset.type}
+  const renderAssetCard = (asset: MediaAsset, idx: number, type: string) => {
+    const isImage = asset.media_type === "image" || (!asset.media_type && !/\.(mp3|wav|ogg|m4a|mp4|mov|webm)$/i.test(asset.filename)) || /\.(png|jpe?g|webp|gif|svg|avif|bmp)$/i.test(asset.filename);
+    const isAudio = asset.media_type === "audio" || /\.(mp3|wav|ogg|m4a|flac)$/i.test(asset.filename);
+    const isVideo = asset.media_type === "video" || /\.(mp4|mov|webm|mkv)$/i.test(asset.filename);
+    const imageSrc = asset.preview_url?.startsWith("/api/assets/file/") ? asset.preview_url : `/api/assets/file/${encodeURIComponent(asset.filename)}`;
+
+    return (
+      <div 
+        key={asset.filename} 
+        className="bg-zinc-950 p-3 rounded-xl border-2 border-zinc-700 hover:border-zinc-600 transition-all space-y-2 relative group flex flex-col"
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="w-5 h-5 rounded-full bg-zinc-800 text-zinc-300 text-[10px] font-mono font-bold flex items-center justify-center">
+              {idx + 1}
             </span>
+            <div>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                {asset.type}
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => openEditModal(asset)}
+              className="text-zinc-500 hover:text-indigo-400 p-1 rounded transition-colors"
+              title="Edit asset"
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => handleDelete(asset.filename)}
+              className="text-zinc-500 hover:text-red-400 p-1 rounded transition-colors"
+              title="Delete asset"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => openEditModal(asset)}
-            className="text-zinc-500 hover:text-indigo-400 p-1 rounded transition-colors"
-            title="Edit asset"
-          >
-            <Edit3 className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={() => handleDelete(asset.filename)}
-            className="text-zinc-500 hover:text-red-400 p-1 rounded transition-colors"
-            title="Delete asset"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </div>
 
-      {asset.media_type === "image" && (
-        <div 
-          className="relative w-full aspect-square bg-zinc-900 rounded-lg overflow-hidden cursor-pointer group/img border border-zinc-800"
-          onClick={() => setLightboxAsset(asset)}
-        >
-          <img 
-            src={asset.preview_url || `/assets/uploads/${asset.filename}`} 
-            alt={asset.subject_name} 
-            className="w-full h-full object-cover" 
-            onError={(e) => {
-              const target = e.currentTarget;
-              if (!target.src.includes("/uploads/")) {
-                target.src = `/uploads/${asset.filename}`;
-              }
-            }}
-          />
-          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
-            <Maximize className="w-6 h-6 text-white" />
+        {isImage ? (
+          <div 
+            className="relative w-full aspect-square bg-zinc-900 rounded-lg overflow-hidden cursor-pointer group/img border border-zinc-800 flex items-center justify-center"
+            onClick={() => setLightboxAsset(asset)}
+          >
+            <img 
+              src={imageSrc} 
+              alt={asset.subject_name} 
+              className="w-full h-full object-cover" 
+              onError={(e) => {
+                const target = e.currentTarget;
+                if (!target.src.includes("/api/uploads/")) {
+                  target.src = `/api/uploads/${encodeURIComponent(asset.filename)}`;
+                } else if (!target.src.includes("/uploads/")) {
+                  target.src = `/uploads/${encodeURIComponent(asset.filename)}`;
+                }
+              }}
+            />
+            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
+              <Maximize className="w-6 h-6 text-white" />
+            </div>
           </div>
+        ) : isVideo ? (
+          <div className="relative w-full aspect-square bg-zinc-900 rounded-lg overflow-hidden border border-zinc-800 flex flex-col items-center justify-center text-indigo-400 gap-2">
+            <VideoIcon className="w-8 h-8 opacity-80" />
+            <span className="text-[10px] font-mono text-zinc-400 uppercase">Video Asset</span>
+          </div>
+        ) : (
+          <div className="relative w-full aspect-square bg-zinc-900 rounded-lg overflow-hidden border border-zinc-800 flex flex-col items-center justify-center text-emerald-400 gap-2">
+            <Music className="w-8 h-8 opacity-80" />
+            <span className="text-[10px] font-mono text-zinc-400 uppercase">Audio Asset</span>
+          </div>
+        )}
+
+        {/* Subject Name & Filename */}
+        <div>
+          <p className="text-xs font-semibold text-zinc-100 truncate">
+            {asset.subject_name}
+          </p>
+          <p className="text-[11px] font-mono text-zinc-400 truncate mt-0.5">
+            {asset.filename}
+          </p>
         </div>
-      )}
 
-      {/* Subject Name & Filename */}
-      <div>
-        <p className="text-xs font-semibold text-zinc-100 truncate">
-          {asset.subject_name}
-        </p>
-        <p className="text-[11px] font-mono text-zinc-400 truncate mt-0.5">
-          {asset.filename}
-        </p>
+        {/* LLM Description preview */}
+        {asset.description && (
+          <p className="text-[11px] text-zinc-400 line-clamp-2 italic bg-zinc-900/70 p-1.5 rounded border-2 border-zinc-700/50">
+            "{asset.description}"
+          </p>
+        )}
+
+        <div className="flex items-center justify-between text-[10px] text-zinc-400 pt-1 border-t border-zinc-900 mt-auto">
+          <span>{(asset.size_bytes / 1024).toFixed(1)} KB</span>
+          <span className="font-mono text-indigo-400">
+            {isVideo ? `<Video ${idx + 1}>` : isAudio ? `<Audio ${idx + 1}>` : `<Picture ${idx + 1}>`}
+          </span>
+        </div>
       </div>
-
-      {/* LLM Description preview */}
-      {asset.description && (
-        <p className="text-[11px] text-zinc-400 line-clamp-2 italic bg-zinc-900/70 p-1.5 rounded border-2 border-zinc-700/50">
-          "{asset.description}"
-        </p>
-      )}
-
-      <div className="flex items-center justify-between text-[10px] text-zinc-400 pt-1 border-t border-zinc-900 mt-auto">
-        <span>{(asset.size_bytes / 1024).toFixed(1)} KB</span>
-        <span className="font-mono text-indigo-400">
-          {asset.media_type === "video" ? `<Video ${idx + 1}>` : asset.media_type === "audio" ? `<Audio ${idx + 1}>` : `<Picture ${idx + 1}>`}
-        </span>
-      </div>
-    </div>
-  );
+    );
+  };
 
   const renderEmptySlot = (idx: number, type: string) => (
     <div 
@@ -248,9 +267,13 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
   };
 
 
-  const images = assets.filter(a => a.media_type === "image");
-  const audios = assets.filter(a => a.media_type === "audio");
-  const videos = assets.filter(a => a.media_type === "video");
+  const isImg = (a: MediaAsset) => a.media_type === "image" || (!a.media_type && !/\.(mp3|wav|ogg|m4a|flac|mp4|mov|webm|mkv)$/i.test(a.filename)) || /\.(png|jpe?g|webp|gif|svg|avif|bmp)$/i.test(a.filename);
+  const isAud = (a: MediaAsset) => a.media_type === "audio" || /\.(mp3|wav|ogg|m4a|flac)$/i.test(a.filename);
+  const isVid = (a: MediaAsset) => a.media_type === "video" || /\.(mp4|mov|webm|mkv)$/i.test(a.filename);
+
+  const images = assets.filter(isImg);
+  const audios = assets.filter(isAud);
+  const videos = assets.filter(isVid);
 
   // Limits
   const MAX_IMAGES = 9;
@@ -687,16 +710,18 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
             >
               <X className="w-6 h-6" />
             </button>
-            {lightboxAsset.media_type === "image" && (
+            {(lightboxAsset.media_type === "image" || !lightboxAsset.media_type || /\.(png|jpe?g|webp|gif|svg|avif|bmp)$/i.test(lightboxAsset.filename)) && (
               <img 
-                src={lightboxAsset.preview_url || `/assets/uploads/${lightboxAsset.filename}`} 
+                src={lightboxAsset.preview_url?.startsWith("/api/assets/file/") ? lightboxAsset.preview_url : `/api/assets/file/${encodeURIComponent(lightboxAsset.filename)}`} 
                 alt={lightboxAsset.subject_name} 
                 className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl border border-white/10"
                 onClick={(e) => e.stopPropagation()}
                 onError={(e) => {
                   const target = e.currentTarget;
-                  if (!target.src.includes("/uploads/")) {
-                    target.src = `/uploads/${lightboxAsset.filename}`;
+                  if (!target.src.includes("/api/uploads/")) {
+                    target.src = `/api/uploads/${encodeURIComponent(lightboxAsset.filename)}`;
+                  } else if (!target.src.includes("/uploads/")) {
+                    target.src = `/uploads/${encodeURIComponent(lightboxAsset.filename)}`;
                   }
                 }}
               />

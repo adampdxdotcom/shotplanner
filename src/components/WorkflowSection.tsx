@@ -260,6 +260,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
               {/* Image Loaders */}
               {imageNodes.map((node) => {
                 const assignedFile = nodeMappings[node.id] || "";
+                const mappedAsset = uploadedAssets.find(a => a.filename === assignedFile);
                 return (
                   <div key={node.id} className="bg-zinc-950/60 p-3 rounded-lg border-2 border-zinc-700 space-y-2">
                     <div className="flex items-center justify-between">
@@ -276,6 +277,21 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
 
                     <div className="flex items-center gap-2">
                       <ArrowRight className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                      {mappedAsset && (
+                        <img 
+                          src={mappedAsset.preview_url?.startsWith("/api/assets/file/") ? mappedAsset.preview_url : `/api/assets/file/${encodeURIComponent(mappedAsset.filename)}`} 
+                          alt={mappedAsset.subject_name} 
+                          className="w-7 h-7 rounded object-cover border border-zinc-700 shrink-0" 
+                          onError={(e) => {
+                            const target = e.currentTarget;
+                            if (!target.src.includes("/api/uploads/")) {
+                              target.src = `/api/uploads/${encodeURIComponent(mappedAsset.filename)}`;
+                            } else if (!target.src.includes("/uploads/")) {
+                              target.src = `/uploads/${encodeURIComponent(mappedAsset.filename)}`;
+                            }
+                          }}
+                        />
+                      )}
                       <select
                         value={assignedFile}
                         onChange={(e) => onUpdateMapping(node.id, e.target.value)}

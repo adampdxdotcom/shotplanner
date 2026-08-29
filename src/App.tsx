@@ -116,12 +116,17 @@ export default function App() {
 
     // 1. Sync & set saved assets if present
     if (Array.isArray(data.assets) && data.assets.length > 0) {
-      setAssets(data.assets);
+      const normalizedAssets = data.assets.map((a: any) => ({
+        ...a,
+        media_type: a.media_type || (/\.(mp3|wav|ogg|m4a|flac)$/i.test(a.filename) ? "audio" : /\.(mp4|mov|webm|mkv)$/i.test(a.filename) ? "video" : "image"),
+        preview_url: `/api/assets/file/${a.filename}`
+      }));
+      setAssets(normalizedAssets);
       try {
         await fetch("/api/assets/sync", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ assets: data.assets })
+          body: JSON.stringify({ assets: normalizedAssets })
         });
       } catch (e) {
         console.error("Failed to sync project assets", e);
@@ -167,7 +172,11 @@ export default function App() {
       const res = await fetch("/api/assets");
       const data = await res.json();
       if (data.assets) {
-        setAssets(data.assets);
+        setAssets(data.assets.map((a: any) => ({
+          ...a,
+          media_type: a.media_type || (/\.(mp3|wav|ogg|m4a|flac)$/i.test(a.filename) ? "audio" : /\.(mp4|mov|webm|mkv)$/i.test(a.filename) ? "video" : "image"),
+          preview_url: `/api/assets/file/${a.filename}`
+        })));
       }
     } catch (e) {
       console.error("Failed to load assets", e);

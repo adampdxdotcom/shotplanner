@@ -149,7 +149,47 @@ app.post("/api/workflows/parse", (req: Request, res: Response) => {
 });
 
 app.get("/api/assets", (req: Request, res: Response) => {
-  res.json({ assets: assetDatabase });
+  const normalized = assetDatabase.map(a => ({
+    ...a,
+    preview_url: `/api/assets/file/${a.filename}`
+  }));
+  res.json({ assets: normalized });
+});
+
+// Dedicated media file serving route with MIME headers and fallback lookup
+app.get([
+  "/api/assets/file/:filename",
+  "/api/uploads/:filename",
+  "/uploads/:filename",
+  "/assets/uploads/:filename"
+], (req: Request, res: Response) => {
+  try {
+    const rawFilename = req.params.filename;
+    if (!rawFilename) return res.status(400).send("Filename is required");
+    const filename = path.basename(rawFilename);
+    const filePath = path.join(UPLOADS_DIR, filename);
+
+    if (fs.existsSync(filePath)) {
+      res.setHeader("Cache-Control", "public, max-age=3600");
+      return res.sendFile(filePath);
+    }
+
+    const altPath = path.join(ASSETS_DIR, filename);
+    if (fs.existsSync(altPath)) {
+      res.setHeader("Cache-Control", "public, max-age=3600");
+      return res.sendFile(altPath);
+    }
+
+    // Check if filename is in workflows or subdirectories
+    const wfPath = path.join(WORKFLOWS_DIR, filename);
+    if (fs.existsSync(wfPath)) {
+      return res.sendFile(wfPath);
+    }
+
+    res.status(404).json({ error: `Asset '${filename}' not found` });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.delete("/api/assets/:filename", (req: Request, res: Response) => {
@@ -458,7 +498,7 @@ app.post("/api/assets/upload", upload.single("file"), (req: Request, res: Respon
       description,
       size_bytes: req.file.size,
       created_at: Date.now(),
-      preview_url: `/assets/uploads/${targetFilename}`
+      preview_url: `/api/assets/file/${targetFilename}`
     };
 
     assetDatabase.unshift(assetRecord);
@@ -523,7 +563,7 @@ app.post("/api/assets/upload_chunk", upload.single("file"), (req: Request, res: 
           description: description || "",
           size_bytes: stats.size,
           created_at: Date.now(),
-          preview_url: `/assets/uploads/${targetFilename}`
+          preview_url: `/api/assets/file/${targetFilename}`
         };
 
         if (replace_filename) {
