@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { MediaAsset, AssetType, ScenePlanning } from "../types";
+import { MediaAsset, AssetType, ScenePlanning, SceneProjectFile, ShotItem } from "../types";
 import { SubjectCombobox } from "./SubjectCombobox";
 import { ScenePlanningHeader } from "./ScenePlanningHeader";
 import { 
@@ -26,10 +26,12 @@ import {
 
 interface AssetManagerSectionProps {
   assets: MediaAsset[];
+  activeShotId: string | null;
+  onSelectShot: (id: string | null) => void;
+  sceneProject: SceneProjectFile;
+  onUpdateProject: (updater: (prev: SceneProjectFile) => SceneProjectFile) => void;
   subjects?: string[];
   onRegisterSubject?: (name: string) => void;
-  planning?: ScenePlanning;
-  onChangePlanning?: (planning: ScenePlanning) => void;
   onAssetUploaded: (asset: MediaAsset, slotIndex?: number, mediaType?: "image" | "audio" | "video") => void;
   onAssetDeleted: (filename: string) => void;
   onAssetUpdated: (oldFilename: string, newAsset: MediaAsset) => void;
@@ -37,10 +39,12 @@ interface AssetManagerSectionProps {
 
 export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
   assets,
+  activeShotId,
+  onSelectShot,
+  sceneProject,
+  onUpdateProject,
   subjects = [],
   onRegisterSubject = (_name: string) => {},
-  planning,
-  onChangePlanning,
   onAssetUploaded,
   onAssetDeleted,
   onAssetUpdated
@@ -69,6 +73,43 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
+  const activeShotIndex = sceneProject.shots.findIndex(s => s.id === activeShotId);
+  const activeShot = activeShotIndex >= 0 ? sceneProject.shots[activeShotIndex] : null;
+
+  const handleAddBlankShot = () => {
+    onUpdateProject(prev => {
+      const newShot: ShotItem = {
+        id: "shot_" + Date.now(),
+        shot_number: prev.shots.length + 1,
+        shot_type: "Medium Shot",
+        camera_movement: "Locked Off",
+        basic_stub: "",
+        expanded_prompt: "",
+        assigned_slots: {},
+        staged: false,
+        updated_at: new Date().toISOString()
+      };
+      setTimeout(() => onSelectShot(newShot.id), 0);
+      return { ...prev, shots: [...prev.shots, newShot] };
+    });
+  };
+
+  const handlePlanningChange = (newPlanning: ScenePlanning) => {
+    if (!activeShotId) return;
+    onUpdateProject(prev => {
+      const shots = [...prev.shots];
+      const idx = shots.findIndex(s => s.id === activeShotId);
+      if (idx !== -1) {
+        shots[idx] = { 
+          ...shots[idx], 
+          shot_number: parseInt(String(newPlanning.shot_number)) || shots[idx].shot_number,
+          shot_type: newPlanning.shot_type,
+          camera_movement: newPlanning.camera_movement
+        };
+      }
+      return { ...prev, scene_name: newPlanning.scene_name, shots };
+    });
+  };
 
   const renderAssetCard = (asset: MediaAsset, idx: number, type: string) => {
     const isImage = asset.media_type === "image" || (!asset.media_type && !/\.(mp3|wav|ogg|m4a|mp4|mov|webm)$/i.test(asset.filename)) || /\.(png|jpe?g|webp|gif|svg|avif|bmp)$/i.test(asset.filename);
@@ -484,17 +525,58 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
   };
 
   return (
-    <div id="assets-section" className="space-y-5">
-      {/* Top Horizontal Card: Scene & Camera Planning */}
-      {planning && onChangePlanning && (
-        <ScenePlanningHeader 
-          planning={planning} 
-          onChangePlanning={onChangePlanning} 
-        />
-      )}
+    <div id="assets-section" className="space-y-5 flex flex-col min-h-0">
+      
+      {/* Assets Screen Header Controls */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-zinc-900/60 p-4 rounded-xl border border-zinc-800 shadow-sm">
+        <div className="flex items-center gap-3">
+          <label className="text-sm font-medium text-zinc-300">Shot Context:</label>
+          <select 
+            value={activeShotId || ""}
+            onChange={(e) => onSelectShot(e.target.value || null)}
+            className="bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none min-w-[250px]"
+          >
+            <option key="empty" value="">-- Select a Shot --</option>
+            {sceneProject.shots.map(s => (
+              <option key={s.id} value={s.id}>
+                Shot {s.shot_number.toString().padStart(2, '0')} - {s.shot_type}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button
+          onClick={handleAddBlankShot}
+          className="px-4 py-2 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 rounded-lg text-sm font-medium transition-colors"
+        >
+          + New Shot
+        </button>
+      </div>
 
-      {/* Main Asset Management Card */}
-      <div className="bg-zinc-900/60 border-2 border-zinc-700 rounded-xl p-5 shadow-sm space-y-5">
+      {!activeShotId ? (
+        <div className="flex flex-col items-center justify-center p-12 bg-zinc-900/40 border-2 border-dashed border-zinc-800 rounded-xl">
+          <FileImage className="w-12 h-12 text-zinc-600 mb-4" />
+          <h2 className="text-xl font-semibold text-zinc-300 mb-2">No Shot Selected</h2>
+          <p className="text-sm text-zinc-500 text-center max-w-md">
+            Choose an existing shot from the dropdown above or click <strong className="text-indigo-400">"+ New Shot"</strong> to stage a new camera setup and assign media assets.
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* Top Horizontal Card: Scene & Camera Planning */}
+          {activeShot && (
+            <ScenePlanningHeader 
+              planning={{
+                scene_name: sceneProject.scene_name,
+                shot_number: activeShot.shot_number.toString(),
+                shot_type: activeShot.shot_type,
+                camera_movement: activeShot.camera_movement
+              }} 
+              onChangePlanning={handlePlanningChange} 
+            />
+          )}
+
+          {/* Main Asset Management Card */}
+          <div className="bg-zinc-900/60 border-2 border-zinc-700 rounded-xl p-5 shadow-sm space-y-5">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
           <div className="flex items-center gap-2.5">
@@ -502,8 +584,8 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
               <HardDrive className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-zinc-100">1. Segmented Asset Management</h2>
-              <p className="text-xs text-zinc-400">Click on an empty slot below to upload and configure semantic metadata. Auto-renames to format <code className="text-zinc-300">{`{type}_{name}_{timestamp}.ext`}</code>.</p>
+              <h2 className="text-sm font-semibold text-zinc-100">Segmented Asset Management</h2>
+              <p className="text-xs text-zinc-400">Click on an empty slot below to upload and configure semantic metadata. Auto-renames to format <code className="text-zinc-300">{`{type}_{name}_{timestamp}.ext`}</code>. Assets are assigned to the active shot context.</p>
             </div>
           </div>
         </div>
@@ -568,8 +650,10 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
           </div>
         </div>
       </div>
-    </div>
-      
+      </div>
+      </>
+      )}
+
       {/* Upload Modal */}
       {uploadModalSlot && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">

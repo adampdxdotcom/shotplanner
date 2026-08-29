@@ -37,13 +37,24 @@ export const Navbar: React.FC<NavbarProps> = ({ activeSection, onNavigate, onSav
             </span>
           </div>
           <p className="text-xs text-zinc-400">
-            Local Assets ⇄ LM Studio Prompt Expansion ⇄ RunPod ComfyUI
+            Local Assets ⇄ LM Studio Prompt Expansion ⇄ Remote ComfyUI
           </p>
         </div>
       </div>
 
       <div className="flex items-center gap-4">
         <nav className="hidden md:flex items-center gap-1 bg-zinc-950/60 p-1 rounded-lg border-2 border-zinc-700/80">
+          <button
+            onClick={() => onNavigate("scene")}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
+              activeSection === "scene" 
+                ? "bg-zinc-800 text-zinc-100 shadow-xs" 
+                : "text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+            Scene Hub
+          </button>
           <button
             onClick={() => onNavigate("assets")}
             className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
@@ -53,7 +64,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeSection, onNavigate, onSav
             }`}
           >
           <HardDrive className="w-3.5 h-3.5" />
-          1. Assets
+          Assets
         </button>
         <button
           onClick={() => onNavigate("workflow")}
@@ -64,7 +75,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeSection, onNavigate, onSav
           }`}
         >
           <Workflow className="w-3.5 h-3.5" />
-          2. Workflow &amp; Map
+          Workflow
         </button>
         <button
           onClick={() => onNavigate("llm")}
@@ -75,7 +86,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeSection, onNavigate, onSav
           }`}
         >
           <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-          3. Prompt LLM
+          Prompt
         </button>
         <button
           onClick={() => onNavigate("execute")}
@@ -86,7 +97,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeSection, onNavigate, onSav
           }`}
         >
           <Cpu className="w-3.5 h-3.5" />
-          4. Execute
+          Upload
         </button>
       </nav>
 

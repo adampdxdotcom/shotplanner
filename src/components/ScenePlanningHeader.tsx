@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ScenePlanning, formatShotNumber, generateSaveVideoPrefix, sanitizeFilenamePart } from "../types";
+import { ScenePlanning, formatShotNumber, generateSaveVideoPrefix, sanitizeFilenamePart, generatePromptPrefix, assembleFinalPrompt } from "../types";
 import { 
   Clapperboard, 
   Camera, 
@@ -13,7 +13,7 @@ import {
   Video
 } from "lucide-react";
 
-export { formatShotNumber, generateSaveVideoPrefix, sanitizeFilenamePart };
+export { formatShotNumber, generateSaveVideoPrefix, sanitizeFilenamePart, generatePromptPrefix, assembleFinalPrompt };
 
 export const SHOT_TYPES = [
   { label: "Extreme Wide Shot (EWS)", value: "Extreme Wide Shot" },
@@ -43,27 +43,6 @@ export const CAMERA_MOVEMENTS = [
   { label: "Zoom In", value: "Zoom In" },
   { label: "Zoom Out", value: "Zoom Out" }
 ];
-
-export function generatePromptPrefix(plan: ScenePlanning): string {
-  const parts: string[] = [];
-  
-  if (plan.scene_name && plan.scene_name.trim()) {
-    parts.push(plan.scene_name.trim());
-  }
-  
-  const shotNum = formatShotNumber(plan.shot_number);
-  parts.push(`Shot ${shotNum}`);
-  
-  if (plan.shot_type && plan.shot_type.trim()) {
-    parts.push(plan.shot_type.trim());
-  }
-  
-  if (plan.camera_movement && plan.camera_movement.trim()) {
-    parts.push(plan.camera_movement.trim());
-  }
-  
-  return parts.join(" - ");
-}
 
 interface ScenePlanningHeaderProps {
   planning: ScenePlanning;

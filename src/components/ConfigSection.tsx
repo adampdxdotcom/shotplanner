@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { AppConfig } from "../types";
-import { RunPodSSHPrimerCard, CodeBlock } from "./RunPodSSHPrimerCard";
+import { RemoteSSHPrimerCard, CodeBlock } from "./RemoteSSHPrimerCard";
 import { 
   Server, 
   Terminal, 
@@ -106,13 +106,13 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange, 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          host: config.runpod_ip,
+          host: config.remote_host,
           port: config.ssh_port,
           username: config.ssh_username,
           password: config.ssh_password,
           key_path: config.ssh_key_path,
           ssh_private_key: config.ssh_private_key,
-          remote_dir: config.remote_input_dir || "/workspace/runpod-slim/ComfyUI/input/"
+          remote_dir: config.remote_comfyui_root || "/workspace/remote-slim/ComfyUI/input/"
         })
       });
       const data = await res.json();
@@ -202,7 +202,7 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange, 
           </div>
           <div>
             <h2 className="text-sm font-semibold text-zinc-100">5. Infrastructure &amp; Remote Credentials</h2>
-            <p className="text-xs text-zinc-400">Configure RunPod SSH instance, ComfyUI API endpoint, and local LM Studio server.</p>
+            <p className="text-xs text-zinc-400">Configure Remote GPU SSH instance, ComfyUI API endpoint, and local LM Studio server.</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -218,11 +218,11 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange, 
           )}
           <button
             onClick={handleTestSSH}
-            disabled={testingSSH || !config.runpod_ip}
+            disabled={testingSSH || !config.remote_host}
             className="px-3 py-1.5 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-zinc-200 border border-zinc-700 rounded-lg transition-colors flex items-center gap-1.5"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${testingSSH ? "animate-spin text-indigo-400" : ""}`} />
-            {testingSSH ? "Testing SSH..." : "Test RunPod SSH"}
+            {testingSSH ? "Testing SSH..." : "Test Remote SSH"}
           </button>
         </div>
       </div>
@@ -242,17 +242,17 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange, 
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* RunPod IP */}
+        {/* Remote GPU IP */}
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
             <Terminal className="w-3.5 h-3.5 text-zinc-400" />
-            RunPod IP / Host
+            Remote GPU Host / IP
           </label>
           <input
             type="text"
             placeholder="194.26.196.xxx"
-            value={config.runpod_ip}
-            onChange={(e) => handleInputChange("runpod_ip", e.target.value)}
+            value={config.remote_host}
+            onChange={(e) => handleInputChange("remote_host", e.target.value)}
             className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
           />
         </div>
@@ -287,7 +287,7 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange, 
             <div className="flex items-center gap-2">
               <label className="text-xs font-semibold text-zinc-200 flex items-center gap-1.5">
                 <Key className="w-3.5 h-3.5 text-amber-400" />
-                <span>SSH Private Key (RunPod Required)</span>
+                <span>SSH Private Key (Remote GPU Required)</span>
               </label>
               {config.ssh_private_key ? (
                 <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/60 font-mono">
@@ -303,7 +303,7 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange, 
                 onClick={handleGenerateKeyPair}
                 disabled={isGeneratingKeyPair}
                 className="px-2.5 py-1 text-xs font-semibold bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 rounded-lg shadow-sm flex items-center gap-1.5 transition-all disabled:opacity-50 cursor-pointer"
-                title="Generate a fresh Ed25519 keypair and display the public key for RunPod"
+                title="Generate a fresh Ed25519 keypair and display the public key for Remote GPU"
               >
                 <Sparkles className={`w-3.5 h-3.5 ${isGeneratingKeyPair ? "animate-spin" : ""}`} />
                 <span>{isGeneratingKeyPair ? "Generating..." : "Generate New Key Pair"}</span>
@@ -314,7 +314,7 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange, 
                   type="button"
                   onClick={() => setShowPublicKeyModal(true)}
                   className="px-2 py-1 text-xs text-amber-300 hover:text-amber-200 bg-amber-950/60 hover:bg-amber-900/60 border border-amber-700/50 rounded-lg font-medium flex items-center gap-1 transition-colors cursor-pointer"
-                  title="View Public Key for RunPod"
+                  title="View Public Key for Remote GPU"
                 >
                   <FileKey className="w-3 h-3 text-amber-400" />
                   <span>Public Key Tray</span>
@@ -363,7 +363,7 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange, 
               <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
                 <h4 className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
                   <Terminal className="w-3.5 h-3.5 text-amber-400" />
-                  RunPod SSH Key Pair Quick Setup
+                  Remote SSH Key Pair Quick Setup
                 </h4>
                 <button
                   type="button"
@@ -396,7 +396,7 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange, 
                   </p>
                   <div className="pl-6">
                     <CodeBlock 
-                      code={`ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_runpod -C "your_email@example.com"`}
+                      code={`ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_remote -C "your_email@example.com"`}
                       label="Bash"
                     />
                   </div>
@@ -406,16 +406,16 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange, 
                 <div className="bg-zinc-950/80 border border-zinc-800 rounded-lg p-3 space-y-1.5">
                   <div className="flex items-center gap-2">
                     <span className="w-4 h-4 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-bold flex items-center justify-center">2</span>
-                    <span className="text-xs font-semibold text-zinc-200">Step 2: Add Public Key to RunPod Account</span>
+                    <span className="text-xs font-semibold text-zinc-200">Step 2: Add Public Key to Remote GPU Account</span>
                   </div>
                   <div className="pl-6 space-y-1.5">
                     <p className="text-[11px] text-zinc-400">
-                      View public key: <code className="text-amber-300 bg-zinc-800 px-1 py-0.5 rounded">cat ~/.ssh/id_ed25519_runpod.pub</code>
+                      View public key: <code className="text-amber-300 bg-zinc-800 px-1 py-0.5 rounded">cat ~/.ssh/id_ed25519_remote.pub</code>
                     </p>
                     <div className="text-[11px] text-zinc-300 bg-zinc-900/90 border border-zinc-700/60 p-2 rounded-lg flex items-start gap-1.5">
                       <Info className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
                       <span>
-                        <strong>Destination:</strong> RunPod Console &rarr; Settings &rarr; SSH Keys &rarr; "+ Add SSH Key".
+                        <strong>Destination:</strong> Remote GPU Console &rarr; Settings &rarr; SSH Keys &rarr; "+ Add SSH Key".
                       </span>
                     </div>
                   </div>
@@ -464,7 +464,7 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange, 
                   </div>
                   <div className="pl-6 space-y-1.5">
                     <p className="text-[11px] text-zinc-400">
-                      Show command: <code className="text-amber-300 bg-zinc-800 px-1 py-0.5 rounded">cat ~/.ssh/id_ed25519_runpod</code>
+                      Show command: <code className="text-amber-300 bg-zinc-800 px-1 py-0.5 rounded">cat ~/.ssh/id_ed25519_remote</code>
                     </p>
                     <div className="text-[11px] text-zinc-300 bg-zinc-900/90 border border-zinc-700/60 p-2 rounded-lg flex items-start gap-1.5">
                       <Info className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
@@ -517,39 +517,55 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange, 
           </label>
           <input
             type="text"
-            placeholder="/workspace/runpod-slim/ComfyUI/input/"
-            value={config.remote_input_dir || ""}
-            onChange={(e) => handleInputChange("remote_input_dir", e.target.value)}
+            placeholder="/workspace/remote-slim/ComfyUI/input/"
+            value={config.remote_comfyui_root || ""}
+            onChange={(e) => handleInputChange("remote_comfyui_root", e.target.value)}
             className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-amber-500 rounded-lg px-3 py-2 text-xs font-mono text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
           />
+        </div>
+
+        {/* Remote ComfyUI Root Path */}
+        <div className="space-y-1.5 md:col-span-2">
+          <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
+            <Server className="w-3.5 h-3.5 text-zinc-400" />
+            Remote ComfyUI Root Path
+          </label>
+          <input
+            type="text"
+            placeholder="/workspace/remote-slim/ComfyUI"
+            value={config.remote_comfyui_root || "/workspace/remote-slim/ComfyUI"}
+            onChange={(e) => handleInputChange("remote_comfyui_root", e.target.value)}
+            className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
+          />
+          <p className="text-[10px] text-zinc-500 mt-1">The absolute directory path where ComfyUI is installed on the remote instance.</p>
         </div>
 
         {/* ComfyUI API URL */}
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
             <Server className="w-3.5 h-3.5 text-emerald-400" />
-            RunPod ComfyUI API URL
+            Remote ComfyUI API URL
           </label>
           <input
             type="text"
-            placeholder="http://127.0.0.1:8188 or https://pod-8188.proxy.runpod.net"
+            placeholder="http://127.0.0.1:8188 or https://pod-8188.proxy.remote.net"
             value={config.comfyui_api_url}
             onChange={(e) => handleInputChange("comfyui_api_url", e.target.value)}
             className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-emerald-500 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
           />
         </div>
 
-        {/* RunPod API Token (for proxy auth) */}
+        {/* Remote API Token (for proxy auth) */}
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
             <ShieldCheck className="w-3.5 h-3.5 text-zinc-400" />
-            RunPod API Token (Optional Proxy Auth Header)
+            Remote API Token (Optional Proxy Auth Header)
           </label>
           <input
             type="password"
-            placeholder="Bearer token if using RunPod proxy endpoint"
-            value={config.runpod_api_token}
-            onChange={(e) => handleInputChange("runpod_api_token", e.target.value)}
+            placeholder="Bearer token if using Remote GPU proxy endpoint"
+            value={config.remote_api_token}
+            onChange={(e) => handleInputChange("remote_api_token", e.target.value)}
             className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
           />
         </div>
@@ -610,12 +626,12 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange, 
 
       <div className="text-[11px] text-zinc-400 bg-zinc-950/40 p-2.5 rounded-lg border-2 border-zinc-700/60 flex items-center gap-2">
         <Info className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-        <span>During execution, media assets are pushed via Paramiko SCP into <code className="text-zinc-200 bg-zinc-800 px-1 py-0.5 rounded">{config.remote_input_dir || "/workspace/runpod-slim/ComfyUI/input/"}</code>, and modified JSON graphs are submitted to <code className="text-zinc-200 bg-zinc-800 px-1 py-0.5 rounded">/prompt</code>.</span>
+        <span>During execution, media assets are pushed via Paramiko SCP into <code className="text-zinc-200 bg-zinc-800 px-1 py-0.5 rounded">{config.remote_comfyui_root || "/workspace/remote-slim/ComfyUI/input/"}</code>, and modified JSON graphs are submitted to <code className="text-zinc-200 bg-zinc-800 px-1 py-0.5 rounded">/prompt</code>.</span>
       </div>
 
-      {/* Feature & Documentation Primer: RunPod SSH Key Setup & Configuration Card */}
-      <div id="runpod-ssh-guide" className="pt-2">
-        <RunPodSSHPrimerCard publicKey={generatedKeyPair?.public_key || config.ssh_public_key || undefined} />
+      {/* Feature & Documentation Primer: Remote GPU SSH Key Setup & Configuration Card */}
+      <div id="remote-ssh-guide" className="pt-2">
+        <RemoteSSHPrimerCard publicKey={generatedKeyPair?.public_key || config.ssh_public_key || undefined} />
       </div>
 
       {/* Public Key Modal / Copy Tray */}
@@ -650,7 +666,7 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange, 
               <div>
                 <p className="font-semibold text-amber-200">Private Key Automatically Configured!</p>
                 <p className="text-[11px] text-amber-300/80 mt-0.5">
-                  Your new Ed25519 private key is ready in Shot Planner. Now copy this matching <strong>Public Key</strong> to your RunPod account.
+                  Your new Ed25519 private key is ready in Shot Planner. Now copy this matching <strong>Public Key</strong> to your Remote GPU account.
                 </p>
               </div>
             </div>
@@ -660,7 +676,7 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange, 
               <div className="flex items-center justify-between">
                 <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
                   <FileKey className="w-3.5 h-3.5 text-amber-400" />
-                  <span>RunPod Public Key (Single-line authorized_keys format)</span>
+                  <span>Remote Public Key (Single-line authorized_keys format)</span>
                 </label>
                 <span className="text-[10px] text-zinc-500 font-mono">Ed25519 Standard</span>
               </div>
@@ -689,7 +705,7 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange, 
 
               <button
                 type="button"
-                onClick={() => handleDownloadFile(generatedKeyPair.public_key, "id_ed25519_runpod.pub")}
+                onClick={() => handleDownloadFile(generatedKeyPair.public_key, "id_ed25519_remote.pub")}
                 className="py-2.5 px-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 rounded-xl text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
                 title="Download public key file (.pub)"
               >
@@ -699,7 +715,7 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange, 
 
               <button
                 type="button"
-                onClick={() => handleDownloadFile(generatedKeyPair.private_key, "id_ed25519_runpod")}
+                onClick={() => handleDownloadFile(generatedKeyPair.private_key, "id_ed25519_remote")}
                 className="py-2.5 px-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 rounded-xl text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
                 title="Download private key file backup"
               >
@@ -727,10 +743,10 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange, 
             <div className="bg-zinc-950/80 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-400 space-y-1">
               <p className="text-zinc-300 font-medium flex items-center gap-1.5">
                 <Info className="w-3.5 h-3.5 text-indigo-400" />
-                Next Step in RunPod:
+                Next Step in Remote GPU:
               </p>
               <p className="text-[11px] leading-relaxed text-zinc-400">
-                Paste this public key into your <strong>RunPod Dashboard &rarr; Settings &rarr; SSH Keys</strong> for all new pods.
+                Paste this public key into your <strong>Remote Dashboard &rarr; Settings &rarr; SSH Keys</strong> for all new pods.
               </p>
             </div>
 

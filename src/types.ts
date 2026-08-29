@@ -36,6 +36,52 @@ export function generateSaveVideoPrefix(sceneName?: string, shotNumber?: string 
   return "";
 }
 
+export function generatePromptPrefix(plan?: Partial<ScenePlanning> | null): string {
+  if (!plan) return "";
+  const parts: string[] = [];
+  
+  if (plan.scene_name && plan.scene_name.trim()) {
+    parts.push(plan.scene_name.trim());
+  }
+  
+  const rawShot = plan.shot_number !== undefined && plan.shot_number !== null ? String(plan.shot_number).trim() : "";
+  const shotNum = formatShotNumber(rawShot || "01");
+  parts.push(`Shot ${shotNum}`);
+  
+  if (plan.shot_type && plan.shot_type.trim()) {
+    parts.push(plan.shot_type.trim());
+  }
+  
+  if (plan.camera_movement && plan.camera_movement.trim()) {
+    parts.push(plan.camera_movement.trim());
+  }
+  
+  return parts.join(" - ");
+}
+
+export function assembleFinalPrompt(
+  expandedPrompt: string,
+  promptPrefix: string,
+  isSceneRefPresent: boolean = false
+): string {
+  let prompt = (expandedPrompt || "").trim();
+  const cleanPrefix = (promptPrefix || "").trim().replace(/\.+$/, "");
+
+  if (cleanPrefix) {
+    // If prompt doesn't start with the clean prefix, prepend it to the top
+    if (!prompt.startsWith(cleanPrefix)) {
+      prompt = prompt ? `${cleanPrefix}\n\n${prompt}` : cleanPrefix;
+    }
+  }
+
+  // Ensure Scene Reference Directive is on its own line if scene reference is present
+  if (isSceneRefPresent && !prompt.includes(SCENE_REFERENCE_DIRECTIVE)) {
+    prompt = prompt ? `${prompt}\n\n${SCENE_REFERENCE_DIRECTIVE}` : SCENE_REFERENCE_DIRECTIVE;
+  }
+
+  return prompt;
+}
+
 export function hasSceneReferencePhoto(assets: Array<{ type?: string; media_type?: string; filename?: string; subject_name?: string }>): boolean {
   if (!assets || !Array.isArray(assets)) return false;
   return assets.some(a => {
@@ -56,6 +102,37 @@ export function hasSceneReferencePhoto(assets: Array<{ type?: string; media_type
   });
 }
 
+export interface SceneProjectFile {
+  schema_version: "1.0";
+  scene_id: string;
+  scene_name: string;
+  workflow_file: string;
+  shared_assets: {
+    slot_index: number;
+    filename: string;
+    label: string;
+    is_location?: boolean;
+  }[];
+  shots: ShotItem[];
+}
+
+export interface ShotItem {
+  id: string;
+  shot_number: number;
+  shot_type: string;
+  camera_movement: string;
+  basic_stub: string;
+  expanded_prompt: string;
+  assigned_slots: Record<number, string>;
+  staged: boolean;
+  updated_at: string;
+  workflow_file?: string;
+  prompt_node_id?: string;
+  node_mappings?: Record<string, string>;
+  generation_params?: GenerationParameters;
+  parameter_node_mappings?: ParameterNodeMappings;
+}
+
 export interface ToastMessage {
   id: string;
   text: string;
@@ -72,15 +149,15 @@ export interface ScenePlanning {
 }
 
 export interface AppConfig {
-  runpod_ip: string;
+  remote_host: string;
   ssh_port: number;
   ssh_username: string;
   ssh_password: string;
   ssh_key_path: string;
   ssh_private_key?: string;
-  remote_input_dir: string;
+  remote_comfyui_root: string;
   comfyui_api_url: string;
-  runpod_api_token: string;
+  remote_api_token: string;
   lm_studio_url: string;
   gemini_api_key?: string;
 }

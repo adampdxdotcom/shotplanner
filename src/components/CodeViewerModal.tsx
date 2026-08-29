@@ -34,8 +34,8 @@ from backend.routes.api import router as api_router
 from backend.utils.file_handlers import ASSETS_DIR
 
 app = FastAPI(
-    title="ComfyUI Bridge & RunPod Orchestrator API",
-    description="Backend bridge service connecting local assets, LM Studio, and remote RunPod ComfyUI instances",
+    title="ComfyUI Bridge & Remote GPU Orchestrator API",
+    description="Backend bridge service connecting local assets, LM Studio, and remote Remote GPU ComfyUI instances",
     version="1.0.0"
 )
 
@@ -82,7 +82,7 @@ from backend.utils.file_handlers import (
     UPLOADS_DIR
 )
 from backend.services.workflow_service import inspect_workflow_nodes, inject_and_prepare_workflow
-from backend.services.ssh_service import RunPodSSHService
+from backend.services.ssh_service import Remote GPUSSHService
 from backend.services.llm_service import expand_prompt_with_llm
 
 router = APIRouter(prefix="/api", tags=["ComfyUI Bridge API"])
@@ -93,14 +93,14 @@ router = APIRouter(prefix="/api", tags=["ComfyUI Bridge API"])
     "services/ssh_service.py": {
       lang: "python",
       path: "/backend/services/ssh_service.py",
-      desc: "Paramiko SFTP client pushing all mapped slot assets sequentially to /workspace/runpod-slim/ComfyUI/input/ with remote existence check (sftp.stat)",
+      desc: "Paramiko SFTP client pushing all mapped slot assets sequentially to /workspace//workspace/ComfyUI/input/ with remote existence check (sftp.stat)",
       content: `import os
 import io
 import paramiko
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
-class RunPodSSHService:
+class Remote GPUSSHService:
     def __init__(self, host: str, port: int = 22, username: str = "root", password: Optional[str] = None, key_path: Optional[str] = None, private_key: Optional[str] = None):
         self.host = host.strip()
         self.port = int(port)
@@ -108,7 +108,7 @@ class RunPodSSHService:
         self.password = password
         self.private_key = private_key.strip() if private_key else None
 
-    def transfer_files_to_runpod(self, local_files: List[Path], remote_dir: str = "/workspace/runpod-slim/ComfyUI/input", overwrite: bool = False):
+    def transfer_files_to_runpod(self, local_files: List[Path], remote_dir: str = "/workspace//workspace/ComfyUI/input", overwrite: bool = False):
         client = self.connect()
         clean_remote_dir = remote_dir.rstrip("/")
         client.exec_command(f"mkdir -p {clean_remote_dir}")
@@ -188,7 +188,7 @@ def inject_and_prepare_workflow(workflow_data, prompt_node_id, expanded_prompt, 
       lang: "markdown",
       path: "/README.md",
       desc: "Complete documentation, architecture diagram, and usage tutorial",
-      content: `# ComfyUI Bridge & RunPod Orchestrator
+      content: `# ComfyUI Bridge & Remote GPU Orchestrator
 See README.md in root for complete instructions and setup guide.`
     }
   };

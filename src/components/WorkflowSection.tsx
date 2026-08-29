@@ -34,6 +34,10 @@ interface WorkflowSectionProps {
   onUpdateParam: (key: keyof GenerationParameters, value: number) => void;
   parameterNodeMappings: ParameterNodeMappings;
   onUpdateParameterMapping: (key: keyof ParameterNodeMappings, nodeId: string) => void;
+  activeShotId: string | null;
+  onSelectShot: (id: string | null) => void;
+  sceneProject: import("../types").SceneProjectFile;
+  onUpdateShot: (updater: (prev: import("../types").ShotItem) => import("../types").ShotItem) => void;
 }
 
 export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
@@ -52,7 +56,11 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
   generationParams,
   onUpdateParam,
   parameterNodeMappings,
-  onUpdateParameterMapping
+  onUpdateParameterMapping,
+  activeShotId,
+  onSelectShot,
+  sceneProject,
+  onUpdateShot
 }) => {
   const [uploading, setUploading] = useState(false);
   const [showRawJson, setShowRawJson] = useState(false);
@@ -81,6 +89,9 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
       if (res.ok) {
         onRefreshWorkflows();
         onSelectWorkflow(data.filename);
+        if (activeShotId) {
+          onUpdateShot(prev => ({ ...prev, workflow_file: data.filename }));
+        }
       } else {
         setUploadError(data.error || "Failed to upload workflow");
       }
@@ -97,46 +108,77 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
   const videoNodes = parsedWorkflow?.nodes_info?.video_loader_nodes || [];
   const audioNodes = parsedWorkflow?.nodes_info?.audio_loader_nodes || [];
 
+  const activeShot = sceneProject.shots.find((s) => s.id === activeShotId);
+
   return (
-    <div id="workflow-section" className="bg-zinc-900/60 border-2 border-zinc-700 rounded-xl p-5 shadow-sm space-y-5">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
-        <div className="flex items-center gap-2.5">
-          <div className="p-1.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20">
-            <Workflow className="w-4 h-4" />
-          </div>
-          <div>
-            <h2 className="text-sm font-semibold text-zinc-100">2. Workflow &amp; Dynamic Node Mapping</h2>
-            <p className="text-xs text-zinc-400">Select standard visual canvas workflow JSON, inspect all loader nodes (active &amp; bypassed), and map uploaded media assets to Node IDs.</p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* Upload Button */}
-          <label className="cursor-pointer px-3 py-1.5 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 rounded-lg transition-colors flex items-center gap-1.5 shadow-xs">
-            <Upload className="w-3.5 h-3.5 text-amber-400" />
-            <span>{uploading ? "Uploading..." : "Upload Visual Workflow JSON"}</span>
-            <input 
-              type="file" 
-              accept=".json" 
-              onChange={handleFileUpload} 
-              className="hidden" 
-              disabled={uploading}
-            />
-          </label>
-
-          {parsedWorkflow && (
-            <button
-              onClick={() => setShowRawJson(!showRawJson)}
-              className="px-2.5 py-1.5 text-xs text-zinc-400 hover:text-zinc-200 bg-zinc-950 border-2 border-zinc-700 rounded-lg transition-colors flex items-center gap-1"
-              title="Inspect flat dictionary JSON"
-            >
-              <Code className="w-3.5 h-3.5" />
-              <span>{showRawJson ? "Hide JSON" : "Inspect Raw"}</span>
-            </button>
-          )}
+    <div id="workflow-section" className="space-y-5 flex flex-col min-h-0">
+      {/* Workflow Screen Header Controls */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-zinc-900/60 p-4 rounded-xl border border-zinc-800 shadow-sm">
+        <div className="flex items-center gap-3">
+          <label className="text-sm font-medium text-zinc-300">Shot Context:</label>
+          <select 
+            value={activeShotId || ""}
+            onChange={(e) => onSelectShot(e.target.value || null)}
+            className="bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none min-w-[250px]"
+          >
+            <option key="empty" value="">-- Select a Shot to Map Workflow --</option>
+            {sceneProject.shots.map(s => (
+              <option key={s.id} value={s.id}>
+                Shot {s.shot_number.toString().padStart(2, '0')} - {s.shot_type}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
+
+      {!activeShotId ? (
+        <div className="flex flex-col items-center justify-center p-12 bg-zinc-900/40 border-2 border-dashed border-zinc-800 rounded-xl">
+          <Layers className="w-12 h-12 text-zinc-600 mb-4" />
+          <h2 className="text-xl font-semibold text-zinc-300 mb-2">No Shot Selected</h2>
+          <p className="text-sm text-zinc-500 text-center max-w-md">
+            Select a shot from the dropdown above to assign a ComfyUI workflow template and map its image loader nodes.
+          </p>
+        </div>
+      ) : (
+        <div className="bg-zinc-900/60 border-2 border-zinc-700 rounded-xl p-5 shadow-sm space-y-5">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                <Workflow className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-zinc-100">Workflow &amp; Dynamic Node Mapping</h2>
+                <p className="text-xs text-zinc-400">Select standard visual canvas workflow JSON, inspect all loader nodes (active &amp; bypassed), and map uploaded media assets to Node IDs.</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {/* Upload Button */}
+              <label className={`cursor-pointer px-3 py-1.5 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 rounded-lg transition-colors flex items-center gap-1.5 shadow-xs ${!activeShotId || uploading ? "opacity-50 cursor-not-allowed" : ""}`}>
+                <Upload className="w-3.5 h-3.5 text-amber-400" />
+                <span>{uploading ? "Uploading..." : "Upload Visual Workflow JSON"}</span>
+                <input 
+                  type="file" 
+                  accept=".json" 
+                  onChange={handleFileUpload} 
+                  className="hidden" 
+                  disabled={!activeShotId || uploading}
+                />
+              </label>
+
+              {parsedWorkflow && (
+                <button
+                  onClick={() => setShowRawJson(!showRawJson)}
+                  className="px-2.5 py-1.5 text-xs text-zinc-400 hover:text-zinc-200 bg-zinc-950 border-2 border-zinc-700 rounded-lg transition-colors flex items-center gap-1"
+                  title="Inspect flat dictionary JSON"
+                >
+                  <Code className="w-3.5 h-3.5" />
+                  <span>{showRawJson ? "Hide JSON" : "Show JSON"}</span>
+                </button>
+              )}
+            </div>
+          </div>
 
       {uploadError && (
         <div className="p-3 rounded-lg bg-red-950/30 border border-red-800/40 text-xs text-red-300 flex items-center gap-2">
@@ -155,12 +197,18 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
           <div className="flex items-center gap-2">
             <select
               value={selectedWorkflowFile}
-              onChange={(e) => onSelectWorkflow(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                onSelectWorkflow(val);
+                if (activeShotId) {
+                  onUpdateShot(prev => ({ ...prev, workflow_file: val }));
+                }
+              }}
               className="flex-1 bg-zinc-950 border-2 border-zinc-700 focus:border-amber-500 rounded-lg px-3 py-2 text-xs text-zinc-100 outline-none transition-colors"
             >
-              {workflows.length === 0 && <option value="">No workflows found in /assets/workflows</option>}
-              {workflows.map((wf) => (
-                <option key={wf.filename} value={wf.filename}>
+              {workflows.length === 0 && <option key="empty" value="">No workflows found in /assets/workflows</option>}
+              {workflows.map((wf, i) => (
+                <option key={`wf-${wf.filename}-${i}`} value={wf.filename}>
                   {wf.title} ({wf.filename} • {wf.node_count} nodes)
                 </option>
               ))}
@@ -229,7 +277,12 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
                   return (
                     <button
                       key={pNode.id}
-                      onClick={() => onSelectPromptNodeId(pNode.id)}
+                      onClick={() => {
+                        onSelectPromptNodeId(pNode.id);
+                        if (activeShotId) {
+                          onUpdateShot(prev => ({ ...prev, prompt_node_id: pNode.id }));
+                        }
+                      }}
                       className={`p-2.5 rounded-lg text-left border transition-all ${
                         isSelected 
                           ? "bg-indigo-950/40 border-indigo-500 text-indigo-200 ring-1 ring-indigo-500/50" 
@@ -276,8 +329,8 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {/* Image Loaders */}
-              {imageNodes.map((node) => {
-                const assignedFile = nodeMappings[node.id] || "";
+              {imageNodes.map((node, idx) => {
+                const assignedFile = activeShot?.assigned_slots[idx] || nodeMappings[node.id] || "";
                 const mappedAsset = uploadedAssets.find(a => a.filename === assignedFile);
                 return (
                   <div key={node.id} className="bg-zinc-950/60 p-3 rounded-lg border-2 border-zinc-700 space-y-2">
@@ -312,12 +365,24 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
                       )}
                       <select
                         value={assignedFile}
-                        onChange={(e) => onUpdateMapping(node.id, e.target.value)}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          onUpdateMapping(node.id, val);
+                          if (activeShotId) {
+                            onUpdateShot(prev => ({
+                              ...prev,
+                              assigned_slots: {
+                                ...prev.assigned_slots,
+                                [idx]: val
+                              }
+                            }));
+                          }
+                        }}
                         className="flex-1 bg-zinc-900 border-2 border-zinc-700 focus:border-amber-500 rounded-md px-2.5 py-1.5 text-xs text-zinc-200 outline-none"
                       >
-                        <option value="">-- Assign Uploaded Asset (or Use Bypass) --</option>
-                        {uploadedAssets.map((asset) => (
-                          <option key={asset.filename} value={asset.filename}>
+                        <option key="empty" value="">-- Assign Uploaded Asset (or Use Bypass) --</option>
+                        {uploadedAssets.map((asset, i) => (
+                          <option key={`asset-${asset.filename}-${i}`} value={asset.filename}>
                             [{asset.type}] {asset.subject_name} ({asset.filename})
                           </option>
                         ))}
@@ -351,9 +416,9 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
                         onChange={(e) => onUpdateMapping(node.id, e.target.value)}
                         className="flex-1 bg-zinc-900 border-2 border-zinc-700 focus:border-indigo-500 rounded-md px-2.5 py-1.5 text-xs text-zinc-200 outline-none"
                       >
-                        <option value="">-- Assign Uploaded Video --</option>
-                        {uploadedAssets.filter(a => a.media_type === "video").map((asset) => (
-                          <option key={asset.filename} value={asset.filename}>
+                        <option key="empty" value="">-- Assign Uploaded Video --</option>
+                        {uploadedAssets.filter(a => a.media_type === "video").map((asset, i) => (
+                          <option key={`vid-${asset.filename}-${i}`} value={asset.filename}>
                             [Video] {asset.subject_name} ({asset.filename})
                           </option>
                         ))}
@@ -387,9 +452,9 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
                         onChange={(e) => onUpdateMapping(node.id, e.target.value)}
                         className="flex-1 bg-zinc-900 border-2 border-zinc-700 focus:border-emerald-500 rounded-md px-2.5 py-1.5 text-xs text-zinc-200 outline-none"
                       >
-                        <option value="">-- Assign Uploaded Audio --</option>
-                        {uploadedAssets.filter(a => a.media_type === "audio").map((asset) => (
-                          <option key={asset.filename} value={asset.filename}>
+                        <option key="empty" value="">-- Assign Uploaded Audio --</option>
+                        {uploadedAssets.filter(a => a.media_type === "audio").map((asset, i) => (
+                          <option key={`aud-${asset.filename}-${i}`} value={asset.filename}>
                             [Audio] {asset.subject_name} ({asset.filename})
                           </option>
                         ))}
@@ -401,6 +466,8 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
             </div>
           </div>
         </div>
+      )}
+      </div>
       )}
     </div>
   );

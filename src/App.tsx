@@ -9,20 +9,22 @@ import { LLMSection } from "./components/LLMSection";
 import { ExecutionSection } from "./components/ExecutionSection";
 import { CodeViewerModal } from "./components/CodeViewerModal";
 import { SaveProjectModal, LoadProjectModal } from "./components/ProjectModals";
+import SceneProjectHub from "./components/SceneProjectHub";
+import { SceneProjectFile, ShotItem } from "./types";
 import { Sparkles, ArrowDown, HelpCircle, Terminal } from "lucide-react";
 
 export default function App() {
   // 1. Config State
   const [config, setConfig] = useState<AppConfig>({
-    runpod_ip: "194.26.196.105",
+    remote_host: "194.26.196.105",
     ssh_port: 22,
     ssh_username: "root",
     ssh_password: "",
     ssh_key_path: "",
     ssh_private_key: "",
-    remote_input_dir: "/workspace/runpod-slim/ComfyUI/input/",
+    remote_comfyui_root: "/workspace/runpod-slim/ComfyUI",
     comfyui_api_url: "http://127.0.0.1:8188",
-    runpod_api_token: "",
+    remote_api_token: "",
     lm_studio_url: "http://localhost:1234/v1"
   });
 
@@ -81,6 +83,26 @@ export default function App() {
   }, [assets]);
 
   // 4. LLM Prompt Expansion & Scene Planning State
+  // Scene Hub State
+  const [sceneProject, setSceneProject] = useState<SceneProjectFile>({
+    schema_version: "1.0",
+    scene_id: "scene_" + Date.now(),
+    scene_name: "New Scene",
+    workflow_file: "",
+    shared_assets: [],
+    shots: [{
+      id: "shot_" + Date.now(),
+      shot_number: 1,
+      shot_type: "Medium Shot",
+      camera_movement: "Locked Off",
+      basic_stub: "",
+      expanded_prompt: "",
+      assigned_slots: {},
+      staged: false,
+      updated_at: new Date().toISOString()
+    }]
+  });
+
   const [scenePlanning, setScenePlanning] = useState<ScenePlanning>({
     scene_name: "",
     shot_number: "01",
@@ -94,7 +116,8 @@ export default function App() {
   const [llmProvider, setLlmProvider] = useState<LLMProvider>("lm_studio");
 
   // UI Navigation & Code Modal
-  const [activeSection, setActiveSection] = useState<string>("assets");
+  const [activeSection, setActiveSection] = useState<string>("scene");
+  const [activeShotId, setActiveShotId] = useState<string | null>(null);
   const [isCodeModalOpen, setIsCodeModalOpen] = useState<boolean>(false);
 
   // Project Save/Load State
@@ -112,6 +135,40 @@ export default function App() {
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
     }, 4000);
+  };
+
+  const [availableScenes, setAvailableScenes] = useState<string[]>([]);
+  
+  useEffect(() => {
+    fetch("/api/projects")
+      .then(res => res.json())
+      .then(data => {
+        if (data.projects) {
+          setAvailableScenes(data.projects.filter((p: string) => p.startsWith("scene_")));
+        }
+      })
+      .catch(e => console.error("Failed to load scene list", e));
+  }, []);
+
+  const handleSelectScene = async (sceneFilename: string) => {
+    if (!sceneFilename) return;
+    try {
+      const res = await fetch(`/api/projects/${sceneFilename}`);
+      if (!res.ok) throw new Error("Failed to fetch scene");
+      const data = await res.json();
+      setSceneProject({
+        schema_version: "1.0",
+        scene_id: data.scene_id || "scene_" + Date.now(),
+        scene_name: data.scene_name || "New Scene",
+        workflow_file: data.workflow_file || "",
+        shared_assets: data.shared_assets || [],
+        shots: data.shots || []
+      });
+      setActiveShotId(null);
+      addToast(`Loaded scene: ${data.scene_name || sceneFilename}`, "success");
+    } catch (e: any) {
+      addToast(e.message || "Failed to load scene", "error");
+    }
   };
 
   useEffect(() => {
@@ -133,12 +190,197 @@ export default function App() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isDirty]);
 
+  // Auto-save sceneProject to disk
+  useEffect(() => {
+    if (isInitialLoad) return;
+    const saveSceneProject = async () => {
+      try {
+        const payload = {
+          name: `scene_${sceneProject.scene_name.replace(/[^a-zA-Z0-9_-]/g, "_")}`,
+          data: sceneProject
+        };
+        await fetch("/api/projects", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+      } catch (err) {
+        console.error("Auto-save failed:", err);
+      }
+    };
+    
+    const timer = setTimeout(saveSceneProject, 1000);
+    return () => clearTimeout(timer);
+  }, [sceneProject, isInitialLoad]);
+
   const handleUpdateParam = (key: keyof GenerationParameters, value: number) => {
     setGenerationParams(prev => ({ ...prev, [key]: value }));
+    if (activeShotId) {
+      setSceneProject(prev => {
+        const shots = [...prev.shots];
+        const idx = shots.findIndex(s => s.id === activeShotId);
+        if (idx !== -1) {
+          shots[idx] = {
+            ...shots[idx],
+            generation_params: {
+              ...(shots[idx].generation_params || { steps: 30, megapixels: 0.5, frames: 81 }),
+              [key]: value
+            }
+          };
+        }
+        return { ...prev, shots };
+      });
+    }
   };
 
   const handleUpdateParameterMapping = (key: keyof ParameterNodeMappings, nodeId: string) => {
     setParameterNodeMappings(prev => ({ ...prev, [key]: nodeId }));
+    if (activeShotId) {
+      setSceneProject(prev => {
+        const shots = [...prev.shots];
+        const idx = shots.findIndex(s => s.id === activeShotId);
+        if (idx !== -1) {
+          shots[idx] = {
+            ...shots[idx],
+            parameter_node_mappings: {
+              ...(shots[idx].parameter_node_mappings || { steps: "", megapixels: "", frames: "" }),
+              [key]: nodeId
+            }
+          };
+        }
+        return { ...prev, shots };
+      });
+    }
+  };
+
+  const handleSceneExpandPrompt = async (shot: ShotItem): Promise<string> => {
+    const shotPrefix = `${sceneProject.scene_name ? sceneProject.scene_name + " - " : ""}Shot ${shot.shot_number.toString().padStart(2, "0")} - ${shot.shot_type} - ${shot.camera_movement}`;
+    
+    // We need to pass the assigned assets for this shot
+    const shotAssets = Object.entries(shot.assigned_slots).map(([idx, filename]) => {
+      const asset = assets.find(a => a.filename === filename);
+      if (asset) return { ...asset, slot_index: parseInt(idx) };
+      return null;
+    }).filter(Boolean) as MediaAsset[];
+
+    // Add shared assets if no specific slot
+    sceneProject.shared_assets.forEach(shared => {
+      if (!shot.assigned_slots[shared.slot_index]) {
+        const asset = assets.find(a => a.filename === shared.filename);
+        if (asset) shotAssets.push({ ...asset, slot_index: shared.slot_index });
+      }
+    });
+    
+    const response = await fetch("/api/llm/expand", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        basic_stub: shot.basic_stub,
+        assets: shotAssets,
+        prompt_prefix: shotPrefix,
+        provider: llmProvider,
+        lm_studio_url: config.lm_studio_url,
+        gemini_api_key: config.gemini_api_key
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Expansion failed");
+    return data.expanded_prompt;
+  };
+
+  const handleSceneTransfer = async (shot: ShotItem): Promise<boolean> => {
+    // Generate the specific node mappings for this shot based on slot_index
+    const shotMappings: Record<string, string> = {};
+    if (parsedWorkflow) {
+      const imgLoaders = parsedWorkflow.nodes_info.image_loader_nodes || [];
+      const vidLoaders = parsedWorkflow.nodes_info.video_loader_nodes || [];
+      const audLoaders = parsedWorkflow.nodes_info.audio_loader_nodes || [];
+      
+      const allLoaders = [...imgLoaders, ...vidLoaders, ...audLoaders];
+      
+      // Assign based on slot index
+      for (let i = 0; i < 9; i++) {
+        const filename = shot.assigned_slots[i] || sceneProject.shared_assets.find(a => a.slot_index === i)?.filename;
+        if (filename && allLoaders[i]) {
+          shotMappings[allLoaders[i].id] = filename;
+        }
+      }
+    }
+
+    const activeSceneName = sceneProject.scene_name.replace(/[^a-zA-Z0-9_-]/g, "_") || "Untitled_Scene";
+    const activeShotNumber = shot.shot_number.toString().padStart(2, "0");
+
+    const payload = {
+      ...config,
+      workflow_filename: selectedWorkflowFile || sceneProject.workflow_file,
+      output_workflow_filename: `${activeSceneName}_Shot_${activeShotNumber}.json`,
+      prompt_node_id: selectedPromptNodeId,
+      expanded_prompt: shot.expanded_prompt,
+      node_mappings: shotMappings,
+      bypass_missing: bypassMissing,
+      generation_parameters: generationParams,
+      parameter_node_mappings: parameterNodeMappings,
+      scene_name: activeSceneName,
+      shot_number: activeShotNumber
+    };
+
+    const response = await fetch("/api/workflow/stage", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Transfer failed");
+    return data.success;
+  };
+
+  const handleSceneTransferAll = async (): Promise<boolean> => {
+    const activeSceneName = sceneProject.scene_name.replace(/[^a-zA-Z0-9_-]/g, "_") || "Untitled_Scene";
+    const shotsData = sceneProject.shots.map(shot => {
+      const shotMappings: Record<string, string> = {};
+      if (parsedWorkflow) {
+        const imgLoaders = parsedWorkflow.nodes_info.image_loader_nodes || [];
+        const vidLoaders = parsedWorkflow.nodes_info.video_loader_nodes || [];
+        const audLoaders = parsedWorkflow.nodes_info.audio_loader_nodes || [];
+        
+        const allLoaders = [...imgLoaders, ...vidLoaders, ...audLoaders];
+        for (let i = 0; i < 9; i++) {
+          const filename = shot.assigned_slots[i] || sceneProject.shared_assets.find(a => a.slot_index === i)?.filename;
+          if (filename && allLoaders[i]) {
+            shotMappings[allLoaders[i].id] = filename;
+          }
+        }
+      }
+      return {
+        shot_number: shot.shot_number.toString().padStart(2, "0"),
+        shot_type: shot.shot_type,
+        camera_movement: shot.camera_movement,
+        expanded_prompt: shot.expanded_prompt,
+        prompt_node_id: selectedPromptNodeId,
+        node_mappings: shotMappings
+      };
+    });
+
+    const payload = {
+      ...config,
+      workflow_filename: selectedWorkflowFile || sceneProject.workflow_file,
+      scene_name: activeSceneName,
+      shots: shotsData,
+      bypass_missing: bypassMissing,
+      generation_parameters: generationParams,
+      parameter_node_mappings: parameterNodeMappings
+    };
+
+    const response = await fetch("/api/workflow/stage-scene", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Scene transfer failed");
+    return data.success;
   };
 
   const handleSaveProject = async (filename: string) => {
@@ -191,6 +433,14 @@ export default function App() {
     }
     const data = await res.json();
 
+    if (data.schema_version === "1.0") {
+      setSceneProject(data);
+      setCurrentProjectName(filename);
+      setActiveSection("scene");
+      setIsDirty(false);
+      return;
+    }
+
     // 1. Sync & set saved assets if present
     if (Array.isArray(data.assets) && data.assets.length > 0) {
       const normalizedAssets = data.assets.map((a: any, idx: number) => ({
@@ -224,7 +474,9 @@ export default function App() {
       setConfig(prev => ({
         ...prev,
         ...data.config,
-        remote_input_dir: data.config.remote_input_dir || prev.remote_input_dir || "/workspace/runpod-slim/ComfyUI/input/"
+        remote_host: data.config.remote_host || data.config.runpod_ip || prev.remote_host,
+        remote_api_token: data.config.remote_api_token || data.config.runpod_api_token || prev.remote_api_token,
+        remote_comfyui_root: data.config.remote_comfyui_root || (data.config.remote_input_dir ? data.config.remote_input_dir.replace(/\/input\/?$/, "") : null) || prev.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI"
       }));
     }
     setSelectedWorkflowFile(data.selectedWorkflowFile || "");
@@ -438,14 +690,49 @@ export default function App() {
 
   const handleUpdateMapping = (nodeId: string, filename: string) => {
     setNodeMappings(prev => ({ ...prev, [nodeId]: filename }));
+    if (activeShotId) {
+      updateActiveShot(prev => ({
+        ...prev,
+        node_mappings: {
+          ...(prev.node_mappings || {}),
+          [nodeId]: filename
+        }
+      }));
+    }
   };
 
   const scrollToSection = (sectionId: string) => {
     setActiveSection(sectionId);
   };
 
+  const updateActiveShot = (updater: (prev: ShotItem) => ShotItem) => {
+    setSceneProject(prev => {
+      const shots = [...prev.shots];
+      const idx = shots.findIndex(s => s.id === activeShotId);
+      if (idx !== -1) {
+        shots[idx] = updater(shots[idx]);
+      }
+      return { ...prev, shots };
+    });
+  };
+
+  useEffect(() => {
+    if (activeShotId) {
+      const shot = sceneProject.shots.find(s => s.id === activeShotId);
+      if (shot) {
+        if (shot.workflow_file !== undefined) setSelectedWorkflowFile(shot.workflow_file);
+        if (shot.prompt_node_id !== undefined) setSelectedPromptNodeId(shot.prompt_node_id);
+        if (shot.node_mappings !== undefined) setNodeMappings(shot.node_mappings);
+        if (shot.generation_params !== undefined) setGenerationParams(shot.generation_params);
+        if (shot.parameter_node_mappings !== undefined) setParameterNodeMappings(shot.parameter_node_mappings);
+        if (shot.basic_stub !== undefined) setBasicStub(shot.basic_stub);
+        if (shot.expanded_prompt !== undefined) setExpandedPrompt(shot.expanded_prompt);
+      }
+    }
+  }, [activeShotId, sceneProject.shots]);
+
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans selection:bg-indigo-500 selection:text-white">
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans selection:bg-indigo-500 selection:text-white flex flex-col">
       {/* Top Navbar */}
       <Navbar 
         activeSection={activeSection}
@@ -457,14 +744,57 @@ export default function App() {
       />
 
       {/* Main Workspace Layout */}
-      <main className="max-w-7xl mx-auto px-4 lg:px-8 py-6 space-y-6">
+      <main className="max-w-7xl mx-auto px-4 lg:px-8 py-6 space-y-6 flex-1 flex flex-col min-h-0">
         {/* Tab Content Rendering */}
+        {activeSection === "scene" && (
+          <div className="flex flex-col gap-6 min-h-0 flex-1">
+            <div className="flex items-center gap-4 bg-zinc-900/40 p-4 rounded-xl border border-zinc-800">
+              <label className="text-sm font-medium text-zinc-400">Active Scene Project:</label>
+              <select
+                value={sceneProject.scene_name}
+                onChange={(e) => {
+                  const sel = e.target.value;
+                  const sceneFile = availableScenes.find(s => s === sel || s === `scene_${sel.replace(/[^a-zA-Z0-9_-]/g, "_")}`);
+                  if (sceneFile) {
+                    handleSelectScene(sceneFile);
+                  } else {
+                    setSceneProject(prev => ({ ...prev, scene_name: sel }));
+                  }
+                }}
+                className="bg-zinc-950 border border-zinc-800 rounded-md px-3 py-1.5 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none min-w-[200px]"
+              >
+                <option key="active" value={sceneProject.scene_name}>{sceneProject.scene_name}</option>
+                {availableScenes
+                  .filter(s => s !== `scene_${sceneProject.scene_name.replace(/[^a-zA-Z0-9_-]/g, "_")}`)
+                  .map(s => (
+                  <option key={s} value={s}>{s.replace(/^scene_/, "").replace(/_/g, " ")}</option>
+                ))}
+              </select>
+            </div>
+            
+            <SceneProjectHub
+              project={sceneProject}
+              onUpdateProject={setSceneProject}
+              activeShotId={activeShotId}
+              onSelectShot={setActiveShotId}
+              config={config}
+              assets={assets}
+              onShowToast={addToast}
+              onTransfer={handleSceneTransfer}
+              onTransferScene={handleSceneTransferAll}
+              onExpandPrompt={handleSceneExpandPrompt}
+            />
+          </div>
+        )}
+
         {activeSection === "assets" && (
           <AssetManagerSection
             assets={assets}
             subjects={subjects}
-            planning={scenePlanning}
-            onChangePlanning={setScenePlanning}
+            activeShotId={activeShotId}
+            onSelectShot={setActiveShotId}
+            sceneProject={sceneProject}
+            onUpdateProject={setSceneProject}
             onRegisterSubject={handleRegisterSubject}
             onAssetUploaded={handleAssetUploaded}
             onAssetDeleted={handleAssetDeleted}
@@ -490,15 +820,25 @@ export default function App() {
             onUpdateParam={handleUpdateParam}
             parameterNodeMappings={parameterNodeMappings}
             onUpdateParameterMapping={handleUpdateParameterMapping}
+            activeShotId={activeShotId}
+            onSelectShot={setActiveShotId}
+            sceneProject={sceneProject}
+            onUpdateShot={updateActiveShot}
           />
         )}
 
         {activeSection === "llm" && (
           <LLMSection
             basicStub={basicStub}
-            onChangeBasicStub={setBasicStub}
+            onChangeBasicStub={(val) => {
+              setBasicStub(val);
+              if (activeShotId) updateActiveShot(prev => ({ ...prev, basic_stub: val, staged: false }));
+            }}
             expandedPrompt={expandedPrompt}
-            onChangeExpandedPrompt={setExpandedPrompt}
+            onChangeExpandedPrompt={(val) => {
+              setExpandedPrompt(val);
+              if (activeShotId) updateActiveShot(prev => ({ ...prev, expanded_prompt: val, staged: false }));
+            }}
             providerChoice={llmProvider}
             onChangeProviderChoice={setLlmProvider}
             promptPrefix={promptPrefix}
@@ -507,21 +847,22 @@ export default function App() {
             lmStudioUrl={config.lm_studio_url}
             geminiApiKey={config.gemini_api_key}
             onShowToast={addToast}
+            activeShotId={activeShotId}
+            onSelectShot={setActiveShotId}
+            sceneProject={sceneProject}
+            onUpdateShot={updateActiveShot}
           />
         )}
 
         {activeSection === "execute" && (
           <ExecutionSection
             config={config}
-            workflowFilename={selectedWorkflowFile}
-            promptNodeId={selectedPromptNodeId}
-            expandedPrompt={expandedPrompt}
-            promptPrefix={promptPrefix}
-            scenePlanning={scenePlanning}
-            nodeMappings={nodeMappings}
-            bypassMissing={bypassMissing}
-            generationParams={generationParams}
-            parameterNodeMappings={parameterNodeMappings}
+            activeShotId={activeShotId}
+            sceneProject={sceneProject}
+            onSelectShot={setActiveShotId}
+            onUpdateShot={updateActiveShot}
+            onUpdateSceneProject={setSceneProject}
+            onShowToast={addToast}
           />
         )}
 
@@ -555,7 +896,7 @@ export default function App() {
 
       {/* Footer */}
       <footer className="border-t border-zinc-800/80 py-6 mt-12 text-center text-xs text-zinc-500">
-        <p>ComfyUI Bridge &amp; RunPod Orchestrator • Dockerized Local Bridge Architecture</p>
+        <p>ComfyUI Bridge &amp; Remote Orchestrator • Dockerized Local Bridge Architecture</p>
       </footer>
     </div>
   );

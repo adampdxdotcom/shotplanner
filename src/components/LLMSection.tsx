@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { MediaAsset, LLMProvider, ScenePlanning, hasSceneReferencePhoto, SCENE_REFERENCE_DIRECTIVE } from "../types";
+import { MediaAsset, LLMProvider, ScenePlanning, hasSceneReferencePhoto, SCENE_REFERENCE_DIRECTIVE, assembleFinalPrompt } from "../types";
 import { formatShotNumber } from "./ScenePlanningHeader";
 import { 
   Sparkles, 
@@ -30,6 +30,10 @@ interface LLMSectionProps {
   lmStudioUrl: string;
   geminiApiKey?: string;
   onShowToast?: (text: string, type: "success" | "error" | "info") => void;
+  activeShotId: string | null;
+  onSelectShot: (id: string | null) => void;
+  sceneProject: import("../types").SceneProjectFile;
+  onUpdateShot: (updater: (prev: import("../types").ShotItem) => import("../types").ShotItem) => void;
 }
 
 export const LLMSection: React.FC<LLMSectionProps> = ({
@@ -44,7 +48,11 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
   assets,
   lmStudioUrl,
   geminiApiKey,
-  onShowToast
+  onShowToast,
+  activeShotId,
+  onSelectShot,
+  sceneProject,
+  onUpdateShot
 }) => {
   const [internalProvider, setInternalProvider] = useState<LLMProvider>("lm_studio");
   const providerChoice = controlledProvider !== undefined ? controlledProvider : internalProvider;
@@ -60,6 +68,13 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
   const [copied, setCopied] = useState(false);
 
   const isSceneRefPresent = hasSceneReferencePhoto(assets);
+
+  const activeShot = activeShotId ? sceneProject.shots.find(s => s.id === activeShotId) : null;
+  const activeShotAssets = activeShot ? Object.values(activeShot.assigned_slots).filter(Boolean) : [];
+  
+  const activeShotPrefix = activeShot 
+    ? `${sceneProject.scene_name ? sceneProject.scene_name + " - " : ""}Shot ${activeShot.shot_number.toString().padStart(2, "0")} - ${activeShot.shot_type} - ${activeShot.camera_movement}`
+    : promptPrefix;
 
   const handleGeneratePrompt = async () => {
     if (!basicStub.trim()) {
@@ -79,7 +94,10 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
           basic_stub: basicStub,
           assets: assets,
           lm_studio_url: lmStudioUrl,
-          provider: providerChoice
+          provider: providerChoice,
+          prompt_prefix: activeShotPrefix,
+          scene_planning: planning,
+          planning: planning
         })
       });
 
@@ -99,7 +117,8 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
   };
 
   const handleCopy = async () => {
-    if (!expandedPrompt || !expandedPrompt.trim()) {
+    const textToCopy = assembleFinalPrompt(expandedPrompt, activeShotPrefix, isSceneRefPresent);
+    if (!textToCopy || !textToCopy.trim()) {
       onShowToast?.("No prompt text to copy.", "info");
       return;
     }
@@ -108,7 +127,7 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
 
     try {
       if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(expandedPrompt);
+        await navigator.clipboard.writeText(textToCopy);
         success = true;
       } else {
         throw new Error("Clipboard API not available");
@@ -117,7 +136,7 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
       // Fallback for iframe / non-focused context
       try {
         const textArea = document.createElement("textarea");
-        textArea.value = expandedPrompt;
+        textArea.value = textToCopy;
         textArea.style.position = "fixed";
         textArea.style.left = "-999999px";
         textArea.style.top = "-999999px";
@@ -134,49 +153,78 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
     if (success) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
-      onShowToast?.("LLM generated prompt copied to clipboard!", "success");
+      onShowToast?.("Final prompt (with Scene & Shot header at top) copied to clipboard!", "success");
     } else {
       onShowToast?.("Failed to copy prompt to clipboard.", "error");
     }
   };
 
   return (
-    <div id="llm-section" className="bg-zinc-900/60 border-2 border-zinc-700 rounded-xl p-5 shadow-sm space-y-5">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
-        <div className="flex items-center gap-2.5">
-          <div className="p-1.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20">
-            <Sparkles className="w-4 h-4" />
-          </div>
-          <div>
-            <h2 className="text-sm font-semibold text-zinc-100">3. LLM Prompt Expansion ("Generate from Stub")</h2>
-            <p className="text-xs text-zinc-400">
-              Passes basic concept + all uploaded asset metadata into local LM Studio to generate ComfyUI-tagged prompts (<code className="text-zinc-300">&lt;Picture 1&gt;</code>, <code className="text-zinc-300">&lt;Video 1&gt;</code>).
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {providerUsed && (
-            <span className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-indigo-950 border border-indigo-800/60 text-indigo-300">
-              Provider: {providerUsed}
-            </span>
-          )}
-          <span className="text-[11px] text-zinc-400 bg-zinc-950 px-2.5 py-1 rounded-lg border-2 border-zinc-700">
-            {assets.length} reference asset(s) in context
-          </span>
+    <div id="llm-section" className="space-y-5 flex flex-col min-h-0">
+      {/* Prompt Screen Header Controls */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-zinc-900/60 p-4 rounded-xl border border-zinc-800 shadow-sm">
+        <div className="flex items-center gap-3">
+          <label className="text-sm font-medium text-zinc-300">Shot Context:</label>
+          <select 
+            value={activeShotId || ""}
+            onChange={(e) => onSelectShot(e.target.value || null)}
+            className="bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none min-w-[250px]"
+          >
+            <option key="empty" value="">-- Select a Shot to Edit Prompt --</option>
+            {sceneProject.shots.map(s => (
+              <option key={s.id} value={s.id}>
+                Shot {s.shot_number.toString().padStart(2, '0')} - {s.shot_type}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
-      {error && (
-        <div className="p-3 rounded-lg bg-red-950/30 border border-red-800/40 text-xs text-red-300 flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
-          <span>{error}</span>
+      {!activeShotId ? (
+        <div className="flex flex-col items-center justify-center p-12 bg-zinc-900/40 border-2 border-dashed border-zinc-800 rounded-xl">
+          <Bot className="w-12 h-12 text-zinc-600 mb-4" />
+          <h2 className="text-xl font-semibold text-zinc-300 mb-2">No Shot Selected</h2>
+          <p className="text-sm text-zinc-500 text-center max-w-md">
+            Select a shot from the dropdown above to write the concept stub, expand with LLM, and inspect the injected prompt.
+          </p>
         </div>
-      )}
+      ) : (
+        <div className="bg-zinc-900/60 border-2 border-zinc-700 rounded-xl p-5 shadow-sm space-y-5">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                <Sparkles className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-zinc-100">LLM Prompt Expansion ("Generate from Stub")</h2>
+                <p className="text-xs text-zinc-400">
+                  Passes basic concept + all uploaded asset metadata into local LM Studio to generate ComfyUI-tagged prompts (<code className="text-zinc-300">&lt;Picture 1&gt;</code>, <code className="text-zinc-300">&lt;Video 1&gt;</code>).
+                </p>
+              </div>
+            </div>
 
-      {/* 2-Column Split: Input Stub & Output Preview */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <div className="flex items-center gap-2">
+              {providerUsed && (
+                <span className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-indigo-950 border border-indigo-800/60 text-indigo-300">
+                  Provider: {providerUsed}
+                </span>
+              )}
+              <span className="text-[11px] text-zinc-400 bg-zinc-950 px-2.5 py-1 rounded-lg border-2 border-zinc-700">
+                {activeShotAssets.length} reference asset(s) in context
+              </span>
+            </div>
+          </div>
+
+          {error && (
+            <div className="p-3 rounded-lg bg-red-950/30 border border-red-800/40 text-xs text-red-300 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {/* 2-Column Split: Input Stub & Output Preview */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Left: Basic Stub Input */}
         <div className="bg-zinc-950/50 p-4 rounded-xl border-2 border-zinc-700/80 space-y-3 flex flex-col justify-between">
           <div className="space-y-2">
@@ -304,35 +352,35 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
             </div>
 
             {/* Scene & Camera Planning Prefix Live Preview Field */}
-            {promptPrefix ? (
+            {activeShotPrefix ? (
               <div className="bg-indigo-950/30 border border-indigo-700/50 rounded-lg p-2.5 space-y-1.5 text-xs">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-semibold text-indigo-300 flex items-center gap-1.5">
                     <Film className="w-3.5 h-3.5 text-indigo-400" />
-                    Scene &amp; Camera Direction Prefix (Auto-Baked on Export)
+                    Scene &amp; Camera Header (Positioned at Top of Prompt)
                   </span>
                   <span className="text-[10px] font-mono text-indigo-300 bg-indigo-900/60 px-1.5 py-0.5 rounded border border-indigo-700/60">
-                    Shot {planning?.shot_number ? formatShotNumber(planning.shot_number) : "01"}
+                    Shot {activeShot?.shot_number ? formatShotNumber(activeShot.shot_number) : "01"}
                   </span>
                 </div>
                 <div className="font-mono text-[11px] text-indigo-200 bg-zinc-950/80 p-2 rounded border border-indigo-900/40 break-words select-all">
-                  {promptPrefix}
+                  {activeShotPrefix}
                 </div>
                 <div className="text-[10px] text-zinc-400 flex flex-wrap items-center justify-between gap-1 pt-0.5">
                   <span className="text-zinc-400">
-                    Will inject into ComfyUI prompt node as: <code className="text-zinc-300">"{promptPrefix}. &#123;Body Prompt&#125;"</code>
+                    Auto-injected at the top: <code className="text-zinc-300">"{activeShotPrefix}\n\n[Prompt Body]"</code>
                   </span>
                   <button
                     type="button"
                     onClick={() => {
-                      if (!expandedPrompt.startsWith(promptPrefix)) {
-                        const newPrompt = expandedPrompt.trim() ? `${promptPrefix}. ${expandedPrompt.trim()}` : `${promptPrefix}. `;
+                      if (!expandedPrompt.startsWith(activeShotPrefix)) {
+                        const newPrompt = expandedPrompt.trim() ? `${activeShotPrefix}\n\n${expandedPrompt.trim()}` : `${activeShotPrefix}\n\n`;
                         onChangeExpandedPrompt(newPrompt);
                       }
                     }}
-                    className="text-[10px] text-indigo-400 hover:text-indigo-300 underline cursor-pointer"
+                    className="text-[10px] text-indigo-400 hover:text-indigo-300 underline cursor-pointer font-medium"
                   >
-                    Insert into editor box
+                    Insert at top of editor box
                   </button>
                 </div>
               </div>
@@ -393,6 +441,8 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
           </div>
         </div>
       </div>
+      </div>
+      )}
     </div>
   );
 };
