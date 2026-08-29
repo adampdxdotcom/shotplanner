@@ -157,7 +157,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
                     if (shotIdx !== -1) {
                       const nextSlots = { ...shots[shotIdx].assigned_slots };
                       delete nextSlots[globalSlot];
-                      shots[shotIdx] = { ...shots[shotIdx], assigned_slots: nextSlots };
+                      shots[shotIdx] = { ...shots[shotIdx], assigned_slots: nextSlots , staged: false };
                     }
                     return { ...prev, shots };
                   });
@@ -283,7 +283,8 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
             assigned_slots: {
               ...(shots[idx].assigned_slots || {}),
               [globalSlot]: selectedLibraryAsset.filename
-            }
+            },
+              staged: false
           };
         }
         return { ...prev, shots };
@@ -608,7 +609,8 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
                 assigned_slots: {
                   ...(shots[idx].assigned_slots || {}),
                   [globalSlot]: finalizedAsset.filename
-                }
+                },
+                staged: false
               };
             }
             return { ...prev, shots };
