@@ -116,8 +116,9 @@ export default function App() {
 
     // 1. Sync & set saved assets if present
     if (Array.isArray(data.assets) && data.assets.length > 0) {
-      const normalizedAssets = data.assets.map((a: any) => ({
+      const normalizedAssets = data.assets.map((a: any, idx: number) => ({
         ...a,
+        slot_index: a.slot_index !== undefined ? a.slot_index : idx,
         media_type: a.media_type || (/\.(mp3|wav|ogg|m4a|flac)$/i.test(a.filename) ? "audio" : /\.(mp4|mov|webm|mkv)$/i.test(a.filename) ? "video" : "image"),
         preview_url: `/api/assets/file/${a.filename}`
       }));
@@ -172,8 +173,9 @@ export default function App() {
       const res = await fetch("/api/assets");
       const data = await res.json();
       if (data.assets) {
-        setAssets(data.assets.map((a: any) => ({
+        setAssets(data.assets.map((a: any, idx: number) => ({
           ...a,
+          slot_index: a.slot_index !== undefined ? a.slot_index : idx,
           media_type: a.media_type || (/\.(mp3|wav|ogg|m4a|flac)$/i.test(a.filename) ? "audio" : /\.(mp4|mov|webm|mkv)$/i.test(a.filename) ? "video" : "image"),
           preview_url: `/api/assets/file/${a.filename}`
         })));
@@ -235,20 +237,56 @@ export default function App() {
   }, [selectedWorkflowFile]);
 
   // Asset handlers
-  const handleAssetUploaded = (newAsset: MediaAsset) => {
-    setAssets(prev => [newAsset, ...prev]);
+  const handleAssetUploaded = (newAsset: MediaAsset, targetSlotIndex?: number, mediaType?: "image" | "audio" | "video") => {
+    const slotIdx = targetSlotIndex !== undefined ? targetSlotIndex : (newAsset.slot_index ?? 0);
+    const mType = mediaType || newAsset.media_type || "image";
+    const assetWithSlot: MediaAsset = {
+      ...newAsset,
+      slot_index: slotIdx,
+      media_type: mType
+    };
 
-    // Auto-map if there's an unassigned loader node
+    setAssets(prev => {
+      // Find if an asset of this media type exists with this slot_index
+      const existingIndex = prev.findIndex(a => {
+        const isMatch = mType === "image" 
+          ? (a.media_type === "image" || (!a.media_type && !/\.(mp3|wav|ogg|m4a|flac|mp4|mov|webm|mkv)$/i.test(a.filename)))
+          : mType === "audio" 
+          ? (a.media_type === "audio" || /\.(mp3|wav|ogg|m4a|flac)$/i.test(a.filename))
+          : (a.media_type === "video" || /\.(mp4|mov|webm|mkv)$/i.test(a.filename));
+        return isMatch && (a.slot_index === slotIdx || (a.slot_index === undefined && prev.filter(p => p.media_type === mType).indexOf(a) === slotIdx));
+      });
+
+      if (existingIndex !== -1) {
+        const next = [...prev];
+        next[existingIndex] = assetWithSlot;
+        return next;
+      }
+      return [...prev, assetWithSlot];
+    });
+
+    // Auto-map if there's a loader node for this slot type and index
     if (parsedWorkflow) {
-      const emptySlot = Object.keys(nodeMappings).find(nodeId => !nodeMappings[nodeId]);
-      if (emptySlot) {
-        setNodeMappings(prev => ({ ...prev, [emptySlot]: newAsset.filename }));
+      const loaderNodes = mType === "image" 
+        ? parsedWorkflow.nodes_info.image_loader_nodes 
+        : mType === "video" 
+        ? parsedWorkflow.nodes_info.video_loader_nodes 
+        : parsedWorkflow.nodes_info.audio_loader_nodes;
+
+      if (loaderNodes && loaderNodes[slotIdx]) {
+        const targetNodeId = loaderNodes[slotIdx].id;
+        setNodeMappings(prev => ({ ...prev, [targetNodeId]: newAsset.filename }));
+      } else {
+        const emptySlot = loaderNodes?.find((n: any) => !nodeMappings[n.id]);
+        if (emptySlot) {
+          setNodeMappings(prev => ({ ...prev, [emptySlot.id]: newAsset.filename }));
+        }
       }
     }
   };
 
   const handleAssetUpdated = (oldFilename: string, newAsset: MediaAsset) => {
-    setAssets(prev => prev.map(a => a.filename === oldFilename ? newAsset : a));
+    setAssets(prev => prev.map(a => a.filename === oldFilename ? { ...newAsset, slot_index: a.slot_index ?? newAsset.slot_index } : a));
     // Update nodeMappings if the filename changed
     if (oldFilename !== newAsset.filename) {
       setNodeMappings(prev => {

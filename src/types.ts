@@ -36,6 +36,7 @@ export interface MediaAsset {
   size_bytes: number;
   created_at: number;
   preview_url?: string;
+  slot_index?: number;
 }
 
 export interface WorkflowItem {

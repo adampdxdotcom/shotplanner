@@ -37,6 +37,7 @@ interface AssetRecord {
   size_bytes: number;
   created_at: number;
   preview_url?: string;
+  slot_index?: number;
 }
 
 const ASSET_DB_FILE = path.join(ASSETS_DIR, "assets_db.json");
@@ -149,10 +150,12 @@ app.post("/api/workflows/parse", (req: Request, res: Response) => {
 });
 
 app.get("/api/assets", (req: Request, res: Response) => {
-  const normalized = assetDatabase.map(a => ({
-    ...a,
-    preview_url: `/api/assets/file/${a.filename}`
-  }));
+  const normalized = [...assetDatabase]
+    .sort((a, b) => (a.slot_index ?? 0) - (b.slot_index ?? 0))
+    .map(a => ({
+      ...a,
+      preview_url: `/api/assets/file/${a.filename}`
+    }));
   res.json({ assets: normalized });
 });
 
@@ -223,15 +226,11 @@ app.post("/api/assets/sync", express.json(), (req: Request, res: Response) => {
   try {
     const { assets } = req.body;
     if (Array.isArray(assets)) {
-      for (const item of assets) {
-        if (!item || !item.filename) continue;
-        const idx = assetDatabase.findIndex(a => a.filename === item.filename);
-        if (idx !== -1) {
-          assetDatabase[idx] = { ...assetDatabase[idx], ...item };
-        } else {
-          assetDatabase.unshift(item);
-        }
-      }
+      assetDatabase = assets.map((item: any, idx: number) => ({
+        ...item,
+        slot_index: item.slot_index !== undefined ? item.slot_index : idx,
+        preview_url: `/api/assets/file/${item.filename}`
+      }));
       saveAssetDatabase();
     }
     res.json({ success: true, assets: assetDatabase });
@@ -488,6 +487,10 @@ app.post("/api/assets/upload", upload.single("file"), (req: Request, res: Respon
     fs.copyFileSync(req.file.path, destinationPath);
     fs.unlinkSync(req.file.path);
 
+    const parsedSlotIndex = (req.body.slot_index !== undefined && req.body.slot_index !== null && req.body.slot_index !== "" && !isNaN(parseInt(req.body.slot_index)))
+      ? parseInt(req.body.slot_index)
+      : undefined;
+
     const assetRecord: AssetRecord = {
       id: targetFilename,
       original_name: req.file.originalname,
@@ -498,10 +501,29 @@ app.post("/api/assets/upload", upload.single("file"), (req: Request, res: Respon
       description,
       size_bytes: req.file.size,
       created_at: Date.now(),
-      preview_url: `/api/assets/file/${targetFilename}`
+      preview_url: `/api/assets/file/${targetFilename}`,
+      slot_index: parsedSlotIndex
     };
 
-    assetDatabase.unshift(assetRecord);
+    if (parsedSlotIndex !== undefined) {
+      const existingIdx = assetDatabase.findIndex(a => 
+        (a.media_type || "image") === (assetRecord.media_type || "image") && a.slot_index === parsedSlotIndex
+      );
+      if (existingIdx !== -1) {
+        const oldFile = assetDatabase[existingIdx].filename;
+        if (oldFile && oldFile !== targetFilename) {
+          const oldPath = path.join(UPLOADS_DIR, oldFile);
+          if (fs.existsSync(oldPath)) {
+            try { fs.unlinkSync(oldPath); } catch (e) {}
+          }
+        }
+        assetDatabase[existingIdx] = assetRecord;
+      } else {
+        assetDatabase.push(assetRecord);
+      }
+    } else {
+      assetDatabase.push(assetRecord);
+    }
     saveAssetDatabase();
 
     res.json({ success: true, asset: assetRecord });
@@ -516,7 +538,7 @@ const uploadChunks = new Map<string, string[]>();
 
 app.post("/api/assets/upload_chunk", upload.single("file"), (req: Request, res: Response) => {
   try {
-    const { upload_id, chunk_index, total_chunks, original_name, media_type, type, subject_name, description, replace_filename } = req.body;
+    const { upload_id, chunk_index, total_chunks, original_name, media_type, type, subject_name, description, replace_filename, slot_index } = req.body;
     
     if (!upload_id) return res.status(400).json({ error: "Missing upload_id" });
     if (!req.file) return res.status(400).json({ error: "No chunk file" });
@@ -553,6 +575,10 @@ app.post("/api/assets/upload_chunk", upload.single("file"), (req: Request, res: 
         uploadChunks.delete(upload_id);
         const stats = fs.statSync(finalPath);
 
+        const parsedSlotIndex = (slot_index !== undefined && slot_index !== null && slot_index !== "" && !isNaN(parseInt(slot_index)))
+          ? parseInt(slot_index)
+          : undefined;
+
         const assetRecord: AssetRecord = {
           id: targetFilename,
           original_name: original_name || "unknown",
@@ -563,22 +589,39 @@ app.post("/api/assets/upload_chunk", upload.single("file"), (req: Request, res: 
           description: description || "",
           size_bytes: stats.size,
           created_at: Date.now(),
-          preview_url: `/api/assets/file/${targetFilename}`
+          preview_url: `/api/assets/file/${targetFilename}`,
+          slot_index: parsedSlotIndex
         };
 
         if (replace_filename) {
           const oldIndex = assetDatabase.findIndex(a => a.filename === replace_filename);
           if (oldIndex !== -1) {
-             const oldPath = path.join(UPLOADS_DIR, replace_filename);
-             if (fs.existsSync(oldPath)) {
-               try { fs.unlinkSync(oldPath); } catch (e) {}
-             }
-             assetDatabase[oldIndex] = assetRecord;
+            const oldPath = path.join(UPLOADS_DIR, replace_filename);
+            if (fs.existsSync(oldPath)) {
+              try { fs.unlinkSync(oldPath); } catch (e) {}
+            }
+            assetDatabase[oldIndex] = { ...assetRecord, slot_index: assetDatabase[oldIndex].slot_index ?? parsedSlotIndex };
           } else {
-             assetDatabase.unshift(assetRecord);
+            assetDatabase.push(assetRecord);
+          }
+        } else if (parsedSlotIndex !== undefined) {
+          const existingSlotIdx = assetDatabase.findIndex(a => 
+            (a.media_type || "image") === (assetRecord.media_type || "image") && a.slot_index === parsedSlotIndex
+          );
+          if (existingSlotIdx !== -1) {
+            const oldFile = assetDatabase[existingSlotIdx].filename;
+            if (oldFile && oldFile !== targetFilename) {
+              const oldPath = path.join(UPLOADS_DIR, oldFile);
+              if (fs.existsSync(oldPath)) {
+                try { fs.unlinkSync(oldPath); } catch (e) {}
+              }
+            }
+            assetDatabase[existingSlotIdx] = assetRecord;
+          } else {
+            assetDatabase.push(assetRecord);
           }
         } else {
-          assetDatabase.unshift(assetRecord);
+          assetDatabase.push(assetRecord);
         }
         saveAssetDatabase();
 
@@ -614,10 +657,20 @@ app.post("/api/generate-prompt", async (req: Request, res: Response) => {
     const buildSubjectDefinitionsHeader = (assetList: any[]) => {
       if (!assetList || assetList.length === 0) return "";
       const lines = ["Global Subject Definitions:\n"];
-      assetList.forEach((a, idx) => {
-        const tag = a.media_type === "video" ? `<Video ${idx + 1}>` : a.media_type === "audio" ? `<Audio ${idx + 1}>` : `<Picture ${idx + 1}>`;
+      
+      const sorted = [...assetList].sort((a, b) => {
+        if (a.media_type !== b.media_type) {
+          const order: Record<string, number> = { image: 0, video: 1, audio: 2 };
+          return (order[a.media_type] ?? 0) - (order[b.media_type] ?? 0);
+        }
+        return (a.slot_index ?? 0) - (b.slot_index ?? 0);
+      });
+
+      sorted.forEach((a, idx) => {
+        const slotNum = a.slot_index !== undefined ? a.slot_index + 1 : idx + 1;
+        const tag = a.media_type === "video" ? `<Video ${slotNum}>` : a.media_type === "audio" ? `<Audio ${slotNum}>` : `<Picture ${slotNum}>`;
         const cat = (a.type || "Reference").toLowerCase();
-        const sname = a.subject_name || `Subject ${idx + 1}`;
+        const sname = a.subject_name || `Subject ${slotNum}`;
         const desc = (a.description || "Facial features, styling").replace(/\.$/, "");
         if (cat.includes("location") || cat.includes("scene") || cat.includes("environment") || sname.toLowerCase().includes("location")) {
           lines.push(`Location(${tag}): ${desc}.`);

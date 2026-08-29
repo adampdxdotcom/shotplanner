@@ -21,7 +21,7 @@ import {
 
 interface AssetManagerSectionProps {
   assets: MediaAsset[];
-  onAssetUploaded: (asset: MediaAsset) => void;
+  onAssetUploaded: (asset: MediaAsset, slotIndex?: number, mediaType?: "image" | "audio" | "video") => void;
   onAssetDeleted: (filename: string) => void;
   onAssetUpdated: (oldFilename: string, newAsset: MediaAsset) => void;
 }
@@ -275,6 +275,29 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
   const audios = assets.filter(isAud);
   const videos = assets.filter(isVid);
 
+  // Helper to map assets strictly by slot_index
+  const getAssetForSlot = (type: "image" | "audio" | "video", slotIdx: number): MediaAsset | undefined => {
+    const typeList = assets.filter(a => type === "image" ? isImg(a) : type === "audio" ? isAud(a) : isVid(a));
+    
+    // 1. Direct match by explicit slot_index
+    const direct = typeList.find(a => a.slot_index === slotIdx);
+    if (direct) return direct;
+
+    // 2. Fallback for legacy assets without slot_index
+    const unassigned = typeList.filter(a => a.slot_index === undefined);
+    const assignedSlots = new Set(typeList.map(a => a.slot_index).filter(idx => idx !== undefined));
+    
+    let currSlot = 0;
+    for (const item of unassigned) {
+      while (assignedSlots.has(currSlot)) {
+        currSlot++;
+      }
+      if (currSlot === slotIdx) return item;
+      currSlot++;
+    }
+    return undefined;
+  };
+
   // Limits
   const MAX_IMAGES = 9;
   const MAX_AUDIOS = 2;
@@ -309,12 +332,8 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
     setUploadProgress(0);
     setUploadError(null);
 
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("media_type", activeTab);
-    formData.append("type", assetType);
-    formData.append("subject_name", subjectName || "subject");
-    formData.append("description", description || "");
+    const targetSlotIndex = uploadModalSlot ? uploadModalSlot.index : 0;
+    const targetMediaType = uploadModalSlot ? uploadModalSlot.type : activeTab;
 
     const CHUNK_SIZE = 512 * 1024; // 512KB chunks to safely account for FormData overhead underneath NGINX 1MB limits
     const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
@@ -330,10 +349,11 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
         formData.append("chunk_index", i.toString());
         formData.append("total_chunks", totalChunks.toString());
         formData.append("original_name", file.name);
+        formData.append("slot_index", targetSlotIndex.toString());
         
         // Always send metadata on the final chunk so the server knows what to do
         if (i === totalChunks - 1) {
-          formData.append("media_type", activeTab);
+          formData.append("media_type", targetMediaType);
           formData.append("type", assetType);
           formData.append("subject_name", subjectName || "subject");
           formData.append("description", description || "");
@@ -368,7 +388,12 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
       }
 
       if (finalData && finalData.asset) {
-        onAssetUploaded(finalData.asset);
+        const finalizedAsset: MediaAsset = {
+          ...finalData.asset,
+          slot_index: targetSlotIndex,
+          media_type: targetMediaType
+        };
+        onAssetUploaded(finalizedAsset, targetSlotIndex, targetMediaType);
         closeUploadModal();
       } else {
         throw new Error("Completed all chunks, but no final asset was returned.");
@@ -426,7 +451,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
             {Array.from({ length: MAX_IMAGES }).map((_, idx) => {
-              const asset = images[idx];
+              const asset = getAssetForSlot("image", idx);
               if (asset) return renderAssetCard(asset, idx, "image");
               return renderEmptySlot(idx, "image");
             })}
@@ -443,7 +468,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
             {Array.from({ length: MAX_VIDEOS }).map((_, idx) => {
-              const asset = videos[idx];
+              const asset = getAssetForSlot("video", idx);
               if (asset) return renderAssetCard(asset, idx, "video");
               return renderEmptySlot(idx, "video");
             })}
@@ -460,7 +485,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
             {Array.from({ length: MAX_AUDIOS }).map((_, idx) => {
-              const asset = audios[idx];
+              const asset = getAssetForSlot("audio", idx);
               if (asset) return renderAssetCard(asset, idx, "audio");
               return renderEmptySlot(idx, "audio");
             })}

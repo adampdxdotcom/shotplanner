@@ -169,11 +169,14 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
                 <p className="text-zinc-500 italic">No assets uploaded. Upload in section 3 to inject reference tags.</p>
               ) : (
                 <div className="flex flex-wrap gap-1.5 pt-0.5">
-                  {assets.map((asset, i) => (
-                    <span key={asset.filename} className="px-2 py-0.5 bg-zinc-800 text-amber-300 font-mono text-[10px] rounded border border-zinc-700">
-                      {asset.media_type === "video" ? `<Video ${i + 1}>` : asset.media_type === "audio" ? `<Audio ${i + 1}>` : `<Picture ${i + 1}>`} ({asset.subject_name})
-                    </span>
-                  ))}
+                  {assets.map((asset, i) => {
+                    const slotNum = asset.slot_index !== undefined ? asset.slot_index + 1 : i + 1;
+                    return (
+                      <span key={asset.filename} className="px-2 py-0.5 bg-zinc-800 text-amber-300 font-mono text-[10px] rounded border border-zinc-700">
+                        {asset.media_type === "video" ? `<Video ${slotNum}>` : asset.media_type === "audio" ? `<Audio ${slotNum}>` : `<Picture ${slotNum}>`} ({asset.subject_name})
+                      </span>
+                    );
+                  })}
                 </div>
               )}
             </div>
