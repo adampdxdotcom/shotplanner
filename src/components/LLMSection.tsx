@@ -92,7 +92,7 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           basic_stub: basicStub,
-          assets: assets,
+          assets: activeShot ? assets.filter(a => activeShotAssets.includes(a.filename) || sceneProject.shared_assets?.some(sa => sa.filename === a.filename)) : assets,
           lm_studio_url: lmStudioUrl,
           provider: providerChoice,
           prompt_prefix: activeShotPrefix,

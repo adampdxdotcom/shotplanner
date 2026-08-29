@@ -30,6 +30,14 @@ class LLMGenerateRequest(BaseModel):
     assets: List[Dict[str, Any]] = Field(default_factory=list)
     lm_studio_url: str = "http://localhost:1234/v1"
     model: Optional[str] = None
+    provider: Optional[str] = None
+    prompt_prefix: Optional[str] = None
+    scene_planning: Optional[Dict[str, Any]] = None
+    planning: Optional[Dict[str, Any]] = None
+    gemini_api_key: Optional[str] = None
+
+    class Config:
+        extra = "allow"
 
 class SSHTestRequest(BaseModel):
     host: str
@@ -150,20 +158,24 @@ async def get_assets():
     return {"assets": in_memory_asset_metadata}
 
 @router.post("/generate-prompt")
+@router.post("/llm/expand")
 async def generate_prompt_endpoint(req: LLMGenerateRequest):
     """
-    Call LM Studio to expand basic prompt stub with structured asset metadata.
+    Call LM Studio / Gemini to expand basic prompt stub with structured asset metadata.
     """
-    if not req.assets:
-        raise HTTPException(status_code=400, detail="At least one uploaded asset is required to generate a prompt.")
+    if not req.basic_stub.strip():
+        raise HTTPException(status_code=400, detail="Basic prompt stub is required.")
     
     expanded = await expand_prompt_with_llm(
         basic_stub=req.basic_stub,
         assets=req.assets,
         lm_studio_url=req.lm_studio_url,
-        model=req.model
+        model=req.model,
+        provider=req.provider,
+        prompt_prefix=req.prompt_prefix,
+        gemini_api_key=req.gemini_api_key
     )
-    return {"expanded_prompt": expanded}
+    return {"expanded_prompt": expanded, "provider": req.provider or "lm_studio"}
 
 @router.post("/ssh/test")
 async def test_ssh_connection(req: SSHTestRequest):
@@ -440,18 +452,38 @@ async def execute_workflow(req: ExecuteWorkflowRequest):
 import time
 import shutil
 import json
+import io
+import zipfile
+from fastapi.responses import StreamingResponse
 
 class ProjectSaveRequest(BaseModel):
-    filename: str
-    data: dict
+    filename: Optional[str] = None
+    name: Optional[str] = None
+    data: Optional[Dict[str, Any]] = None
+
+    class Config:
+        extra = "allow"
 
 @router.post("/projects")
-async def save_project(req: ProjectSaveRequest):
-    sanitized_name = "".join(c for c in req.filename if c.isalnum() or c in ("_", "-"))
+async def save_project(req: Dict[str, Any]):
+    raw_name = req.get("filename") or req.get("name") or (req.get("data", {}).get("scene_name") if isinstance(req.get("data"), dict) else None) or "project"
+    sanitized_name = "".join(c for c in str(raw_name) if c.isalnum() or c in ("_", "-"))
+    if not sanitized_name:
+        sanitized_name = "project"
     final_filename = sanitized_name[:-5] + ".json" if sanitized_name.endswith("_json") else (sanitized_name if sanitized_name.endswith(".json") else f"{sanitized_name}.json")
     file_path = PROJECTS_DIR / final_filename
+    
+    data_to_save = req.get("data") if ("data" in req and isinstance(req["data"], dict)) else req
     with open(file_path, "w", encoding="utf-8") as f:
-        json.dump(req.data, f, indent=2)
+        json.dump(data_to_save, f, indent=2)
+
+    # Sync assets into memory if provided
+    if isinstance(data_to_save, dict) and isinstance(data_to_save.get("assets"), list):
+        for asset in data_to_save["assets"]:
+            if isinstance(asset, dict) and asset.get("filename"):
+                if not any(a.get("filename") == asset["filename"] for a in in_memory_asset_metadata):
+                    in_memory_asset_metadata.append(asset)
+
     return {"success": True, "filename": final_filename}
 
 @router.get("/projects")
@@ -468,7 +500,155 @@ async def get_project(filename: str):
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="Project not found")
     with open(file_path, "r", encoding="utf-8") as f:
-        return json.load(f)
+        data = json.load(f)
+        if isinstance(data, dict) and isinstance(data.get("assets"), list):
+            for asset in data["assets"]:
+                if isinstance(asset, dict) and asset.get("filename"):
+                    if not any(a.get("filename") == asset["filename"] for a in in_memory_asset_metadata):
+                        in_memory_asset_metadata.append(asset)
+        return data
+
+@router.get("/projects/{filename}/export")
+async def export_project_zip(filename: str):
+    clean_name = filename[:-5] if filename.endswith(".json") else filename
+    clean_name = "".join(c for c in clean_name if c.isalnum() or c in ("_", "-"))
+    file_path = PROJECTS_DIR / f"{clean_name}.json"
+    
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail=f"Project '{clean_name}' not found on server. Please save it first.")
+    
+    with open(file_path, "r", encoding="utf-8") as f:
+        project_data = json.load(f)
+    
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        # 1. Add project json
+        zip_file.writestr(f"{clean_name}.json", json.dumps(project_data, indent=2))
+        
+        # 2. Add workflow if selected
+        wf_name = project_data.get("selectedWorkflowFile") or project_data.get("workflow_file")
+        if wf_name:
+            wf_path = WORKFLOWS_DIR / os.path.basename(wf_name)
+            if wf_path.exists():
+                zip_file.write(wf_path, arcname=f"workflows/{os.path.basename(wf_name)}")
+                
+        # 3. Add all project media assets
+        added_files = set()
+        assets_list = project_data.get("assets", [])
+        if isinstance(assets_list, list):
+            for asset in assets_list:
+                if isinstance(asset, dict) and asset.get("filename"):
+                    fn = asset["filename"].strip()
+                    if fn and fn not in added_files:
+                        asset_path = UPLOADS_DIR / fn
+                        if asset_path.exists():
+                            zip_file.write(asset_path, arcname=f"uploads/{fn}")
+                            added_files.add(fn)
+                            
+        # Check shots assigned_slots for Scene Projects
+        shots = project_data.get("shots", [])
+        if isinstance(shots, list):
+            for shot in shots:
+                if isinstance(shot, dict) and isinstance(shot.get("assigned_slots"), dict):
+                    for slot_fn in shot["assigned_slots"].values():
+                        if slot_fn and isinstance(slot_fn, str):
+                            fn = slot_fn.strip()
+                            if fn and fn not in added_files:
+                                asset_path = UPLOADS_DIR / fn
+                                if asset_path.exists():
+                                    zip_file.write(asset_path, arcname=f"uploads/{fn}")
+                                    added_files.add(fn)
+                                    
+        # Check shared_assets for Scene Projects
+        shared_assets = project_data.get("shared_assets", [])
+        if isinstance(shared_assets, list):
+            for sa in shared_assets:
+                if isinstance(sa, dict) and sa.get("filename"):
+                    fn = sa["filename"].strip()
+                    if fn and fn not in added_files:
+                        asset_path = UPLOADS_DIR / fn
+                        if asset_path.exists():
+                            zip_file.write(asset_path, arcname=f"uploads/{fn}")
+                            added_files.add(fn)
+                            
+        # Check nodeMappings
+        node_mappings = project_data.get("nodeMappings", {})
+        if isinstance(node_mappings, dict):
+            for fn_val in node_mappings.values():
+                if fn_val and isinstance(fn_val, str):
+                    fn = fn_val.strip()
+                    if fn and fn not in added_files:
+                        asset_path = UPLOADS_DIR / fn
+                        if asset_path.exists():
+                            zip_file.write(asset_path, arcname=f"uploads/{fn}")
+                            added_files.add(fn)
+                            
+        # Write assets_db.json
+        relevant_meta = [a for a in in_memory_asset_metadata if a.get("filename") in added_files]
+        final_meta = relevant_meta if relevant_meta else assets_list
+        zip_file.writestr("assets_db.json", json.dumps(final_meta, indent=2))
+        
+    zip_buffer.seek(0)
+    
+    headers = {
+        "Content-Disposition": f'attachment; filename="{clean_name}.zip"',
+        "Content-Type": "application/zip"
+    }
+    return StreamingResponse(zip_buffer, media_type="application/zip", headers=headers)
+
+@router.post("/projects/import")
+async def import_project_zip(file: UploadFile = File(...)):
+    if not file.filename.endswith(".zip"):
+        raise HTTPException(status_code=400, detail="Uploaded file must be a .zip archive")
+        
+    content = await file.read()
+    zip_buffer = io.BytesIO(content)
+    imported_project = ""
+    
+    with zipfile.ZipFile(zip_buffer, "r") as zip_file:
+        for member in zip_file.infolist():
+            if member.is_dir():
+                continue
+                
+            filename = member.filename
+            file_bytes = zip_file.read(member)
+            
+            if filename.startswith("workflows/"):
+                out_name = os.path.basename(filename)
+                if out_name:
+                    with open(WORKFLOWS_DIR / out_name, "wb") as f:
+                        f.write(file_bytes)
+            elif filename.startswith("uploads/"):
+                out_name = os.path.basename(filename)
+                if out_name:
+                    with open(UPLOADS_DIR / out_name, "wb") as f:
+                        f.write(file_bytes)
+            elif filename == "assets_db.json":
+                try:
+                    assets_arr = json.loads(file_bytes.decode("utf-8"))
+                    if isinstance(assets_arr, list):
+                        for a in assets_arr:
+                            if isinstance(a, dict) and a.get("filename"):
+                                if not any(x.get("filename") == a["filename"] for x in in_memory_asset_metadata):
+                                    in_memory_asset_metadata.append(a)
+                except Exception:
+                    pass
+            elif filename.endswith(".json") and "/" not in filename and "\\" not in filename:
+                out_name = os.path.basename(filename)
+                with open(PROJECTS_DIR / out_name, "wb") as f:
+                    f.write(file_bytes)
+                imported_project = out_name[:-5]
+                try:
+                    p_data = json.loads(file_bytes.decode("utf-8"))
+                    if isinstance(p_data, dict) and isinstance(p_data.get("assets"), list):
+                        for a in p_data["assets"]:
+                            if isinstance(a, dict) and a.get("filename"):
+                                if not any(x.get("filename") == a["filename"] for x in in_memory_asset_metadata):
+                                    in_memory_asset_metadata.append(a)
+                except Exception:
+                    pass
+                    
+    return {"success": True, "filename": imported_project}
 
 @router.post("/assets/upload_chunk")
 async def upload_chunk(

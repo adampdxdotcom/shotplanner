@@ -3,7 +3,7 @@ import { expandPrompt } from "../services/promptExpansionService";
 
 const router = Router();
 
-router.post("/generate-prompt", async (req: Request, res: Response) => {
+router.post(["/generate-prompt", "/llm/expand"], async (req: Request, res: Response) => {
   try {
     const result = await expandPrompt(req.body);
     res.json(result);

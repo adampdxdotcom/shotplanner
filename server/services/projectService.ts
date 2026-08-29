@@ -100,6 +100,34 @@ export async function exportProjectZip(projectName: string, res: Response): Prom
     }
   }
 
+  if (Array.isArray(projectData.shots)) {
+    for (const shot of projectData.shots) {
+      if (shot && shot.assigned_slots && typeof shot.assigned_slots === "object") {
+        for (const slotFn of Object.values(shot.assigned_slots)) {
+          if (slotFn && typeof slotFn === "string" && !addedFiles.has(slotFn)) {
+            const assetPath = path.join(UPLOADS_DIR, slotFn);
+            if (fs.existsSync(assetPath)) {
+              archive.file(assetPath, { name: `uploads/${slotFn}` });
+              addedFiles.add(slotFn);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (Array.isArray(projectData.shared_assets)) {
+    for (const sa of projectData.shared_assets) {
+      if (sa && sa.filename && !addedFiles.has(sa.filename)) {
+        const assetPath = path.join(UPLOADS_DIR, sa.filename);
+        if (fs.existsSync(assetPath)) {
+          archive.file(assetPath, { name: `uploads/${sa.filename}` });
+          addedFiles.add(sa.filename);
+        }
+      }
+    }
+  }
+
   if (projectData.nodeMappings) {
     for (const assetFile of Object.values(projectData.nodeMappings)) {
       if (assetFile && typeof assetFile === "string" && !addedFiles.has(assetFile)) {

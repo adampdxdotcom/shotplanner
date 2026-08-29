@@ -258,34 +258,45 @@ export default function App() {
     const shotPrefix = `${shot.shot_name ? shot.shot_name + " - " : ""}Shot ${shot.shot_number.toString().padStart(2, "0")} - ${shot.shot_type} - ${shot.camera_movement}`;
     
     // We need to pass the assigned assets for this shot
-    const shotAssets = Object.entries(shot.assigned_slots).map(([idx, filename]) => {
+    const shotAssets = Object.entries(shot.assigned_slots || {}).map(([idx, filename]) => {
       const asset = assets.find(a => a.filename === filename);
       if (asset) return { ...asset, slot_index: parseInt(idx) };
       return null;
     }).filter(Boolean) as MediaAsset[];
 
     // Add shared assets if no specific slot
-    sceneProject.shared_assets.forEach(shared => {
-      if (!shot.assigned_slots[shared.slot_index]) {
+    (sceneProject.shared_assets || []).forEach(shared => {
+      if (!shot.assigned_slots || !shot.assigned_slots[shared.slot_index]) {
         const asset = assets.find(a => a.filename === shared.filename);
-        if (asset) shotAssets.push({ ...asset, slot_index: shared.slot_index });
+        if (asset && !shotAssets.some(sa => sa.filename === asset.filename)) {
+          shotAssets.push({ ...asset, slot_index: shared.slot_index });
+        }
       }
     });
+
+    const stubToUse = (shot.basic_stub || "").trim() || (shot.shot_name ? `${shot.shot_name} scene action` : `${shotPrefix} action`);
     
-    const response = await fetch("/api/llm/expand", {
+    const response = await fetch("/api/generate-prompt", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        basic_stub: shot.basic_stub,
+        basic_stub: stubToUse,
         assets: shotAssets,
         prompt_prefix: shotPrefix,
         provider: llmProvider,
         lm_studio_url: config.lm_studio_url,
-        gemini_api_key: config.gemini_api_key
+        gemini_api_key: config.gemini_api_key,
+        shot_number: shot.shot_number,
+        shot_type: shot.shot_type,
+        camera_movement: shot.camera_movement,
+        scene_name: sceneProject.scene_name || ""
       }),
     });
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Expansion failed");
+    if (!response.ok || !data.expanded_prompt) {
+      throw new Error(data.error || "Expansion failed");
+    }
+    addToast(`Shot ${shot.shot_number.toString().padStart(2, "0")} prompt expanded with ${data.provider || "LLM"}`, "success");
     return data.expanded_prompt;
   };
 
