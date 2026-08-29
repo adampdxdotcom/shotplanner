@@ -108,12 +108,17 @@ export default function SceneProjectHub({
   };
 
   const getAssetFilenameForSlot = (slotIndex: number) => {
-    return activeShot?.assigned_slots[slotIndex] || project.shared_assets.find(a => a.slot_index === slotIndex)?.filename || "";
+    return activeShot?.assigned_slots[slotIndex] || activeShot?.assigned_slots[slotIndex + 1] || project.shared_assets.find(a => a.slot_index === slotIndex)?.filename || "";
   };
 
   const getAssetForSlot = (slotIndex: number) => {
     const filename = getAssetFilenameForSlot(slotIndex);
-    return assets.find(a => a.filename === filename);
+    if (!filename) return null;
+    return assets.find(a => a.filename === filename || a.name === filename) || {
+      filename,
+      preview_url: `/api/assets/preview/${filename}`,
+      label: `Slot ${slotIndex + 1}`
+    } as any;
   };
 
   const handleClearSlot = (slotIndex: number) => {
@@ -202,8 +207,8 @@ export default function SceneProjectHub({
           className="flex flex-1 gap-4 overflow-x-auto snap-x snap-mandatory hide-scrollbar px-2"
         >
           {project.shots.map((shot, idx) => {
-            const locAssetFilename = shot.assigned_slots[8] || project.shared_assets.find(a => a.slot_index === 8)?.filename || shot.assigned_slots[0] || project.shared_assets.find(a => a.slot_index === 0)?.filename;
-            const locAsset = assets.find(a => a.filename === locAssetFilename);
+            const locAssetFilename = shot.assigned_slots[8] || shot.assigned_slots[9] || project.shared_assets.find(a => a.slot_index === 8)?.filename || shot.assigned_slots[0] || shot.assigned_slots[1] || project.shared_assets.find(a => a.slot_index === 0)?.filename;
+            const locAsset = locAssetFilename ? (assets.find(a => a.filename === locAssetFilename || a.name === locAssetFilename) || { preview_url: `/api/assets/preview/${locAssetFilename}` } as any) : null;
             
             return (
               <div
