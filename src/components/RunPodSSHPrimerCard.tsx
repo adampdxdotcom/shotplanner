@@ -4,14 +4,16 @@ import {
   Terminal, 
   Copy, 
   Check, 
-  HelpCircle, 
   ChevronDown, 
   ChevronUp, 
   ShieldAlert, 
   FileKey, 
   Lock, 
   Info,
-  BookOpen
+  BookOpen,
+  CloudUpload,
+  AlertTriangle,
+  Sparkles
 } from "lucide-react";
 
 interface CopyButtonProps {
@@ -28,7 +30,6 @@ const CopyButton: React.FC<CopyButtonProps> = ({ text }) => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Fallback if clipboard API unavailable
       const textArea = document.createElement("textarea");
       textArea.value = text;
       document.body.appendChild(textArea);
@@ -44,7 +45,7 @@ const CopyButton: React.FC<CopyButtonProps> = ({ text }) => {
     <button
       type="button"
       onClick={handleCopy}
-      className={`px-2 py-1 rounded text-[11px] font-medium flex items-center gap-1 transition-all ${
+      className={`px-2 py-1 rounded text-[11px] font-medium flex items-center gap-1 transition-all cursor-pointer ${
         copied 
           ? "bg-emerald-950/80 text-emerald-300 border border-emerald-700/50" 
           : "bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700"
@@ -57,7 +58,7 @@ const CopyButton: React.FC<CopyButtonProps> = ({ text }) => {
   );
 };
 
-const CodeBlock: React.FC<{ code: string; label?: string }> = ({ code, label = "Bash" }) => {
+export const CodeBlock: React.FC<{ code: string; label?: string }> = ({ code, label = "Bash" }) => {
   return (
     <div className="relative group bg-zinc-950 border border-zinc-800 rounded-lg overflow-hidden my-1.5">
       <div className="flex items-center justify-between px-3 py-1 bg-zinc-900/80 border-b border-zinc-800/80 text-[10px] font-mono text-zinc-400">
@@ -73,14 +74,14 @@ const CodeBlock: React.FC<{ code: string; label?: string }> = ({ code, label = "
 
 export const RunPodSSHPrimerCard: React.FC = () => {
   const [isExpanded, setIsExpanded] = useState(true);
-  const [activeTab, setActiveTab] = useState<"quickstart" | "concepts" | "commands">("quickstart");
+  const [activeTab, setActiveTab] = useState<"quickstart" | "concepts" | "commands" | "runpod_auth">("quickstart");
 
   return (
-    <div className="bg-zinc-900/70 border-2 border-zinc-700 rounded-xl overflow-hidden shadow-sm">
+    <div id="runpod-ssh-guide-card" className="bg-zinc-900/80 border-2 border-zinc-700 rounded-xl overflow-hidden shadow-sm">
       {/* Header */}
       <div 
         onClick={() => setIsExpanded(!isExpanded)}
-        className="px-5 py-3.5 bg-zinc-900/90 hover:bg-zinc-800/60 cursor-pointer flex items-center justify-between transition-colors select-none"
+        className="px-5 py-3.5 bg-zinc-900 hover:bg-zinc-800/60 cursor-pointer flex items-center justify-between transition-colors select-none"
       >
         <div className="flex items-center gap-3">
           <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
@@ -94,7 +95,7 @@ export const RunPodSSHPrimerCard: React.FC = () => {
               </span>
             </div>
             <p className="text-xs text-zinc-400 mt-0.5">
-              Complete setup primer, keypair generation instructions, and copyable terminal snippets for RunPod authentication.
+              Step-by-step keypair generation, RunPod authorization, active pod permission fixes, and SSH concepts.
             </p>
           </div>
         </div>
@@ -111,23 +112,23 @@ export const RunPodSSHPrimerCard: React.FC = () => {
       {isExpanded && (
         <div className="p-5 border-t border-zinc-800 space-y-5">
           {/* Sub-Navigation Tabs */}
-          <div className="flex items-center gap-2 border-b border-zinc-800 pb-3">
+          <div className="flex items-center gap-2 border-b border-zinc-800 pb-3 flex-wrap">
             <button
               type="button"
               onClick={() => setActiveTab("quickstart")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeTab === "quickstart"
                   ? "bg-amber-500/15 text-amber-300 border border-amber-500/30"
                   : "bg-zinc-800/60 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
               }`}
             >
               <Terminal className="w-3.5 h-3.5" />
-              <span>3-Step Quick Setup</span>
+              <span>4-Step Quick Setup</span>
             </button>
             <button
               type="button"
               onClick={() => setActiveTab("concepts")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeTab === "concepts"
                   ? "bg-amber-500/15 text-amber-300 border border-amber-500/30"
                   : "bg-zinc-800/60 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
@@ -139,7 +140,7 @@ export const RunPodSSHPrimerCard: React.FC = () => {
             <button
               type="button"
               onClick={() => setActiveTab("commands")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeTab === "commands"
                   ? "bg-amber-500/15 text-amber-300 border border-amber-500/30"
                   : "bg-zinc-800/60 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
@@ -148,9 +149,21 @@ export const RunPodSSHPrimerCard: React.FC = () => {
               <FileKey className="w-3.5 h-3.5" />
               <span>2. Key Generation Commands</span>
             </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("runpod_auth")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
+                activeTab === "runpod_auth"
+                  ? "bg-amber-500/15 text-amber-300 border border-amber-500/30"
+                  : "bg-zinc-800/60 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
+              }`}
+            >
+              <CloudUpload className="w-3.5 h-3.5" />
+              <span>3. RunPod Upload &amp; Active Pod Fix</span>
+            </button>
           </div>
 
-          {/* TAB 1: 3-Step Quick Setup */}
+          {/* TAB 1: 4-Step Quick Setup */}
           {activeTab === "quickstart" && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -158,20 +171,25 @@ export const RunPodSSHPrimerCard: React.FC = () => {
                   <Terminal className="w-3.5 h-3.5 text-amber-400" />
                   RunPod SSH Key Pair Quick Setup
                 </h4>
-                <span className="text-[11px] text-zinc-400">Step-by-step terminal instructions</span>
+                <span className="text-[11px] text-zinc-400">Step-by-step instructions</span>
               </div>
 
               <div className="grid grid-cols-1 gap-3.5">
                 {/* Step 1 */}
-                <div className="bg-zinc-950/60 border border-zinc-800 rounded-lg p-3.5 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold flex items-center justify-center border border-amber-500/30">
-                      1
+                <div className="bg-zinc-950/70 border border-zinc-800 rounded-lg p-3.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold flex items-center justify-center border border-amber-500/30">
+                        1
+                      </span>
+                      <span className="text-xs font-semibold text-zinc-200">Step 1: Generate Key Pair</span>
+                    </div>
+                    <span className="text-[10px] text-amber-400 bg-amber-950/60 border border-amber-800/50 px-2 py-0.5 rounded-full font-medium">
+                      In-App or Terminal
                     </span>
-                    <span className="text-xs font-semibold text-zinc-200">Step 1: Generate on Local Terminal</span>
                   </div>
                   <p className="text-xs text-zinc-400 pl-7">
-                    Run this command on your local machine to create a dedicated Ed25519 key pair:
+                    Click the <strong>"Generate New Key Pair"</strong> button above, or run this snippet in your local terminal:
                   </p>
                   <div className="pl-7">
                     <CodeBlock 
@@ -182,50 +200,75 @@ export const RunPodSSHPrimerCard: React.FC = () => {
                 </div>
 
                 {/* Step 2 */}
-                <div className="bg-zinc-950/60 border border-zinc-800 rounded-lg p-3.5 space-y-2">
+                <div className="bg-zinc-950/70 border border-zinc-800 rounded-lg p-3.5 space-y-2">
                   <div className="flex items-center gap-2">
                     <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold flex items-center justify-center border border-amber-500/30">
                       2
                     </span>
-                    <span className="text-xs font-semibold text-zinc-200">Step 2: Add Public Key to RunPod</span>
+                    <span className="text-xs font-semibold text-zinc-200">Step 2: Add Public Key to RunPod Account</span>
                   </div>
                   <p className="text-xs text-zinc-400 pl-7">
-                    Print and copy your public key (.pub):
+                    View your public key string:
                   </p>
-                  <div className="pl-7">
+                  <div className="pl-7 space-y-2">
                     <CodeBlock 
                       code={`cat ~/.ssh/id_ed25519_runpod.pub`}
                       label="Bash (Terminal)"
                     />
-                    <div className="mt-2 text-[11px] text-zinc-300 bg-zinc-900/90 border border-zinc-700/60 p-2.5 rounded-lg flex items-start gap-2">
-                      <Info className="w-3.5 h-3.5 text-indigo-400 shrink-0 mt-0.5" />
+                    <div className="text-[11px] text-zinc-300 bg-zinc-900/90 border border-zinc-700/60 p-2.5 rounded-lg flex items-start gap-2">
+                      <Info className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
                       <span>
-                        <strong className="text-zinc-100">Action:</strong> Paste this single line into your <strong>RunPod Dashboard &rarr; Settings &rarr; SSH Keys</strong>.
+                        <strong className="text-zinc-100">Destination:</strong> <strong>RunPod Console &rarr; Settings &rarr; SSH Keys &rarr; "+ Add SSH Key"</strong>.
                       </span>
                     </div>
                   </div>
                 </div>
 
                 {/* Step 3 */}
-                <div className="bg-zinc-950/60 border border-zinc-800 rounded-lg p-3.5 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold flex items-center justify-center border border-amber-500/30">
-                      3
-                    </span>
-                    <span className="text-xs font-semibold text-zinc-200">Step 3: Load Private Key into Shot Planner</span>
+                <div className="bg-zinc-950/70 border-2 border-amber-900/40 rounded-lg p-3.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold flex items-center justify-center border border-amber-500/30">
+                        3
+                      </span>
+                      <span className="text-xs font-semibold text-zinc-200">Step 3: Fix Permissions on Active Pod (If already running)</span>
+                    </div>
+                    <span className="text-[10px] text-amber-400 font-mono">Crucial Step</span>
                   </div>
                   <p className="text-xs text-zinc-400 pl-7">
-                    Print the private key to paste or upload into this Config section:
+                    In your pod's <strong>Web Terminal</strong> (via the browser connect button on the Pod card), paste:
                   </p>
-                  <div className="pl-7">
+                  <div className="pl-7 space-y-2">
+                    <CodeBlock 
+                      code={`mkdir -p ~/.ssh && echo "YOUR_PUBLIC_KEY" >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys`}
+                      label="Pod Web Terminal (One-liner)"
+                    />
+                    <p className="text-[11px] text-zinc-400 italic">
+                      Replace <code className="text-amber-300 bg-zinc-800 px-1 py-0.5 rounded">YOUR_PUBLIC_KEY</code> with your single-line <code className="text-emerald-400">ssh-ed25519 AAAAC3...</code> string.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Step 4 */}
+                <div className="bg-zinc-950/70 border border-zinc-800 rounded-lg p-3.5 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold flex items-center justify-center border border-amber-500/30">
+                      4
+                    </span>
+                    <span className="text-xs font-semibold text-zinc-200">Step 4: Load Private Key into Shot Planner</span>
+                  </div>
+                  <p className="text-xs text-zinc-400 pl-7">
+                    Print the private key file on your local terminal:
+                  </p>
+                  <div className="pl-7 space-y-2">
                     <CodeBlock 
                       code={`cat ~/.ssh/id_ed25519_runpod`}
                       label="Bash (Terminal)"
                     />
-                    <div className="mt-2 text-[11px] text-zinc-300 bg-zinc-900/90 border border-zinc-700/60 p-2.5 rounded-lg flex items-start gap-2">
-                      <Info className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                    <div className="text-[11px] text-zinc-300 bg-zinc-900/90 border border-zinc-700/60 p-2.5 rounded-lg flex items-start gap-2">
+                      <Info className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
                       <span>
-                        <strong className="text-zinc-100">Action:</strong> Paste the entire multi-line block (including <code className="text-amber-300 bg-zinc-800 px-1 py-0.5 rounded">BEGIN</code> and <code className="text-amber-300 bg-zinc-800 px-1 py-0.5 rounded">END</code> headers) into the <strong>SSH Private Key</strong> field in the form, or click <strong>"Upload Key File"</strong>.
+                        <strong className="text-zinc-100">Note:</strong> Paste the entire multi-line block (including <code className="text-amber-300 bg-zinc-800 px-1 py-0.5 rounded">BEGIN</code> and <code className="text-amber-300 bg-zinc-800 px-1 py-0.5 rounded">END</code> headers) into the <strong>SSH Private Key</strong> box below, or click <strong>"Upload Key File"</strong>.
                       </span>
                     </div>
                   </div>
@@ -245,12 +288,12 @@ export const RunPodSSHPrimerCard: React.FC = () => {
                 <span className="text-[11px] text-zinc-400">Asymmetric SSH Cryptography</span>
               </div>
               <p className="text-xs text-zinc-300 leading-relaxed">
-                SSH authentication requires two complementary files that work together to guarantee secure, passwordless access:
+                SSH authentication requires two complementary files:
               </p>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                 {/* Public Key Card */}
-                <div className="bg-zinc-950/70 border-2 border-indigo-900/50 rounded-xl p-4 space-y-2">
+                <div className="bg-zinc-950/70 border-2 border-indigo-900/50 rounded-xl p-4 space-y-2.5">
                   <div className="flex items-center gap-2">
                     <div className="p-1.5 rounded-md bg-indigo-500/15 text-indigo-400">
                       <FileKey className="w-4 h-4" />
@@ -261,15 +304,15 @@ export const RunPodSSHPrimerCard: React.FC = () => {
                     </div>
                   </div>
                   <p className="text-xs text-zinc-300 leading-relaxed">
-                    This file contains a single line starting with <code className="text-indigo-300 bg-zinc-800 px-1 py-0.5 rounded">ssh-ed25519</code> or <code className="text-indigo-300 bg-zinc-800 px-1 py-0.5 rounded">ssh-rsa</code> and ending with the comment/email.
+                    This file contains a single line starting with <code className="text-indigo-300 bg-zinc-800 px-1 py-0.5 rounded font-mono">ssh-ed25519</code> or <code className="text-indigo-300 bg-zinc-800 px-1 py-0.5 rounded font-mono">ssh-rsa</code> and ending with the comment/email.
                   </p>
                   <div className="text-[11px] text-zinc-400 bg-zinc-900/80 p-2.5 rounded-lg border border-zinc-800">
-                    <strong className="text-zinc-200">Where it lives:</strong> It is added to your RunPod account settings and automatically injected into <code className="text-zinc-300 bg-zinc-800 px-1 rounded">/root/.ssh/authorized_keys</code> on the pod when it is provisioned.
+                    <strong className="text-zinc-200">Where it lives:</strong> It lives in your RunPod account settings and gets injected into <code className="text-indigo-300 bg-zinc-800 px-1 rounded font-mono">/root/.ssh/authorized_keys</code> on your pods.
                   </div>
                 </div>
 
                 {/* Private Key Card */}
-                <div className="bg-zinc-950/70 border-2 border-amber-900/50 rounded-xl p-4 space-y-2">
+                <div className="bg-zinc-950/70 border-2 border-amber-900/50 rounded-xl p-4 space-y-2.5">
                   <div className="flex items-center gap-2">
                     <div className="p-1.5 rounded-md bg-amber-500/15 text-amber-400">
                       <Key className="w-4 h-4" />
@@ -280,10 +323,10 @@ export const RunPodSSHPrimerCard: React.FC = () => {
                     </div>
                   </div>
                   <p className="text-xs text-zinc-300 leading-relaxed">
-                    This file contains multiple lines wrapped in <code className="text-amber-300 bg-zinc-800 px-1 py-0.5 rounded">-----BEGIN OPENSSH PRIVATE KEY-----</code> (or RSA PRIVATE KEY) and <code className="text-amber-300 bg-zinc-800 px-1 py-0.5 rounded">-----END...</code>.
+                    This file contains multiple lines wrapped in <code className="text-amber-300 bg-zinc-800 px-1 py-0.5 rounded font-mono">-----BEGIN OPENSSH PRIVATE KEY-----</code> (or <code className="text-amber-300 bg-zinc-800 px-1 py-0.5 rounded font-mono">RSA PRIVATE KEY</code>) and <code className="text-amber-300 bg-zinc-800 px-1 py-0.5 rounded font-mono">-----END...</code>.
                   </p>
                   <div className="text-[11px] text-zinc-400 bg-zinc-900/80 p-2.5 rounded-lg border border-zinc-800">
-                    <strong className="text-zinc-200">Where it stays:</strong> It stays secret on the local client machine and must be provided to Shot Planner so its Python backend (paramiko) can authenticate without passwords.
+                    <strong className="text-zinc-200">Where it stays:</strong> It stays secret on your local machine and must be provided to Shot Planner so its Python backend (<code className="text-amber-300 font-mono">paramiko</code>) can authenticate without passwords.
                   </div>
                 </div>
               </div>
@@ -298,7 +341,7 @@ export const RunPodSSHPrimerCard: React.FC = () => {
                   <Terminal className="w-3.5 h-3.5 text-emerald-400" />
                   2. Step-by-Step Key Generation Commands
                 </h4>
-                <span className="text-[11px] text-zinc-400">Standard terminal commands</span>
+                <span className="text-[11px] text-zinc-400">Terminal snippets</span>
               </div>
 
               <div className="space-y-3">
@@ -336,42 +379,106 @@ export const RunPodSSHPrimerCard: React.FC = () => {
                     (Press Enter twice to skip passphrase unless the app UI specifically supports passphrase inputs).
                   </p>
                 </div>
+              </div>
+            </div>
+          )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
-                  <div>
-                    <span className="text-xs font-semibold text-zinc-200 block mb-1">
-                      Get the Public Key (to paste into RunPod Account Settings):
-                    </span>
-                    <CodeBlock 
-                      code={`cat ~/.ssh/id_ed25519_runpod.pub`}
-                      label="Bash"
-                    />
+          {/* TAB 4: How to Upload & Authorize the Public Key on RunPod */}
+          {activeTab === "runpod_auth" && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-zinc-200 uppercase tracking-wider flex items-center gap-1.5">
+                  <CloudUpload className="w-3.5 h-3.5 text-amber-400" />
+                  3. How to Upload &amp; Authorize the Public Key on RunPod
+                </h4>
+                <span className="text-[11px] text-zinc-400">Account Settings &amp; Active Pod Sync</span>
+              </div>
+
+              <div className="space-y-4">
+                {/* 1. Copy public key */}
+                <div className="bg-zinc-950/70 border border-zinc-800 rounded-xl p-3.5 space-y-2">
+                  <h5 className="text-xs font-bold text-zinc-200 flex items-center gap-2">
+                    <span className="w-4 h-4 rounded-full bg-indigo-500/20 text-indigo-400 text-[10px] font-bold flex items-center justify-center">A</span>
+                    Copy the Public Key:
+                  </h5>
+                  <ul className="text-xs text-zinc-300 space-y-1 pl-6 list-disc">
+                    <li>
+                      <strong>If generated via terminal:</strong>
+                      <CodeBlock code={`cat ~/.ssh/id_ed25519_runpod.pub`} label="Bash" />
+                    </li>
+                    <li>
+                      <strong>If generated via Shot Planner's in-app button:</strong> click <strong>"Copy Public Key"</strong>.
+                    </li>
+                    <li className="text-zinc-400 text-[11px]">
+                      (The key is a single line starting with <code className="text-emerald-400">ssh-ed25519...</code>).
+                    </li>
+                  </ul>
+                </div>
+
+                {/* 2. Add to account settings */}
+                <div className="bg-zinc-950/70 border border-zinc-800 rounded-xl p-3.5 space-y-2">
+                  <h5 className="text-xs font-bold text-zinc-200 flex items-center gap-2">
+                    <span className="w-4 h-4 rounded-full bg-indigo-500/20 text-indigo-400 text-[10px] font-bold flex items-center justify-center">B</span>
+                    Add to RunPod Account Settings (For all future pods):
+                  </h5>
+                  <ol className="text-xs text-zinc-300 space-y-1.5 pl-6 list-decimal leading-relaxed">
+                    <li>Go to the <strong>RunPod Console</strong>.</li>
+                    <li>Navigate to <strong>Settings</strong> (or <strong>Manage &rarr; SSH Keys</strong>).</li>
+                    <li>Under <strong>SSH Public Keys</strong>, click <strong>"+ Add SSH Key"</strong>.</li>
+                    <li>Give it a name, paste the public key string, and click <strong>Save</strong>.</li>
+                  </ol>
+                </div>
+
+                {/* 3. Crucial on Active Pod */}
+                <div className="bg-amber-950/30 border-2 border-amber-600/50 rounded-xl p-4 space-y-3">
+                  <div className="flex items-start gap-2.5">
+                    <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                    <div>
+                      <h5 className="text-xs font-bold text-amber-200">
+                        Crucial: Authorizing on an ALREADY RUNNING Pod (Avoids Authentication Failure)
+                      </h5>
+                      <p className="text-xs text-amber-300/90 leading-relaxed mt-1">
+                        RunPod injects SSH keys into containers <strong>only at pod startup</strong>. Adding a key in web settings does not sync to an active pod.
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <span className="text-xs font-semibold text-zinc-200 block mb-1">
-                      Get the Private Key (to paste/upload into Shot Planner UI):
-                    </span>
+
+                  <div className="space-y-2 pl-7">
+                    <p className="text-xs text-zinc-300">
+                      1. Open your running pod's <strong>Web Terminal</strong> (via the browser connect button on the Pod card).
+                    </p>
+                    <p className="text-xs text-zinc-300">
+                      2. Run these exact commands to authorize the key and lock down file permissions:
+                    </p>
                     <CodeBlock 
-                      code={`cat ~/.ssh/id_ed25519_runpod`}
-                      label="Bash"
+                      code={`mkdir -p ~/.ssh\necho "PASTE_YOUR_PUBLIC_KEY_STRING_HERE" >> ~/.ssh/authorized_keys\nchmod 700 ~/.ssh\nchmod 600 ~/.ssh/authorized_keys`}
+                      label="Pod Web Terminal"
                     />
+                    <div className="bg-zinc-900/90 border border-amber-700/40 rounded-lg p-2.5 text-[11px] text-amber-300/90 flex items-center gap-2">
+                      <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span>
+                        Without the <code className="text-amber-200 font-mono">chmod</code> step, SSH daemons will silently reject the key due to unsafe permissions.
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Important Callout / Notice */}
-          <div className="bg-amber-950/25 border-2 border-amber-700/40 rounded-xl p-4 flex items-start gap-3">
-            <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <h5 className="text-xs font-bold text-amber-200 flex items-center gap-2">
-                Important Callout / Notice on Existing Pods
-              </h5>
-              <p className="text-xs text-amber-300/90 leading-relaxed">
-                RunPod injects public keys into <code className="bg-zinc-900/90 text-amber-200 px-1.5 py-0.5 rounded border border-amber-700/50 font-mono">~/.ssh/authorized_keys</code> <strong>only when a pod is created</strong>. If your pod was launched before adding the public key to RunPod, restart the pod or append the public key manually via the pod's Web Terminal.
-              </p>
-            </div>
+          {/* Quick Footer Notice */}
+          <div className="bg-zinc-950/50 border border-zinc-800/80 rounded-xl p-3.5 text-xs text-zinc-400 flex items-center justify-between flex-wrap gap-2">
+            <span className="flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>Shot Planner uses <code className="text-zinc-200 font-mono">paramiko</code> for fast direct SFTP asset transfer and workflow triggering.</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setActiveTab("quickstart")}
+              className="text-amber-400 hover:text-amber-300 text-xs font-semibold cursor-pointer underline"
+            >
+              View Quick Setup Steps &rarr;
+            </button>
           </div>
         </div>
       )}

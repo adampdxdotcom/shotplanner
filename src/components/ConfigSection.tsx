@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { AppConfig } from "../types";
-import { RunPodSSHPrimerCard } from "./RunPodSSHPrimerCard";
+import { RunPodSSHPrimerCard, CodeBlock } from "./RunPodSSHPrimerCard";
 import { 
   Server, 
   Terminal, 
@@ -21,7 +21,9 @@ import {
   Download,
   X,
   FileKey,
-  Upload
+  Upload,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 
 interface ConfigSectionProps {
@@ -46,6 +48,7 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange, 
   const [generatedKeyPair, setGeneratedKeyPair] = useState<{ public_key: string; private_key: string } | null>(null);
   const [showPublicKeyModal, setShowPublicKeyModal] = useState(false);
   const [hasCopiedPublicKey, setHasCopiedPublicKey] = useState(false);
+  const [showInlineSSHGuide, setShowInlineSSHGuide] = useState(false);
 
   // Check Gemini Status on mount
   useEffect(() => {
@@ -329,14 +332,20 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange, 
                 />
               </label>
 
-              <a
-                href="#runpod-ssh-guide"
-                className="text-[10px] text-zinc-400 hover:text-zinc-200 bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700 px-2 py-1 rounded-lg font-medium flex items-center gap-1 transition-colors"
-                title="View RunPod SSH Key Setup Instructions"
+              <button
+                type="button"
+                onClick={() => setShowInlineSSHGuide(!showInlineSSHGuide)}
+                className={`text-[11px] px-2 py-1 rounded-lg font-medium flex items-center gap-1 transition-colors cursor-pointer ${
+                  showInlineSSHGuide
+                    ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                    : "text-zinc-300 hover:text-white bg-zinc-800 hover:bg-zinc-700 border border-zinc-700"
+                }`}
+                title="Toggle inline SSH setup instructions"
               >
-                <HelpCircle className="w-3 h-3 text-zinc-400" />
-                <span>Guide</span>
-              </a>
+                <HelpCircle className="w-3.5 h-3.5 text-amber-400" />
+                <span>Quick Setup</span>
+                {showInlineSSHGuide ? <ChevronUp className="w-3 h-3 text-amber-400" /> : <ChevronDown className="w-3 h-3 text-zinc-400" />}
+              </button>
             </div>
           </div>
 
@@ -347,6 +356,112 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange, 
             onChange={(e) => handleInputChange("ssh_private_key", e.target.value)}
             className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-amber-500 rounded-lg px-3 py-1.5 text-[11px] font-mono text-zinc-100 placeholder-zinc-600 outline-none transition-colors resize-y mt-1.5"
           />
+
+          {/* Inline Dedicated Helper Card */}
+          {showInlineSSHGuide && (
+            <div className="mt-2 bg-zinc-900 border-2 border-amber-600/60 rounded-xl p-4 space-y-3.5 animate-in fade-in duration-150">
+              <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+                <h4 className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                  <Terminal className="w-3.5 h-3.5 text-amber-400" />
+                  RunPod SSH Key Pair Quick Setup
+                </h4>
+                <button
+                  type="button"
+                  onClick={() => setShowInlineSSHGuide(false)}
+                  className="text-zinc-400 hover:text-zinc-200 text-[11px] cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3">
+                {/* Step 1 */}
+                <div className="bg-zinc-950/80 border border-zinc-800 rounded-lg p-3 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-4 h-4 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-bold flex items-center justify-center">1</span>
+                      <span className="text-xs font-semibold text-zinc-200">Step 1: Generate Key Pair</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleGenerateKeyPair}
+                      disabled={isGeneratingKeyPair}
+                      className="text-[10px] text-amber-400 hover:text-amber-300 underline font-medium cursor-pointer"
+                    >
+                      Click "Generate New Key Pair"
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-zinc-400 pl-6">
+                    Or run this generation snippet in your terminal:
+                  </p>
+                  <div className="pl-6">
+                    <CodeBlock 
+                      code={`ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_runpod -C "your_email@example.com"`}
+                      label="Bash"
+                    />
+                  </div>
+                </div>
+
+                {/* Step 2 */}
+                <div className="bg-zinc-950/80 border border-zinc-800 rounded-lg p-3 space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="w-4 h-4 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-bold flex items-center justify-center">2</span>
+                    <span className="text-xs font-semibold text-zinc-200">Step 2: Add Public Key to RunPod Account</span>
+                  </div>
+                  <div className="pl-6 space-y-1.5">
+                    <p className="text-[11px] text-zinc-400">
+                      View public key: <code className="text-amber-300 bg-zinc-800 px-1 py-0.5 rounded">cat ~/.ssh/id_ed25519_runpod.pub</code>
+                    </p>
+                    <div className="text-[11px] text-zinc-300 bg-zinc-900/90 border border-zinc-700/60 p-2 rounded-lg flex items-start gap-1.5">
+                      <Info className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                      <span>
+                        <strong>Destination:</strong> RunPod Console &rarr; Settings &rarr; SSH Keys &rarr; "+ Add SSH Key".
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Step 3 */}
+                <div className="bg-zinc-950/80 border-2 border-amber-900/50 rounded-lg p-3 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-4 h-4 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-bold flex items-center justify-center">3</span>
+                      <span className="text-xs font-semibold text-amber-200">Step 3: Fix Permissions on Active Pod (If already running)</span>
+                    </div>
+                    <span className="text-[10px] text-amber-400 font-mono">Crucial</span>
+                  </div>
+                  <div className="pl-6 space-y-1.5">
+                    <p className="text-[11px] text-zinc-400">
+                      In your pod's <strong>Web Terminal</strong>, paste:
+                    </p>
+                    <CodeBlock 
+                      code={`mkdir -p ~/.ssh && echo "YOUR_PUBLIC_KEY" >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys`}
+                      label="Pod Web Terminal"
+                    />
+                  </div>
+                </div>
+
+                {/* Step 4 */}
+                <div className="bg-zinc-950/80 border border-zinc-800 rounded-lg p-3 space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="w-4 h-4 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-bold flex items-center justify-center">4</span>
+                    <span className="text-xs font-semibold text-zinc-200">Step 4: Load Private Key into Shot Planner</span>
+                  </div>
+                  <div className="pl-6 space-y-1.5">
+                    <p className="text-[11px] text-zinc-400">
+                      Show command: <code className="text-amber-300 bg-zinc-800 px-1 py-0.5 rounded">cat ~/.ssh/id_ed25519_runpod</code>
+                    </p>
+                    <div className="text-[11px] text-zinc-300 bg-zinc-900/90 border border-zinc-700/60 p-2 rounded-lg flex items-start gap-1.5">
+                      <Info className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                      <span>
+                        <strong>Note:</strong> Paste the entire multi-line block (including BEGIN and END headers) into the Private Key box below, or click "Upload Key File".
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="flex items-center justify-between text-[11px] text-zinc-400 pt-0.5">
             <span>The private key is stored securely in your app settings for automated Paramiko authentication.</span>
