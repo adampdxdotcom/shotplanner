@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { MediaAsset, AssetType } from "../types";
+import { SubjectCombobox } from "./SubjectCombobox";
 import { 
   Edit3,
   Maximize,
@@ -16,11 +17,16 @@ import {
   User, 
   AlignLeft,
   AlertCircle,
-  Loader2
+  Loader2,
+  RefreshCw,
+  Undo2,
+  FileImage
 } from "lucide-react";
 
 interface AssetManagerSectionProps {
   assets: MediaAsset[];
+  subjects?: string[];
+  onRegisterSubject?: (name: string) => void;
   onAssetUploaded: (asset: MediaAsset, slotIndex?: number, mediaType?: "image" | "audio" | "video") => void;
   onAssetDeleted: (filename: string) => void;
   onAssetUpdated: (oldFilename: string, newAsset: MediaAsset) => void;
@@ -28,6 +34,8 @@ interface AssetManagerSectionProps {
 
 export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
   assets,
+  subjects = [],
+  onRegisterSubject = (_name: string) => {},
   onAssetUploaded,
   onAssetDeleted,
   onAssetUpdated
@@ -50,6 +58,9 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
   const [editDescription, setEditDescription] = useState<string>("");
   const [editType, setEditType] = useState<string>("");
   const [editFile, setEditFile] = useState<File | null>(null);
+  const [editFilePreviewUrl, setEditFilePreviewUrl] = useState<string | null>(null);
+  const [isReplacingFile, setIsReplacingFile] = useState<boolean>(false);
+  const [editDragActive, setEditDragActive] = useState<boolean>(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
@@ -191,12 +202,59 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
     setEditDescription(asset.description);
     setEditType(asset.type);
     setEditFile(null);
+    if (editFilePreviewUrl) {
+      URL.revokeObjectURL(editFilePreviewUrl);
+    }
+    setEditFilePreviewUrl(null);
+    setIsReplacingFile(false);
+    setEditDragActive(false);
     setEditError(null);
   };
 
   const closeEditModal = () => {
+    if (editFilePreviewUrl) {
+      URL.revokeObjectURL(editFilePreviewUrl);
+    }
     setEditingAsset(null);
     setEditFile(null);
+    setEditFilePreviewUrl(null);
+    setIsReplacingFile(false);
+    setEditDragActive(false);
+    setEditError(null);
+  };
+
+  const handleEditFileSelected = (file: File | null) => {
+    if (editFilePreviewUrl) {
+      URL.revokeObjectURL(editFilePreviewUrl);
+      setEditFilePreviewUrl(null);
+    }
+    if (file) {
+      setEditFile(file);
+      setIsReplacingFile(true);
+      if (file.type.startsWith("image/")) {
+        setEditFilePreviewUrl(URL.createObjectURL(file));
+      }
+    } else {
+      setEditFile(null);
+    }
+  };
+
+  const handleTriggerReplace = () => {
+    if (editFilePreviewUrl) {
+      URL.revokeObjectURL(editFilePreviewUrl);
+      setEditFilePreviewUrl(null);
+    }
+    setEditFile(null);
+    setIsReplacingFile(true);
+  };
+
+  const handleRevertToOriginal = () => {
+    if (editFilePreviewUrl) {
+      URL.revokeObjectURL(editFilePreviewUrl);
+      setEditFilePreviewUrl(null);
+    }
+    setEditFile(null);
+    setIsReplacingFile(false);
   };
 
   const submitEdit = async () => {
@@ -205,8 +263,8 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
     setEditError(null);
 
     try {
-      if (editFile) {
-        // Upload new file chunks
+      if (isReplacingFile && editFile) {
+        // Upload new file chunks to replace the file on disk
         const CHUNK_SIZE = 512 * 1024;
         const totalChunks = Math.ceil(editFile.size / CHUNK_SIZE);
         const uploadId = Date.now().toString() + "_" + Math.random().toString(36).substring(2);
@@ -239,12 +297,14 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
         }
         
         if (finalData && finalData.asset) {
+          if (editSubjectName.trim()) onRegisterSubject(editSubjectName.trim());
           onAssetUpdated(editingAsset.filename, finalData.asset);
         } else {
           throw new Error("Failed to get updated asset.");
         }
       } else {
-        // Just update metadata
+        // Just update metadata without modifying file on disk
+        if (editSubjectName.trim()) onRegisterSubject(editSubjectName.trim());
         const res = await fetch(`/api/assets/${editingAsset.filename}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -388,6 +448,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
       }
 
       if (finalData && finalData.asset) {
+        onRegisterSubject(subjectName.trim());
         const finalizedAsset: MediaAsset = {
           ...finalData.asset,
           slot_index: targetSlotIndex,
@@ -555,16 +616,24 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-zinc-300 flex items-center gap-1">
-                  <User className="w-3 h-3 text-zinc-400" />
-                  <span>Subject / Entity Name</span>
+                <label className="text-xs font-medium text-zinc-300 flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <User className="w-3 h-3 text-zinc-400" />
+                    <span>Subject / Entity Name</span>
+                  </span>
+                  <span className="text-[10px] text-zinc-500 font-mono">
+                    Global Autocomplete
+                  </span>
                 </label>
-                <input
-                  type="text"
-                  placeholder="e.g. jackie, cyberpunk_car, tavern"
+                <SubjectCombobox
                   value={subjectName}
-                  onChange={(e) => setSubjectName(e.target.value)}
-                  className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-amber-500 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 placeholder-zinc-600 outline-none"
+                  onChange={setSubjectName}
+                  subjects={subjects}
+                  onRegisterSubject={onRegisterSubject}
+                  assets={assets}
+                  assetType={assetType}
+                  placeholder="e.g. Jackie, Cyberpunk_Car, Tavern"
+                  disabled={uploading}
                 />
               </div>
 
@@ -668,12 +737,16 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1">Subject Name</label>
-                <input
-                  type="text"
+                <label className="block text-xs font-medium text-zinc-400 mb-1">Subject / Entity Name</label>
+                <SubjectCombobox
                   value={editSubjectName}
-                  onChange={(e) => setEditSubjectName(e.target.value)}
-                  className="w-full bg-zinc-950 border-2 border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:border-indigo-500 transition-colors outline-none"
+                  onChange={setEditSubjectName}
+                  subjects={subjects}
+                  onRegisterSubject={onRegisterSubject}
+                  assets={assets}
+                  assetType={editType}
+                  placeholder="e.g. Jackie, Cyberpunk_Car, Tavern"
+                  disabled={isEditing}
                 />
               </div>
               <div>
@@ -685,14 +758,201 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
                   className="w-full bg-zinc-950 border-2 border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:border-indigo-500 transition-colors outline-none resize-none"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1">Replace File (Optional)</label>
-                <input
-                  type="file"
-                  accept={editingAsset.media_type === "image" ? "image/*" : editingAsset.media_type === "audio" ? "audio/*" : "video/*"}
-                  onChange={(e) => setEditFile(e.target.files?.[0] || null)}
-                  className="w-full bg-zinc-950 border-2 border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-200 file:mr-3 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:bg-zinc-800 file:text-zinc-300 hover:file:bg-zinc-700"
-                />
+              {/* Media Preview & Optional Replacement Zone */}
+              <div className="space-y-1.5 pt-1">
+                <div className="flex items-center justify-between text-xs font-medium text-zinc-400">
+                  <span className="flex items-center gap-1.5">
+                    <FileImage className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>Media File</span>
+                  </span>
+                  {!isReplacingFile ? (
+                    <span className="text-[10px] text-emerald-400/90 font-mono bg-emerald-950/40 border border-emerald-800/40 px-2 py-0.5 rounded">
+                      Retaining Current File
+                    </span>
+                  ) : editFile ? (
+                    <span className="text-[10px] text-amber-400/90 font-mono bg-amber-950/40 border border-amber-800/40 px-2 py-0.5 rounded">
+                      New Replacement Staged
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-amber-400/90 font-mono bg-amber-950/40 border border-amber-800/40 px-2 py-0.5 rounded">
+                      Select Replacement
+                    </span>
+                  )}
+                </div>
+
+                {/* State 1: Active Retained Media Preview (Default) */}
+                {!isReplacingFile && (
+                  <div className="relative group bg-zinc-950 border-2 border-zinc-700 rounded-xl overflow-hidden shadow-inner">
+                    {/* Media Display */}
+                    {(editingAsset.media_type === "image" || !editingAsset.media_type || /\.(png|jpe?g|webp|gif|svg|avif|bmp)$/i.test(editingAsset.filename)) ? (
+                      <div className="relative w-full h-44 bg-zinc-950/80 flex items-center justify-center overflow-hidden">
+                        <img
+                          src={editingAsset.preview_url?.startsWith("/api/assets/file/") ? editingAsset.preview_url : `/api/assets/file/${encodeURIComponent(editingAsset.filename)}`}
+                          alt={editingAsset.subject_name}
+                          className="w-full h-full object-contain"
+                          onError={(e) => {
+                            const target = e.currentTarget;
+                            if (!target.src.includes("/api/uploads/")) {
+                              target.src = `/api/uploads/${encodeURIComponent(editingAsset.filename)}`;
+                            } else if (!target.src.includes("/uploads/")) {
+                              target.src = `/uploads/${encodeURIComponent(editingAsset.filename)}`;
+                            }
+                          }}
+                        />
+                      </div>
+                    ) : editingAsset.media_type === "audio" || /\.(mp3|wav|ogg|m4a|flac)$/i.test(editingAsset.filename) ? (
+                      <div className="p-4 flex flex-col items-center justify-center gap-2 bg-zinc-950/90 min-h-[120px]">
+                        <Music className="w-8 h-8 text-amber-400" />
+                        <audio 
+                          controls 
+                          src={editingAsset.preview_url?.startsWith("/api/assets/file/") ? editingAsset.preview_url : `/api/assets/file/${encodeURIComponent(editingAsset.filename)}`}
+                          className="w-full max-w-xs h-8 mt-1" 
+                        />
+                      </div>
+                    ) : (
+                      <div className="relative w-full h-44 bg-zinc-950/80 flex items-center justify-center overflow-hidden">
+                        <video 
+                          controls
+                          src={editingAsset.preview_url?.startsWith("/api/assets/file/") ? editingAsset.preview_url : `/api/assets/file/${encodeURIComponent(editingAsset.filename)}`}
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                    )}
+
+                    {/* Top file meta tag */}
+                    <div className="absolute top-2 left-2 right-2 flex items-center justify-between pointer-events-none">
+                      <span className="text-[10px] font-mono bg-black/75 text-zinc-300 px-2 py-0.5 rounded backdrop-blur-sm truncate max-w-[200px] border border-white/10">
+                        {editingAsset.filename}
+                      </span>
+                      <span className="text-[10px] font-mono bg-black/75 text-zinc-400 px-2 py-0.5 rounded backdrop-blur-sm border border-white/10">
+                        {(editingAsset.size_bytes / 1024).toFixed(1)} KB
+                      </span>
+                    </div>
+
+                    {/* Bottom Action Bar / Overlay */}
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-3 pt-6 flex items-center justify-between transition-opacity">
+                      <p className="text-[11px] text-zinc-300">
+                        Original file will be kept
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleTriggerReplace}
+                        className="px-3 py-1.5 bg-zinc-800/90 hover:bg-red-950/80 hover:text-red-300 hover:border-red-500/50 text-zinc-200 border border-zinc-600 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md"
+                        title="Replace or clear this image file"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Replace Image</span>
+                        <Trash2 className="w-3.5 h-3.5 text-zinc-400 ml-0.5 hover:text-red-400" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* State 2: Replacement Mode (Staged new file or Drop Zone) */}
+                {isReplacingFile && (
+                  <div className="space-y-2">
+                    {editFile ? (
+                      /* Staged Replacement Preview */
+                      <div className="relative bg-zinc-950 border-2 border-amber-500/80 rounded-xl overflow-hidden">
+                        {editFilePreviewUrl ? (
+                          <div className="relative w-full h-44 bg-zinc-950 flex items-center justify-center">
+                            <img 
+                              src={editFilePreviewUrl} 
+                              alt="Staged replacement" 
+                              className="w-full h-full object-contain"
+                            />
+                          </div>
+                        ) : (
+                          <div className="p-6 flex flex-col items-center justify-center gap-2">
+                            <FileImage className="w-8 h-8 text-amber-400" />
+                            <p className="text-xs font-mono text-zinc-200">{editFile.name}</p>
+                          </div>
+                        )}
+
+                        <div className="absolute top-2 left-2 right-2 flex items-center justify-between pointer-events-none">
+                          <span className="text-[10px] font-mono bg-amber-950/90 text-amber-300 px-2 py-0.5 rounded border border-amber-600/40 truncate max-w-[200px]">
+                            New: {editFile.name}
+                          </span>
+                          <span className="text-[10px] font-mono bg-black/80 text-zinc-300 px-2 py-0.5 rounded">
+                            {(editFile.size / 1024).toFixed(1)} KB
+                          </span>
+                        </div>
+
+                        {/* Staged file actions */}
+                        <div className="p-2.5 bg-zinc-900 border-t border-zinc-800 flex items-center justify-between">
+                          <button
+                            type="button"
+                            onClick={handleRevertToOriginal}
+                            className="px-2.5 py-1 text-xs text-zinc-400 hover:text-zinc-200 flex items-center gap-1.5 transition-colors"
+                          >
+                            <Undo2 className="w-3.5 h-3.5" />
+                            <span>Keep original file</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleEditFileSelected(null)}
+                            className="px-2.5 py-1 bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-800/50 rounded-md text-xs flex items-center gap-1.5 transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Remove</span>
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Drop Zone for selecting new file */
+                      <div
+                        onDragEnter={(e) => {
+                          e.preventDefault();
+                          setEditDragActive(true);
+                        }}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          setEditDragActive(true);
+                        }}
+                        onDragLeave={(e) => {
+                          e.preventDefault();
+                          setEditDragActive(false);
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          setEditDragActive(false);
+                          if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                            handleEditFileSelected(e.dataTransfer.files[0]);
+                          }
+                        }}
+                        className={`relative w-full flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-xl transition-all ${
+                          editDragActive
+                            ? "border-amber-400 bg-amber-500/10"
+                            : "border-zinc-700 hover:border-amber-500/80 bg-zinc-950/60 hover:bg-zinc-900/60 cursor-pointer"
+                        }`}
+                      >
+                        <label className="w-full flex flex-col items-center justify-center cursor-pointer">
+                          <UploadCloud className="w-8 h-8 mb-2 text-amber-400 animate-pulse" />
+                          <p className="text-xs font-semibold text-zinc-200 text-center">
+                            Select Replacement {editingAsset.media_type ? editingAsset.media_type.toUpperCase() : "MEDIA"} File
+                          </p>
+                          <p className="text-[11px] text-zinc-400 text-center mt-1">
+                            Click to browse files or drag and drop here
+                          </p>
+                          <input
+                            type="file"
+                            accept={editingAsset.media_type === "image" ? "image/*" : editingAsset.media_type === "audio" ? "audio/*" : "video/*"}
+                            onChange={(e) => handleEditFileSelected(e.target.files?.[0] || null)}
+                            className="hidden"
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={handleRevertToOriginal}
+                          className="mt-3 text-[11px] text-zinc-400 hover:text-zinc-200 underline flex items-center gap-1"
+                        >
+                          <Undo2 className="w-3 h-3" />
+                          Cancel replacement & keep original
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               
               {editError && (

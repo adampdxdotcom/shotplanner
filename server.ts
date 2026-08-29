@@ -1,6 +1,7 @@
 import express, { Request, Response } from "express";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
 import { ZipArchive } from "archiver";
 import unzipper from "unzipper";
 import multer from "multer";
@@ -120,6 +121,14 @@ app.post("/api/workflows/parse", (req: Request, res: Response) => {
     const videoLoaderNodes: any[] = [];
     const audioLoaderNodes: any[] = [];
     const otherNodes: any[] = [];
+
+    const detectedNodes: { steps: string | null; megapixels: string | null; frames: string | null } = {
+      steps: null,
+      megapixels: null,
+      frames: null
+    };
+    const detectedValues: Record<string, any> = {};
+
     for (const [nodeId, nodeData] of Object.entries<any>(workflow)) {
       if (!nodeData || typeof nodeData !== "object") continue;
       const classType = nodeData.class_type || "";
@@ -127,6 +136,7 @@ app.post("/api/workflows/parse", (req: Request, res: Response) => {
       const title = meta.title || `${classType} (#${nodeId})`;
       const inputs = nodeData.inputs || {};
       const nodeInfo = { id: String(nodeId), class_type: classType, title, inputs };
+      
       if (["PrimitiveStringMultiline", "CLIPTextEncode", "StringLiteral", "ShowText"].includes(classType)) {
         promptNodes.push({ ...nodeInfo, current_value: inputs.value ?? inputs.text ?? "" });
       } else if (["LoadImage", "LoadImageMask", "LoadImageFromUrl"].includes(classType)) {
@@ -138,10 +148,41 @@ app.post("/api/workflows/parse", (req: Request, res: Response) => {
       } else {
         otherNodes.push(nodeInfo);
       }
+
+      // Auto-detect dynamic parameter nodes
+      // 1. Steps
+      if (detectedNodes.steps === null && inputs && typeof inputs === "object" && "steps" in inputs) {
+        detectedNodes.steps = String(nodeId);
+        detectedValues.steps = inputs.steps;
+      }
+      // 2. Megapixels
+      if (detectedNodes.megapixels === null && inputs && typeof inputs === "object" && "megapixels" in inputs) {
+        detectedNodes.megapixels = String(nodeId);
+        detectedValues.megapixels = inputs.megapixels;
+      }
+      // 3. Frames / Duration / Length
+      if (detectedNodes.frames === null && inputs && typeof inputs === "object") {
+        for (const frameKey of ["frames", "length", "num_frames", "duration", "frame_count"]) {
+          if (frameKey in inputs) {
+            detectedNodes.frames = String(nodeId);
+            detectedValues.frames = inputs[frameKey];
+            break;
+          }
+        }
+      }
     }
     res.json({
       filename,
-      nodes_info: { prompt_nodes: promptNodes, image_loader_nodes: imageLoaderNodes, video_loader_nodes: videoLoaderNodes, audio_loader_nodes: audioLoaderNodes, total_nodes: Object.keys(workflow).length },
+      detected_nodes: detectedNodes,
+      detected_values: detectedValues,
+      nodes_info: { 
+        prompt_nodes: promptNodes, 
+        image_loader_nodes: imageLoaderNodes, 
+        video_loader_nodes: videoLoaderNodes, 
+        audio_loader_nodes: audioLoaderNodes, 
+        detected_nodes: detectedNodes,
+        total_nodes: Object.keys(workflow).length 
+      },
       raw_json: workflow
     });
   } catch (err: any) {
@@ -824,6 +865,87 @@ non_diegetic_music: N/A`;
   }
 });
 
+// 7b. In-App SSH Key Pair Generator (Ed25519 OpenSSH)
+function generateEd25519OpenSSH() {
+  const { privateKey, publicKey } = crypto.generateKeyPairSync("ed25519");
+  const privDer = privateKey.export({ type: "pkcs8", format: "der" });
+  const pubDer = publicKey.export({ type: "spki", format: "der" });
+  const privRaw = privDer.subarray(privDer.length - 32);
+  const pubRaw = pubDer.subarray(pubDer.length - 32);
+
+  function encodeString(buf: Buffer | string) {
+    const b = Buffer.isBuffer(buf) ? buf : Buffer.from(buf);
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(b.length, 0);
+    return Buffer.concat([len, b]);
+  }
+
+  const pubBlob = Buffer.concat([
+    encodeString("ssh-ed25519"),
+    encodeString(pubRaw)
+  ]);
+  const public_openssh = "ssh-ed25519 " + pubBlob.toString("base64") + " shot-planner@app";
+
+  const checkInt = crypto.randomBytes(4).readUInt32BE(0);
+  const checkIntBuf = Buffer.alloc(4);
+  checkIntBuf.writeUInt32BE(checkInt, 0);
+
+  const privAndPub = Buffer.concat([privRaw, pubRaw]);
+
+  let privBlob = Buffer.concat([
+    checkIntBuf,
+    checkIntBuf,
+    encodeString("ssh-ed25519"),
+    encodeString(pubRaw),
+    encodeString(privAndPub),
+    encodeString("shot-planner@app")
+  ]);
+
+  const padLen = (8 - (privBlob.length % 8)) % 8;
+  const padding = Buffer.alloc(padLen);
+  for (let i = 0; i < padLen; i++) padding[i] = i + 1;
+  privBlob = Buffer.concat([privBlob, padding]);
+
+  const magic = Buffer.from("openssh-key-v1\0");
+  const ciphername = encodeString("none");
+  const kdfname = encodeString("none");
+  const kdfoptions = encodeString("");
+  const numKeys = Buffer.alloc(4);
+  numKeys.writeUInt32BE(1, 0);
+  const encPubBlob = encodeString(pubBlob);
+  const encPrivBlob = encodeString(privBlob);
+
+  const keyBuffer = Buffer.concat([
+    magic,
+    ciphername,
+    kdfname,
+    kdfoptions,
+    numKeys,
+    encPubBlob,
+    encPrivBlob
+  ]);
+
+  const b64 = keyBuffer.toString("base64");
+  const lines: string[] = [];
+  for (let i = 0; i < b64.length; i += 70) {
+    lines.push(b64.slice(i, i + 70));
+  }
+
+  const private_pem = "-----BEGIN OPENSSH PRIVATE KEY-----\n" + lines.join("\n") + "\n-----END OPENSSH PRIVATE KEY-----\n";
+
+  return { private_key: private_pem, public_key: public_openssh };
+}
+
+app.post("/api/ssh/generate_keypair", (req: Request, res: Response) => {
+  try {
+    const keyPair = generateEd25519OpenSSH();
+    res.json(keyPair);
+  } catch (err: any) {
+    console.error("SSH Key generation failed:", err);
+    res.status(500).json({ error: err.message || "Failed to generate SSH key pair" });
+  }
+});
+
 // 8. Test SSH Connection / Credentials
 app.post("/api/ssh/test", async (req: Request, res: Response) => {
   const { host, port = 22, username = "root", ssh_private_key, password, key_path, remote_dir = "/workspace/runpod-slim/ComfyUI/input/" } = req.body;
@@ -977,6 +1099,9 @@ app.post("/api/execute", async (req: Request, res: Response) => {
       node_mappings = {},
       bypass_missing = true,
       safe_placeholder = "empty.png",
+      parameter_overrides = {},
+      parameter_node_mappings = {},
+      generation_parameters = null,
       dry_run_only = false
     } = req.body;
 
@@ -1041,11 +1166,58 @@ app.post("/api/execute", async (req: Request, res: Response) => {
       }
     }
 
+    // Step C: Inject Dynamic Generation Parameter Overrides
+    const paramOverrides = { ...parameter_overrides };
+    const paramNodeMaps = { ...parameter_node_mappings };
+    if (generation_parameters && typeof generation_parameters === "object") {
+      for (const [k, v] of Object.entries<any>(generation_parameters)) {
+        if (v && typeof v === "object" && "value" in v && "node_id" in v) {
+          paramOverrides[k] = v.value;
+          paramNodeMaps[k] = String(v.node_id);
+        }
+      }
+    }
+
+    const injectedParamDesc: string[] = [];
+
+    // Sampling Steps
+    if (paramNodeMaps.steps && modifiedWf[paramNodeMaps.steps] && paramOverrides.steps !== undefined) {
+      const sNode = modifiedWf[paramNodeMaps.steps];
+      sNode.inputs = sNode.inputs || {};
+      sNode.inputs.steps = Number(paramOverrides.steps);
+      injectedParamDesc.push(`Steps=${paramOverrides.steps} (Node #${paramNodeMaps.steps})`);
+    }
+
+    // Megapixels
+    if (paramNodeMaps.megapixels && modifiedWf[paramNodeMaps.megapixels] && paramOverrides.megapixels !== undefined) {
+      const mNode = modifiedWf[paramNodeMaps.megapixels];
+      mNode.inputs = mNode.inputs || {};
+      mNode.inputs.megapixels = Number(paramOverrides.megapixels);
+      injectedParamDesc.push(`Megapixels=${paramOverrides.megapixels} (Node #${paramNodeMaps.megapixels})`);
+    }
+
+    // Duration / Frames
+    if (paramNodeMaps.frames && modifiedWf[paramNodeMaps.frames] && paramOverrides.frames !== undefined) {
+      const fNode = modifiedWf[paramNodeMaps.frames];
+      fNode.inputs = fNode.inputs || {};
+      let matchedKey = "frames";
+      for (const k of ["frames", "length", "num_frames", "duration", "frame_count"]) {
+        if (k in fNode.inputs) {
+          matchedKey = k;
+          break;
+        }
+      }
+      fNode.inputs[matchedKey] = Number(paramOverrides.frames);
+      injectedParamDesc.push(`Frames=${paramOverrides.frames} (Node #${paramNodeMaps.frames}.${matchedKey})`);
+    }
+
+    const paramSummary = injectedParamDesc.length > 0 ? ` Parameters: ${injectedParamDesc.join(", ")}.` : "";
+
     stepsLog.push({
       step: "C",
-      title: "Prompt & Asset Filenames Injected",
+      title: "Prompt, Assets & Parameters Injected",
       status: "success",
-      detail: `Injected expanded prompt into Node #${prompt_node_id || 'Auto'} and applied ${Object.keys(node_mappings).length} asset mappings (Bypass Safe Placeholder: ${bypass_missing ? safe_placeholder : 'Disabled'}).`
+      detail: `Injected expanded prompt into Node #${prompt_node_id || 'Auto'}, mapped ${Object.keys(node_mappings).length} asset slot(s) (Safe Placeholder: ${bypass_missing ? safe_placeholder : 'Disabled'}).${paramSummary}`
     });
 
     // If Dry Run requested, return immediately with the modified graph

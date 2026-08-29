@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { WorkflowItem, ParsedWorkflow, MediaAsset } from "../types";
+import { WorkflowItem, ParsedWorkflow, MediaAsset, GenerationParameters, ParameterNodeMappings } from "../types";
+import { GenerationParametersSection } from "./GenerationParametersSection";
 import { 
   Workflow, 
   Upload, 
@@ -29,6 +30,10 @@ interface WorkflowSectionProps {
   uploadedAssets: MediaAsset[];
   bypassMissing: boolean;
   onToggleBypass: (val: boolean) => void;
+  generationParams: GenerationParameters;
+  onUpdateParam: (key: keyof GenerationParameters, value: number) => void;
+  parameterNodeMappings: ParameterNodeMappings;
+  onUpdateParameterMapping: (key: keyof ParameterNodeMappings, nodeId: string) => void;
 }
 
 export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
@@ -43,7 +48,11 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
   onUpdateMapping,
   uploadedAssets,
   bypassMissing,
-  onToggleBypass
+  onToggleBypass,
+  generationParams,
+  onUpdateParam,
+  parameterNodeMappings,
+  onUpdateParameterMapping
 }) => {
   const [uploading, setUploading] = useState(false);
   const [showRawJson, setShowRawJson] = useState(false);
@@ -244,7 +253,16 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
             )}
           </div>
 
-          {/* 2. Media Loader Nodes Dynamic Mapping */}
+          {/* 2. Generation Parameters (Dynamic Workflow Overrides) */}
+          <GenerationParametersSection
+            detectedNodes={parsedWorkflow.detected_nodes || parsedWorkflow.nodes_info?.detected_nodes}
+            generationParams={generationParams}
+            onChangeParam={onUpdateParam}
+            parameterNodeMappings={parameterNodeMappings}
+            onChangeParameterMapping={onUpdateParameterMapping}
+          />
+
+          {/* 3. Media Loader Nodes Dynamic Mapping */}
           <div className="space-y-2.5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-zinc-200 flex items-center gap-1.5">

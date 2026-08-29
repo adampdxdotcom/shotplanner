@@ -72,6 +72,9 @@ class ExecuteWorkflowRequest(BaseModel):
     node_mappings: Dict[str, str] = Field(default_factory=dict) # { "137": "headshot_jackie_123.png" }
     bypass_missing: bool = True
     safe_placeholder: str = "empty.png"
+    parameter_overrides: Dict[str, Any] = Field(default_factory=dict) # { "steps": 30, "megapixels": 0.8, "frames": 81 }
+    parameter_node_mappings: Dict[str, str] = Field(default_factory=dict) # { "steps": "131", "megapixels": "115", "frames": "131" }
+    generation_parameters: Optional[Dict[str, Any]] = None
     dry_run_only: bool = False
 
 @router.get("/workflows")
@@ -277,21 +280,40 @@ async def execute_workflow(req: ExecuteWorkflowRequest):
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed loading workflow: {str(e)}")
 
-    # 2. Inject Prompt and Node Mappings (Step C)
+    # 2. Inject Prompt, Asset Mappings, and Generation Parameters (Step C)
+    # Extract parameter overrides
+    param_overrides = dict(req.parameter_overrides)
+    param_node_maps = dict(req.parameter_node_mappings)
+    if req.generation_parameters:
+        for k, v in req.generation_parameters.items():
+            if isinstance(v, dict) and "value" in v and "node_id" in v:
+                param_overrides[k] = v["value"]
+                param_node_maps[k] = str(v["node_id"])
+
     modified_workflow = inject_and_prepare_workflow(
         workflow_data=workflow_data,
         prompt_node_id=req.prompt_node_id,
         expanded_prompt=req.expanded_prompt,
         node_mappings=req.node_mappings,
         bypass_missing=req.bypass_missing,
-        safe_placeholder=req.safe_placeholder
+        safe_placeholder=req.safe_placeholder,
+        parameter_overrides=param_overrides,
+        parameter_node_mappings=param_node_maps
     )
+
+    injected_param_desc = []
+    if param_overrides and param_node_maps:
+        for p_key, p_val in param_overrides.items():
+            if p_key in param_node_maps and param_node_maps[p_key]:
+                injected_param_desc.append(f"{p_key}={p_val} (Node #{param_node_maps[p_key]})")
+
+    param_summary = f" Overrides: {', '.join(injected_param_desc)}." if injected_param_desc else ""
 
     steps_log.append({
         "step": "C",
         "title": "Payload Injected",
         "status": "success",
-        "detail": f"Injected prompt into node '{req.prompt_node_id}' and mapped {len(req.node_mappings)} asset nodes."
+        "detail": f"Injected prompt into node '{req.prompt_node_id}', mapped {len(req.node_mappings)} asset nodes.{param_summary}"
     })
 
     if req.dry_run_only:
@@ -493,3 +515,32 @@ async def upload_chunk(
         return {"success": True, "asset": asset_record}
         
     return {"success": True, "message": "chunk received"}
+
+@router.post("/ssh/generate_keypair")
+def generate_ssh_keypair():
+    try:
+        from cryptography.hazmat.primitives.asymmetric import ed25519
+        from cryptography.hazmat.primitives import serialization
+
+        # 1. Generate private key
+        private_key = ed25519.Ed25519PrivateKey.generate()
+
+        # 2. Serialize Private Key (OpenSSH PEM format)
+        private_pem = private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.OpenSSH,
+            encryption_algorithm=serialization.NoEncryption()
+        ).decode("utf-8")
+
+        # 3. Serialize Public Key (Single-line authorized_keys format)
+        public_openssh = private_key.public_key().public_bytes(
+            encoding=serialization.Encoding.OpenSSH,
+            format=serialization.PublicFormat.OpenSSH
+        ).decode("utf-8") + " shot-planner@app"
+
+        return {
+            "private_key": private_pem,
+            "public_key": public_openssh
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

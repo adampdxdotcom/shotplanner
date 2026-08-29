@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { AppConfig, ExecutionResult, ExecutionStepLog, TransferResult } from "../types";
+import { AppConfig, ExecutionResult, ExecutionStepLog, TransferResult, GenerationParameters, ParameterNodeMappings } from "../types";
 import { 
   Play, 
   Eye, 
@@ -19,7 +19,10 @@ import {
   UploadCloud,
   CheckCircle,
   HardDrive,
-  SkipForward
+  SkipForward,
+  Gauge,
+  Film,
+  Sliders
 } from "lucide-react";
 
 interface ExecutionSectionProps {
@@ -29,6 +32,8 @@ interface ExecutionSectionProps {
   expandedPrompt: string;
   nodeMappings: Record<string, string>;
   bypassMissing: boolean;
+  generationParams?: GenerationParameters;
+  parameterNodeMappings?: ParameterNodeMappings;
 }
 
 export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
@@ -37,7 +42,9 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
   promptNodeId,
   expandedPrompt,
   nodeMappings,
-  bypassMissing
+  bypassMissing,
+  generationParams = { steps: 30, megapixels: 0.5, frames: 81 },
+  parameterNodeMappings = { steps: "", megapixels: "", frames: "" }
 }) => {
   const [executing, setExecuting] = useState(false);
   const [transferring, setTransferring] = useState(false);
@@ -112,6 +119,13 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
           node_mappings: nodeMappings,
           bypass_missing: bypassMissing,
           safe_placeholder: "empty.png",
+          parameter_overrides: generationParams,
+          parameter_node_mappings: parameterNodeMappings,
+          generation_parameters: {
+            steps: { node_id: parameterNodeMappings.steps, value: generationParams.steps },
+            megapixels: { node_id: parameterNodeMappings.megapixels, value: generationParams.megapixels },
+            frames: { node_id: parameterNodeMappings.frames, value: generationParams.frames }
+          },
           dry_run_only: dryRun
         })
       });
@@ -310,7 +324,7 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
             </span>
           </div>
           <p className="text-[11px] text-zinc-400">
-            Prompt → Node #{promptNodeId || 'Auto'} + Mapped Filenames + Bypass
+            Prompt → #{promptNodeId || 'Auto'} • Steps ({generationParams.steps}) • {generationParams.megapixels}MP • {generationParams.frames}f
           </p>
         </div>
 

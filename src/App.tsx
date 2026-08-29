@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { AppConfig, MediaAsset, WorkflowItem, ParsedWorkflow, ToastMessage } from "./types";
+import { AppConfig, MediaAsset, WorkflowItem, ParsedWorkflow, ToastMessage, GenerationParameters, ParameterNodeMappings } from "./types";
 import { Navbar } from "./components/Navbar";
 import { ConfigSection } from "./components/ConfigSection";
 import { WorkflowSection } from "./components/WorkflowSection";
@@ -33,8 +33,51 @@ export default function App() {
   const [nodeMappings, setNodeMappings] = useState<Record<string, string>>({});
   const [bypassMissing, setBypassMissing] = useState<boolean>(true);
 
+  // Dynamic Generation Parameters & Node Overrides
+  const [generationParams, setGenerationParams] = useState<GenerationParameters>({
+    steps: 30,
+    megapixels: 0.5,
+    frames: 81
+  });
+  const [parameterNodeMappings, setParameterNodeMappings] = useState<ParameterNodeMappings>({
+    steps: "",
+    megapixels: "",
+    frames: ""
+  });
+
   // 3. Asset Management State
   const [assets, setAssets] = useState<MediaAsset[]>([]);
+  const [subjects, setSubjects] = useState<string[]>([]);
+
+  // Function to register subject in project registry
+  const handleRegisterSubject = (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setSubjects(prev => {
+      if (prev.some(s => s.toLowerCase() === trimmed.toLowerCase())) return prev;
+      return [...prev, trimmed];
+    });
+  };
+
+  // Sync subjects when assets change
+  useEffect(() => {
+    if (assets.length > 0) {
+      setSubjects(prev => {
+        let changed = false;
+        const currentLower = new Set(prev.map(s => s.toLowerCase()));
+        const next = [...prev];
+        for (const a of assets) {
+          const s = (a.subject_name || "").trim();
+          if (s && !currentLower.has(s.toLowerCase())) {
+            currentLower.add(s.toLowerCase());
+            next.push(s);
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    }
+  }, [assets]);
 
   // 4. LLM Prompt Expansion State
   const [basicStub, setBasicStub] = useState<string>("");
@@ -67,7 +110,7 @@ export default function App() {
       return;
     }
     setIsDirty(true);
-  }, [config, selectedWorkflowFile, selectedPromptNodeId, nodeMappings, bypassMissing, basicStub, expandedPrompt]);
+  }, [config, selectedWorkflowFile, selectedPromptNodeId, nodeMappings, bypassMissing, basicStub, expandedPrompt, generationParams, parameterNodeMappings, subjects]);
 
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -80,16 +123,34 @@ export default function App() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isDirty]);
 
+  const handleUpdateParam = (key: keyof GenerationParameters, value: number) => {
+    setGenerationParams(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleUpdateParameterMapping = (key: keyof ParameterNodeMappings, nodeId: string) => {
+    setParameterNodeMappings(prev => ({ ...prev, [key]: nodeId }));
+  };
+
   const handleSaveProject = async (filename: string) => {
+    const consolidatedSubjects = Array.from(
+      new Set([
+        ...subjects.map(s => s.trim()).filter(Boolean),
+        ...assets.map(a => (a.subject_name || "").trim()).filter(Boolean)
+      ])
+    );
+
     const payload = {
       config,
       selectedWorkflowFile,
       selectedPromptNodeId,
       nodeMappings,
       bypassMissing,
+      generationParams,
+      parameterNodeMappings,
       basicStub,
       expandedPrompt,
-      assets // Save media assets with the project
+      assets, // Save media assets with the project
+      subjects: consolidatedSubjects // Save global subjects registry
     };
     
     const res = await fetch("/api/projects", {
@@ -105,7 +166,7 @@ export default function App() {
     
     setCurrentProjectName(filename.replace(/\.json$/, ""));
     setIsDirty(false);
-    addToast(`Project "${filename}" saved successfully with ${assets.length} image asset(s).`, "success");
+    addToast(`Project "${filename}" saved successfully with ${assets.length} image asset(s) and ${consolidatedSubjects.length} subject(s).`, "success");
   };
 
   const handleLoadProject = async (filename: string) => {
@@ -138,6 +199,13 @@ export default function App() {
       await fetchAssets();
     }
     
+    // 2. Restore subjects registry
+    if (Array.isArray(data.subjects)) {
+      setSubjects(data.subjects);
+    } else if (Array.isArray(data.assets)) {
+      setSubjects(Array.from(new Set(data.assets.map((a: any) => (a.subject_name || "").trim()).filter(Boolean))));
+    }
+
     if (data.config) {
       setConfig(prev => ({
         ...prev,
@@ -149,6 +217,12 @@ export default function App() {
     setSelectedPromptNodeId(data.selectedPromptNodeId || "");
     setNodeMappings(data.nodeMappings || {});
     setBypassMissing(data.bypassMissing ?? true);
+    if (data.generationParams) {
+      setGenerationParams(data.generationParams);
+    }
+    if (data.parameterNodeMappings) {
+      setParameterNodeMappings(data.parameterNodeMappings);
+    }
     setBasicStub(data.basicStub || "");
     setExpandedPrompt(data.expandedPrompt || "");
     setCurrentProjectName(filename.replace(/\.json$/, ""));
@@ -212,6 +286,24 @@ export default function App() {
         const data = await res.json();
         if (res.ok && data.nodes_info) {
           setParsedWorkflow(data);
+
+          // Auto-sync detected parameter nodes
+          const detected = data.detected_nodes || data.nodes_info.detected_nodes;
+          if (detected) {
+            setParameterNodeMappings(prev => ({
+              steps: detected.steps || prev.steps || "",
+              megapixels: detected.megapixels || prev.megapixels || "",
+              frames: detected.frames || prev.frames || ""
+            }));
+          }
+
+          if (data.detected_values) {
+            setGenerationParams(prev => ({
+              steps: typeof data.detected_values.steps === "number" ? data.detected_values.steps : prev.steps,
+              megapixels: typeof data.detected_values.megapixels === "number" ? data.detected_values.megapixels : prev.megapixels,
+              frames: typeof data.detected_values.frames === "number" ? data.detected_values.frames : prev.frames
+            }));
+          }
 
           // Preserve selected prompt node ID if valid, otherwise select default
           setSelectedPromptNodeId(prev => {
@@ -345,6 +437,8 @@ export default function App() {
         {activeSection === "assets" && (
           <AssetManagerSection
             assets={assets}
+            subjects={subjects}
+            onRegisterSubject={handleRegisterSubject}
             onAssetUploaded={handleAssetUploaded}
             onAssetDeleted={handleAssetDeleted}
             onAssetUpdated={handleAssetUpdated}
@@ -365,6 +459,10 @@ export default function App() {
             uploadedAssets={assets}
             bypassMissing={bypassMissing}
             onToggleBypass={setBypassMissing}
+            generationParams={generationParams}
+            onUpdateParam={handleUpdateParam}
+            parameterNodeMappings={parameterNodeMappings}
+            onUpdateParameterMapping={handleUpdateParameterMapping}
           />
         )}
 
@@ -388,6 +486,8 @@ export default function App() {
             expandedPrompt={expandedPrompt}
             nodeMappings={nodeMappings}
             bypassMissing={bypassMissing}
+            generationParams={generationParams}
+            parameterNodeMappings={parameterNodeMappings}
           />
         )}
 

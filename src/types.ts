@@ -57,14 +57,34 @@ export interface WorkflowNodeInfo {
   current_file?: string;
 }
 
+export interface DetectedNodes {
+  steps: string | null;
+  megapixels: string | null;
+  frames: string | null;
+}
+
+export interface GenerationParameters {
+  steps: number;
+  megapixels: number;
+  frames: number;
+}
+
+export interface ParameterNodeMappings {
+  steps: string;
+  megapixels: string;
+  frames: string;
+}
+
 export interface ParsedWorkflow {
   filename: string;
+  detected_nodes?: DetectedNodes;
   nodes_info: {
     prompt_nodes: WorkflowNodeInfo[];
     image_loader_nodes: WorkflowNodeInfo[];
     video_loader_nodes: WorkflowNodeInfo[];
     audio_loader_nodes: WorkflowNodeInfo[];
     total_nodes: number;
+    detected_nodes?: DetectedNodes;
   };
   raw_json: Record<string, any>;
 }

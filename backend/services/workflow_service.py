@@ -8,12 +8,24 @@ def inspect_workflow_nodes(workflow: Dict[str, Any]) -> Dict[str, Any]:
     - Image loader nodes (LoadImage, LoadImageMask, etc.)
     - Video loader nodes (LoadVideo, VHS_LoadVideo, etc.)
     - Audio loader nodes (LoadAudio, etc.)
+    - Dynamic Workflow Overrides:
+        * Sampling Steps: Check for any node whose inputs contain "steps"
+        * Megapixels: Check for any node whose inputs contain "megapixels"
+        * Duration / Frames: Check for any node whose inputs contain "frames", "length", "num_frames", or "duration"
     """
     prompt_nodes = []
     image_loader_nodes = []
     video_loader_nodes = []
     audio_loader_nodes = []
     other_nodes = []
+
+    detected_nodes = {
+        "steps": None,
+        "megapixels": None,
+        "frames": None
+    }
+
+    detected_values = {}
 
     for node_id, node_data in workflow.items():
         if not isinstance(node_data, dict):
@@ -51,11 +63,31 @@ def inspect_workflow_nodes(workflow: Dict[str, Any]) -> Dict[str, Any]:
         else:
             other_nodes.append(node_info)
 
+        # 1. Check for Sampling Steps ("steps")
+        if detected_nodes["steps"] is None and isinstance(inputs, dict) and "steps" in inputs:
+            detected_nodes["steps"] = str(node_id)
+            detected_values["steps"] = inputs.get("steps")
+
+        # 2. Check for Megapixels ("megapixels")
+        if detected_nodes["megapixels"] is None and isinstance(inputs, dict) and "megapixels" in inputs:
+            detected_nodes["megapixels"] = str(node_id)
+            detected_values["megapixels"] = inputs.get("megapixels")
+
+        # 3. Check for Duration / Frames ("frames", "length", "num_frames", "duration")
+        if detected_nodes["frames"] is None and isinstance(inputs, dict):
+            for frame_key in ["frames", "length", "num_frames", "duration", "frame_count"]:
+                if frame_key in inputs:
+                    detected_nodes["frames"] = str(node_id)
+                    detected_values["frames"] = inputs.get(frame_key)
+                    break
+
     return {
         "prompt_nodes": prompt_nodes,
         "image_loader_nodes": image_loader_nodes,
         "video_loader_nodes": video_loader_nodes,
         "audio_loader_nodes": audio_loader_nodes,
+        "detected_nodes": detected_nodes,
+        "detected_values": detected_values,
         "total_nodes": len(workflow)
     }
 
@@ -65,13 +97,16 @@ def inject_and_prepare_workflow(
     expanded_prompt: str,
     node_mappings: Dict[str, str], # { "node_id": "filename.png" }
     bypass_missing: bool = True,
-    safe_placeholder: str = "empty.png"
+    safe_placeholder: str = "empty.png",
+    parameter_overrides: Optional[Dict[str, Any]] = None,
+    parameter_node_mappings: Optional[Dict[str, str]] = None
 ) -> Dict[str, Any]:
     """
     Step B & C:
     Injects the expanded prompt into the chosen text node (inputs.value or inputs.text).
     Injects uploaded/renamed asset filenames into their mapped LoadImage/Video/Audio nodes.
     Applies bypass placeholder logic for unmapped loader nodes to prevent ComfyUI execution failure.
+    Injects dynamic generation parameter overrides (steps, megapixels, frames/duration) into target nodes.
     """
     modified_wf = copy.deepcopy(workflow_data)
 
@@ -121,5 +156,43 @@ def inject_and_prepare_workflow(
                 inputs["audio"] = safe_placeholder
 
         node_data["inputs"] = inputs
+
+    # 3. Inject Dynamic Generation Parameter Overrides (Step C)
+    if parameter_overrides and parameter_node_mappings:
+        # Sampling Steps
+        steps_val = parameter_overrides.get("steps")
+        steps_node = parameter_node_mappings.get("steps")
+        if steps_node and str(steps_node) in modified_wf and steps_val is not None:
+            n_inputs = modified_wf[str(steps_node)].setdefault("inputs", {})
+            try:
+                n_inputs["steps"] = int(steps_val)
+            except (ValueError, TypeError):
+                n_inputs["steps"] = steps_val
+
+        # Megapixels
+        mp_val = parameter_overrides.get("megapixels")
+        mp_node = parameter_node_mappings.get("megapixels")
+        if mp_node and str(mp_node) in modified_wf and mp_val is not None:
+            n_inputs = modified_wf[str(mp_node)].setdefault("inputs", {})
+            try:
+                n_inputs["megapixels"] = float(mp_val)
+            except (ValueError, TypeError):
+                n_inputs["megapixels"] = mp_val
+
+        # Duration / Frames
+        frames_val = parameter_overrides.get("frames")
+        frames_node = parameter_node_mappings.get("frames")
+        if frames_node and str(frames_node) in modified_wf and frames_val is not None:
+            n_inputs = modified_wf[str(frames_node)].setdefault("inputs", {})
+            # Detect existing key name or default to frames
+            matched_key = "frames"
+            for k in ["frames", "length", "num_frames", "duration", "frame_count"]:
+                if k in n_inputs:
+                    matched_key = k
+                    break
+            try:
+                n_inputs[matched_key] = int(frames_val)
+            except (ValueError, TypeError):
+                n_inputs[matched_key] = frames_val
 
     return modified_wf
