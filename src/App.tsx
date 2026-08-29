@@ -266,38 +266,6 @@ export default function App() {
 
       {/* Main Workspace Layout */}
       <main className="max-w-7xl mx-auto px-4 lg:px-8 py-6 space-y-6">
-        {/* Quick Pipeline Status Banner */}
-        <div className="bg-gradient-to-r from-zinc-900 via-zinc-900/90 to-indigo-950/40 border-2 border-zinc-700 rounded-2xl p-5 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
-              <h2 className="text-base font-bold text-zinc-100">
-                ComfyUI Multi-Asset Orchestrator
-              </h2>
-            </div>
-            <p className="text-xs text-zinc-400 max-w-2xl leading-relaxed">
-              Upload local reference media with semantic metadata, expand prompt stubs using your local LM Studio LLM with <code className="text-zinc-200 bg-zinc-800 px-1 py-0.5 rounded">&lt;Picture 1&gt;</code> reference tags, and seamlessly dispatch modified flat JSON dictionary payloads to remote RunPod ComfyUI via SSH and API.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="text-right text-xs">
-              <span className="text-zinc-400 block">Active Workflow:</span>
-              <span className="font-mono font-semibold text-amber-300">
-                {selectedWorkflowFile || "None Selected"}
-              </span>
-            </div>
-
-            <button
-              onClick={() => scrollToSection("execute")}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
-            >
-              <span>Jump to Execute</span>
-              <ArrowDown className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-
         {/* Tab Content Rendering */}
         {activeSection === "assets" && (
           <AssetManagerSection

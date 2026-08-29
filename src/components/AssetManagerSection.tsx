@@ -41,6 +41,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadModalSlot, setUploadModalSlot] = useState<{ type: "image" | "audio" | "video", index: number } | null>(null);
 
   const [lightboxAsset, setLightboxAsset] = useState<MediaAsset | null>(null);
   
@@ -51,6 +52,109 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
   const [editFile, setEditFile] = useState<File | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+
+
+  const renderAssetCard = (asset: MediaAsset, idx: number, type: string) => (
+    <div 
+      key={asset.filename} 
+      className="bg-zinc-950 p-3 rounded-xl border-2 border-zinc-700 hover:border-zinc-700 transition-all space-y-2 relative group flex flex-col"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="w-5 h-5 rounded-full bg-zinc-800 text-zinc-300 text-[10px] font-mono font-bold flex items-center justify-center">
+            {idx + 1}
+          </span>
+          <div>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/20">
+              {asset.type}
+            </span>
+          </div>
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => openEditModal(asset)}
+            className="text-zinc-500 hover:text-indigo-400 p-1 rounded transition-colors"
+            title="Edit asset"
+          >
+            <Edit3 className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => handleDelete(asset.filename)}
+            className="text-zinc-500 hover:text-red-400 p-1 rounded transition-colors"
+            title="Delete asset"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+
+      {asset.media_type === "image" && asset.preview_url && (
+        <div 
+          className="relative w-full aspect-square bg-zinc-900 rounded-lg overflow-hidden cursor-pointer group/img border border-zinc-800"
+          onClick={() => setLightboxAsset(asset)}
+        >
+          <img src={asset.preview_url} alt={asset.subject_name} className="w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
+            <Maximize className="w-6 h-6 text-white" />
+          </div>
+        </div>
+      )}
+
+      {/* Subject Name & Filename */}
+      <div>
+        <p className="text-xs font-semibold text-zinc-100 truncate">
+          {asset.subject_name}
+        </p>
+        <p className="text-[11px] font-mono text-zinc-400 truncate mt-0.5">
+          {asset.filename}
+        </p>
+      </div>
+
+      {/* LLM Description preview */}
+      {asset.description && (
+        <p className="text-[11px] text-zinc-400 line-clamp-2 italic bg-zinc-900/70 p-1.5 rounded border-2 border-zinc-700/50">
+          "{asset.description}"
+        </p>
+      )}
+
+      <div className="flex items-center justify-between text-[10px] text-zinc-400 pt-1 border-t border-zinc-900 mt-auto">
+        <span>{(asset.size_bytes / 1024).toFixed(1)} KB</span>
+        <span className="font-mono text-indigo-400">
+          {asset.media_type === "video" ? `<Video ${idx + 1}>` : asset.media_type === "audio" ? `<Audio ${idx + 1}>` : `<Picture ${idx + 1}>`}
+        </span>
+      </div>
+    </div>
+  );
+
+  const renderEmptySlot = (idx: number, type: string) => (
+    <div 
+      key={`empty-${type}-${idx}`} 
+      onClick={() => openUploadModal(type as any, idx)}
+      className="bg-zinc-950/30 p-3 rounded-xl border-2 border-dashed border-zinc-800/80 flex flex-col items-center justify-center min-h-[160px] text-zinc-600 transition-colors cursor-pointer hover:border-zinc-600 hover:bg-zinc-900/50 hover:text-zinc-400 group"
+    >
+      <div className="w-8 h-8 rounded-full bg-zinc-900 flex items-center justify-center mb-2 group-hover:bg-zinc-800 group-hover:text-amber-400 transition-colors">
+        <UploadCloud className="w-4 h-4" />
+      </div>
+      <span className="text-xs font-semibold mb-1 uppercase tracking-wider opacity-50 group-hover:opacity-100 transition-opacity">Upload Slot</span>
+      <span className="font-mono text-[10px] text-zinc-500 group-hover:text-zinc-400 transition-colors">
+        {type === "video" ? `<Video ${idx + 1}>` : type === "audio" ? `<Audio ${idx + 1}>` : `<Picture ${idx + 1}>`}
+      </span>
+    </div>
+  );
+
+
+  const openUploadModal = (type: "image" | "audio" | "video", index: number) => {
+    setActiveTab(type);
+    setAssetType(type === "image" ? "Headshot" : type === "audio" ? "Voiceover Audio" : "Motion Reference Video");
+    setSubjectName("");
+    setDescription("");
+    setUploadError(null);
+    setUploadModalSlot({ type, index });
+  };
+
+  const closeUploadModal = () => {
+    setUploadModalSlot(null);
+  };
 
   const openEditModal = (asset: MediaAsset) => {
     setEditingAsset(asset);
@@ -232,6 +336,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
 
       if (finalData && finalData.asset) {
         onAssetUploaded(finalData.asset);
+        closeUploadModal();
       } else {
         throw new Error("Completed all chunks, but no final asset was returned.");
       }
@@ -263,304 +368,224 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
             <HardDrive className="w-4 h-4" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-zinc-100">1. Segmented Asset Management &amp; Metadata</h2>
-            <p className="text-xs text-zinc-400">Configure semantic tags, subject name, and LLM context prior to upload. Auto-renames to format <code className="text-zinc-300">{`{type}_{name}_{timestamp}.ext`}</code>.</p>
+            <h2 className="text-sm font-semibold text-zinc-100">1. Segmented Asset Management</h2>
+            <p className="text-xs text-zinc-400">Click on an empty slot below to upload and configure semantic metadata. Auto-renames to format <code className="text-zinc-300">{`{type}_{name}_{timestamp}.ext`}</code>.</p>
           </div>
-        </div>
-
-        {/* Tab Switcher */}
-        <div className="flex items-center gap-1 bg-zinc-950 p-1 rounded-lg border-2 border-zinc-700">
-          <button
-            onClick={() => {
-              setActiveTab("image");
-              setAssetType("Headshot");
-            }}
-            className={`px-3 py-1 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5 ${
-              activeTab === "image" 
-                ? "bg-amber-500/20 text-amber-300 border border-amber-500/30" 
-                : "text-zinc-400 hover:text-zinc-200"
-            }`}
-          >
-            <ImageIcon className="w-3.5 h-3.5" />
-            <span>Images ({images.length}/{MAX_IMAGES})</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setActiveTab("audio");
-              setAssetType("Voiceover Audio");
-            }}
-            className={`px-3 py-1 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5 ${
-              activeTab === "audio" 
-                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" 
-                : "text-zinc-400 hover:text-zinc-200"
-            }`}
-          >
-            <Music className="w-3.5 h-3.5" />
-            <span>Audio ({audios.length}/{MAX_AUDIOS})</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setActiveTab("video");
-              setAssetType("Motion Reference Video");
-            }}
-            className={`px-3 py-1 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5 ${
-              activeTab === "video" 
-                ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30" 
-                : "text-zinc-400 hover:text-zinc-200"
-            }`}
-          >
-            <VideoIcon className="w-3.5 h-3.5" />
-            <span>Video ({videos.length}/{MAX_VIDEOS})</span>
-          </button>
-        </div>
-      </div>
-
-      {uploadError && (
-        <div className="p-3 rounded-lg bg-red-950/30 border border-red-800/40 text-xs text-red-300 flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
-          <span>{uploadError}</span>
-        </div>
-      )}
-
-      {/* Metadata & Upload Form */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* Left: Metadata Inputs (Required before upload) */}
-        <div className="lg:col-span-7 bg-zinc-950/50 p-4 rounded-xl border-2 border-zinc-700/80 space-y-3.5">
-          <div className="flex items-center justify-between border-b border-zinc-800/60 pb-2">
-            <span className="text-xs font-semibold text-zinc-200 flex items-center gap-1.5">
-              <Tag className="w-3.5 h-3.5 text-amber-400" />
-              Pre-Upload Metadata &amp; Renaming Rules
-            </span>
-            <span className="text-[11px] text-zinc-400 font-mono">
-              Target: {previewFilename}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* Type Dropdown */}
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-zinc-300 flex items-center gap-1">
-                <span>Asset Semantic Type</span>
-              </label>
-              {activeTab === "image" ? (
-                <select
-                  value={assetType}
-                  onChange={(e) => setAssetType(e.target.value)}
-                  className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-amber-500 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 outline-none"
-                >
-                  <option value="Headshot">Headshot</option>
-                  <option value="Body Reference">Body Reference</option>
-                  <option value="Scene Reference">Scene Reference</option>
-                  <option value="Object Reference">Object Reference</option>
-                  <option value="Style Reference">Style Reference</option>
-                </select>
-              ) : activeTab === "audio" ? (
-                <select
-                  value={assetType}
-                  onChange={(e) => setAssetType(e.target.value)}
-                  className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-emerald-500 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 outline-none"
-                >
-                  <option value="Voiceover Audio">Voiceover Audio</option>
-                  <option value="Soundtrack / BGM">Soundtrack / BGM</option>
-                  <option value="SFX / Ambient">SFX / Ambient</option>
-                </select>
-              ) : (
-                <select
-                  value={assetType}
-                  onChange={(e) => setAssetType(e.target.value)}
-                  className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-indigo-500 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 outline-none"
-                >
-                  <option value="Motion Reference Video">Motion Reference Video</option>
-                  <option value="Style Reference Video">Style Reference Video</option>
-                </select>
-              )}
-            </div>
-
-            {/* Subject Name Input */}
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-zinc-300 flex items-center gap-1">
-                <User className="w-3 h-3 text-zinc-400" />
-                <span>Subject / Entity Name</span>
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. jackie, cyberpunk_car, tavern"
-                value={subjectName}
-                onChange={(e) => setSubjectName(e.target.value)}
-                className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-amber-500 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 placeholder-zinc-600 outline-none"
-              />
-            </div>
-          </div>
-
-          {/* Description Textarea for LLM Context */}
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-zinc-300 flex items-center justify-between">
-              <span className="flex items-center gap-1">
-                <AlignLeft className="w-3 h-3 text-zinc-400" />
-                <span>Description (Passed to LLM for Prompt Expansion)</span>
-              </span>
-              <span className="text-[10px] text-amber-400/80 flex items-center gap-1">
-                <Sparkles className="w-2.5 h-2.5" /> Used in LLM System Prompt
-              </span>
-            </label>
-            <textarea
-              rows={2}
-              placeholder="Describe wardrobe, lighting, identity, angles, key attributes..."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-amber-500 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 placeholder-zinc-600 outline-none resize-none"
-            />
-          </div>
-
-          {/* File Renaming Format Visualizer */}
-          <div className="bg-zinc-900/90 px-3 py-2 rounded-lg border-2 border-zinc-700 text-[11px] flex items-center justify-between">
-            <span className="text-zinc-400">Renamed File Strategy:</span>
-            <span className="font-mono text-amber-300 font-medium truncate max-w-[280px]">
-              {previewFilename}
-            </span>
-          </div>
-        </div>
-
-        {/* Right: Upload Dropzone */}
-        <div className="lg:col-span-5 flex flex-col">
-          <label className={`relative flex-1 flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-xl transition-all ${
-            isUploadDisabled
-              ? "opacity-50 cursor-not-allowed border-zinc-800 bg-zinc-950/30" 
-              : "border-zinc-700 hover:border-amber-500/80 bg-zinc-950/40 hover:bg-zinc-900/60 cursor-pointer"
-          }`}>
-            {uploading ? (
-              <>
-                <Loader2 className="w-8 h-8 mb-2 text-amber-400 animate-spin" />
-                <p className="text-xs font-semibold text-zinc-200 text-center mb-2">
-                  Uploading... {uploadProgress}%
-                </p>
-                <div className="w-full max-w-[200px] bg-zinc-800 rounded-full h-1.5 overflow-hidden">
-                  <div 
-                    className="bg-amber-400 h-1.5 transition-all duration-300 ease-out" 
-                    style={{ width: `${uploadProgress}%` }}
-                  />
-                </div>
-              </>
-            ) : (
-              <>
-                <UploadCloud className={`w-8 h-8 mb-2 ${isLimitReached ? "text-zinc-600" : "text-amber-400 animate-pulse"}`} />
-                <p className="text-xs font-semibold text-zinc-200 text-center">
-                  Upload {activeTab.toUpperCase()}
-                </p>
-                <p className="text-[11px] text-zinc-400 text-center mt-1">
-                  {isLimitReached 
-                    ? `Max ${currentMax} ${activeTab}(s) reached` 
-                    : isMetadataIncomplete
-                    ? "Enter subject name & description first"
-                    : `Click or drop ${activeTab} file (Slot ${currentCount + 1} of ${currentMax})`}
-                </p>
-              </>
-            )}
-            <input
-              type="file"
-              accept={activeTab === "image" ? "image/*" : activeTab === "audio" ? "audio/*" : "video/*"}
-              onChange={handleFileSelect}
-              disabled={isUploadDisabled}
-              className="hidden"
-            />
-          </label>
         </div>
       </div>
 
       {/* Uploaded Assets Grid */}
-      <div className="space-y-3 pt-2">
+      <div className="space-y-6 pt-4 border-t border-zinc-800">
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-semibold text-zinc-200">
-            Uploaded {activeTab.toUpperCase()} Library ({currentCount} / {currentMax})
-          </h3>
+          <h2 className="text-sm font-semibold text-zinc-200">
+            Uploaded Media Library
+          </h2>
           <span className="text-[11px] text-zinc-400">Physically stored in <code className="text-zinc-300 bg-zinc-800 px-1 py-0.5 rounded">/assets/uploads/</code></span>
         </div>
 
-        {currentCount === 0 ? (
-          <div className="p-6 rounded-xl border-2 border-zinc-700/60 bg-zinc-950/30 text-center text-xs text-zinc-500">
-            No {activeTab} assets uploaded yet. Fill in the metadata and upload above.
+        {/* Images Section */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-amber-300">
+            <ImageIcon className="w-4 h-4" />
+            <h3 className="text-xs font-semibold uppercase tracking-wider">
+              Images ({images.length} / {MAX_IMAGES})
+            </h3>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {(activeTab === "image" ? images : activeTab === "audio" ? audios : videos).map((asset, idx) => (
-              <div 
-                key={asset.filename} 
-                className="bg-zinc-950 p-3 rounded-xl border-2 border-zinc-700 hover:border-zinc-700 transition-all space-y-2 relative group flex flex-col"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="w-5 h-5 rounded-full bg-zinc-800 text-zinc-300 text-[10px] font-mono font-bold flex items-center justify-center">
-                      {idx + 1}
-                    </span>
-                    <div>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/20">
-                        {asset.type}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => openEditModal(asset)}
-                      className="text-zinc-500 hover:text-indigo-400 p-1 rounded transition-colors"
-                      title="Edit asset"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(asset.filename)}
-                      className="text-zinc-500 hover:text-red-400 p-1 rounded transition-colors"
-                      title="Delete asset"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-
-                {asset.media_type === "image" && asset.preview_url && (
-                  <div 
-                    className="relative w-full aspect-square bg-zinc-900 rounded-lg overflow-hidden cursor-pointer group/img border border-zinc-800"
-                    onClick={() => setLightboxAsset(asset)}
-                  >
-                    <img src={asset.preview_url} alt={asset.subject_name} className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
-                      <Maximize className="w-6 h-6 text-white" />
-                    </div>
-                  </div>
-                )}
-
-
-                {/* Subject Name & Filename */}
-                <div>
-                  <p className="text-xs font-semibold text-zinc-100 truncate">
-                    {asset.subject_name}
-                  </p>
-                  <p className="text-[11px] font-mono text-zinc-400 truncate mt-0.5">
-                    {asset.filename}
-                  </p>
-                </div>
-
-                {/* LLM Description preview */}
-                {asset.description && (
-                  <p className="text-[11px] text-zinc-400 line-clamp-2 italic bg-zinc-900/70 p-1.5 rounded border-2 border-zinc-700/50">
-                    "{asset.description}"
-                  </p>
-                )}
-
-                <div className="flex items-center justify-between text-[10px] text-zinc-400 pt-1 border-t border-zinc-900">
-                  <span>{(asset.size_bytes / 1024).toFixed(1)} KB</span>
-                  <span className="font-mono text-indigo-400">
-                    {asset.media_type === "video" ? `<Video ${idx + 1}>` : asset.media_type === "audio" ? `<Audio ${idx + 1}>` : `<Picture ${idx + 1}>`}
-                  </span>
-                </div>
-              </div>
-            ))}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+            {Array.from({ length: MAX_IMAGES }).map((_, idx) => {
+              const asset = images[idx];
+              if (asset) return renderAssetCard(asset, idx, "image");
+              return renderEmptySlot(idx, "image");
+            })}
           </div>
-        )}
+        </div>
+
+        {/* Video Section */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-indigo-300">
+            <VideoIcon className="w-4 h-4" />
+            <h3 className="text-xs font-semibold uppercase tracking-wider">
+              Video ({videos.length} / {MAX_VIDEOS})
+            </h3>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+            {Array.from({ length: MAX_VIDEOS }).map((_, idx) => {
+              const asset = videos[idx];
+              if (asset) return renderAssetCard(asset, idx, "video");
+              return renderEmptySlot(idx, "video");
+            })}
+          </div>
+        </div>
+
+        {/* Audio Section */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-emerald-300">
+            <Music className="w-4 h-4" />
+            <h3 className="text-xs font-semibold uppercase tracking-wider">
+              Audio ({audios.length} / {MAX_AUDIOS})
+            </h3>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+            {Array.from({ length: MAX_AUDIOS }).map((_, idx) => {
+              const asset = audios[idx];
+              if (asset) return renderAssetCard(asset, idx, "audio");
+              return renderEmptySlot(idx, "audio");
+            })}
+          </div>
+        </div>
       </div>
 
+      
+      {/* Upload Modal */}
+      {uploadModalSlot && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-zinc-900 border-2 border-zinc-700 rounded-xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-zinc-800 bg-zinc-950/50">
+              <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
+                <UploadCloud className="w-4 h-4 text-amber-400" />
+                Upload {uploadModalSlot.type.toUpperCase()} to Slot {uploadModalSlot.index + 1}
+              </h3>
+              <button onClick={closeUploadModal} className="text-zinc-400 hover:text-white transition-colors" disabled={uploading}>
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div className="p-4 space-y-4 overflow-y-auto max-h-[75vh]">
+              {uploadError && (
+                <div className="p-3 rounded-lg bg-red-950/30 border border-red-800/40 text-xs text-red-300 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                  <span>{uploadError}</span>
+                </div>
+              )}
+              
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-zinc-300 flex items-center gap-1">
+                  <span>Asset Semantic Type</span>
+                </label>
+                {activeTab === "image" ? (
+                  <select
+                    value={assetType}
+                    onChange={(e) => setAssetType(e.target.value)}
+                    className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-amber-500 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 outline-none"
+                  >
+                    <option value="Headshot">Headshot</option>
+                    <option value="Body Reference">Body Reference</option>
+                    <option value="Scene Reference">Scene Reference</option>
+                    <option value="Object Reference">Object Reference</option>
+                    <option value="Style Reference">Style Reference</option>
+                  </select>
+                ) : activeTab === "audio" ? (
+                  <select
+                    value={assetType}
+                    onChange={(e) => setAssetType(e.target.value)}
+                    className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-emerald-500 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 outline-none"
+                  >
+                    <option value="Voiceover Audio">Voiceover Audio</option>
+                    <option value="Soundtrack / BGM">Soundtrack / BGM</option>
+                    <option value="SFX / Ambient">SFX / Ambient</option>
+                  </select>
+                ) : (
+                  <select
+                    value={assetType}
+                    onChange={(e) => setAssetType(e.target.value)}
+                    className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-indigo-500 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 outline-none"
+                  >
+                    <option value="Motion Reference Video">Motion Reference Video</option>
+                    <option value="Style Reference Video">Style Reference Video</option>
+                  </select>
+                )}
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-zinc-300 flex items-center gap-1">
+                  <User className="w-3 h-3 text-zinc-400" />
+                  <span>Subject / Entity Name</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. jackie, cyberpunk_car, tavern"
+                  value={subjectName}
+                  onChange={(e) => setSubjectName(e.target.value)}
+                  className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-amber-500 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 placeholder-zinc-600 outline-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-zinc-300 flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <AlignLeft className="w-3 h-3 text-zinc-400" />
+                    <span>Description (Passed to LLM)</span>
+                  </span>
+                  <span className="text-[10px] text-amber-400/80 flex items-center gap-1">
+                    <Sparkles className="w-2.5 h-2.5" /> Context
+                  </span>
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Describe wardrobe, lighting, identity, angles..."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-amber-500 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 placeholder-zinc-600 outline-none resize-none"
+                />
+              </div>
+              
+              <div className="bg-zinc-950 px-3 py-2 rounded-lg border-2 border-zinc-700/80 text-[11px] flex items-center justify-between">
+                <span className="text-zinc-400">Renamed File Strategy:</span>
+                <span className="font-mono text-amber-300 font-medium truncate max-w-[280px]">
+                  {previewFilename}
+                </span>
+              </div>
+
+              <div className="mt-4 pt-4 border-t border-zinc-800">
+                <label className={`relative w-full flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-xl transition-all ${
+                  isUploadDisabled
+                    ? "opacity-50 cursor-not-allowed border-zinc-800 bg-zinc-950/30" 
+                    : "border-zinc-700 hover:border-amber-500/80 bg-zinc-950/40 hover:bg-zinc-900/60 cursor-pointer"
+                }`}>
+                  {uploading ? (
+                    <>
+                      <Loader2 className="w-8 h-8 mb-2 text-amber-400 animate-spin" />
+                      <p className="text-xs font-semibold text-zinc-200 text-center mb-2">
+                        Uploading... {uploadProgress}%
+                      </p>
+                      <div className="w-full max-w-[200px] bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+                        <div 
+                          className="bg-amber-400 h-1.5 transition-all duration-300 ease-out" 
+                          style={{ width: `${uploadProgress}%` }}
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <UploadCloud className={`w-8 h-8 mb-2 ${isLimitReached ? "text-zinc-600" : "text-amber-400 animate-pulse"}`} />
+                      <p className="text-xs font-semibold text-zinc-200 text-center">
+                        Select {activeTab.toUpperCase()} File
+                      </p>
+                      <p className="text-[11px] text-zinc-400 text-center mt-1">
+                        {isLimitReached 
+                          ? `Max ${currentMax} ${activeTab}(s) reached` 
+                          : isMetadataIncomplete
+                          ? "Enter subject name & description first"
+                          : `Click to browse files`}
+                      </p>
+                    </>
+                  )}
+                  <input
+                    type="file"
+                    accept={activeTab === "image" ? "image/*" : activeTab === "audio" ? "audio/*" : "video/*"}
+                    onChange={handleFileSelect}
+                    disabled={isUploadDisabled}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Edit Modal */}
+
       {editingAsset && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-zinc-900 border-2 border-zinc-700 rounded-xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col">
