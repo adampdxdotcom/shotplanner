@@ -118,6 +118,7 @@ export interface SceneProjectFile {
 
 export interface ShotItem {
   id: string;
+  shot_name?: string;
   shot_number: number;
   shot_type: string;
   camera_movement: string;

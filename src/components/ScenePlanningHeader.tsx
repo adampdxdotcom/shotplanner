@@ -114,17 +114,17 @@ export const ScenePlanningHeader: React.FC<ScenePlanningHeaderProps> = ({
 
       {/* 4-Column Controls Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {/* 1. Scene Name */}
+        {/* 1. Shot Name */}
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
             <Layers className="w-3.5 h-3.5 text-indigo-400" />
-            <span>Scene Name</span>
+            <span>Shot Name</span>
           </label>
           <input
             type="text"
             value={planning.scene_name}
             onChange={handleSceneNameChange}
-            placeholder="e.g. Jackie's reading session"
+            placeholder="e.g. Hero Close-up"
             className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-indigo-500 focus:outline-hidden text-zinc-100 text-xs px-3 py-2 rounded-lg transition-colors placeholder:text-zinc-500"
           />
         </div>

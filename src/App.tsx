@@ -255,7 +255,7 @@ export default function App() {
   };
 
   const handleSceneExpandPrompt = async (shot: ShotItem): Promise<string> => {
-    const shotPrefix = `${sceneProject.scene_name ? sceneProject.scene_name + " - " : ""}Shot ${shot.shot_number.toString().padStart(2, "0")} - ${shot.shot_type} - ${shot.camera_movement}`;
+    const shotPrefix = `${shot.shot_name ? shot.shot_name + " - " : ""}Shot ${shot.shot_number.toString().padStart(2, "0")} - ${shot.shot_type} - ${shot.camera_movement}`;
     
     // We need to pass the assigned assets for this shot
     const shotAssets = Object.entries(shot.assigned_slots).map(([idx, filename]) => {
@@ -741,28 +741,40 @@ export default function App() {
         {/* Tab Content Rendering */}
         {activeSection === "scene" && (
           <div className="flex flex-col gap-6 min-h-0 flex-1">
-            <div className="flex items-center gap-4 bg-zinc-900/40 p-4 rounded-xl border border-zinc-800">
-              <label className="text-sm font-medium text-zinc-400">Active Scene Project:</label>
-              <select
-                value={sceneProject.scene_name}
-                onChange={(e) => {
-                  const sel = e.target.value;
-                  const sceneFile = availableScenes.find(s => s === sel || s === `scene_${sel.replace(/[^a-zA-Z0-9_-]/g, "_")}`);
-                  if (sceneFile) {
-                    handleSelectScene(sceneFile);
-                  } else {
-                    setSceneProject(prev => ({ ...prev, scene_name: sel }));
-                  }
-                }}
-                className="bg-zinc-950 border border-zinc-800 rounded-md px-3 py-1.5 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none min-w-[200px]"
-              >
-                <option key="active" value={sceneProject.scene_name}>{sceneProject.scene_name}</option>
-                {availableScenes
-                  .filter(s => s !== `scene_${sceneProject.scene_name.replace(/[^a-zA-Z0-9_-]/g, "_")}`)
-                  .map(s => (
-                  <option key={s} value={s}>{s.replace(/^scene_/, "").replace(/_/g, " ")}</option>
-                ))}
-              </select>
+            <div className="flex flex-wrap items-center gap-4 bg-zinc-900/40 p-4 rounded-xl border border-zinc-800">
+              <div className="flex items-center gap-3">
+                <label className="text-sm font-medium text-zinc-400">Load Project:</label>
+                <select
+                  value={""}
+                  onChange={(e) => {
+                    const sel = e.target.value;
+                    if (!sel) return;
+                    const sceneFile = availableScenes.find(s => s === sel || s === `scene_${sel.replace(/[^a-zA-Z0-9_-]/g, "_")}`);
+                    if (sceneFile) {
+                      handleSelectScene(sceneFile);
+                    }
+                  }}
+                  className="bg-zinc-950 border border-zinc-800 rounded-md px-3 py-1.5 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none w-48"
+                >
+                  <option value="" disabled>-- Select Project --</option>
+                  {availableScenes
+                    .filter(s => s !== `scene_${sceneProject.scene_name.replace(/[^a-zA-Z0-9_-]/g, "_")}`)
+                    .map(s => (
+                    <option key={s} value={s}>{s.replace(/^scene_/, "").replace(/_/g, " ")}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="w-px h-6 bg-zinc-800 hidden sm:block"></div>
+              <div className="flex items-center gap-3 flex-1">
+                <label className="text-sm font-medium text-zinc-400">Project Name:</label>
+                <input
+                  type="text"
+                  value={sceneProject.scene_name}
+                  onChange={(e) => setSceneProject(prev => ({ ...prev, scene_name: e.target.value }))}
+                  placeholder="e.g. My Movie Project"
+                  className="bg-zinc-950 border border-zinc-800 rounded-md px-3 py-1.5 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none flex-1 max-w-sm"
+                />
+              </div>
             </div>
             
             <SceneProjectHub

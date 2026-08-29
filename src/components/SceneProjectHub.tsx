@@ -326,17 +326,18 @@ export default function SceneProjectHub({
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-white">Shot Context & References</h2>
               <span className="text-sm text-zinc-500 font-mono">
-                {generateSaveVideoPrefix(project.scene_name, activeShot.shot_number)}
+                {generateSaveVideoPrefix(activeShot.shot_name || "", activeShot.shot_number)}
               </span>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-400">Scene Name</label>
+                <label className="text-xs font-medium text-zinc-400">Shot Name</label>
                 <input 
                   type="text" 
-                  value={project.scene_name} 
-                  onChange={e => onUpdateProject(p => ({ ...p, scene_name: e.target.value }))}
+                  value={activeShot.shot_name || ""} 
+                  onChange={e => updateActiveShot(p => ({ ...p, shot_name: e.target.value }))}
+                  placeholder="e.g. Hero Close-up"
                   className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none"
                 />
               </div>

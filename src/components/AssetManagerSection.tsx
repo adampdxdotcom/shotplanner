@@ -107,12 +107,13 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
       if (idx !== -1) {
         shots[idx] = { 
           ...shots[idx], 
+          shot_name: newPlanning.scene_name,
           shot_number: parseInt(String(newPlanning.shot_number)) || shots[idx].shot_number,
           shot_type: newPlanning.shot_type,
           camera_movement: newPlanning.camera_movement
         };
       }
-      return { ...prev, scene_name: newPlanning.scene_name, shots };
+      return { ...prev, shots };
     });
   };
 
@@ -682,7 +683,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
           {activeShot && (
             <ScenePlanningHeader 
               planning={{
-                scene_name: sceneProject.scene_name,
+                scene_name: activeShot.shot_name || "",
                 shot_number: activeShot.shot_number.toString(),
                 shot_type: activeShot.shot_type,
                 camera_movement: activeShot.camera_movement
