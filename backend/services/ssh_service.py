@@ -97,16 +97,16 @@ class RunPodSSHService:
         self.client = client
         return client
 
-    def test_connection(self) -> Dict[str, Any]:
-        """Verify SSH credentials and ensure remote directories exist."""
+    def test_connection(self, remote_dir: str = "/workspace/runpod-slim/ComfyUI/input") -> Dict[str, Any]:
+        """Verify SSH credentials and ensure remote input directory exists."""
         try:
             client = self.connect()
-            stdin, stdout, stderr = client.exec_command("mkdir -p /workspace/ComfyUI/input && ls -la /workspace/ComfyUI/input")
+            stdin, stdout, stderr = client.exec_command(f"mkdir -p {remote_dir} && ls -la {remote_dir}")
             output = stdout.read().decode("utf-8")
             client.close()
             return {
                 "success": True,
-                "message": f"Connected to {self.username}@{self.host}:{self.port} successfully via publickey auth. Remote input directory is verified.",
+                "message": f"Connected to {self.username}@{self.host}:{self.port} successfully via publickey auth. Remote input directory '{remote_dir}' is verified.",
                 "output": output
             }
         except paramiko.AuthenticationException as e:
@@ -123,12 +123,12 @@ class RunPodSSHService:
     def transfer_files_to_runpod(
         self,
         local_files: List[Path],
-        remote_dir: str = "/workspace/ComfyUI/input",
+        remote_dir: str = "/workspace/runpod-slim/ComfyUI/input",
         progress_callback: Optional[Callable[[str, int, int], None]] = None
     ) -> List[Dict[str, Any]]:
         """
         Step A: Push all mapped, renamed media assets from local /assets/uploads
-        directly to the RunPod remote /workspace/ComfyUI/input/ directory via SCP.
+        directly to the RunPod remote /workspace/runpod-slim/ComfyUI/input/ directory via SCP.
         """
         results = []
         client = self.connect()

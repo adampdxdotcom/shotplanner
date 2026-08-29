@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { AppConfig, ExecutionResult, ExecutionStepLog } from "../types";
+import { AppConfig, ExecutionResult, ExecutionStepLog, TransferResult } from "../types";
 import { 
   Play, 
   Eye, 
@@ -15,7 +15,10 @@ import {
   Server,
   Layers,
   Sparkles,
-  ShieldAlert
+  ShieldAlert,
+  UploadCloud,
+  CheckCircle,
+  HardDrive
 } from "lucide-react";
 
 interface ExecutionSectionProps {
@@ -36,11 +39,49 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
   bypassMissing
 }) => {
   const [executing, setExecuting] = useState(false);
+  const [transferring, setTransferring] = useState(false);
+  const [transferResult, setTransferResult] = useState<TransferResult | null>(null);
   const [executionResult, setExecutionResult] = useState<ExecutionResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeStepTab, setActiveStepTab] = useState<"steps" | "json">("steps");
   const [copied, setCopied] = useState(false);
 
+  // Button 1: Transfer Assets Only (Step A Only - SSH/SCP to remote ComfyUI input)
+  const handleTransferOnly = async () => {
+    setTransferring(true);
+    setError(null);
+    setTransferResult(null);
+
+    try {
+      const res = await fetch("/api/assets/sync_remote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          runpod_ip: config.runpod_ip,
+          ssh_port: config.ssh_port,
+          ssh_username: config.ssh_username,
+          ssh_password: config.ssh_password,
+          ssh_key_path: config.ssh_key_path,
+          ssh_private_key: config.ssh_private_key,
+          remote_input_dir: config.remote_input_dir || "/workspace/runpod-slim/ComfyUI/input/",
+          node_mappings: nodeMappings
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setTransferResult(data);
+      } else {
+        setError(data.error || "Failed to transfer assets via SSH.");
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to connect for asset transfer.");
+    } finally {
+      setTransferring(false);
+    }
+  };
+
+  // Button 2: Master Execute Workflow (Full End-to-End Automation)
   const handleRun = async (dryRun: boolean = false) => {
     if (!workflowFilename) {
       setError("Please select a workflow file in Step 2.");
@@ -61,6 +102,7 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
           ssh_password: config.ssh_password,
           ssh_key_path: config.ssh_key_path,
           ssh_private_key: config.ssh_private_key,
+          remote_input_dir: config.remote_input_dir || "/workspace/runpod-slim/ComfyUI/input/",
           comfyui_api_url: config.comfyui_api_url,
           runpod_api_token: config.runpod_api_token,
           workflow_filename: workflowFilename,
@@ -96,7 +138,7 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
   return (
     <div id="execute-section" className="bg-zinc-900/60 border-2 border-zinc-700 rounded-xl p-5 shadow-sm space-y-5">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
         <div className="flex items-center gap-2.5">
           <div className="p-1.5 rounded-md bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
             <Play className="w-4 h-4" />
@@ -104,16 +146,27 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
           <div>
             <h2 className="text-sm font-semibold text-zinc-100">4. Pipeline Execution &amp; Server Dispatch</h2>
             <p className="text-xs text-zinc-400">
-              SSH asset sync → Payload injection → ComfyUI <code className="text-zinc-300">/prompt</code> dispatch.
+              Transfer media assets, inspect modified graph payload, or trigger full ComfyUI execution.
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Button 1: Transfer Assets Only */}
+          <button
+            onClick={handleTransferOnly}
+            disabled={transferring || executing}
+            className="px-3 py-1.5 text-xs font-semibold bg-amber-600/90 hover:bg-amber-500 disabled:opacity-50 text-white rounded-lg transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
+            title="Upload and verify assets in the remote ComfyUI input directory without executing the workflow"
+          >
+            <UploadCloud className={`w-3.5 h-3.5 ${transferring ? "animate-bounce" : ""}`} />
+            <span>{transferring ? "Transferring Assets..." : "Transfer Assets Only"}</span>
+          </button>
+
           {/* Dry Run Button */}
           <button
             onClick={() => handleRun(true)}
-            disabled={executing || !workflowFilename}
+            disabled={executing || transferring || !workflowFilename}
             className="px-3 py-1.5 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-zinc-200 border border-zinc-700 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
             title="Inspect injected JSON without running remote SSH/API"
           >
@@ -121,14 +174,15 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
             <span>Dry Run (Inspect JSON)</span>
           </button>
 
-          {/* Master Execute Button */}
+          {/* Button 2: Master Execute Workflow */}
           <button
             onClick={() => handleRun(false)}
-            disabled={executing || !workflowFilename}
+            disabled={executing || transferring || !workflowFilename}
             className="px-4 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+            title="Run end-to-end pipeline: SSH transfer check, inject nodes, and submit /prompt to ComfyUI"
           >
             <Play className={`w-3.5 h-3.5 ${executing ? "animate-spin" : ""}`} />
-            <span>{executing ? "Dispatching..." : "Send to Server (Execute)"}</span>
+            <span>{executing ? "Dispatching..." : "Execute Workflow"}</span>
           </button>
         </div>
       </div>
@@ -137,8 +191,49 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
         <div className="p-3.5 rounded-lg bg-red-950/30 border border-red-800/40 text-xs text-red-300 flex items-start gap-2.5">
           <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
           <div>
-            <p className="font-semibold">Execution Stoppage</p>
+            <p className="font-semibold">Execution / Transfer Stoppage</p>
             <p className="opacity-90">{error}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Standalone Asset Transfer Result Confirmation Box */}
+      {transferResult && (
+        <div className="p-4 rounded-xl bg-emerald-950/30 border-2 border-emerald-700/50 space-y-2.5 text-xs">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-emerald-300 font-semibold">
+              <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>Asset Staging Confirmed (Step A Completed)</span>
+            </div>
+            <span className="font-mono text-[10px] bg-emerald-900/50 text-emerald-300 px-2 py-0.5 rounded border border-emerald-700/60">
+              SSH Verified
+            </span>
+          </div>
+
+          <p className="text-zinc-300 text-[11px] leading-relaxed">
+            {transferResult.message}
+          </p>
+
+          <div className="bg-zinc-950/70 p-2.5 rounded-lg border border-emerald-900/40 space-y-1.5">
+            <div className="flex items-center justify-between text-[11px] text-zinc-400">
+              <span className="flex items-center gap-1.5">
+                <HardDrive className="w-3.5 h-3.5 text-emerald-400" />
+                Target Remote Input Dir:
+              </span>
+              <code className="text-emerald-300 font-mono font-medium">{transferResult.remote_dir}</code>
+            </div>
+
+            {transferResult.transferred_files.length > 0 && (
+              <div className="pt-1 border-t border-zinc-800/80 flex flex-wrap gap-1.5">
+                {transferResult.transferred_files.map((file, i) => (
+                  <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono bg-zinc-900 text-zinc-200 border border-zinc-700">
+                    <Check className="w-3 h-3 text-emerald-400" />
+                    {file.filename}
+                    <span className="text-zinc-500">({Math.round(file.size_bytes / 1024)} KB)</span>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -154,7 +249,7 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
             </span>
           </div>
           <p className="text-[11px] text-zinc-400">
-            Pushes renamed assets to <code className="text-zinc-300 bg-zinc-800 px-1 py-0.5 rounded">/workspace/ComfyUI/input/</code>
+            Pushes renamed assets to <code className="text-zinc-300 bg-zinc-800 px-1 py-0.5 rounded break-all">{config.remote_input_dir || "/workspace/runpod-slim/ComfyUI/input/"}</code>
           </p>
         </div>
 
@@ -251,7 +346,7 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
                     s.status === "success" 
                       ? "bg-emerald-950 text-emerald-400 border border-emerald-800/50" 
                       : s.status === "warning" 
-                      ? "bg-amber-950 text-amber-400 border border-amber-800/50"
+                      ? "bg-amber-950 text-amber-400 border border-amber-800/50" 
                       : "bg-zinc-800 text-zinc-400"
                   }`}>
                     {s.status === "success" ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}

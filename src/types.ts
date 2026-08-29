@@ -11,6 +11,7 @@ export interface AppConfig {
   ssh_password: string;
   ssh_key_path: string;
   ssh_private_key?: string;
+  remote_input_dir: string;
   comfyui_api_url: string;
   runpod_api_token: string;
   lm_studio_url: string;
@@ -85,3 +86,16 @@ export interface ExecutionResult {
   modified_workflow: Record<string, any>;
   error?: string;
 }
+
+export interface TransferResult {
+  success: boolean;
+  remote_dir: string;
+  transferred_files: Array<{
+    filename: string;
+    size_bytes: number;
+    status: string;
+  }>;
+  message: string;
+  error?: string;
+}
+

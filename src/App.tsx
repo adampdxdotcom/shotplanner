@@ -19,6 +19,7 @@ export default function App() {
     ssh_password: "",
     ssh_key_path: "",
     ssh_private_key: "",
+    remote_input_dir: "/workspace/runpod-slim/ComfyUI/input/",
     comfyui_api_url: "http://127.0.0.1:8188",
     runpod_api_token: "",
     lm_studio_url: "http://localhost:1234/v1"
@@ -137,7 +138,13 @@ export default function App() {
       await fetchAssets();
     }
     
-    setConfig(data.config || config);
+    if (data.config) {
+      setConfig(prev => ({
+        ...prev,
+        ...data.config,
+        remote_input_dir: data.config.remote_input_dir || prev.remote_input_dir || "/workspace/runpod-slim/ComfyUI/input/"
+      }));
+    }
     setSelectedWorkflowFile(data.selectedWorkflowFile || "");
     setSelectedPromptNodeId(data.selectedPromptNodeId || "");
     setNodeMappings(data.nodeMappings || {});

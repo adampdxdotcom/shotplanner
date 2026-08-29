@@ -38,6 +38,18 @@ class SSHTestRequest(BaseModel):
     password: Optional[str] = None
     key_path: Optional[str] = None
     ssh_private_key: Optional[str] = None
+    remote_dir: str = "/workspace/runpod-slim/ComfyUI/input"
+
+class SSHTransferRequest(BaseModel):
+    runpod_ip: str
+    ssh_port: int = 22
+    ssh_username: str = "root"
+    ssh_password: Optional[str] = None
+    ssh_key_path: Optional[str] = None
+    ssh_private_key: Optional[str] = None
+    remote_input_dir: str = "/workspace/runpod-slim/ComfyUI/input"
+    node_mappings: Dict[str, str] = Field(default_factory=dict)
+    filenames: List[str] = Field(default_factory=list)
 
 class ExecuteWorkflowRequest(BaseModel):
     # Remote RunPod & SSH Config
@@ -47,6 +59,7 @@ class ExecuteWorkflowRequest(BaseModel):
     ssh_password: Optional[str] = None
     ssh_key_path: Optional[str] = None
     ssh_private_key: Optional[str] = None
+    remote_input_dir: str = "/workspace/runpod-slim/ComfyUI/input"
     
     # ComfyUI API Config
     comfyui_api_url: str = "http://127.0.0.1:8188"
@@ -151,7 +164,7 @@ async def generate_prompt_endpoint(req: LLMGenerateRequest):
 
 @router.post("/ssh/test")
 async def test_ssh_connection(req: SSHTestRequest):
-    """Test SSH connectivity to RunPod instance."""
+    """Test SSH connectivity to RunPod instance and verify remote directory."""
     ssh_service = RunPodSSHService(
         host=req.host,
         port=req.port,
@@ -160,14 +173,71 @@ async def test_ssh_connection(req: SSHTestRequest):
         key_path=req.key_path,
         private_key=req.ssh_private_key
     )
-    result = ssh_service.test_connection()
+    result = ssh_service.test_connection(remote_dir=req.remote_dir)
     return result
+
+@router.post("/ssh/transfer")
+@router.post("/assets/sync_remote")
+async def transfer_assets_only(req: SSHTransferRequest):
+    """
+    Decoupled Asset Transfer Endpoint:
+    Runs only Step A (SSH/SCP file staging to the remote ComfyUI input directory).
+    Validates file existence without parsing or submitting the ComfyUI workflow graph.
+    """
+    if not req.runpod_ip:
+        raise HTTPException(status_code=400, detail="RunPod Host/IP is required for remote transfer.")
+
+    files_to_transfer: List[Path] = []
+    file_names = set(req.filenames)
+    for node_id, filename in req.node_mappings.items():
+        if filename:
+            file_names.add(filename)
+
+    if not file_names and UPLOADS_DIR.exists():
+        for f in UPLOADS_DIR.iterdir():
+            if f.is_file() and not f.name.startswith("."):
+                files_to_transfer.append(f)
+    else:
+        for fname in file_names:
+            local_file = UPLOADS_DIR / fname
+            if local_file.exists():
+                files_to_transfer.append(local_file)
+
+    if not files_to_transfer:
+        return {
+            "success": True,
+            "remote_dir": req.remote_input_dir,
+            "transferred_files": [],
+            "message": f"No active assets found locally to transfer to {req.remote_input_dir}."
+        }
+
+    try:
+        ssh_service = RunPodSSHService(
+            host=req.runpod_ip,
+            port=req.ssh_port,
+            username=req.ssh_username,
+            password=req.ssh_password,
+            key_path=req.ssh_key_path,
+            private_key=req.ssh_private_key
+        )
+        transfer_results = ssh_service.transfer_files_to_runpod(
+            local_files=files_to_transfer,
+            remote_dir=req.remote_input_dir
+        )
+        return {
+            "success": True,
+            "remote_dir": req.remote_input_dir,
+            "transferred_files": transfer_results,
+            "message": f"Successfully transferred {len(transfer_results)} asset(s) via SSH into remote directory {req.remote_input_dir}. ComfyUI workflow graph and API untouched."
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"SSH Asset Transfer Failed: {str(e)}")
 
 @router.post("/execute")
 async def execute_workflow(req: ExecuteWorkflowRequest):
     """
     The Master Execution Pipeline:
-    Step A: SSH/SCP transfer of mapped assets to RunPod /workspace/ComfyUI/input/
+    Step A: SSH/SCP transfer of mapped assets to RunPod remote input directory
     Step B: Load user-selected workflow_api.json
     Step C: Inject expanded prompt and asset filenames (with bypass placeholder logic)
     Step D: Send modified JSON payload to RunPod ComfyUI /prompt endpoint
@@ -235,13 +305,13 @@ async def execute_workflow(req: ExecuteWorkflowRequest):
             )
             transfer_results = ssh_service.transfer_files_to_runpod(
                 local_files=files_to_transfer,
-                remote_dir="/workspace/ComfyUI/input"
+                remote_dir=req.remote_input_dir
             )
             steps_log.append({
                 "step": "A",
                 "title": "SSH File Transfer Completed",
                 "status": "success",
-                "detail": f"Transferred {len(transfer_results)} asset files to remote /workspace/ComfyUI/input/.",
+                "detail": f"Transferred {len(transfer_results)} asset files to remote {req.remote_input_dir}.",
                 "files": transfer_results
             })
         except Exception as e:

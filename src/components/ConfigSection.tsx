@@ -7,12 +7,13 @@ import {
   Bot, 
   CheckCircle2, 
   AlertCircle, 
-  RefreshCw,
-  Info,
-  ShieldCheck,
-  Sparkles,
-  Save,
-  FileCode2
+  RefreshCw, 
+  Info, 
+  ShieldCheck, 
+  Sparkles, 
+  Save, 
+  FileCode2,
+  FolderOpen
 } from "lucide-react";
 
 interface ConfigSectionProps {
@@ -93,7 +94,8 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange, 
           username: config.ssh_username,
           password: config.ssh_password,
           key_path: config.ssh_key_path,
-          ssh_private_key: config.ssh_private_key
+          ssh_private_key: config.ssh_private_key,
+          remote_dir: config.remote_input_dir || "/workspace/runpod-slim/ComfyUI/input/"
         })
       });
       const data = await res.json();
@@ -255,7 +257,22 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange, 
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+        {/* Remote ComfyUI Input Directory */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
+            <FolderOpen className="w-3.5 h-3.5 text-amber-400" />
+            Remote ComfyUI Input Dir
+          </label>
+          <input
+            type="text"
+            placeholder="/workspace/runpod-slim/ComfyUI/input/"
+            value={config.remote_input_dir || ""}
+            onChange={(e) => handleInputChange("remote_input_dir", e.target.value)}
+            className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-amber-500 rounded-lg px-3 py-2 text-xs font-mono text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
+          />
+        </div>
+
         {/* ComfyUI API URL */}
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
@@ -342,7 +359,7 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange, 
 
       <div className="text-[11px] text-zinc-400 bg-zinc-950/40 p-2.5 rounded-lg border-2 border-zinc-700/60 flex items-center gap-2">
         <Info className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-        <span>During execution, media assets are pushed via Paramiko SCP into <code className="text-zinc-200 bg-zinc-800 px-1 py-0.5 rounded">/workspace/ComfyUI/input/</code>, and modified JSON graphs are submitted to <code className="text-zinc-200 bg-zinc-800 px-1 py-0.5 rounded">/prompt</code>.</span>
+        <span>During execution, media assets are pushed via Paramiko SCP into <code className="text-zinc-200 bg-zinc-800 px-1 py-0.5 rounded">{config.remote_input_dir || "/workspace/runpod-slim/ComfyUI/input/"}</code>, and modified JSON graphs are submitted to <code className="text-zinc-200 bg-zinc-800 px-1 py-0.5 rounded">/prompt</code>.</span>
       </div>
     </div>
   );
