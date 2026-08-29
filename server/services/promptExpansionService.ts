@@ -16,7 +16,6 @@ export interface ExpandPromptOptions {
   shot_number?: string | number;
   shot_type?: string;
   camera_movement?: string;
-  gemini_api_key?: string;
 }
 
 export function buildSubjectDefinitionsHeader(assetList: any[]): string {
@@ -69,13 +68,14 @@ export async function expandPrompt(options: ExpandPromptOptions): Promise<{ expa
     scene_name,
     shot_number,
     shot_type,
-    camera_movement,
-    gemini_api_key
+    camera_movement
   } = options;
 
-  const stubText = (basic_stub || "").trim();
-  if (!stubText) {
-    throw new Error("Basic prompt stub is required to expand prompt");
+  if (!basic_stub) {
+    throw new Error("Basic prompt stub is required");
+  }
+  if (assets.length === 0) {
+    throw new Error("At least one uploaded asset is required to generate a prompt.");
   }
 
   const resolvedPromptPrefix =
@@ -174,7 +174,7 @@ Please expand this basic stub into a structured MiniMax-H3 prompt. Begin with th
   let generatedPrompt = "";
   let providerUsed = "Local LM Studio";
 
-  const storedGeminiKey = gemini_api_key || getStoredGeminiKey();
+  const storedGeminiKey = getStoredGeminiKey();
 
   // If explicit Gemini provider requested
   if (provider === "gemini") {
@@ -235,9 +235,8 @@ Please expand this basic stub into a structured MiniMax-H3 prompt. Begin with th
 
   // Dynamic smart expansion fallback if both are offline
   if (!generatedPrompt) {
-    const tagsList = assets.length > 0 ? assets.map((_: any, i: number) => `<Picture ${i + 1}>`).slice(0, 3).join(" and ") : "";
-    const featureSentence = tagsList ? `Featuring ${tagsList} with authentic facial expressions, realistic skin texture, and seamless character identity preservation. ` : "";
-    generatedPrompt = `${definitionsHeader}integrated_multimodal_description: [Shot 1] Live-action, cinematic 4K sequence capturing ${stubText}. ${featureSentence}The camera pushes in with small amplitude at slow speed.
+    const tagsList = assets.map((_: any, i: number) => `<Picture ${i + 1}>`).slice(0, 3).join(" and ");
+    generatedPrompt = `${definitionsHeader}integrated_multimodal_description: [Shot 1] Live-action, cinematic 4K sequence capturing ${basic_stub.trim()}. Featuring ${tagsList || "<Picture 1>"} with authentic facial expressions, realistic skin texture, and seamless character identity preservation. The camera pushes in with small amplitude at slow speed.
 
 overall_soundscape: Soft room ambience and atmospheric audio.
 

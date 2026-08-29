@@ -423,7 +423,7 @@ export default function SceneProjectHub({
             <div className="flex justify-end">
               <button 
                 onClick={handleExpandPrompt}
-                disabled={isExpanding || (!activeShot.basic_stub?.trim() && !activeShot.shot_name?.trim())}
+                disabled={isExpanding || !activeShot.basic_stub.trim()}
                 className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
               >
                 {isExpanding ? "Expanding..." : "Expand Prompt"}
