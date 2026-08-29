@@ -453,7 +453,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
     return true;
   });
 
-  const groupedLibraryAssets = filteredLibraryAssets.reduce((acc, asset) => {
+  const groupedLibraryAssets: Record<string, MediaAsset[]> = filteredLibraryAssets.reduce((acc: Record<string, MediaAsset[]>, asset: MediaAsset) => {
     const subject = asset.subject_name || "Uncategorized";
     if (!acc[subject]) acc[subject] = [];
     acc[subject].push(asset);
@@ -478,32 +478,26 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
   };
 
   const getAssetForSlot = (type: "image" | "audio" | "video", slotIdx: number): MediaAsset | undefined => {
+    if (!activeShot) return undefined;
+    
     const globalSlot = getGlobalSlotIndex(type, slotIdx);
-    
-    // 1. Check activeShot.assigned_slots first
-    if (activeShotId) {
-      const shot = sceneProject.shots.find(s => s.id === activeShotId);
-      if (shot && shot.assigned_slots && shot.assigned_slots[globalSlot]) {
-        const filename = shot.assigned_slots[globalSlot];
-        const match = assets.find(a => a.filename === filename);
-        if (match) return match;
-      }
+
+    // 1. Look up the assigned identifier for this slot from the ACTIVE SHOT ONLY
+    const assignedIdentifier = activeShot.assigned_slots?.[globalSlot] 
+                            || activeShot.assigned_slots?.[globalSlot + 1]
+                            || activeShot.assigned_slots?.[`slot_${globalSlot}`];
+
+    if (!assignedIdentifier) {
+      // If the active shot has nothing mapped to this slot, it MUST remain empty!
+      return undefined;
     }
-    
-    // 2. Fallback to global slot_index
-    const typeList = assets.filter(a => type === "image" ? isImg(a) : type === "audio" ? isAud(a) : isVid(a));
-    const direct = typeList.find(a => a.slot_index === slotIdx);
-    if (direct) return direct;
-    
-    const unassigned = typeList.filter(a => a.slot_index === undefined);
-    const assignedSlots = new Set(typeList.map(a => a.slot_index).filter(idx => idx !== undefined));
-    let currSlot = 0;
-    for (const item of unassigned) {
-      while (assignedSlots.has(currSlot)) currSlot++;
-      if (currSlot === slotIdx) return item;
-      currSlot++;
-    }
-    return undefined;
+
+    // 2. Resolve the asset from the master asset library by filename or ID
+    return assets.find(a => 
+      a.filename === assignedIdentifier || 
+      (a as any).name === assignedIdentifier ||
+      (a as any).id === assignedIdentifier
+    );
   };
 
 
@@ -983,16 +977,16 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
                         {Object.keys(groupedLibraryAssets).length === 0 ? (
                           <div className="text-center py-8 text-zinc-500 text-sm">No assets match your search/filter.</div>
                         ) : (
-                          Object.entries(groupedLibraryAssets).map(([subject, assets]) => (
+                          Object.entries(groupedLibraryAssets).map(([subject, groupAssets]) => (
                             <div key={subject} className="space-y-3">
                               <div className="flex items-center gap-2 border-b border-zinc-800 pb-2 sticky top-0 bg-zinc-900/90 backdrop-blur z-10">
                                 <h4 className="text-sm font-semibold text-zinc-200">{subject}</h4>
                                 <span className="px-2 py-0.5 bg-zinc-800 rounded-full text-[10px] text-zinc-400 font-medium">
-                                  {assets.length} {assets.length === 1 ? "Asset" : "Assets"}
+                                  {groupAssets.length} {groupAssets.length === 1 ? "Asset" : "Assets"}
                                 </span>
                               </div>
                               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                {assets.map(asset => (
+                                {groupAssets.map(asset => (
                                   <div
                                     key={asset.id || asset.filename}
                                     onClick={() => setSelectedLibraryAsset(asset)}

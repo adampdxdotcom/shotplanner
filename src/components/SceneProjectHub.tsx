@@ -119,7 +119,7 @@ export default function SceneProjectHub({
     
     if (shotFilenameOverride) {
        // Look up the full asset by filename
-       const matchedAsset = assets.find(a => a.filename === shotFilenameOverride || a.name === shotFilenameOverride);
+       const matchedAsset = assets.find(a => a.filename === shotFilenameOverride || (a as any).name === shotFilenameOverride);
        if (matchedAsset) {
            return { ...matchedAsset, preview_url: getAssetMediaUrl(matchedAsset) };
        }
