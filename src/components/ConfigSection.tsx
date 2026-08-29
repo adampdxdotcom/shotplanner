@@ -423,21 +423,36 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange, 
 
                 {/* Step 3 */}
                 <div className="bg-zinc-950/80 border-2 border-amber-900/50 rounded-lg p-3 space-y-1.5">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between flex-wrap gap-1">
                     <div className="flex items-center gap-2">
                       <span className="w-4 h-4 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-bold flex items-center justify-center">3</span>
                       <span className="text-xs font-semibold text-amber-200">Step 3: Fix Permissions on Active Pod (If already running)</span>
                     </div>
-                    <span className="text-[10px] text-amber-400 font-mono">Crucial</span>
+                    {(generatedKeyPair?.public_key || config.ssh_public_key) ? (
+                      <span className="text-[10px] text-emerald-400 bg-emerald-950/80 border border-emerald-800/60 px-2 py-0.5 rounded-full font-mono">
+                        ✓ Public Key Filled In
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-amber-400 font-mono">Crucial</span>
+                    )}
                   </div>
                   <div className="pl-6 space-y-1.5">
                     <p className="text-[11px] text-zinc-400">
                       In your pod's <strong>Web Terminal</strong>, paste:
                     </p>
                     <CodeBlock 
-                      code={`mkdir -p ~/.ssh && echo "YOUR_PUBLIC_KEY" >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys`}
+                      code={
+                        (generatedKeyPair?.public_key || config.ssh_public_key)
+                          ? `mkdir -p ~/.ssh && echo "${(generatedKeyPair?.public_key || config.ssh_public_key || "").trim()}" >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys`
+                          : `mkdir -p ~/.ssh && echo "YOUR_PUBLIC_KEY" >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys`
+                      }
                       label="Pod Web Terminal"
                     />
+                    {!(generatedKeyPair?.public_key || config.ssh_public_key) && (
+                      <p className="text-[10px] text-zinc-500 italic">
+                        Replace <code className="text-amber-300">YOUR_PUBLIC_KEY</code> with your <code className="text-emerald-400">ssh-ed25519 AAAAC3...</code> string.
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -600,13 +615,13 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange, 
 
       {/* Feature & Documentation Primer: RunPod SSH Key Setup & Configuration Card */}
       <div id="runpod-ssh-guide" className="pt-2">
-        <RunPodSSHPrimerCard />
+        <RunPodSSHPrimerCard publicKey={generatedKeyPair?.public_key || config.ssh_public_key || undefined} />
       </div>
 
       {/* Public Key Modal / Copy Tray */}
       {showPublicKeyModal && generatedKeyPair && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-zinc-900 border-2 border-amber-500/80 rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4">
+          <div className="bg-zinc-900 border-2 border-amber-500/80 rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
               <div className="flex items-center gap-2.5">
@@ -693,6 +708,21 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange, 
               </button>
             </div>
 
+            {/* Running Pod One-Liner Quick Fix Box */}
+            <div className="bg-zinc-950/90 border border-amber-900/40 rounded-xl p-3 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold text-amber-300 flex items-center gap-1.5">
+                  <Terminal className="w-3.5 h-3.5 text-amber-400" />
+                  Already Running Pod? (Paste in Pod Web Terminal):
+                </span>
+                <span className="text-[10px] text-emerald-400 font-mono">Pre-filled</span>
+              </div>
+              <CodeBlock 
+                code={`mkdir -p ~/.ssh && echo "${generatedKeyPair.public_key.trim()}" >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys`}
+                label="Pod Web Terminal"
+              />
+            </div>
+
             {/* Subtext instructions */}
             <div className="bg-zinc-950/80 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-400 space-y-1">
               <p className="text-zinc-300 font-medium flex items-center gap-1.5">
@@ -700,7 +730,7 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange, 
                 Next Step in RunPod:
               </p>
               <p className="text-[11px] leading-relaxed text-zinc-400">
-                Paste this public key into your <strong>RunPod Dashboard &rarr; Settings &rarr; SSH Keys</strong> (or append it to <code className="text-amber-300 bg-zinc-800 px-1 py-0.5 rounded">~/.ssh/authorized_keys</code> on your active pod).
+                Paste this public key into your <strong>RunPod Dashboard &rarr; Settings &rarr; SSH Keys</strong> for all new pods.
               </p>
             </div>
 

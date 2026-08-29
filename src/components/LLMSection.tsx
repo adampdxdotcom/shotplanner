@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { MediaAsset } from "../types";
+import { MediaAsset, LLMProvider, ScenePlanning, hasSceneReferencePhoto, SCENE_REFERENCE_DIRECTIVE } from "../types";
+import { formatShotNumber } from "./ScenePlanningHeader";
 import { 
   Sparkles, 
   Bot, 
@@ -9,7 +10,11 @@ import {
   AlertCircle, 
   Info, 
   FileText,
-  Sliders
+  Sliders,
+  Film,
+  Camera,
+  Layers,
+  MapPin
 } from "lucide-react";
 
 interface LLMSectionProps {
@@ -17,9 +22,14 @@ interface LLMSectionProps {
   onChangeBasicStub: (val: string) => void;
   expandedPrompt: string;
   onChangeExpandedPrompt: (val: string) => void;
+  providerChoice?: LLMProvider;
+  onChangeProviderChoice?: (val: LLMProvider) => void;
+  promptPrefix?: string;
+  planning?: ScenePlanning;
   assets: MediaAsset[];
   lmStudioUrl: string;
   geminiApiKey?: string;
+  onShowToast?: (text: string, type: "success" | "error" | "info") => void;
 }
 
 export const LLMSection: React.FC<LLMSectionProps> = ({
@@ -27,15 +37,29 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
   onChangeBasicStub,
   expandedPrompt,
   onChangeExpandedPrompt,
+  providerChoice: controlledProvider,
+  onChangeProviderChoice,
+  promptPrefix = "",
+  planning,
   assets,
   lmStudioUrl,
-  geminiApiKey
+  geminiApiKey,
+  onShowToast
 }) => {
-  const [providerChoice, setProviderChoice] = useState<"gemini" | "lm_studio">("gemini");
+  const [internalProvider, setInternalProvider] = useState<LLMProvider>("lm_studio");
+  const providerChoice = controlledProvider !== undefined ? controlledProvider : internalProvider;
+
+  const setProviderChoice = (p: LLMProvider) => {
+    setInternalProvider(p);
+    onChangeProviderChoice?.(p);
+  };
+
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [providerUsed, setProviderUsed] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  const isSceneRefPresent = hasSceneReferencePhoto(assets);
 
   const handleGeneratePrompt = async () => {
     if (!basicStub.trim()) {
@@ -63,6 +87,7 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
       if (res.ok && data.expanded_prompt) {
         onChangeExpandedPrompt(data.expanded_prompt);
         if (data.provider) setProviderUsed(data.provider);
+        onShowToast?.("Prompt expanded successfully with " + (data.provider || "LLM"), "success");
       } else {
         setError(data.error || "Failed to generate prompt from LLM");
       }
@@ -73,10 +98,46 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
     }
   };
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(expandedPrompt);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopy = async () => {
+    if (!expandedPrompt || !expandedPrompt.trim()) {
+      onShowToast?.("No prompt text to copy.", "info");
+      return;
+    }
+
+    let success = false;
+
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(expandedPrompt);
+        success = true;
+      } else {
+        throw new Error("Clipboard API not available");
+      }
+    } catch {
+      // Fallback for iframe / non-focused context
+      try {
+        const textArea = document.createElement("textarea");
+        textArea.value = expandedPrompt;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-999999px";
+        textArea.style.top = "-999999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        success = document.execCommand("copy");
+        document.body.removeChild(textArea);
+      } catch (err) {
+        console.error("ExecCommand copy failed:", err);
+      }
+    }
+
+    if (success) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+      onShowToast?.("LLM generated prompt copied to clipboard!", "success");
+    } else {
+      onShowToast?.("Failed to copy prompt to clipboard.", "error");
+    }
   };
 
   return (
@@ -129,18 +190,6 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
               <div className="flex items-center bg-zinc-900 border-2 border-zinc-700 rounded-lg p-0.5 text-[11px]">
                 <button
                   type="button"
-                  onClick={() => setProviderChoice("gemini")}
-                  className={`px-2 py-0.5 rounded-md font-medium transition-colors flex items-center gap-1 ${
-                    providerChoice === "gemini" 
-                      ? "bg-purple-600/80 text-white" 
-                      : "text-zinc-400 hover:text-zinc-200"
-                  }`}
-                >
-                  <Sparkles className="w-3 h-3" />
-                  Gemini 3.6 Flash
-                </button>
-                <button
-                  type="button"
                   onClick={() => setProviderChoice("lm_studio")}
                   className={`px-2 py-0.5 rounded-md font-medium transition-colors flex items-center gap-1 ${
                     providerChoice === "lm_studio" 
@@ -150,6 +199,18 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
                 >
                   <Bot className="w-3 h-3" />
                   LM Studio
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setProviderChoice("gemini")}
+                  className={`px-2 py-0.5 rounded-md font-medium transition-colors flex items-center gap-1 ${
+                    providerChoice === "gemini" 
+                      ? "bg-purple-600/80 text-white" 
+                      : "text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  <Sparkles className="w-3 h-3" />
+                  Gemini 3.6 Flash
                 </button>
               </div>
             </div>
@@ -216,16 +277,106 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
                 Preview / Edit Expanded Prompt (Injected into Node)
               </label>
               
-              {expandedPrompt && (
+              <div className="flex items-center gap-2">
+                {copied && (
+                  <span className="text-[11px] text-emerald-400 font-medium bg-emerald-950/90 border border-emerald-800/80 px-2 py-0.5 rounded-md flex items-center gap-1">
+                    <Check className="w-3 h-3" />
+                    Copied!
+                  </span>
+                )}
                 <button
+                  type="button"
                   onClick={handleCopy}
-                  className="px-2 py-1 text-[11px] text-zinc-400 hover:text-zinc-200 bg-zinc-900 border-2 border-zinc-700 rounded transition-colors flex items-center gap-1"
+                  disabled={!expandedPrompt || !expandedPrompt.trim()}
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition-all flex items-center gap-1.5 shadow-xs ${
+                    copied
+                      ? "bg-emerald-600 border-emerald-500 text-white shadow-emerald-900/30 cursor-default"
+                      : expandedPrompt && expandedPrompt.trim()
+                      ? "bg-zinc-800 hover:bg-zinc-700 text-amber-300 hover:text-amber-200 border-zinc-700 hover:border-amber-500/50 cursor-pointer"
+                      : "bg-zinc-900 text-zinc-600 border-zinc-800 cursor-not-allowed"
+                  }`}
+                  title={expandedPrompt && expandedPrompt.trim() ? "Copy LLM generated prompt" : "Generate a prompt first"}
                 >
-                  {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                  <span>{copied ? "Copied" : "Copy"}</span>
+                  {copied ? <Check className="w-3.5 h-3.5 text-white" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copied ? "Copied to Clipboard" : "Copy Prompt"}</span>
                 </button>
-              )}
+              </div>
             </div>
+
+            {/* Scene & Camera Planning Prefix Live Preview Field */}
+            {promptPrefix ? (
+              <div className="bg-indigo-950/30 border border-indigo-700/50 rounded-lg p-2.5 space-y-1.5 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-indigo-300 flex items-center gap-1.5">
+                    <Film className="w-3.5 h-3.5 text-indigo-400" />
+                    Scene &amp; Camera Direction Prefix (Auto-Baked on Export)
+                  </span>
+                  <span className="text-[10px] font-mono text-indigo-300 bg-indigo-900/60 px-1.5 py-0.5 rounded border border-indigo-700/60">
+                    Shot {planning?.shot_number ? formatShotNumber(planning.shot_number) : "01"}
+                  </span>
+                </div>
+                <div className="font-mono text-[11px] text-indigo-200 bg-zinc-950/80 p-2 rounded border border-indigo-900/40 break-words select-all">
+                  {promptPrefix}
+                </div>
+                <div className="text-[10px] text-zinc-400 flex flex-wrap items-center justify-between gap-1 pt-0.5">
+                  <span className="text-zinc-400">
+                    Will inject into ComfyUI prompt node as: <code className="text-zinc-300">"{promptPrefix}. &#123;Body Prompt&#125;"</code>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!expandedPrompt.startsWith(promptPrefix)) {
+                        const newPrompt = expandedPrompt.trim() ? `${promptPrefix}. ${expandedPrompt.trim()}` : `${promptPrefix}. `;
+                        onChangeExpandedPrompt(newPrompt);
+                      }
+                    }}
+                    className="text-[10px] text-indigo-400 hover:text-indigo-300 underline cursor-pointer"
+                  >
+                    Insert into editor box
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {/* Scene Reference Photo Exact Likeness Directive */}
+            {isSceneRefPresent && (
+              <div className="bg-amber-950/30 border border-amber-600/50 rounded-lg p-2.5 space-y-1.5 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-amber-300 flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-amber-400" />
+                    Scene Reference Photo Directive (Active)
+                  </span>
+                  <span className="text-[10px] font-mono text-amber-300 bg-amber-900/60 px-1.5 py-0.5 rounded border border-amber-600/60">
+                    Exact Likeness Rule
+                  </span>
+                </div>
+                <div className="font-mono text-[11px] text-amber-200 bg-zinc-950/80 p-2 rounded border border-amber-800/40 select-all font-medium">
+                  {SCENE_REFERENCE_DIRECTIVE}
+                </div>
+                <div className="text-[10px] text-zinc-400 flex flex-wrap items-center justify-between gap-1 pt-0.5">
+                  <span className="text-zinc-400">
+                    {expandedPrompt.includes(SCENE_REFERENCE_DIRECTIVE) 
+                      ? "✓ Directive is present in prompt editor on its own line."
+                      : "Auto-baked on prompt generation & workflow staging."}
+                  </span>
+                  {!expandedPrompt.includes(SCENE_REFERENCE_DIRECTIVE) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const trimmed = expandedPrompt.trim();
+                        const updated = trimmed 
+                          ? `${trimmed}\n${SCENE_REFERENCE_DIRECTIVE}` 
+                          : SCENE_REFERENCE_DIRECTIVE;
+                        onChangeExpandedPrompt(updated);
+                      }}
+                      className="text-[10px] text-amber-400 hover:text-amber-300 underline cursor-pointer font-medium"
+                    >
+                      Insert line into editor box
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
 
             <textarea
               rows={8}

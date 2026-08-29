@@ -63,7 +63,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
     if (!file) return;
 
     if (!file.name.endsWith(".json")) {
-      setUploadError("Only .json ComfyUI API workflow files are allowed.");
+      setUploadError("Only .json ComfyUI workflow files are allowed.");
       return;
     }
 
@@ -107,7 +107,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
           </div>
           <div>
             <h2 className="text-sm font-semibold text-zinc-100">2. Workflow &amp; Dynamic Node Mapping</h2>
-            <p className="text-xs text-zinc-400">Select API-format workflow JSON, inspect loader nodes, and map uploaded media assets to Node IDs.</p>
+            <p className="text-xs text-zinc-400">Select standard visual canvas workflow JSON, inspect all loader nodes (active &amp; bypassed), and map uploaded media assets to Node IDs.</p>
           </div>
         </div>
 
@@ -115,7 +115,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
           {/* Upload Button */}
           <label className="cursor-pointer px-3 py-1.5 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 rounded-lg transition-colors flex items-center gap-1.5 shadow-xs">
             <Upload className="w-3.5 h-3.5 text-amber-400" />
-            <span>{uploading ? "Uploading..." : "Upload Workflow JSON"}</span>
+            <span>{uploading ? "Uploading..." : "Upload Visual Workflow JSON"}</span>
             <input 
               type="file" 
               accept=".json" 

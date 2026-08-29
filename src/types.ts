@@ -1,7 +1,74 @@
+export const SCENE_REFERENCE_DIRECTIVE = "Do not embellish the setting. Use the exact likeness of location.";
+
+export function formatShotNumber(raw: string | number): string {
+  const str = String(raw !== undefined && raw !== null ? raw : "").trim().replace(/^shot\s*/i, "");
+  if (!str) return "01";
+  const num = parseInt(str, 10);
+  if (!isNaN(num)) {
+    return num.toString().padStart(2, "0");
+  }
+  return str;
+}
+
+export function sanitizeFilenamePart(str: string): string {
+  if (!str) return "";
+  return str
+    .replace(/[/\\:*?"<>|']/g, "") // strip invalid filesystem chars
+    .replace(/[\s-]+/g, "_") // replace spaces and hyphens with _
+    .replace(/_+/g, "_") // collapse multiple consecutive underscores
+    .replace(/^_+|_+$/g, ""); // trim leading and trailing underscores
+}
+
+export function generateSaveVideoPrefix(sceneName?: string, shotNumber?: string | number): string {
+  const sanitizedScene = sanitizeFilenamePart(sceneName || "");
+  const rawShot = shotNumber !== undefined && shotNumber !== null ? String(shotNumber).trim() : "";
+  const paddedShot = rawShot ? formatShotNumber(rawShot) : "";
+
+  if (sanitizedScene && paddedShot) {
+    return `video/${sanitizedScene}_Shot_${paddedShot}_`;
+  }
+  if (sanitizedScene) {
+    return `video/${sanitizedScene}_`;
+  }
+  if (paddedShot) {
+    return `video/Shot_${paddedShot}_`;
+  }
+  return "";
+}
+
+export function hasSceneReferencePhoto(assets: Array<{ type?: string; media_type?: string; filename?: string; subject_name?: string }>): boolean {
+  if (!assets || !Array.isArray(assets)) return false;
+  return assets.some(a => {
+    if (!a) return false;
+    const isImage = !a.media_type || a.media_type === "image";
+    const typeStr = (a.type || "").toLowerCase();
+    const sname = (a.subject_name || "").toLowerCase();
+    const fname = (a.filename || "").toLowerCase();
+    return isImage && (
+      typeStr === "scene reference" ||
+      typeStr.includes("scene") ||
+      typeStr.includes("location") ||
+      typeStr.includes("environment") ||
+      sname.includes("location") ||
+      fname.startsWith("scene_") ||
+      fname.includes("scene_reference")
+    );
+  });
+}
+
 export interface ToastMessage {
   id: string;
   text: string;
   type: "success" | "error" | "info";
+}
+
+export type LLMProvider = "lm_studio" | "gemini";
+
+export interface ScenePlanning {
+  scene_name: string;
+  shot_number: string | number;
+  shot_type: string;
+  camera_movement: string;
 }
 
 export interface AppConfig {
@@ -102,6 +169,7 @@ export interface ExecutionResult {
   success: boolean;
   prompt_id?: string;
   dry_run?: boolean;
+  save_video_prefix?: string;
   steps: ExecutionStepLog[];
   modified_workflow: Record<string, any>;
   error?: string;
@@ -119,12 +187,16 @@ export interface TransferredFileItem {
 export interface TransferResult {
   success: boolean;
   remote_dir: string;
+  remote_workflow_path?: string;
+  staged_workflow_filename?: string;
+  save_video_prefix?: string;
   transferred_count?: number;
   skipped_count?: number;
   total_checked?: number;
   uploaded_files?: string[];
   skipped_files?: string[];
   transferred_files: TransferredFileItem[];
+  updated_workflow_json?: Record<string, any>;
   message: string;
   error?: string;
 }

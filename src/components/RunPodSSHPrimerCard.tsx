@@ -72,9 +72,22 @@ export const CodeBlock: React.FC<{ code: string; label?: string }> = ({ code, la
   );
 };
 
-export const RunPodSSHPrimerCard: React.FC = () => {
+interface RunPodSSHPrimerCardProps {
+  publicKey?: string;
+}
+
+export const RunPodSSHPrimerCard: React.FC<RunPodSSHPrimerCardProps> = ({ publicKey }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const [activeTab, setActiveTab] = useState<"quickstart" | "concepts" | "commands" | "runpod_auth">("quickstart");
+
+  const effectivePublicKey = publicKey?.trim() || "";
+  const authCommandOneLiner = effectivePublicKey
+    ? `mkdir -p ~/.ssh && echo "${effectivePublicKey}" >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys`
+    : `mkdir -p ~/.ssh && echo "YOUR_PUBLIC_KEY" >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys`;
+
+  const authCommandMultiLine = effectivePublicKey
+    ? `mkdir -p ~/.ssh\necho "${effectivePublicKey}" >> ~/.ssh/authorized_keys\nchmod 700 ~/.ssh\nchmod 600 ~/.ssh/authorized_keys`
+    : `mkdir -p ~/.ssh\necho "PASTE_YOUR_PUBLIC_KEY_STRING_HERE" >> ~/.ssh/authorized_keys\nchmod 700 ~/.ssh\nchmod 600 ~/.ssh/authorized_keys`;
 
   return (
     <div id="runpod-ssh-guide-card" className="bg-zinc-900/80 border-2 border-zinc-700 rounded-xl overflow-hidden shadow-sm">
@@ -226,26 +239,38 @@ export const RunPodSSHPrimerCard: React.FC = () => {
 
                 {/* Step 3 */}
                 <div className="bg-zinc-950/70 border-2 border-amber-900/40 rounded-lg p-3.5 space-y-2">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between flex-wrap gap-1.5">
                     <div className="flex items-center gap-2">
                       <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold flex items-center justify-center border border-amber-500/30">
                         3
                       </span>
                       <span className="text-xs font-semibold text-zinc-200">Step 3: Fix Permissions on Active Pod (If already running)</span>
                     </div>
-                    <span className="text-[10px] text-amber-400 font-mono">Crucial Step</span>
+                    {effectivePublicKey ? (
+                      <span className="text-[10px] text-emerald-400 bg-emerald-950/80 border border-emerald-800/60 px-2 py-0.5 rounded-full font-mono">
+                        ✓ Public Key Filled In
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-amber-400 font-mono">Crucial Step</span>
+                    )}
                   </div>
                   <p className="text-xs text-zinc-400 pl-7">
                     In your pod's <strong>Web Terminal</strong> (via the browser connect button on the Pod card), paste:
                   </p>
                   <div className="pl-7 space-y-2">
                     <CodeBlock 
-                      code={`mkdir -p ~/.ssh && echo "YOUR_PUBLIC_KEY" >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys`}
+                      code={authCommandOneLiner}
                       label="Pod Web Terminal (One-liner)"
                     />
-                    <p className="text-[11px] text-zinc-400 italic">
-                      Replace <code className="text-amber-300 bg-zinc-800 px-1 py-0.5 rounded">YOUR_PUBLIC_KEY</code> with your single-line <code className="text-emerald-400">ssh-ed25519 AAAAC3...</code> string.
-                    </p>
+                    {!effectivePublicKey ? (
+                      <p className="text-[11px] text-zinc-400 italic">
+                        Replace <code className="text-amber-300 bg-zinc-800 px-1 py-0.5 rounded">YOUR_PUBLIC_KEY</code> with your single-line <code className="text-emerald-400">ssh-ed25519 AAAAC3...</code> string.
+                      </p>
+                    ) : (
+                      <p className="text-[11px] text-emerald-400/90 font-medium">
+                        Your generated public key has been inserted into this command for easy one-click copying.
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -444,14 +469,21 @@ export const RunPodSSHPrimerCard: React.FC = () => {
                   </div>
 
                   <div className="space-y-2 pl-7">
-                    <p className="text-xs text-zinc-300">
-                      1. Open your running pod's <strong>Web Terminal</strong> (via the browser connect button on the Pod card).
-                    </p>
+                    <div className="flex items-center justify-between flex-wrap gap-1">
+                      <p className="text-xs text-zinc-300">
+                        1. Open your running pod's <strong>Web Terminal</strong> (via the browser connect button on the Pod card).
+                      </p>
+                      {effectivePublicKey && (
+                        <span className="text-[10px] text-emerald-400 bg-emerald-950/80 border border-emerald-800/60 px-2 py-0.5 rounded-full font-mono">
+                          ✓ Generated Public Key Filled In
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-zinc-300">
                       2. Run these exact commands to authorize the key and lock down file permissions:
                     </p>
                     <CodeBlock 
-                      code={`mkdir -p ~/.ssh\necho "PASTE_YOUR_PUBLIC_KEY_STRING_HERE" >> ~/.ssh/authorized_keys\nchmod 700 ~/.ssh\nchmod 600 ~/.ssh/authorized_keys`}
+                      code={authCommandMultiLine}
                       label="Pod Web Terminal"
                     />
                     <div className="bg-zinc-900/90 border border-amber-700/40 rounded-lg p-2.5 text-[11px] text-amber-300/90 flex items-center gap-2">

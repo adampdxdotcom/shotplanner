@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { MediaAsset, AssetType } from "../types";
+import { MediaAsset, AssetType, ScenePlanning } from "../types";
 import { SubjectCombobox } from "./SubjectCombobox";
+import { ScenePlanningHeader } from "./ScenePlanningHeader";
 import { 
   Edit3,
   Maximize,
@@ -27,6 +28,8 @@ interface AssetManagerSectionProps {
   assets: MediaAsset[];
   subjects?: string[];
   onRegisterSubject?: (name: string) => void;
+  planning?: ScenePlanning;
+  onChangePlanning?: (planning: ScenePlanning) => void;
   onAssetUploaded: (asset: MediaAsset, slotIndex?: number, mediaType?: "image" | "audio" | "video") => void;
   onAssetDeleted: (filename: string) => void;
   onAssetUpdated: (oldFilename: string, newAsset: MediaAsset) => void;
@@ -36,6 +39,8 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
   assets,
   subjects = [],
   onRegisterSubject = (_name: string) => {},
+  planning,
+  onChangePlanning,
   onAssetUploaded,
   onAssetDeleted,
   onAssetUpdated
@@ -479,19 +484,29 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
   };
 
   return (
-    <div id="assets-section" className="bg-zinc-900/60 border-2 border-zinc-700 rounded-xl p-5 shadow-sm space-y-5">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
-        <div className="flex items-center gap-2.5">
-          <div className="p-1.5 rounded-md bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-            <HardDrive className="w-4 h-4" />
-          </div>
-          <div>
-            <h2 className="text-sm font-semibold text-zinc-100">1. Segmented Asset Management</h2>
-            <p className="text-xs text-zinc-400">Click on an empty slot below to upload and configure semantic metadata. Auto-renames to format <code className="text-zinc-300">{`{type}_{name}_{timestamp}.ext`}</code>.</p>
+    <div id="assets-section" className="space-y-5">
+      {/* Top Horizontal Card: Scene & Camera Planning */}
+      {planning && onChangePlanning && (
+        <ScenePlanningHeader 
+          planning={planning} 
+          onChangePlanning={onChangePlanning} 
+        />
+      )}
+
+      {/* Main Asset Management Card */}
+      <div className="bg-zinc-900/60 border-2 border-zinc-700 rounded-xl p-5 shadow-sm space-y-5">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="p-1.5 rounded-md bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+              <HardDrive className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-zinc-100">1. Segmented Asset Management</h2>
+              <p className="text-xs text-zinc-400">Click on an empty slot below to upload and configure semantic metadata. Auto-renames to format <code className="text-zinc-300">{`{type}_{name}_{timestamp}.ext`}</code>.</p>
+            </div>
           </div>
         </div>
-      </div>
 
       {/* Uploaded Assets Grid */}
       <div className="space-y-6 pt-4 border-t border-zinc-800">
@@ -553,7 +568,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
           </div>
         </div>
       </div>
-
+    </div>
       
       {/* Upload Modal */}
       {uploadModalSlot && (

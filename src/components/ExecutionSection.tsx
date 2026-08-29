@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { AppConfig, ExecutionResult, ExecutionStepLog, TransferResult, GenerationParameters, ParameterNodeMappings } from "../types";
+import { AppConfig, ExecutionResult, ExecutionStepLog, TransferResult, GenerationParameters, ParameterNodeMappings, ScenePlanning, generateSaveVideoPrefix } from "../types";
 import { 
   Play, 
   Eye, 
@@ -30,6 +30,8 @@ interface ExecutionSectionProps {
   workflowFilename: string;
   promptNodeId: string;
   expandedPrompt: string;
+  promptPrefix?: string;
+  scenePlanning?: ScenePlanning;
   nodeMappings: Record<string, string>;
   bypassMissing: boolean;
   generationParams?: GenerationParameters;
@@ -41,6 +43,8 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
   workflowFilename,
   promptNodeId,
   expandedPrompt,
+  promptPrefix = "",
+  scenePlanning,
   nodeMappings,
   bypassMissing,
   generationParams = { steps: 30, megapixels: 0.5, frames: 81 },
@@ -54,7 +58,9 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
   const [activeStepTab, setActiveStepTab] = useState<"steps" | "json">("steps");
   const [copied, setCopied] = useState(false);
 
-  // Button 1: Transfer Assets Only (Step A Only - SSH/SCP to remote ComfyUI input)
+  const saveVideoPrefix = generateSaveVideoPrefix(scenePlanning?.scene_name, scenePlanning?.shot_number);
+
+  // Button 1: Transfer Assets & Stage Workflow (Manual ComfyUI Mode)
   const handleTransferOnly = async () => {
     setTransferring(true);
     setError(null);
@@ -72,7 +78,22 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
           ssh_key_path: config.ssh_key_path,
           ssh_private_key: config.ssh_private_key,
           remote_input_dir: config.remote_input_dir || "/workspace/runpod-slim/ComfyUI/input/",
-          node_mappings: nodeMappings
+          workflow_filename: workflowFilename,
+          prompt_node_id: promptNodeId,
+          expanded_prompt: expandedPrompt,
+          prompt_prefix: promptPrefix,
+          save_video_prefix: saveVideoPrefix,
+          scene_planning: scenePlanning,
+          nodeMappings: nodeMappings,
+          bypass_missing: bypassMissing,
+          safe_placeholder: "empty.png",
+          parameter_overrides: generationParams,
+          parameter_node_mappings: parameterNodeMappings,
+          generation_parameters: {
+            steps: { node_id: parameterNodeMappings.steps, value: generationParams.steps },
+            megapixels: { node_id: parameterNodeMappings.megapixels, value: generationParams.megapixels },
+            frames: { node_id: parameterNodeMappings.frames, value: generationParams.frames }
+          }
         })
       });
 
@@ -116,6 +137,9 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
           workflow_filename: workflowFilename,
           prompt_node_id: promptNodeId,
           expanded_prompt: expandedPrompt,
+          prompt_prefix: promptPrefix,
+          save_video_prefix: saveVideoPrefix,
+          scene_planning: scenePlanning,
           node_mappings: nodeMappings,
           bypass_missing: bypassMissing,
           safe_placeholder: "empty.png",
@@ -143,9 +167,31 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
     }
   };
 
-  const handleCopyJson = () => {
+  const handleCopyJson = async () => {
     if (!executionResult?.modified_workflow) return;
-    navigator.clipboard.writeText(JSON.stringify(executionResult.modified_workflow, null, 2));
+    const text = JSON.stringify(executionResult.modified_workflow, null, 2);
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        throw new Error("Clipboard API not available");
+      }
+    } catch {
+      try {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-999999px";
+        textArea.style.top = "-999999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textArea);
+      } catch (err) {
+        console.error("Fallback copy failed:", err);
+      }
+    }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -212,23 +258,23 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
         </div>
       )}
 
-      {/* Standalone Asset Transfer Result Confirmation Box */}
+      {/* Standalone Asset Transfer & Workflow Staging Confirmation Box */}
       {transferResult && (
         <div className="p-4 rounded-xl bg-emerald-950/30 border-2 border-emerald-700/50 space-y-3 text-xs">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2 text-emerald-300 font-semibold">
               <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>Asset Staging Confirmed (Step A Completed)</span>
+              <span>Workflow &amp; Assets Staged Successfully (Manual Mode Ready)</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="font-mono text-[10px] bg-emerald-900/50 text-emerald-300 px-2 py-0.5 rounded border border-emerald-700/60 flex items-center gap-1">
                 <Check className="w-3 h-3 text-emerald-400" />
-                {transferResult.transferred_count ?? transferResult.transferred_files.filter(f => f.status === "transferred").length} New Uploaded
+                {transferResult.transferred_count ?? transferResult.transferred_files.filter(f => f.status === "transferred").length} Files Transferred
               </span>
-              {(transferResult.skipped_count ?? transferResult.transferred_files.filter(f => f.status === "skipped_existing").length) > 0 && (
-                <span className="font-mono text-[10px] bg-amber-900/50 text-amber-300 px-2 py-0.5 rounded border border-amber-700/60 flex items-center gap-1">
-                  <SkipForward className="w-3 h-3 text-amber-400" />
-                  {transferResult.skipped_count ?? transferResult.transferred_files.filter(f => f.status === "skipped_existing").length} Skipped (Already Remote)
+              {transferResult.remote_workflow_path && (
+                <span className="font-mono text-[10px] bg-indigo-900/50 text-indigo-300 px-2 py-0.5 rounded border border-indigo-700/60 flex items-center gap-1">
+                  <FileCode className="w-3 h-3 text-indigo-400" />
+                  Workflow Staged
                 </span>
               )}
             </div>
@@ -238,8 +284,8 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
             {transferResult.message}
           </p>
 
-          <div className="bg-zinc-950/70 p-3 rounded-lg border border-emerald-900/40 space-y-2">
-            <div className="flex items-center justify-between text-[11px] text-zinc-400">
+          <div className="bg-zinc-950/70 p-3 rounded-lg border border-emerald-900/40 space-y-2.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[11px] text-zinc-400">
               <span className="flex items-center gap-1.5">
                 <HardDrive className="w-3.5 h-3.5 text-emerald-400" />
                 Target Remote Input Dir:
@@ -247,23 +293,48 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
               <code className="text-emerald-300 font-mono font-medium">{transferResult.remote_dir}</code>
             </div>
 
+            {transferResult.remote_workflow_path && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[11px] text-zinc-400 border-t border-zinc-800/60 pt-2">
+                <span className="flex items-center gap-1.5">
+                  <FileCode className="w-3.5 h-3.5 text-indigo-400" />
+                  Remote Staged Workflow:
+                </span>
+                <code className="text-indigo-300 font-mono font-medium">{transferResult.remote_workflow_path}</code>
+              </div>
+            )}
+
+            {transferResult.save_video_prefix && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[11px] text-zinc-400 border-t border-zinc-800/60 pt-2">
+                <span className="flex items-center gap-1.5">
+                  <Film className="w-3.5 h-3.5 text-emerald-400" />
+                  SaveVideo Output Prefix:
+                </span>
+                <code className="text-emerald-300 font-mono font-semibold">{transferResult.save_video_prefix}#####.mp4</code>
+              </div>
+            )}
+
             {transferResult.transferred_files.length > 0 && (
               <div className="pt-2 border-t border-zinc-800/80 flex flex-wrap gap-2">
                 {transferResult.transferred_files.map((file, i) => {
                   const isSkipped = file.status === "skipped_existing";
                   const isMissing = file.status === "missing_locally";
+                  const isWf = file.filename.endsWith(".json");
                   return (
                     <span 
                       key={i} 
                       className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-mono border ${
-                        isSkipped 
+                        isWf
+                          ? "bg-indigo-950/40 text-indigo-300 border-indigo-800/60"
+                          : isSkipped 
                           ? "bg-amber-950/40 text-amber-300 border-amber-800/60" 
                           : isMissing
                           ? "bg-red-950/40 text-red-300 border-red-800/60"
                           : "bg-emerald-950/40 text-emerald-300 border-emerald-800/60"
                       }`}
                     >
-                      {isSkipped ? (
+                      {isWf ? (
+                        <FileCode className="w-3 h-3 text-indigo-400 shrink-0" />
+                      ) : isSkipped ? (
                         <SkipForward className="w-3 h-3 text-amber-400 shrink-0" />
                       ) : isMissing ? (
                         <AlertCircle className="w-3 h-3 text-red-400 shrink-0" />
@@ -272,7 +343,9 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
                       )}
                       <span>{file.filename}</span>
                       <span className="text-zinc-400 text-[10px]">
-                        {isSkipped 
+                        {isWf
+                          ? "(Staged Workflow JSON)"
+                          : isSkipped 
                           ? "(already present - skipped)" 
                           : isMissing 
                           ? "(missing locally)" 

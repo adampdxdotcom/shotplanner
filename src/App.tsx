@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from "react";
-import { AppConfig, MediaAsset, WorkflowItem, ParsedWorkflow, ToastMessage, GenerationParameters, ParameterNodeMappings } from "./types";
+import React, { useState, useEffect, useMemo } from "react";
+import { AppConfig, MediaAsset, WorkflowItem, ParsedWorkflow, ToastMessage, GenerationParameters, ParameterNodeMappings, LLMProvider, ScenePlanning } from "./types";
 import { Navbar } from "./components/Navbar";
 import { ConfigSection } from "./components/ConfigSection";
 import { WorkflowSection } from "./components/WorkflowSection";
 import { AssetManagerSection } from "./components/AssetManagerSection";
+import { generatePromptPrefix } from "./components/ScenePlanningHeader";
 import { LLMSection } from "./components/LLMSection";
 import { ExecutionSection } from "./components/ExecutionSection";
 import { CodeViewerModal } from "./components/CodeViewerModal";
@@ -79,9 +80,18 @@ export default function App() {
     }
   }, [assets]);
 
-  // 4. LLM Prompt Expansion State
+  // 4. LLM Prompt Expansion & Scene Planning State
+  const [scenePlanning, setScenePlanning] = useState<ScenePlanning>({
+    scene_name: "",
+    shot_number: "01",
+    shot_type: "Medium Shot (MS)",
+    camera_movement: "Locked Off (Static)"
+  });
+  const promptPrefix = useMemo(() => generatePromptPrefix(scenePlanning), [scenePlanning]);
+
   const [basicStub, setBasicStub] = useState<string>("");
   const [expandedPrompt, setExpandedPrompt] = useState<string>("");
+  const [llmProvider, setLlmProvider] = useState<LLMProvider>("lm_studio");
 
   // UI Navigation & Code Modal
   const [activeSection, setActiveSection] = useState<string>("assets");
@@ -110,7 +120,7 @@ export default function App() {
       return;
     }
     setIsDirty(true);
-  }, [config, selectedWorkflowFile, selectedPromptNodeId, nodeMappings, bypassMissing, basicStub, expandedPrompt, generationParams, parameterNodeMappings, subjects]);
+  }, [config, selectedWorkflowFile, selectedPromptNodeId, nodeMappings, bypassMissing, basicStub, expandedPrompt, generationParams, parameterNodeMappings, subjects, llmProvider, scenePlanning]);
 
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -147,8 +157,12 @@ export default function App() {
       bypassMissing,
       generationParams,
       parameterNodeMappings,
+      scenePlanning,
+      scene_planning: scenePlanning,
       basicStub,
       expandedPrompt,
+      llmProvider, // Save user's choice of LLM
+      llm_provider: llmProvider,
       assets, // Save media assets with the project
       subjects: consolidatedSubjects // Save global subjects registry
     };
@@ -223,8 +237,19 @@ export default function App() {
     if (data.parameterNodeMappings) {
       setParameterNodeMappings(data.parameterNodeMappings);
     }
+    if (data.scenePlanning || data.scene_planning) {
+      const loadedPlanning = data.scenePlanning || data.scene_planning;
+      setScenePlanning({
+        scene_name: loadedPlanning.scene_name || "",
+        shot_number: loadedPlanning.shot_number || "01",
+        shot_type: loadedPlanning.shot_type || "Medium Shot (MS)",
+        camera_movement: loadedPlanning.camera_movement || "Locked Off (Static)"
+      });
+    }
     setBasicStub(data.basicStub || "");
     setExpandedPrompt(data.expandedPrompt || "");
+    const loadedLlmProvider = data.llmProvider || data.llm_provider || data.llmChoice || data.providerChoice || "lm_studio";
+    setLlmProvider(loadedLlmProvider === "gemini" ? "gemini" : "lm_studio");
     setCurrentProjectName(filename.replace(/\.json$/, ""));
     
     await fetchWorkflows();
@@ -438,6 +463,8 @@ export default function App() {
           <AssetManagerSection
             assets={assets}
             subjects={subjects}
+            planning={scenePlanning}
+            onChangePlanning={setScenePlanning}
             onRegisterSubject={handleRegisterSubject}
             onAssetUploaded={handleAssetUploaded}
             onAssetDeleted={handleAssetDeleted}
@@ -472,9 +499,14 @@ export default function App() {
             onChangeBasicStub={setBasicStub}
             expandedPrompt={expandedPrompt}
             onChangeExpandedPrompt={setExpandedPrompt}
+            providerChoice={llmProvider}
+            onChangeProviderChoice={setLlmProvider}
+            promptPrefix={promptPrefix}
+            planning={scenePlanning}
             assets={assets}
             lmStudioUrl={config.lm_studio_url}
             geminiApiKey={config.gemini_api_key}
+            onShowToast={addToast}
           />
         )}
 
@@ -484,6 +516,8 @@ export default function App() {
             workflowFilename={selectedWorkflowFile}
             promptNodeId={selectedPromptNodeId}
             expandedPrompt={expandedPrompt}
+            promptPrefix={promptPrefix}
+            scenePlanning={scenePlanning}
             nodeMappings={nodeMappings}
             bypassMissing={bypassMissing}
             generationParams={generationParams}

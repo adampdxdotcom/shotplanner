@@ -122,30 +122,30 @@ export const Navbar: React.FC<NavbarProps> = ({ activeSection, onNavigate, onSav
           </button>
         </div>
         
-        {/* Toast Messages Area underneath buttons */}
+        {/* Toast Messages Floating Overlay */}
         {toasts.length > 0 && (
-          <div className="flex flex-col items-end gap-2 mt-1 w-full max-w-sm">
+          <div className="fixed top-16 right-4 z-50 flex flex-col items-end gap-2 max-w-sm w-full pointer-events-auto">
             {toasts.map((toast) => (
               <div 
                 key={toast.id}
-                className={`flex items-start gap-2 w-full p-2.5 rounded-lg border shadow-sm transition-all ${
-                  toast.type === "success" ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" :
-                  toast.type === "error" ? "bg-red-500/10 border-red-500/20 text-red-400" :
-                  "bg-blue-500/10 border-blue-500/20 text-blue-400"
+                className={`flex items-start gap-2.5 w-full p-3 rounded-xl border shadow-xl backdrop-blur-md transition-all animate-in slide-in-from-top-2 duration-200 ${
+                  toast.type === "success" ? "bg-zinc-900/95 border-emerald-500/50 text-emerald-300 shadow-emerald-950/40" :
+                  toast.type === "error" ? "bg-zinc-900/95 border-red-500/50 text-red-300 shadow-red-950/40" :
+                  "bg-zinc-900/95 border-indigo-500/50 text-indigo-300 shadow-indigo-950/40"
                 }`}
               >
                 <div className="mt-0.5 shrink-0">
-                  {toast.type === "success" && <CheckCircle2 className="w-4 h-4" />}
-                  {toast.type === "error" && <AlertCircle className="w-4 h-4" />}
-                  {toast.type === "info" && <Info className="w-4 h-4" />}
+                  {toast.type === "success" && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
+                  {toast.type === "error" && <AlertCircle className="w-4 h-4 text-red-400" />}
+                  {toast.type === "info" && <Info className="w-4 h-4 text-indigo-400" />}
                 </div>
-                <p className="text-xs flex-1 leading-relaxed break-words">{toast.text}</p>
+                <p className="text-xs font-medium flex-1 leading-relaxed break-words text-zinc-100">{toast.text}</p>
                 {onDismissToast && (
                   <button 
                     onClick={() => onDismissToast(toast.id)}
-                    className="shrink-0 p-0.5 hover:bg-black/20 rounded transition-colors"
+                    className="shrink-0 p-1 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 rounded-lg transition-colors cursor-pointer"
                   >
-                    <X className="w-3.5 h-3.5 opacity-70 hover:opacity-100" />
+                    <X className="w-3.5 h-3.5" />
                   </button>
                 )}
               </div>

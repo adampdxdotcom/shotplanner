@@ -6,6 +6,42 @@ from pathlib import Path
 from typing import List, Dict, Any, Callable, Optional
 
 
+# Standard 1x1 transparent pixel PNG bytes
+EMPTY_1X1_PNG_BYTES = (
+    b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+    b"\x08\x06\x00\x00\x00\x1f\x15c4\x00\x00\x00\rIDATx\x9cc`\x00\x00\x00"
+    b"\x02\x00\x01H\xaf\xa4q\x00\x00\x00\x00IEND\xaeB`\x82"
+)
+
+
+def ensure_remote_empty_png(sftp_client: paramiko.SFTPClient, remote_dir: str) -> bool:
+    """
+    Ensure remote input directory contains default 1x1 transparent pixel empty.png
+    for safe loader node bypass. Uploads only if not already present.
+    """
+    clean_dir = remote_dir.rstrip("/")
+    remote_empty = f"{clean_dir}/empty.png"
+    try:
+        sftp_client.stat(remote_empty)
+        return True # already exists
+    except Exception:
+        pass
+
+    try:
+        # Check local assets/uploads/empty.png first
+        base_dir = Path(__file__).resolve().parent.parent.parent
+        local_empty = base_dir / "assets" / "uploads" / "empty.png"
+        if local_empty.exists():
+            sftp_client.put(str(local_empty), remote_empty)
+        else:
+            with sftp_client.file(remote_empty, "wb") as remote_file:
+                remote_file.write(EMPTY_1X1_PNG_BYTES)
+        return True
+    except Exception as e:
+        print(f"Warning: Could not auto-upload empty.png to remote directory: {e}")
+        return False
+
+
 def load_private_key(key_string: str, passphrase: Optional[str] = None):
     """
     Robust private key loader supporting Ed25519, RSA, and ECDSA keys.
@@ -98,16 +134,36 @@ class RunPodSSHService:
         return client
 
     def test_connection(self, remote_dir: str = "/workspace/runpod-slim/ComfyUI/input") -> Dict[str, Any]:
-        """Verify SSH credentials and ensure remote input directory exists."""
+        """
+        Verify SSH credentials, ensure remote input directory exists,
+        and auto-upload default empty.png (1x1 transparent pixel) if not present.
+        """
         try:
             client = self.connect()
-            stdin, stdout, stderr = client.exec_command(f"mkdir -p {remote_dir} && ls -la {remote_dir}")
+            clean_remote_dir = remote_dir.rstrip("/")
+            client.exec_command(f"mkdir -p {clean_remote_dir}")
+
+            # Automatic Input Validation Check: Ensure empty.png exists remotely
+            sftp = client.open_sftp()
+            empty_png_staged = False
+            try:
+                ensure_remote_empty_png(sftp, clean_remote_dir)
+                empty_png_staged = True
+            except Exception as e:
+                print(f"empty.png sync check notice: {e}")
+            finally:
+                sftp.close()
+
+            stdin, stdout, stderr = client.exec_command(f"ls -la {clean_remote_dir}")
             output = stdout.read().decode("utf-8")
             client.close()
+
+            empty_msg = " [empty.png bypass placeholder verified]" if empty_png_staged else ""
             return {
                 "success": True,
-                "message": f"Connected to {self.username}@{self.host}:{self.port} successfully via publickey auth. Remote input directory '{remote_dir}' is verified.",
-                "output": output
+                "message": f"Connected to {self.username}@{self.host}:{self.port} successfully via publickey auth. Remote input directory '{clean_remote_dir}' is verified{empty_msg}.",
+                "output": output,
+                "empty_png_staged": empty_png_staged
             }
         except paramiko.AuthenticationException as e:
             return {
@@ -130,6 +186,7 @@ class RunPodSSHService:
         """
         Step A: Push all mapped media assets sequentially to RunPod remote input directory via SFTP.
         Performs remote existence check (sftp.stat) to skip files that already exist unless overwrite=True.
+        Also guarantees default empty.png (1x1 transparent pixel) is staged for unmapped loader node bypass.
         """
         results = []
         uploaded_files = []
@@ -144,6 +201,9 @@ class RunPodSSHService:
 
             sftp = client.open_sftp()
             try:
+                # Automatic input validation: ensure empty.png is present in remote input/ folder
+                ensure_remote_empty_png(sftp, clean_remote_dir)
+
                 for file_path in local_files:
                     filename = file_path.name
                     if not file_path.exists():
