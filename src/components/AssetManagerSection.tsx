@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { MediaAsset, AssetType, ScenePlanning, SceneProjectFile, ShotItem } from "../types";
+import { getAssetMediaUrl } from "../utils/assetUrl";
 import { SubjectCombobox } from "./SubjectCombobox";
 import { ScenePlanningHeader } from "./ScenePlanningHeader";
 import { 
@@ -115,7 +116,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
     const isImage = asset.media_type === "image" || (!asset.media_type && !/\.(mp3|wav|ogg|m4a|mp4|mov|webm)$/i.test(asset.filename)) || /\.(png|jpe?g|webp|gif|svg|avif|bmp)$/i.test(asset.filename);
     const isAudio = asset.media_type === "audio" || /\.(mp3|wav|ogg|m4a|flac)$/i.test(asset.filename);
     const isVideo = asset.media_type === "video" || /\.(mp4|mov|webm|mkv)$/i.test(asset.filename);
-    const imageSrc = asset.preview_url?.startsWith("/api/assets/file/") ? asset.preview_url : `/api/assets/file/${encodeURIComponent(asset.filename)}`;
+    const imageSrc = getAssetMediaUrl(asset);
 
     return (
       <div 
@@ -160,14 +161,6 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
               src={imageSrc} 
               alt={asset.subject_name} 
               className="w-full h-full object-cover" 
-              onError={(e) => {
-                const target = e.currentTarget;
-                if (!target.src.includes("/api/uploads/")) {
-                  target.src = `/api/uploads/${encodeURIComponent(asset.filename)}`;
-                } else if (!target.src.includes("/uploads/")) {
-                  target.src = `/uploads/${encodeURIComponent(asset.filename)}`;
-                }
-              }}
             />
             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
               <Maximize className="w-6 h-6 text-white" />
@@ -886,17 +879,9 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
                     {(editingAsset.media_type === "image" || !editingAsset.media_type || /\.(png|jpe?g|webp|gif|svg|avif|bmp)$/i.test(editingAsset.filename)) ? (
                       <div className="relative w-full h-44 bg-zinc-950/80 flex items-center justify-center overflow-hidden">
                         <img
-                          src={editingAsset.preview_url?.startsWith("/api/assets/file/") ? editingAsset.preview_url : `/api/assets/file/${encodeURIComponent(editingAsset.filename)}`}
+                          src={getAssetMediaUrl(editingAsset)}
                           alt={editingAsset.subject_name}
                           className="w-full h-full object-contain"
-                          onError={(e) => {
-                            const target = e.currentTarget;
-                            if (!target.src.includes("/api/uploads/")) {
-                              target.src = `/api/uploads/${encodeURIComponent(editingAsset.filename)}`;
-                            } else if (!target.src.includes("/uploads/")) {
-                              target.src = `/uploads/${encodeURIComponent(editingAsset.filename)}`;
-                            }
-                          }}
                         />
                       </div>
                     ) : editingAsset.media_type === "audio" || /\.(mp3|wav|ogg|m4a|flac)$/i.test(editingAsset.filename) ? (
@@ -904,7 +889,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
                         <Music className="w-8 h-8 text-amber-400" />
                         <audio 
                           controls 
-                          src={editingAsset.preview_url?.startsWith("/api/assets/file/") ? editingAsset.preview_url : `/api/assets/file/${encodeURIComponent(editingAsset.filename)}`}
+                          src={getAssetMediaUrl(editingAsset)}
                           className="w-full max-w-xs h-8 mt-1" 
                         />
                       </div>
@@ -912,7 +897,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
                       <div className="relative w-full h-44 bg-zinc-950/80 flex items-center justify-center overflow-hidden">
                         <video 
                           controls
-                          src={editingAsset.preview_url?.startsWith("/api/assets/file/") ? editingAsset.preview_url : `/api/assets/file/${encodeURIComponent(editingAsset.filename)}`}
+                          src={getAssetMediaUrl(editingAsset)}
                           className="w-full h-full object-contain"
                         />
                       </div>
@@ -1096,18 +1081,10 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
             </button>
             {(lightboxAsset.media_type === "image" || !lightboxAsset.media_type || /\.(png|jpe?g|webp|gif|svg|avif|bmp)$/i.test(lightboxAsset.filename)) && (
               <img 
-                src={lightboxAsset.preview_url?.startsWith("/api/assets/file/") ? lightboxAsset.preview_url : `/api/assets/file/${encodeURIComponent(lightboxAsset.filename)}`} 
+                src={getAssetMediaUrl(lightboxAsset)} 
                 alt={lightboxAsset.subject_name} 
                 className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl border border-white/10"
                 onClick={(e) => e.stopPropagation()}
-                onError={(e) => {
-                  const target = e.currentTarget;
-                  if (!target.src.includes("/api/uploads/")) {
-                    target.src = `/api/uploads/${encodeURIComponent(lightboxAsset.filename)}`;
-                  } else if (!target.src.includes("/uploads/")) {
-                    target.src = `/uploads/${encodeURIComponent(lightboxAsset.filename)}`;
-                  }
-                }}
               />
             )}
             <div 

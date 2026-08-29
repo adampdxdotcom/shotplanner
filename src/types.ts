@@ -278,3 +278,5 @@ export interface TransferResult {
   error?: string;
 }
 
+export { getAssetMediaUrl } from "./utils/assetUrl";
+

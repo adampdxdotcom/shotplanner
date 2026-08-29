@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { WorkflowItem, ParsedWorkflow, MediaAsset, GenerationParameters, ParameterNodeMappings } from "../types";
+import { getAssetMediaUrl } from "../utils/assetUrl";
 import { GenerationParametersSection } from "./GenerationParametersSection";
 import { 
   Workflow, 
@@ -350,17 +351,9 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
                       <ArrowRight className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
                       {mappedAsset && (
                         <img 
-                          src={mappedAsset.preview_url?.startsWith("/api/assets/file/") ? mappedAsset.preview_url : `/api/assets/file/${encodeURIComponent(mappedAsset.filename)}`} 
+                          src={getAssetMediaUrl(mappedAsset)} 
                           alt={mappedAsset.subject_name} 
                           className="w-7 h-7 rounded object-cover border border-zinc-700 shrink-0" 
-                          onError={(e) => {
-                            const target = e.currentTarget;
-                            if (!target.src.includes("/api/uploads/")) {
-                              target.src = `/api/uploads/${encodeURIComponent(mappedAsset.filename)}`;
-                            } else if (!target.src.includes("/uploads/")) {
-                              target.src = `/uploads/${encodeURIComponent(mappedAsset.filename)}`;
-                            }
-                          }}
                         />
                       )}
                       <select

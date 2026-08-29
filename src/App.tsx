@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { AppConfig, MediaAsset, WorkflowItem, ParsedWorkflow, ToastMessage, GenerationParameters, ParameterNodeMappings, LLMProvider, ScenePlanning } from "./types";
+import { getAssetMediaUrl } from "./utils/assetUrl";
 import { Navbar } from "./components/Navbar";
 import { ConfigSection } from "./components/ConfigSection";
 import { WorkflowSection } from "./components/WorkflowSection";
@@ -447,7 +448,7 @@ export default function App() {
         ...a,
         slot_index: a.slot_index !== undefined ? a.slot_index : idx,
         media_type: a.media_type || (/\.(mp3|wav|ogg|m4a|flac)$/i.test(a.filename) ? "audio" : /\.(mp4|mov|webm|mkv)$/i.test(a.filename) ? "video" : "image"),
-        preview_url: `/api/assets/file/${a.filename}`
+        preview_url: getAssetMediaUrl(a.filename)
       }));
       setAssets(normalizedAssets);
       try {
@@ -536,7 +537,7 @@ export default function App() {
           ...a,
           slot_index: a.slot_index !== undefined ? a.slot_index : idx,
           media_type: a.media_type || (/\.(mp3|wav|ogg|m4a|flac)$/i.test(a.filename) ? "audio" : /\.(mp4|mov|webm|mkv)$/i.test(a.filename) ? "video" : "image"),
-          preview_url: `/api/assets/file/${a.filename}`
+          preview_url: getAssetMediaUrl(a.filename)
         })));
       }
     } catch (e) {

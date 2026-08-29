@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { SceneProjectFile, ShotItem, MediaAsset, AppConfig, ToastMessage } from "../types";
 import { generateSaveVideoPrefix } from "../types";
+import { getAssetMediaUrl } from "../utils/assetUrl";
 import { X, Copy, Trash2, Plus, ChevronLeft, ChevronRight, UploadCloud } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -107,20 +108,6 @@ export default function SceneProjectHub({
     }
   };
 
-  const getPreviewUrl = (assetOrFilename: MediaAsset | string | null | undefined): string => {
-    if (!assetOrFilename) return "";
-    
-    // If it's already an asset object with a valid preview URL that uses our endpoints
-    if (typeof assetOrFilename === "object" && assetOrFilename.preview_url?.startsWith("/api/assets/file/")) {
-        return assetOrFilename.preview_url;
-    }
-
-    const filename = typeof assetOrFilename === "string" ? assetOrFilename : assetOrFilename.filename;
-    if (!filename) return "";
-    
-    return `/api/assets/file/${encodeURIComponent(filename)}`;
-  };
-
   const getAssetFilenameForSlot = (slotIndex: number) => {
     // 1. Check shot-level overrides first
     return activeShot?.assigned_slots[slotIndex] || activeShot?.assigned_slots[slotIndex + 1] || project.shared_assets.find(a => a.slot_index === slotIndex)?.filename || "";
@@ -134,12 +121,12 @@ export default function SceneProjectHub({
        // Look up the full asset by filename
        const matchedAsset = assets.find(a => a.filename === shotFilenameOverride || a.name === shotFilenameOverride);
        if (matchedAsset) {
-           return { ...matchedAsset, preview_url: getPreviewUrl(matchedAsset) };
+           return { ...matchedAsset, preview_url: getAssetMediaUrl(matchedAsset) };
        }
        // Fallback for missing asset metadata but assigned filename
        return {
          filename: shotFilenameOverride,
-         preview_url: getPreviewUrl(shotFilenameOverride),
+         preview_url: getAssetMediaUrl(shotFilenameOverride),
          label: `Slot ${slotIndex + 1}`
        } as any;
     }
@@ -147,7 +134,7 @@ export default function SceneProjectHub({
     // 2. If no shot override, check the project shared library for an asset inherently assigned to this slot index
     const libraryAsset = assets.find(a => a.slot_index === slotIndex);
     if (libraryAsset) {
-        return { ...libraryAsset, preview_url: getPreviewUrl(libraryAsset) };
+        return { ...libraryAsset, preview_url: getAssetMediaUrl(libraryAsset) };
     }
 
     return null;
@@ -186,7 +173,7 @@ export default function SceneProjectHub({
           if (imageAsset) filename = imageAsset.filename;
       }
 
-      return getPreviewUrl(filename);
+      return getAssetMediaUrl(filename);
   };
 
   const handleClearSlot = (slotIndex: number) => {

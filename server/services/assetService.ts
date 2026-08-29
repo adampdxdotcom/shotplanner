@@ -35,7 +35,7 @@ class AssetService {
       .sort((a, b) => (a.slot_index ?? 0) - (b.slot_index ?? 0))
       .map((a) => ({
         ...a,
-        preview_url: `/api/assets/file/${a.filename}`
+        preview_url: `/api/uploads/${a.filename}`
       }));
   }
 
@@ -83,7 +83,7 @@ class AssetService {
       this.assetDatabase = assets.map((item: any, idx: number) => ({
         ...item,
         slot_index: item.slot_index !== undefined ? item.slot_index : idx,
-        preview_url: `/api/assets/file/${item.filename}`
+        preview_url: `/api/uploads/${item.filename}`
       }));
       this.saveAssetDatabase();
     }
@@ -183,7 +183,7 @@ class AssetService {
       description,
       size_bytes: file.size,
       created_at: Date.now(),
-      preview_url: `/api/assets/file/${targetFilename}`,
+      preview_url: `/api/uploads/${targetFilename}`,
       slot_index: parsedSlotIndex
     };
 
@@ -284,7 +284,7 @@ class AssetService {
           description: description || "",
           size_bytes: stats.size,
           created_at: Date.now(),
-          preview_url: `/api/assets/file/${targetFilename}`,
+          preview_url: `/api/uploads/${targetFilename}`,
           slot_index: parsedSlotIndex
         };
 
