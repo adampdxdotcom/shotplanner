@@ -178,6 +178,28 @@ app.put("/api/assets/:filename", express.json(), (req: Request, res: Response) =
   res.json({ success: true, asset });
 });
 
+// Sync project assets with server database
+app.post("/api/assets/sync", express.json(), (req: Request, res: Response) => {
+  try {
+    const { assets } = req.body;
+    if (Array.isArray(assets)) {
+      for (const item of assets) {
+        if (!item || !item.filename) continue;
+        const idx = assetDatabase.findIndex(a => a.filename === item.filename);
+        if (idx !== -1) {
+          assetDatabase[idx] = { ...assetDatabase[idx], ...item };
+        } else {
+          assetDatabase.unshift(item);
+        }
+      }
+      saveAssetDatabase();
+    }
+    res.json({ success: true, assets: assetDatabase });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Projects API
 app.get("/api/projects", (req: Request, res: Response) => {
   if (!fs.existsSync(PROJECTS_DIR)) return res.json({ projects: [] });
@@ -190,7 +212,23 @@ app.post("/api/projects", (req: Request, res: Response) => {
     const rawName = req.body.name || req.body.filename;
     if (!rawName) return res.status(400).json({ error: "Project name is required" });
     const name = String(rawName).replace(/\.json$/, "");
-    fs.writeFileSync(path.join(PROJECTS_DIR, `${name}.json`), JSON.stringify(req.body.data, null, 2));
+    const projectData = req.body.data;
+    fs.writeFileSync(path.join(PROJECTS_DIR, `${name}.json`), JSON.stringify(projectData, null, 2));
+
+    // If project payload includes assets, sync them into assetDatabase
+    if (projectData && Array.isArray(projectData.assets)) {
+      for (const item of projectData.assets) {
+        if (!item || !item.filename) continue;
+        const idx = assetDatabase.findIndex(a => a.filename === item.filename);
+        if (idx !== -1) {
+          assetDatabase[idx] = { ...assetDatabase[idx], ...item };
+        } else {
+          assetDatabase.unshift(item);
+        }
+      }
+      saveAssetDatabase();
+    }
+
     res.json({ success: true, filename: name });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -202,7 +240,21 @@ app.get("/api/projects/:filename", (req: Request, res: Response) => {
     const rawName = req.params.filename.replace(/\.json$/, "");
     const p = path.join(PROJECTS_DIR, `${rawName}.json`);
     if (fs.existsSync(p)) {
-      res.json(JSON.parse(fs.readFileSync(p, "utf-8")));
+      const projectData = JSON.parse(fs.readFileSync(p, "utf-8"));
+      // Sync any saved assets into assetDatabase
+      if (Array.isArray(projectData.assets)) {
+        for (const item of projectData.assets) {
+          if (!item || !item.filename) continue;
+          const idx = assetDatabase.findIndex(a => a.filename === item.filename);
+          if (idx !== -1) {
+            assetDatabase[idx] = { ...assetDatabase[idx], ...item };
+          } else {
+            assetDatabase.unshift(item);
+          }
+        }
+        saveAssetDatabase();
+      }
+      res.json(projectData);
     } else {
       res.status(404).json({ error: `Project '${rawName}' not found` });
     }
@@ -249,8 +301,23 @@ app.get("/api/projects/:filename/export", async (req: Request, res: Response) =>
       }
     }
 
-    // 3. Add mapped assets
+    // 3. Add all project media assets
     const addedFiles = new Set<string>();
+
+    // From projectData.assets
+    if (Array.isArray(projectData.assets)) {
+      for (const asset of projectData.assets) {
+        if (asset && asset.filename && !addedFiles.has(asset.filename)) {
+          const assetPath = path.join(UPLOADS_DIR, asset.filename);
+          if (fs.existsSync(assetPath)) {
+            archive.file(assetPath, { name: `uploads/${asset.filename}` });
+            addedFiles.add(asset.filename);
+          }
+        }
+      }
+    }
+
+    // From projectData.nodeMappings
     if (projectData.nodeMappings) {
       for (const assetFile of Object.values(projectData.nodeMappings)) {
         if (assetFile && typeof assetFile === "string" && !addedFiles.has(assetFile)) {
@@ -263,11 +330,23 @@ app.get("/api/projects/:filename/export", async (req: Request, res: Response) =>
       }
     }
 
+    // If no specific assets found in project, include all current uploaded media in database
+    if (addedFiles.size === 0 && assetDatabase.length > 0) {
+      for (const asset of assetDatabase) {
+        if (asset && asset.filename && !addedFiles.has(asset.filename)) {
+          const assetPath = path.join(UPLOADS_DIR, asset.filename);
+          if (fs.existsSync(assetPath)) {
+            archive.file(assetPath, { name: `uploads/${asset.filename}` });
+            addedFiles.add(asset.filename);
+          }
+        }
+      }
+    }
+
     // Include asset metadata database for portability
     const relevantAssets = assetDatabase.filter(a => addedFiles.has(a.filename));
-    if (relevantAssets.length > 0) {
-      archive.append(JSON.stringify(relevantAssets, null, 2), { name: "assets_db.json" });
-    }
+    const finalAssetsDb = relevantAssets.length > 0 ? relevantAssets : (projectData.assets || assetDatabase);
+    archive.append(JSON.stringify(finalAssetsDb, null, 2), { name: "assets_db.json" });
 
     await archive.finalize();
   } catch (err: any) {
@@ -302,8 +381,12 @@ app.post("/api/projects/import", upload.single("file"), async (req: Request, res
         try {
           const importedDb: AssetRecord[] = JSON.parse(buffer.toString("utf-8"));
           for (const item of importedDb) {
-            const exists = assetDatabase.some(a => a.filename === item.filename);
-            if (!exists) assetDatabase.unshift(item);
+            const idx = assetDatabase.findIndex(a => a.filename === item.filename);
+            if (idx !== -1) {
+              assetDatabase[idx] = { ...assetDatabase[idx], ...item };
+            } else {
+              assetDatabase.unshift(item);
+            }
           }
           saveAssetDatabase();
         } catch (e) {}
@@ -311,6 +394,21 @@ app.post("/api/projects/import", upload.single("file"), async (req: Request, res
         const fname = path.basename(file.path);
         fs.writeFileSync(path.join(PROJECTS_DIR, fname), buffer);
         importedProject = fname.replace(/\.json$/, "");
+        try {
+          const pData = JSON.parse(buffer.toString("utf-8"));
+          if (Array.isArray(pData.assets)) {
+            for (const item of pData.assets) {
+              if (!item || !item.filename) continue;
+              const idx = assetDatabase.findIndex(a => a.filename === item.filename);
+              if (idx !== -1) {
+                assetDatabase[idx] = { ...assetDatabase[idx], ...item };
+              } else {
+                assetDatabase.unshift(item);
+              }
+            }
+            saveAssetDatabase();
+          }
+        } catch (e) {}
       }
     }
 
@@ -810,8 +908,10 @@ app.post("/api/execute", async (req: Request, res: Response) => {
 });
 
 // Serve user uploaded media statically
+app.use("/assets/uploads", express.static(UPLOADS_DIR));
 app.use("/uploads", express.static(UPLOADS_DIR));
 app.use("/api/uploads", express.static(UPLOADS_DIR));
+app.use("/assets", express.static(ASSETS_DIR));
 app.use("/user_assets", express.static(ASSETS_DIR));
 
 // Setup Vite middleware

@@ -88,12 +88,22 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
         </div>
       </div>
 
-      {asset.media_type === "image" && asset.preview_url && (
+      {asset.media_type === "image" && (
         <div 
           className="relative w-full aspect-square bg-zinc-900 rounded-lg overflow-hidden cursor-pointer group/img border border-zinc-800"
           onClick={() => setLightboxAsset(asset)}
         >
-          <img src={asset.preview_url} alt={asset.subject_name} className="w-full h-full object-cover" />
+          <img 
+            src={asset.preview_url || `/assets/uploads/${asset.filename}`} 
+            alt={asset.subject_name} 
+            className="w-full h-full object-cover" 
+            onError={(e) => {
+              const target = e.currentTarget;
+              if (!target.src.includes("/uploads/")) {
+                target.src = `/uploads/${asset.filename}`;
+              }
+            }}
+          />
           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
             <Maximize className="w-6 h-6 text-white" />
           </div>
@@ -677,12 +687,18 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
             >
               <X className="w-6 h-6" />
             </button>
-            {lightboxAsset.media_type === "image" && lightboxAsset.preview_url && (
+            {lightboxAsset.media_type === "image" && (
               <img 
-                src={lightboxAsset.preview_url} 
+                src={lightboxAsset.preview_url || `/assets/uploads/${lightboxAsset.filename}`} 
                 alt={lightboxAsset.subject_name} 
                 className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl border border-white/10"
                 onClick={(e) => e.stopPropagation()}
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  if (!target.src.includes("/uploads/")) {
+                    target.src = `/uploads/${lightboxAsset.filename}`;
+                  }
+                }}
               />
             )}
             <div 

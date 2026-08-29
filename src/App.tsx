@@ -86,7 +86,8 @@ export default function App() {
       nodeMappings,
       bypassMissing,
       basicStub,
-      expandedPrompt
+      expandedPrompt,
+      assets // Save media assets with the project
     };
     
     const res = await fetch("/api/projects", {
@@ -100,9 +101,9 @@ export default function App() {
       throw new Error(err.error || "Failed to save project.");
     }
     
-    setCurrentProjectName(filename.replace(".json", ""));
+    setCurrentProjectName(filename.replace(/\.json$/, ""));
     setIsDirty(false);
-    addToast(`Project "${filename}" saved successfully.`, "success");
+    addToast(`Project "${filename}" saved successfully with ${assets.length} image asset(s).`, "success");
   };
 
   const handleLoadProject = async (filename: string) => {
@@ -112,6 +113,22 @@ export default function App() {
       throw new Error(err.error || "Failed to load project.");
     }
     const data = await res.json();
+
+    // 1. Sync & set saved assets if present
+    if (Array.isArray(data.assets) && data.assets.length > 0) {
+      setAssets(data.assets);
+      try {
+        await fetch("/api/assets/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ assets: data.assets })
+        });
+      } catch (e) {
+        console.error("Failed to sync project assets", e);
+      }
+    } else {
+      await fetchAssets();
+    }
     
     setConfig(data.config || config);
     setSelectedWorkflowFile(data.selectedWorkflowFile || "");
@@ -120,13 +137,13 @@ export default function App() {
     setBypassMissing(data.bypassMissing ?? true);
     setBasicStub(data.basicStub || "");
     setExpandedPrompt(data.expandedPrompt || "");
-    setCurrentProjectName(filename.replace(".json", ""));
+    setCurrentProjectName(filename.replace(/\.json$/, ""));
     
     await fetchWorkflows();
-    await fetchAssets();
     
     setTimeout(() => setIsDirty(false), 100);
-    addToast(`Project "${filename}" loaded successfully.`, "success");
+    const assetCount = Array.isArray(data.assets) ? data.assets.length : 0;
+    addToast(`Project "${filename}" loaded successfully (${assetCount} image assets restored).`, "success");
   };
 
   // Fetch workflows and assets on initial mount
@@ -177,25 +194,28 @@ export default function App() {
         if (res.ok && data.nodes_info) {
           setParsedWorkflow(data);
 
-          // Auto-select primary prompt node
-          if (data.nodes_info.prompt_nodes?.length > 0) {
-            setSelectedPromptNodeId(data.nodes_info.prompt_nodes[0].id);
-          } else {
-            setSelectedPromptNodeId("");
-          }
+          // Preserve selected prompt node ID if valid, otherwise select default
+          setSelectedPromptNodeId(prev => {
+            if (prev && data.nodes_info.prompt_nodes?.some((p: any) => p.id === prev)) {
+              return prev;
+            }
+            return data.nodes_info.prompt_nodes?.[0]?.id || prev || "";
+          });
 
-          // Initialize clean node mapping
-          const initialMappings: Record<string, string> = {};
-          data.nodes_info.image_loader_nodes?.forEach((n: any) => {
-            initialMappings[n.id] = "";
+          // Preserve existing node mappings for the parsed loader nodes
+          setNodeMappings(prev => {
+            const nextMappings: Record<string, string> = {};
+            data.nodes_info.image_loader_nodes?.forEach((n: any) => {
+              nextMappings[n.id] = prev[n.id] || "";
+            });
+            data.nodes_info.video_loader_nodes?.forEach((n: any) => {
+              nextMappings[n.id] = prev[n.id] || "";
+            });
+            data.nodes_info.audio_loader_nodes?.forEach((n: any) => {
+              nextMappings[n.id] = prev[n.id] || "";
+            });
+            return nextMappings;
           });
-          data.nodes_info.video_loader_nodes?.forEach((n: any) => {
-            initialMappings[n.id] = "";
-          });
-          data.nodes_info.audio_loader_nodes?.forEach((n: any) => {
-            initialMappings[n.id] = "";
-          });
-          setNodeMappings(initialMappings);
         }
       } catch (err) {
         console.error("Failed to parse workflow", err);
