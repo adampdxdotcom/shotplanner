@@ -60,6 +60,7 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
           ssh_username: config.ssh_username,
           ssh_password: config.ssh_password,
           ssh_key_path: config.ssh_key_path,
+          ssh_private_key: config.ssh_private_key,
           comfyui_api_url: config.comfyui_api_url,
           runpod_api_token: config.runpod_api_token,
           workflow_filename: workflowFilename,

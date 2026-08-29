@@ -10,6 +10,7 @@ export interface AppConfig {
   ssh_username: string;
   ssh_password: string;
   ssh_key_path: string;
+  ssh_private_key?: string;
   comfyui_api_url: string;
   runpod_api_token: string;
   lm_studio_url: string;

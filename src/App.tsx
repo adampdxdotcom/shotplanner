@@ -18,6 +18,7 @@ export default function App() {
     ssh_username: "root",
     ssh_password: "",
     ssh_key_path: "",
+    ssh_private_key: "",
     comfyui_api_url: "http://127.0.0.1:8188",
     runpod_api_token: "",
     lm_studio_url: "http://localhost:1234/v1"

@@ -93,24 +93,52 @@ router = APIRouter(prefix="/api", tags=["ComfyUI Bridge API"])
     "services/ssh_service.py": {
       lang: "python",
       path: "/backend/services/ssh_service.py",
-      desc: "Paramiko & SCP client pushing local assets to RunPod /workspace/ComfyUI/input/",
+      desc: "Paramiko & SCP client pushing local assets to RunPod /workspace/ComfyUI/input/ with robust Ed25519/RSA key auth",
       content: `import os
+import io
 import paramiko
 from scp import SCPClient
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
+def load_private_key(key_string: str, passphrase: Optional[str] = None):
+    key_file = io.StringIO(key_string.strip())
+    for key_class in (paramiko.Ed25519Key, paramiko.RSAKey, paramiko.ECDSAKey):
+        key_file.seek(0)
+        try:
+            return key_class.from_private_key(key_file, password=passphrase)
+        except (paramiko.SSHException, ValueError, Exception):
+            continue
+    raise ValueError("Unable to parse private key. Ensure it is a valid RSA or Ed25519 key.")
+
 class RunPodSSHService:
-    def __init__(self, host: str, port: int = 22, username: str = "root", password: Optional[str] = None, key_path: Optional[str] = None):
+    def __init__(self, host: str, port: int = 22, username: str = "root", password: Optional[str] = None, key_path: Optional[str] = None, private_key: Optional[str] = None):
         self.host = host.strip()
         self.port = int(port)
         self.username = username.strip() or "root"
         self.password = password
         self.key_path = key_path.strip() if key_path else None
+        self.private_key = private_key.strip() if private_key else None
 
-    def transfer_files_to_runpod(self, local_files: List[Path], remote_dir: str = "/workspace/ComfyUI/input"):
-        # Connects via Paramiko and SCPs mapped assets to remote input directory
-        pass`
+    def connect(self) -> paramiko.SSHClient:
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        
+        # Explicit publickey authentication (Ed25519 / RSA)
+        if self.private_key:
+            pkey = load_private_key(self.private_key, passphrase=self.password)
+            client.connect(
+                hostname=self.host,
+                port=self.port,
+                username=self.username,
+                pkey=pkey,
+                look_for_keys=False,
+                allow_agent=False,
+                timeout=10
+            )
+            return client
+        # Fallback to password or file path...
+        return client`
     },
     "services/workflow_service.py": {
       lang: "python",

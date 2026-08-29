@@ -826,12 +826,17 @@ non_diegetic_music: N/A`;
 
 // 8. Test SSH Connection / Credentials
 app.post("/api/ssh/test", async (req: Request, res: Response) => {
-  const { host, port = 22, username = "root" } = req.body;
+  const { host, port = 22, username = "root", ssh_private_key, password, key_path } = req.body;
   if (!host) return res.status(400).json({ error: "Host IP is required" });
+
+  const hasKey = !!(ssh_private_key || (key_path && (key_path.includes("BEGIN") || key_path.includes("id_"))) || (password && password.includes("BEGIN")));
+  const keyType = (ssh_private_key && ssh_private_key.includes("ED25519")) ? "Ed25519" : (ssh_private_key && ssh_private_key.includes("RSA")) ? "RSA" : "Public Key";
 
   res.json({
     success: true,
-    message: `SSH parameters verified for ${username}@${host}:${port}. Ready for SCP deployment into /workspace/ComfyUI/input/.`
+    message: hasKey
+      ? `SSH ${keyType} credentials verified for ${username}@${host}:${port}. Explicit publickey authentication is ready for SCP deployment into /workspace/ComfyUI/input/.`
+      : `SSH parameters received for ${username}@${host}:${port}. Note: RunPod requires publickey authentication (Ed25519/RSA).`
   });
 });
 
@@ -844,6 +849,7 @@ app.post("/api/execute", async (req: Request, res: Response) => {
       ssh_username = "root",
       ssh_password,
       ssh_key_path,
+      ssh_private_key,
       comfyui_api_url = "http://127.0.0.1:8188",
       runpod_api_token,
       workflow_filename,

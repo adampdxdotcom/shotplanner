@@ -37,6 +37,7 @@ class SSHTestRequest(BaseModel):
     username: str = "root"
     password: Optional[str] = None
     key_path: Optional[str] = None
+    ssh_private_key: Optional[str] = None
 
 class ExecuteWorkflowRequest(BaseModel):
     # Remote RunPod & SSH Config
@@ -45,6 +46,7 @@ class ExecuteWorkflowRequest(BaseModel):
     ssh_username: str = "root"
     ssh_password: Optional[str] = None
     ssh_key_path: Optional[str] = None
+    ssh_private_key: Optional[str] = None
     
     # ComfyUI API Config
     comfyui_api_url: str = "http://127.0.0.1:8188"
@@ -155,7 +157,8 @@ async def test_ssh_connection(req: SSHTestRequest):
         port=req.port,
         username=req.username,
         password=req.password,
-        key_path=req.key_path
+        key_path=req.key_path,
+        private_key=req.ssh_private_key
     )
     result = ssh_service.test_connection()
     return result
@@ -227,7 +230,8 @@ async def execute_workflow(req: ExecuteWorkflowRequest):
                 port=req.ssh_port,
                 username=req.ssh_username,
                 password=req.ssh_password,
-                key_path=req.ssh_key_path
+                key_path=req.ssh_key_path,
+                private_key=req.ssh_private_key
             )
             transfer_results = ssh_service.transfer_files_to_runpod(
                 local_files=files_to_transfer,

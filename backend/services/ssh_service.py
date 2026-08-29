@@ -1,8 +1,26 @@
 import os
+import io
 import paramiko
 from scp import SCPClient
 from pathlib import Path
 from typing import List, Dict, Any, Callable, Optional
+
+
+def load_private_key(key_string: str, passphrase: Optional[str] = None):
+    """
+    Robust private key loader supporting Ed25519, RSA, and ECDSA keys.
+    Handles OpenSSH format and traditional PEM formats cleanly via io.StringIO.
+    """
+    key_file = io.StringIO(key_string.strip())
+    # Try Ed25519 first (modern default for RunPod), then fall back to RSA and ECDSA
+    for key_class in (paramiko.Ed25519Key, paramiko.RSAKey, paramiko.ECDSAKey):
+        key_file.seek(0)
+        try:
+            return key_class.from_private_key(key_file, password=passphrase)
+        except (paramiko.SSHException, ValueError, Exception):
+            continue
+    raise ValueError("Unable to parse private key. Ensure it is a valid RSA or Ed25519 key.")
+
 
 class RunPodSSHService:
     def __init__(
@@ -11,36 +29,71 @@ class RunPodSSHService:
         port: int = 22,
         username: str = "root",
         password: Optional[str] = None,
-        key_path: Optional[str] = None
+        key_path: Optional[str] = None,
+        private_key: Optional[str] = None
     ):
         self.host = host.strip()
         self.port = int(port)
         self.username = username.strip() or "root"
         self.password = password
         self.key_path = key_path.strip() if key_path else None
+        self.private_key = private_key.strip() if private_key else None
         self.client: Optional[paramiko.SSHClient] = None
 
     def connect(self) -> paramiko.SSHClient:
-        """Establish SSH connection using Paramiko with password or key."""
+        """Establish SSH connection using Paramiko with explicit publickey or password auth."""
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         
-        connect_kwargs = {
-            "hostname": self.host,
-            "port": self.port,
-            "username": self.username,
-            "timeout": 15,
-        }
+        # 1. Determine if a direct private key string was provided
+        raw_key_string = self.private_key
 
-        if self.key_path and os.path.exists(self.key_path):
-            connect_kwargs["key_filename"] = self.key_path
-        elif self.password:
-            connect_kwargs["password"] = self.password
-        else:
-            # Try default SSH agent or system keys
-            pass
+        # If private key string wasn't explicitly in self.private_key, check if key_path is actually key content or if password contains a key block
+        if not raw_key_string and self.key_path and ("BEGIN" in self.key_path or "-----" in self.key_path):
+            raw_key_string = self.key_path
+        elif not raw_key_string and self.password and ("BEGIN" in self.password or "-----" in self.password):
+            raw_key_string = self.password
+        elif not raw_key_string and self.key_path and os.path.exists(self.key_path):
+            try:
+                with open(self.key_path, "r", encoding="utf-8") as kf:
+                    raw_key_string = kf.read()
+            except Exception as e:
+                raise ValueError(f"Could not read private key file at '{self.key_path}': {str(e)}")
 
-        client.connect(**connect_kwargs)
+        # 2. If private key content is available, parse with load_private_key and connect with explicit pkey
+        if raw_key_string:
+            pkey = load_private_key(raw_key_string, passphrase=self.password if self.password and "BEGIN" not in self.password else None)
+            client.connect(
+                hostname=self.host,
+                port=self.port,
+                username=self.username,
+                pkey=pkey,
+                look_for_keys=False,
+                allow_agent=False,
+                timeout=10
+            )
+            self.client = client
+            return client
+
+        # 3. Fallback: Password authentication if no private key was provided
+        if self.password:
+            client.connect(
+                hostname=self.host,
+                port=self.port,
+                username=self.username,
+                password=self.password,
+                timeout=10
+            )
+            self.client = client
+            return client
+
+        # 4. Default system key lookup if nothing is specified
+        client.connect(
+            hostname=self.host,
+            port=self.port,
+            username=self.username,
+            timeout=10
+        )
         self.client = client
         return client
 
@@ -53,8 +106,13 @@ class RunPodSSHService:
             client.close()
             return {
                 "success": True,
-                "message": f"Connected to {self.username}@{self.host}:{self.port} successfully. Remote input directory is verified.",
+                "message": f"Connected to {self.username}@{self.host}:{self.port} successfully via publickey auth. Remote input directory is verified.",
                 "output": output
+            }
+        except paramiko.AuthenticationException as e:
+            return {
+                "success": False,
+                "message": f"SSH authentication failed: {str(e)}. RunPod requires a valid SSH private key (Ed25519 or RSA)."
             }
         except Exception as e:
             return {

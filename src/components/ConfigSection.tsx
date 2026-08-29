@@ -92,7 +92,8 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange, 
           port: config.ssh_port,
           username: config.ssh_username,
           password: config.ssh_password,
-          key_path: config.ssh_key_path
+          key_path: config.ssh_key_path,
+          ssh_private_key: config.ssh_private_key
         })
       });
       const data = await res.json();
@@ -102,6 +103,19 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange, 
     } finally {
       setTestingSSH(false);
     }
+  };
+
+  const handleKeyFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      if (content) {
+        handleInputChange("ssh_private_key", content);
+      }
+    };
+    reader.readAsText(file);
   };
 
   return (
@@ -192,23 +206,41 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange, 
           </div>
         </div>
 
-        {/* SSH Password or Key */}
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
-            <Key className="w-3.5 h-3.5 text-zinc-400" />
-            SSH Password / Key Path
-          </label>
-          <input
-            type="password"
-            placeholder="Pod password or /root/.ssh/id_ed25519"
-            value={config.ssh_password}
-            onChange={(e) => handleInputChange("ssh_password", e.target.value)}
-            className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
+        {/* SSH Private Key or Password */}
+        <div className="space-y-1.5 md:col-span-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
+              <Key className="w-3.5 h-3.5 text-indigo-400" />
+              SSH Private Key (RunPod Required)
+            </label>
+            <div className="flex items-center gap-2">
+              {config.ssh_private_key ? (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-800/50">
+                  {config.ssh_private_key.includes("ED25519") ? "Ed25519 Key Loaded" : config.ssh_private_key.includes("RSA") ? "RSA Key Loaded" : "Key Loaded"}
+                </span>
+              ) : null}
+              <label className="cursor-pointer text-[11px] text-indigo-400 hover:text-indigo-300 underline font-medium">
+                Upload Key File
+                <input
+                  type="file"
+                  accept=".pem,.pub,.key,text/plain,id_rsa,id_ed25519"
+                  onChange={handleKeyFileUpload}
+                  className="hidden"
+                />
+              </label>
+            </div>
+          </div>
+          <textarea
+            rows={2}
+            placeholder="-----BEGIN OPENSSH PRIVATE KEY----- (or id_ed25519 / id_rsa)"
+            value={config.ssh_private_key || ""}
+            onChange={(e) => handleInputChange("ssh_private_key", e.target.value)}
+            className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-1.5 text-[11px] font-mono text-zinc-100 placeholder-zinc-600 outline-none transition-colors resize-y"
           />
         </div>
 
         {/* LM Studio Local URL */}
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 md:col-span-2">
           <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
             <Bot className="w-3.5 h-3.5 text-amber-400" />
             Local LM Studio API URL
