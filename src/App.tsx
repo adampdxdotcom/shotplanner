@@ -625,19 +625,11 @@ export default function App() {
     };
 
     setAssets(prev => {
-      // Find if an asset of this media type exists with this slot_index
-      const existingIndex = prev.findIndex(a => {
-        const isMatch = mType === "image" 
-          ? (a.media_type === "image" || (!a.media_type && !/\.(mp3|wav|ogg|m4a|flac|mp4|mov|webm|mkv)$/i.test(a.filename)))
-          : mType === "audio" 
-          ? (a.media_type === "audio" || /\.(mp3|wav|ogg|m4a|flac)$/i.test(a.filename))
-          : (a.media_type === "video" || /\.(mp4|mov|webm|mkv)$/i.test(a.filename));
-        return isMatch && (a.slot_index === slotIdx || (a.slot_index === undefined && prev.filter(p => p.media_type === mType).indexOf(a) === slotIdx));
-      });
-
-      if (existingIndex !== -1) {
+      // Find if this exact asset file already exists
+      const exactMatch = prev.findIndex(a => a.filename === newAsset.filename);
+      if (exactMatch !== -1) {
         const next = [...prev];
-        next[existingIndex] = assetWithSlot;
+        next[exactMatch] = assetWithSlot; // update its latest slot assignment globally
         return next;
       }
       return [...prev, assetWithSlot];

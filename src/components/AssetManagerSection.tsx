@@ -84,7 +84,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
   const handleAddBlankShot = () => {
     onUpdateProject(prev => {
       const newShot: ShotItem = {
-        id: "shot_" + Date.now(),
+        id: "shot_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
         shot_number: prev.shots.length + 1,
         shot_type: "Medium Shot",
         camera_movement: "Locked Off",
@@ -147,7 +147,24 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
               <Edit3 className="w-3.5 h-3.5" />
             </button>
             <button
-              onClick={() => handleDelete(asset.filename)}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (activeShotId) {
+                  const globalSlot = getGlobalSlotIndex(type as any, idx);
+                  onUpdateProject(prev => {
+                    const shots = [...prev.shots];
+                    const shotIdx = shots.findIndex(s => s.id === activeShotId);
+                    if (shotIdx !== -1) {
+                      const nextSlots = { ...shots[shotIdx].assigned_slots };
+                      delete nextSlots[globalSlot];
+                      shots[shotIdx] = { ...shots[shotIdx], assigned_slots: nextSlots };
+                    }
+                    return { ...prev, shots };
+                  });
+                } else {
+                  handleDelete(asset.filename);
+                }
+              }}
               className="text-zinc-500 hover:text-red-400 p-1 rounded transition-colors"
               title="Delete asset"
             >
@@ -254,7 +271,27 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
 
   const handleAssignExistingAsset = () => {
     if (!selectedLibraryAsset || !uploadModalSlot) return;
+    
+    if (activeShotId) {
+      const globalSlot = getGlobalSlotIndex(uploadModalSlot.type, uploadModalSlot.index);
+      onUpdateProject(prev => {
+        const shots = [...prev.shots];
+        const idx = shots.findIndex(s => s.id === activeShotId);
+        if (idx !== -1) {
+          shots[idx] = {
+            ...shots[idx],
+            assigned_slots: {
+              ...(shots[idx].assigned_slots || {}),
+              [globalSlot]: selectedLibraryAsset.filename
+            }
+          };
+        }
+        return { ...prev, shots };
+      });
+    }
+    // Also dispatch the upload event so it binds correctly in the legacy system if needed
     onAssetUploaded(selectedLibraryAsset, uploadModalSlot.index, uploadModalSlot.type);
+    
     closeUploadModal();
   };
 
@@ -432,27 +469,43 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
   const videos = assets.filter(isVid);
 
   // Helper to map assets strictly by slot_index
+
+  // Maps UI slot indices to global assigned_slots indices to prevent collisions
+  const getGlobalSlotIndex = (type: string, idx: number) => {
+    if (type === "audio") return 9 + idx;
+    if (type === "video") return 11 + idx;
+    return idx;
+  };
+
   const getAssetForSlot = (type: "image" | "audio" | "video", slotIdx: number): MediaAsset | undefined => {
-    const typeList = assets.filter(a => type === "image" ? isImg(a) : type === "audio" ? isAud(a) : isVid(a));
+    const globalSlot = getGlobalSlotIndex(type, slotIdx);
     
-    // 1. Direct match by explicit slot_index
+    // 1. Check activeShot.assigned_slots first
+    if (activeShotId) {
+      const shot = sceneProject.shots.find(s => s.id === activeShotId);
+      if (shot && shot.assigned_slots && shot.assigned_slots[globalSlot]) {
+        const filename = shot.assigned_slots[globalSlot];
+        const match = assets.find(a => a.filename === filename);
+        if (match) return match;
+      }
+    }
+    
+    // 2. Fallback to global slot_index
+    const typeList = assets.filter(a => type === "image" ? isImg(a) : type === "audio" ? isAud(a) : isVid(a));
     const direct = typeList.find(a => a.slot_index === slotIdx);
     if (direct) return direct;
-
-    // 2. Fallback for legacy assets without slot_index
+    
     const unassigned = typeList.filter(a => a.slot_index === undefined);
     const assignedSlots = new Set(typeList.map(a => a.slot_index).filter(idx => idx !== undefined));
-    
     let currSlot = 0;
     for (const item of unassigned) {
-      while (assignedSlots.has(currSlot)) {
-        currSlot++;
-      }
+      while (assignedSlots.has(currSlot)) currSlot++;
       if (currSlot === slotIdx) return item;
       currSlot++;
     }
     return undefined;
   };
+
 
   // Limits
   const MAX_IMAGES = 9;
@@ -550,6 +603,23 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
           slot_index: targetSlotIndex,
           media_type: targetMediaType
         };
+        if (activeShotId) {
+          const globalSlot = getGlobalSlotIndex(targetMediaType, targetSlotIndex);
+          onUpdateProject(prev => {
+            const shots = [...prev.shots];
+            const idx = shots.findIndex(s => s.id === activeShotId);
+            if (idx !== -1) {
+              shots[idx] = {
+                ...shots[idx],
+                assigned_slots: {
+                  ...(shots[idx].assigned_slots || {}),
+                  [globalSlot]: finalizedAsset.filename
+                }
+              };
+            }
+            return { ...prev, shots };
+          });
+        }
         onAssetUploaded(finalizedAsset, targetSlotIndex, targetMediaType);
         closeUploadModal();
       } else {

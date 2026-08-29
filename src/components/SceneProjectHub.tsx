@@ -87,7 +87,7 @@ export default function SceneProjectHub({
 
   const handleAddBlankShot = () => {
     const newShot: ShotItem = {
-      id: "shot_" + Date.now(),
+      id: "shot_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
       shot_number: project.shots.length + 1,
       shot_type: "Medium Shot",
       camera_movement: "Locked Off",
