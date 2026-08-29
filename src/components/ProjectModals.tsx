@@ -44,12 +44,41 @@ export const SaveProjectModal: React.FC<SaveProjectModalProps> = ({ isOpen, onCl
     }
   };
 
-  const handleExportZip = () => {
-    if (!currentProjectName) {
-      setError("Please save the project first before exporting.");
+  const handleExportZip = async () => {
+    const targetName = (filename.trim() || currentProjectName || "").replace(/\.json$/, "");
+    if (!targetName) {
+      setError("Please enter a project name before exporting.");
       return;
     }
-    window.location.href = `/api/projects/${currentProjectName}/export`;
+    setSaving(true);
+    setError(null);
+    try {
+      // Auto-save first so the server has the latest project configuration
+      await onSave(targetName);
+
+      // Fetch the zip as a blob to prevent navigating away on error
+      const response = await fetch(`/api/projects/${encodeURIComponent(targetName)}/export`);
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || `Export failed (HTTP ${response.status})`);
+      }
+
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = `${targetName}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      window.URL.revokeObjectURL(downloadUrl);
+      link.remove();
+
+      onClose();
+    } catch (err: any) {
+      setError(err.message || "Failed to export project ZIP.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleSave = async () => {
@@ -104,9 +133,13 @@ export const SaveProjectModal: React.FC<SaveProjectModalProps> = ({ isOpen, onCl
         </div>
 
         <div className="p-4 border-t border-zinc-800 bg-zinc-950/30 flex justify-between gap-3">
-          <button onClick={handleExportZip} className="px-4 py-2 text-xs font-medium text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 rounded-lg transition-colors flex items-center gap-2 border border-emerald-500/20">
+          <button 
+            onClick={handleExportZip} 
+            disabled={saving}
+            className="px-4 py-2 text-xs font-medium text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-50 rounded-lg transition-colors flex items-center gap-2 border border-emerald-500/20 cursor-pointer"
+          >
             <Download className="w-3.5 h-3.5" />
-            Export Zip
+            {saving ? "Exporting..." : "Export Zip"}
           </button>
           <div className="flex gap-2">
             <button onClick={onClose} className="px-4 py-2 text-xs font-medium text-zinc-400 hover:text-white transition-colors">

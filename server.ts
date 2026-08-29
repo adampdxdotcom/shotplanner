@@ -41,7 +41,26 @@ interface AssetRecord {
 
 const ASSET_DB_FILE = path.join(ASSETS_DIR, "assets_db.json");
 let assetDatabase: AssetRecord[] = [];
-// This isn't perfect but we will mock it if it's completely missing, or just let the API run.
+
+function loadAssetDatabase() {
+  if (fs.existsSync(ASSET_DB_FILE)) {
+    try {
+      assetDatabase = JSON.parse(fs.readFileSync(ASSET_DB_FILE, "utf-8"));
+    } catch (e) {
+      assetDatabase = [];
+    }
+  }
+}
+
+function saveAssetDatabase() {
+  try {
+    fs.writeFileSync(ASSET_DB_FILE, JSON.stringify(assetDatabase, null, 2));
+  } catch (e) {
+    console.error("Failed to save asset database:", e);
+  }
+}
+
+loadAssetDatabase();
 
 function sanitizeSlug(str: string) {
   return str.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_").replace(/_+/g, "_");
@@ -59,9 +78,11 @@ function getStoredGeminiKey() {
 
 async function generateWithGeminiAPI(apiKey: string, promptText: string) {
   const genAI = new GoogleGenAI({ apiKey });
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-  const result = await model.generateContent(promptText);
-  return { text: result.response.text(), modelUsed: "gemini-2.5-flash" };
+  const result = await genAI.models.generateContent({
+    model: "gemini-2.5-flash",
+    contents: promptText
+  });
+  return { text: result.text || "", modelUsed: "gemini-2.5-flash" };
 }
 
 app.get("/api/settings/gemini", (req: Request, res: Response) => {
@@ -138,6 +159,7 @@ app.delete("/api/assets/:filename", (req: Request, res: Response) => {
     assetDatabase.splice(assetIndex, 1);
     const p = path.join(UPLOADS_DIR, filename);
     if (fs.existsSync(p)) fs.unlinkSync(p);
+    saveAssetDatabase();
   }
   res.json({ success: true });
 });
@@ -151,6 +173,7 @@ app.put("/api/assets/:filename", express.json(), (req: Request, res: Response) =
   asset.type = type || asset.type;
   asset.subject_name = subject_name || asset.subject_name;
   asset.description = description !== undefined ? description : asset.description;
+  saveAssetDatabase();
   
   res.json({ success: true, asset });
 });
@@ -159,35 +182,149 @@ app.put("/api/assets/:filename", express.json(), (req: Request, res: Response) =
 app.get("/api/projects", (req: Request, res: Response) => {
   if (!fs.existsSync(PROJECTS_DIR)) return res.json({ projects: [] });
   const files = fs.readdirSync(PROJECTS_DIR).filter(f => f.endsWith(".json"));
-  res.json({ projects: files.map(f => f.replace(".json", "")) });
+  res.json({ projects: files.map(f => f.replace(/\.json$/, "")) });
 });
 
 app.post("/api/projects", (req: Request, res: Response) => {
-  const { name, data } = req.body;
-  fs.writeFileSync(path.join(PROJECTS_DIR, `${name}.json`), JSON.stringify(data, null, 2));
-  res.json({ success: true });
+  try {
+    const rawName = req.body.name || req.body.filename;
+    if (!rawName) return res.status(400).json({ error: "Project name is required" });
+    const name = String(rawName).replace(/\.json$/, "");
+    fs.writeFileSync(path.join(PROJECTS_DIR, `${name}.json`), JSON.stringify(req.body.data, null, 2));
+    res.json({ success: true, filename: name });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get("/api/projects/:filename", (req: Request, res: Response) => {
   try {
-    const p = path.join(PROJECTS_DIR, `${req.params.filename}.json`);
+    const rawName = req.params.filename.replace(/\.json$/, "");
+    const p = path.join(PROJECTS_DIR, `${rawName}.json`);
     if (fs.existsSync(p)) {
       res.json(JSON.parse(fs.readFileSync(p, "utf-8")));
     } else {
-      res.status(404).json({ error: "Not found" });
+      res.status(404).json({ error: `Project '${rawName}' not found` });
     }
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Mock export route so frontend doesn't break
-app.get("/api/projects/:filename/export", (req: Request, res: Response) => {
-  res.status(400).json({ error: "Export not implemented in restored mock" });
+// Export Project Zip
+app.get("/api/projects/:filename/export", async (req: Request, res: Response) => {
+  try {
+    const rawName = req.params.filename.replace(/\.json$/, "");
+    const jsonFileName = `${rawName}.json`;
+    const filePath = path.join(PROJECTS_DIR, jsonFileName);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: `Project '${rawName}' not found on server. Please save it first.` });
+    }
+
+    const projectData = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader("Content-Disposition", `attachment; filename="${rawName}.zip"`);
+
+    const archive = new ZipArchive({ zlib: { level: 9 } });
+
+    archive.on("error", (err: any) => {
+      console.error("Archive error:", err);
+      if (!res.headersSent) {
+        res.status(500).json({ error: err.message || "Failed to create archive" });
+      }
+    });
+
+    archive.pipe(res);
+
+    // 1. Add project json
+    archive.file(filePath, { name: jsonFileName });
+
+    // 2. Add workflow if selected
+    if (projectData.selectedWorkflowFile) {
+      const wfPath = path.join(WORKFLOWS_DIR, projectData.selectedWorkflowFile);
+      if (fs.existsSync(wfPath)) {
+        archive.file(wfPath, { name: `workflows/${projectData.selectedWorkflowFile}` });
+      }
+    }
+
+    // 3. Add mapped assets
+    const addedFiles = new Set<string>();
+    if (projectData.nodeMappings) {
+      for (const assetFile of Object.values(projectData.nodeMappings)) {
+        if (assetFile && typeof assetFile === "string" && !addedFiles.has(assetFile)) {
+          const assetPath = path.join(UPLOADS_DIR, assetFile);
+          if (fs.existsSync(assetPath)) {
+            archive.file(assetPath, { name: `uploads/${assetFile}` });
+            addedFiles.add(assetFile);
+          }
+        }
+      }
+    }
+
+    // Include asset metadata database for portability
+    const relevantAssets = assetDatabase.filter(a => addedFiles.has(a.filename));
+    if (relevantAssets.length > 0) {
+      archive.append(JSON.stringify(relevantAssets, null, 2), { name: "assets_db.json" });
+    }
+
+    await archive.finalize();
+  } catch (err: any) {
+    console.error("Export error:", err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: err.message || "Export error" });
+    }
+  }
 });
 
+// Import Project Zip
 app.post("/api/projects/import", upload.single("file"), async (req: Request, res: Response) => {
-  res.status(400).json({ error: "Import not implemented in restored mock" });
+  try {
+    if (!req.file) return res.status(400).json({ error: "No zip file provided" });
+
+    const zipBuffer = fs.readFileSync(req.file.path);
+    const directory = await unzipper.Open.buffer(zipBuffer);
+
+    let importedProject = "";
+
+    for (const file of directory.files) {
+      if (file.type !== "File") continue;
+      const buffer = await file.buffer();
+
+      if (file.path.startsWith("workflows/")) {
+        const fname = path.basename(file.path);
+        fs.writeFileSync(path.join(WORKFLOWS_DIR, fname), buffer);
+      } else if (file.path.startsWith("uploads/")) {
+        const fname = path.basename(file.path);
+        fs.writeFileSync(path.join(UPLOADS_DIR, fname), buffer);
+      } else if (file.path === "assets_db.json") {
+        try {
+          const importedDb: AssetRecord[] = JSON.parse(buffer.toString("utf-8"));
+          for (const item of importedDb) {
+            const exists = assetDatabase.some(a => a.filename === item.filename);
+            if (!exists) assetDatabase.unshift(item);
+          }
+          saveAssetDatabase();
+        } catch (e) {}
+      } else if (file.path.endsWith(".json") && !file.path.includes("/")) {
+        const fname = path.basename(file.path);
+        fs.writeFileSync(path.join(PROJECTS_DIR, fname), buffer);
+        importedProject = fname.replace(/\.json$/, "");
+      }
+    }
+
+    try { fs.unlinkSync(req.file.path); } catch (e) {}
+
+    if (importedProject) {
+      res.json({ success: true, filename: importedProject });
+    } else {
+      res.status(400).json({ error: "No project JSON found in zip" });
+    }
+  } catch (err: any) {
+    console.error("Import error:", err);
+    res.status(500).json({ error: err.message || "Failed to import zip" });
+  }
 });
 
 
@@ -227,6 +364,7 @@ app.post("/api/assets/upload", upload.single("file"), (req: Request, res: Respon
     };
 
     assetDatabase.unshift(assetRecord);
+    saveAssetDatabase();
 
     res.json({ success: true, asset: assetRecord });
   } catch (err: any) {
@@ -304,6 +442,7 @@ app.post("/api/assets/upload_chunk", upload.single("file"), (req: Request, res: 
         } else {
           assetDatabase.unshift(assetRecord);
         }
+        saveAssetDatabase();
 
         return res.json({ success: true, asset: assetRecord });
       });
