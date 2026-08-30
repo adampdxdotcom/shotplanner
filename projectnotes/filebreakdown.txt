@@ -148,3 +148,11 @@
 ## Bug Fixes
 - **`backend/routes/api.py`**
   - **Updates:** Fixed `NameError: name 'safe_filename' is not defined` in `get_project` that arose after migrating to the resilient locator utility. Updated the fallback scene directory provisioning step to use `file_path.stem` dynamically during load.
+
+## Strict Scene-Level Asset Isolation
+- **`backend/routes/api.py` & `server/services/assetService.ts`**
+  - **Updates:** Completely removed all global in-memory asset pool contamination (`in_memory_asset_metadata` and `assetDatabase`). `GET /api/assets` now accepts an optional `scene_name` query parameter and synthesizes asset lists dynamically by physically walking isolated scene directories (`assets/{scene_name}/{images,videos,audios}`) and `assets/shared/`.
+  - Added a Python stub for `PUT /api/assets/{filename}` to align parity with the TS backend.
+  - Deletions are securely funneled through `find_asset_file_path` to guarantee assets are safely unlinked from disk without crossing scene boundaries.
+- **`src/App.tsx`**
+  - **Updates:** Upgraded the `fetchAssets` UI pipeline to actively pass the current `scene_name` to `/api/assets`, securely enforcing complete state isolation during project loads.

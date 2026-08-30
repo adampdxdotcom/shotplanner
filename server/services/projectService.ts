@@ -62,13 +62,7 @@ export function getProjectData(projectName: string): any | null {
   const sceneName = projectData?.scene_name || projectData?.scene_planning?.scene_name || cleanName;
   ensureSceneDirectories(sceneName);
 
-  // Sync any saved assets into assetDatabase
-  if (Array.isArray(projectData.assets)) {
-    for (const item of projectData.assets) {
-      if (!item || !item.filename) continue;
-      assetService.upsertAsset(item);
-    }
-  }
+  // Strict isolation: no global asset database sync
   return projectData;
 }
 
@@ -148,13 +142,7 @@ export function saveProjectData(projectName: string, projectData: any): string {
   
   fs.writeFileSync(targetPath, JSON.stringify(projectData, null, 2));
 
-  // If project payload includes assets, sync them into assetDatabase
-  if (projectData && Array.isArray(projectData.assets)) {
-    for (const item of projectData.assets) {
-      if (!item || !item.filename) continue;
-      assetService.upsertAsset(item);
-    }
-  }
+  // Strict isolation: no global asset database sync
 
   return cleanName;
 }
@@ -328,12 +316,7 @@ export async function importProjectZip(uploadedFilePath: string): Promise<string
       const fname = path.basename(file.path);
       fs.writeFileSync(path.join(UPLOADS_DIR, fname), buffer);
     } else if (file.path === "assets_db.json") {
-      try {
-        const importedDb: AssetRecord[] = JSON.parse(buffer.toString("utf-8"));
-        for (const item of importedDb) {
-          assetService.upsertAsset(item);
-        }
-      } catch (e) {}
+      // Ignored: strictly using project JSON for metadata now
     } else if (file.path.endsWith(".json") && !file.path.includes("/")) {
       const fname = path.basename(file.path);
       fs.writeFileSync(path.join(PROJECTS_DIR, fname), buffer);
@@ -345,12 +328,7 @@ export async function importProjectZip(uploadedFilePath: string): Promise<string
         const sceneName = pData?.scene_name || pData?.scene_planning?.scene_name || importedProject;
         ensureSceneDirectories(sceneName);
 
-        if (Array.isArray(pData.assets)) {
-          for (const item of pData.assets) {
-            if (!item || !item.filename) continue;
-            assetService.upsertAsset(item);
-          }
-        }
+
       } catch (e) {}
     }
   }

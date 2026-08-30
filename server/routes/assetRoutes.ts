@@ -8,7 +8,8 @@ const router = Router();
 
 // Retrieve all assets
 router.get("/", (req: Request, res: Response) => {
-  res.json({ assets: assetService.getAllAssets() });
+  const sceneName = req.query.scene_name as string | undefined;
+  res.json({ assets: assetService.getAllAssets(sceneName) });
 });
 
 // Dedicated media file serving route with MIME headers and fallback lookup across scene folders

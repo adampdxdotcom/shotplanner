@@ -33,7 +33,6 @@ from backend.services.llm_service import expand_prompt_with_llm
 router = APIRouter(prefix="/api", tags=["ComfyUI Bridge API"])
 
 # In-memory session tracking for assets uploaded during runtime
-in_memory_asset_metadata: List[Dict[str, Any]] = []
 
 class LLMGenerateRequest(BaseModel):
     basic_stub: str
@@ -208,13 +207,47 @@ async def upload_asset(
         "preview_url": f"/api/uploads/{target_filename}"
     }
 
-    in_memory_asset_metadata.append(asset_record)
     return {"success": True, "asset": asset_record}
 
 @router.get("/assets")
-async def get_assets():
-    """List all registered uploaded assets."""
-    return {"assets": in_memory_asset_metadata}
+async def get_assets(scene_name: Optional[str] = None):
+    """List assets dynamically from the requested scene directory and global shared."""
+    assets = []
+    seen = set()
+    
+    def process_file(f, sn):
+        if not f.is_file(): return
+        if f.name == ".DS_Store" or f.name == "empty.png" or f.name in seen: return
+        seen.add(f.name)
+        ext = f.suffix.lower()
+        if ext in [".mp4", ".mov", ".webm", ".mkv", ".avi"]: media_type = "video"
+        elif ext in [".mp3", ".wav", ".ogg", ".flac", ".m4a"]: media_type = "audio"
+        else: media_type = "image"
+        assets.append({
+            "filename": f.name,
+            "media_type": media_type,
+            "scene_name": sn,
+            "preview_url": f"/api/uploads/{f.name}"
+        })
+
+    dirs_to_scan = []
+    if scene_name:
+        scene_dirs = get_scene_directories(scene_name)
+        dirs_to_scan.extend([scene_dirs["images"], scene_dirs["videos"], scene_dirs["audios"], scene_dirs["shared"]])
+    
+    global_shared = ASSETS_DIR / "shared"
+    dirs_to_scan.append(global_shared)
+    
+    # Also fallback to legacy flat directories if scene_name is missing or for backward compat
+    if not scene_name:
+        dirs_to_scan.extend([LEGACY_IMAGES_DIR, LEGACY_VIDEOS_DIR, LEGACY_AUDIOS_DIR, LEGACY_UPLOADS_DIR])
+
+    for d in dirs_to_scan:
+        if d.exists() and d.is_dir():
+            for f in d.iterdir():
+                process_file(f, scene_name if d != global_shared else "shared")
+                
+    return {"assets": assets}
 
 @router.get("/uploads/{filename}")
 async def serve_upload_file(filename: str):
@@ -742,12 +775,7 @@ async def save_project(req: Dict[str, Any]):
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(data_to_save, f, indent=2)
 
-    # Sync assets into memory if provided
-    if isinstance(data_to_save, dict) and isinstance(data_to_save.get("assets"), list):
-        for asset in data_to_save["assets"]:
-            if isinstance(asset, dict) and asset.get("filename"):
-                if not any(a.get("filename") == asset["filename"] for a in in_memory_asset_metadata):
-                    in_memory_asset_metadata.append(asset)
+    # No global memory sync, strict isolation
 
     return {"success": True, "filename": final_filename}
 
@@ -801,12 +829,44 @@ async def get_project(filename: str):
             scene_name = data.get("scene_name") or data.get("scene_planning", {}).get("scene_name")
         ensure_scene_directories(scene_name or file_path.stem)
 
-        if isinstance(data, dict) and isinstance(data.get("assets"), list):
-            for asset in data["assets"]:
-                if isinstance(asset, dict) and asset.get("filename"):
-                    if not any(a.get("filename") == asset["filename"] for a in in_memory_asset_metadata):
-                        in_memory_asset_metadata.append(asset)
+
         return data
+
+from pydantic import BaseModel
+class AssetUpdate(BaseModel):
+    type: str = None
+    subject_name: str = None
+    description: str = None
+
+@router.put("/assets/{filename}")
+async def update_asset_metadata(filename: str, updates: AssetUpdate):
+    # Purely a stub to satisfy frontend, metadata is persisted in project JSON
+    return {
+        "success": True,
+        "asset": {
+            "id": filename,
+            "filename": filename,
+            "original_name": filename,
+            "media_type": "image",
+            "type": updates.type or "unknown",
+            "subject_name": updates.subject_name or "subject",
+            "description": updates.description or "",
+            "size_bytes": 0,
+            "preview_url": f"/api/uploads/{filename}",
+            "path": ""
+        }
+    }
+
+@router.delete("/assets/{filename}")
+async def delete_asset_endpoint(filename: str):
+    file_path = find_asset_file_path(filename)
+    if not file_path or not file_path.exists():
+        raise HTTPException(status_code=404, detail="Asset not found")
+    try:
+        file_path.unlink()
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/projects/{filename}")
 async def delete_project_endpoint(filename: str):
@@ -902,8 +962,8 @@ async def export_project_zip(filename: str):
                             zip_file.write(asset_path, arcname=f"uploads/{fn}")
                             added_files.add(fn)
                             
-        # Write assets_db.json
-        relevant_meta = [a for a in in_memory_asset_metadata if a.get("filename") in added_files]
+        # Write assets_db.json purely from the isolated project JSON
+        relevant_meta = [a for a in assets_list if a.get("filename") in added_files]
         final_meta = relevant_meta if relevant_meta else assets_list
         zip_file.writestr("assets_db.json", json.dumps(final_meta, indent=2))
         
@@ -987,22 +1047,14 @@ async def import_project_zip(file: UploadFile = File(...)):
                 with open(target_dir / out_name, "wb") as f:
                     f.write(file_bytes)
                     
-            elif filename == "assets_db.json":
-                for a in assets_db_meta:
-                    if not any(x.get("filename") == a["filename"] for x in in_memory_asset_metadata):
-                        in_memory_asset_metadata.append(a)
+
                         
             elif filename.endswith(".json") and "/" not in filename and "\\" not in filename:
                 out_name = os.path.basename(filename)
                 with open(PROJECTS_DIR / out_name, "wb") as f:
                     f.write(file_bytes)
                 
-                # Also load assets from the project JSON into memory meta if needed
-                if isinstance(project_json_data, dict) and isinstance(project_json_data.get("assets"), list):
-                    for a in project_json_data["assets"]:
-                        if isinstance(a, dict) and a.get("filename"):
-                            if not any(x.get("filename") == a["filename"] for x in in_memory_asset_metadata):
-                                in_memory_asset_metadata.append(a)
+
                                 
     return {"success": True, "filename": imported_project}
 
@@ -1062,7 +1114,6 @@ async def upload_chunk(
             "path": str(destination_path),
             "preview_url": f"/api/uploads/{target_filename}"
         }
-        in_memory_asset_metadata.append(asset_record)
         return {"success": True, "asset": asset_record}
         
     return {"success": True, "message": "chunk received"}

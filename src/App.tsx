@@ -467,7 +467,7 @@ export default function App() {
         console.error("Failed to sync project assets", e);
       }
     } else {
-      await fetchAssets();
+      await fetchAssets(data.scene_name || cleanName);
     }
     
     // 2. Restore subjects registry
@@ -588,9 +588,10 @@ export default function App() {
     }
   };
 
-  const fetchAssets = async () => {
+  const fetchAssets = async (sceneName?: string) => {
     try {
-      const res = await fetch("/api/assets");
+      const url = sceneName ? `/api/assets?scene_name=${encodeURIComponent(sceneName)}` : "/api/assets";
+      const res = await fetch(url);
       const data = await res.json();
       if (data.assets) {
         setAssets(data.assets.map((a: any, idx: number) => ({

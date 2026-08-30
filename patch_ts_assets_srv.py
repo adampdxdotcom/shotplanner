@@ -1,20 +1,10 @@
-import fs from "fs";
-import path from "path";
-import { 
-  ASSET_DB_FILE, 
-  ASSETS_DIR, 
-  LEGACY_IMAGES_DIR, 
-  LEGACY_VIDEOS_DIR, 
-  LEGACY_AUDIOS_DIR, 
-  LEGACY_UPLOADS_DIR, 
-  TMP_DIR,
-  ensureSceneDirectories,
-  formatSceneFolderName 
-} from "../config/constants";
-import { AssetRecord } from "../types";
-import { sanitizeSlug } from "../utils/formatters";
+import re
 
-class AssetService {
+with open("server/services/assetService.ts", "r") as f:
+    content = f.read()
+
+# Replace class AssetService methods
+r_class = """class AssetService {
   private uploadChunks = new Map<string, string[]>();
 
   constructor() {}
@@ -75,8 +65,8 @@ class AssetService {
             seen.add(file.name);
             const ext = path.extname(file.name).toLowerCase();
             let mediaType = "image";
-            if (/\.(mp4|mov|webm|mkv|avi)$/i.test(ext)) mediaType = "video";
-            else if (/\.(mp3|wav|ogg|flac|aac|m4a)$/i.test(ext)) mediaType = "audio";
+            if (/\\.(mp4|mov|webm|mkv|avi)$/i.test(ext)) mediaType = "video";
+            else if (/\\.(mp3|wav|ogg|flac|aac|m4a)$/i.test(ext)) mediaType = "audio";
             
             let size = 0;
             let mtime = Date.now();
@@ -173,11 +163,11 @@ class AssetService {
 
     const sceneDirs = ensureSceneDirectories(sceneName);
     let targetDir = sceneDirs.images;
-    if (mediaType === "video" || ext.match(/\.(mp4|mov|webm|mkv|avi)$/i)) {
+    if (mediaType === "video" || ext.match(/\\.(mp4|mov|webm|mkv|avi)$/i)) {
       targetDir = sceneDirs.videos;
-    } else if (mediaType === "audio" || ext.match(/\.(mp3|wav|ogg|flac|aac|m4a)$/i)) {
+    } else if (mediaType === "audio" || ext.match(/\\.(mp3|wav|ogg|flac|aac|m4a)$/i)) {
       targetDir = sceneDirs.audios;
-    } else if (mediaType === "image" || ext.match(/\.(png|jpg|jpeg|webp|gif|bmp)$/i)) {
+    } else if (mediaType === "image" || ext.match(/\\.(png|jpg|jpeg|webp|gif|bmp)$/i)) {
       targetDir = sceneDirs.images;
     } else {
       targetDir = sceneDirs.shared || sceneDirs.images;
@@ -277,11 +267,11 @@ class AssetService {
       const sceneDirs = ensureSceneDirectories(resolvedSceneName);
       const mType = (media_type as "image" | "audio" | "video") || "image";
       let targetDir = sceneDirs.images;
-      if (mType === "video" || ext.match(/\.(mp4|mov|webm|mkv|avi)$/i)) {
+      if (mType === "video" || ext.match(/\\.(mp4|mov|webm|mkv|avi)$/i)) {
         targetDir = sceneDirs.videos;
-      } else if (mType === "audio" || ext.match(/\.(mp3|wav|ogg|flac|aac|m4a)$/i)) {
+      } else if (mType === "audio" || ext.match(/\\.(mp3|wav|ogg|flac|aac|m4a)$/i)) {
         targetDir = sceneDirs.audios;
-      } else if (mType === "image" || ext.match(/\.(png|jpg|jpeg|webp|gif|bmp)$/i)) {
+      } else if (mType === "image" || ext.match(/\\.(png|jpg|jpeg|webp|gif|bmp)$/i)) {
         targetDir = sceneDirs.images;
       } else {
         targetDir = sceneDirs.shared || sceneDirs.images;
@@ -347,6 +337,9 @@ class AssetService {
     });
   }
 }
+"""
 
+content = re.sub(r'class AssetService \{.*\}\n\nexport const assetService = new AssetService\(\);', r_class + '\n\nexport const assetService = new AssetService();', content, flags=re.DOTALL)
 
-export const assetService = new AssetService();
+with open("server/services/assetService.ts", "w") as f:
+    f.write(content)
