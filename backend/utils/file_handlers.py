@@ -185,37 +185,13 @@ def load_workflow_json(filename: str, scene_name: Optional[str] = None) -> Dict[
     raise FileNotFoundError(f"Workflow file '{filename}' not found in any workflow directory.")
 
 def find_asset_file_path(filename: str) -> Optional[Path]:
-    """Finds an asset file path checking Scene-First folders then legacy fallback."""
+    """Finds an asset file path checking recursively across the entire assets directory."""
     clean_name = os.path.basename(filename)
-    
-    # Scan all Scene folders first
     if ASSETS_DIR.exists():
-        for sub in ASSETS_DIR.iterdir():
-            if sub.is_dir() and sub.name.startswith("scene"):
-                for sub_type in ["images", "videos", "audios", "workflows", "shared"]:
-                    potential = sub / sub_type / clean_name
-                    if potential.exists() and potential.is_file():
-                        return potential
-                        
-    # Fallback to legacy flat folders
-    candidate_dirs = [
-        LEGACY_IMAGES_DIR,
-        LEGACY_VIDEOS_DIR,
-        LEGACY_AUDIOS_DIR,
-        LEGACY_UPLOADS_DIR,
-        LEGACY_WORKFLOWS_DIR,
-        ASSETS_DIR
-    ]
-    for d in candidate_dirs:
-        if d.exists():
-            direct = d / clean_name
-            if direct.exists() and direct.is_file():
-                return direct
-            for sub in d.iterdir():
-                if sub.is_dir():
-                    sub_file = sub / clean_name
-                    if sub_file.exists() and sub_file.is_file():
-                        return sub_file
+        # Recursive search across all directories and subdirectories under the base assets directory
+        for path in ASSETS_DIR.rglob(clean_name):
+            if path.is_file():
+                return path
     return None
 
 async def save_workflow_json(filename: str, content: Dict[str, Any], scene_name: Optional[str] = "scene01") -> str:

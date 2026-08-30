@@ -1,3 +1,4 @@
+import mimetypes
 import os
 import httpx
 from pathlib import Path
@@ -219,7 +220,11 @@ async def serve_upload_file(filename: str):
         raise HTTPException(status_code=404, detail="File not found")
     
     # We use FileResponse to handle proper Content-Type deduction and caching headers
-    return FileResponse(path=file_path, headers={"Cache-Control": "public, max-age=3600"})
+    mime_type, _ = mimetypes.guess_type(str(file_path))
+    if not mime_type:
+        mime_type = "application/octet-stream"
+        
+    return FileResponse(path=file_path, media_type=mime_type, headers={"Cache-Control": "public, max-age=3600"})
 
 @router.post("/generate-prompt")
 @router.post("/llm/expand")

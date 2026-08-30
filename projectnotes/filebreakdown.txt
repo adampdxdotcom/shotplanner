@@ -97,3 +97,9 @@
   - **Updates:** Updated the chunked upload iterators to actively append `scene_name` to every chunk `FormData` object. This guarantees that when the final file chunk executes, the backend correctly places the fully stitched file within the `scene_name` target directory.
 - **`backend/routes/api.py`** & **`server/services/assetService.ts`**
   - **Updates:** Modified the chunk assembly handler to consume the `scene_name` metadata, resolve the proper nested media directory, stitch the file into its final scene path on disk, and explicitly verify file existence via an `fs.existsSync` or `os.path.exists()` assertion prior to emitting the successful `AssetRecord` back to the frontend.
+
+## Recursive Asset Discovery
+- **`backend/utils/file_handlers.py`**
+  - **Updates:** Refactored `find_asset_file_path` to implement a fully recursive search utilizing `rglob` across all directories and subdirectories underneath the base `ASSETS_DIR`. This guarantees immediate location of any asset by its filename, regardless of how deeply nested it is within `images/`, `videos/`, `workflows/`, or `shared/` under any scene folders.
+- **`backend/routes/api.py`**
+  - **Updates:** Hardened the asset serving endpoint `/api/uploads/{filename}` by explicitly utilizing the `mimetypes` module to extract and pass appropriate MIME type headers directly into the `FileResponse`. This ensures robust cross-browser rendering for media assets resolved by the recursive finder.
