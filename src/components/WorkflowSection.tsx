@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from "react";
-import { WorkflowItem, ParsedWorkflow, MediaAsset, GenerationParameters, ParameterNodeMappings } from "../types";
+import React, { useState, useEffect, useMemo } from "react";
+import { WorkflowItem, ParsedWorkflow, MediaAsset, GenerationParameters, ParameterNodeMappings, ShotItem, SceneProjectFile } from "../types";
 import { getAssetMediaUrl } from "../utils/assetUrl";
+import { formatShotNumber, generateSaveVideoPrefix } from "../utils/formatters";
 import { GenerationParametersSection } from "./GenerationParametersSection";
 import { 
   Workflow, 
@@ -18,6 +19,304 @@ import {
   AlertTriangle,
   RefreshCw
 } from "lucide-react";
+
+/**
+ * Performs live in-memory injection of active shot assets, prompt, and parameters
+ * into the workflow canvas JSON for instant preview and copy.
+ */
+function generateLiveInjectedWorkflow(
+  rawJson: any,
+  activeShot: ShotItem | undefined,
+  selectedPromptNodeId: string,
+  nodeMappings: Record<string, string>,
+  bypassMissing: boolean,
+  generationParams: GenerationParameters,
+  parameterNodeMappings: ParameterNodeMappings,
+  activeSceneName: string,
+  imageNodes: { id: string }[]
+): any {
+  if (!rawJson) return null;
+  const cloned = JSON.parse(JSON.stringify(rawJson));
+  const placeholder = "empty.png";
+
+  const effectivePromptNodeId = activeShot?.prompt_node_id || selectedPromptNodeId;
+  const effectivePrompt = activeShot?.expanded_prompt || "";
+
+  // Merge shot assigned_slots and nodeMappings
+  const effectiveMappings: Record<string, string> = {
+    ...nodeMappings,
+    ...(activeShot?.node_mappings || {})
+  };
+
+  imageNodes.forEach((node, idx) => {
+    if (activeShot?.assigned_slots && activeShot.assigned_slots[idx]) {
+      effectiveMappings[node.id] = activeShot.assigned_slots[idx];
+    }
+  });
+
+  const effectiveParams = activeShot?.generation_params || generationParams;
+  const effectiveParamNodes = activeShot?.parameter_node_mappings || parameterNodeMappings;
+  const shotNumStr = activeShot ? formatShotNumber(activeShot.shot_number) : "01";
+  const saveVideoPrefix = generateSaveVideoPrefix(activeSceneName, shotNumStr);
+
+  // 1. Visual Canvas format (nodes array)
+  if (Array.isArray(cloned.nodes)) {
+    for (const node of cloned.nodes) {
+      if (!node || typeof node !== "object") continue;
+      const strId = String(node.id ?? "");
+      const classType = String(node.type ?? "");
+      const title = String(node.title ?? "");
+
+      // Prompt Node Injection
+      if (
+        (effectivePromptNodeId && strId === String(effectivePromptNodeId)) ||
+        (!effectivePromptNodeId && (["PrimitiveStringMultiline", "CLIPTextEncode", "StringLiteral", "ShowText"].includes(classType) || title.toLowerCase().includes("prompt")))
+      ) {
+        if (effectivePrompt) {
+          if (Array.isArray(node.widgets_values) && node.widgets_values.length > 0) {
+            node.widgets_values[0] = effectivePrompt;
+          } else {
+            node.widgets_values = [effectivePrompt];
+          }
+          if (node.widgets_values_named && typeof node.widgets_values_named === "object") {
+            node.widgets_values_named.value = effectivePrompt;
+            node.widgets_values_named.text = effectivePrompt;
+          }
+        }
+      }
+
+      // Image Loader Nodes Injection
+      if (
+        ["LoadImage", "LoadImageMask", "LoadImageFromUrl", "LoadImageBase64"].includes(classType) ||
+        classType.toLowerCase().includes("image") ||
+        strId in effectiveMappings
+      ) {
+        if (effectiveMappings[strId] && String(effectiveMappings[strId]).trim()) {
+          const assigned = String(effectiveMappings[strId]).trim();
+          if (Array.isArray(node.widgets_values) && node.widgets_values.length > 0) {
+            node.widgets_values[0] = assigned;
+          } else {
+            node.widgets_values = [assigned, "image"];
+          }
+          if (node.widgets_values_named && typeof node.widgets_values_named === "object") {
+            node.widgets_values_named.image = assigned;
+          }
+          if (node.mode === 2 || node.mode === 4) {
+            node.mode = 0;
+          }
+        } else {
+          if (bypassMissing) {
+            if (Array.isArray(node.widgets_values) && node.widgets_values.length > 0) {
+              if (!node.widgets_values[0] || node.widgets_values[0] === "example.png") {
+                node.widgets_values[0] = placeholder;
+              }
+            } else {
+              node.widgets_values = [placeholder, "image"];
+            }
+            if (node.widgets_values_named && typeof node.widgets_values_named === "object") {
+              node.widgets_values_named.image = placeholder;
+            }
+          }
+        }
+      }
+
+      // Video Loader Nodes Injection
+      else if (["LoadVideo", "VHS_LoadVideo", "VHS_LoadVideoPath"].includes(classType)) {
+        if (effectiveMappings[strId] && String(effectiveMappings[strId]).trim()) {
+          const assigned = String(effectiveMappings[strId]).trim();
+          if (Array.isArray(node.widgets_values) && node.widgets_values.length > 0) {
+            node.widgets_values[0] = assigned;
+          } else {
+            node.widgets_values = [assigned];
+          }
+          if (node.widgets_values_named && typeof node.widgets_values_named === "object") {
+            node.widgets_values_named.video = assigned;
+          }
+          if (node.mode === 2 || node.mode === 4) node.mode = 0;
+        } else if (bypassMissing) {
+          if (Array.isArray(node.widgets_values) && node.widgets_values.length > 0 && (!node.widgets_values[0] || String(node.widgets_values[0]).includes("default"))) {
+            node.widgets_values[0] = placeholder;
+          }
+        }
+      }
+
+      // Audio Loader Nodes Injection
+      else if (["LoadAudio", "VHS_LoadAudio"].includes(classType)) {
+        if (effectiveMappings[strId] && String(effectiveMappings[strId]).trim()) {
+          const assigned = String(effectiveMappings[strId]).trim();
+          if (Array.isArray(node.widgets_values) && node.widgets_values.length > 0) {
+            node.widgets_values[0] = assigned;
+          } else {
+            node.widgets_values = [assigned];
+          }
+          if (node.widgets_values_named && typeof node.widgets_values_named === "object") {
+            node.widgets_values_named.audio = assigned;
+          }
+          if (node.mode === 2 || node.mode === 4) node.mode = 0;
+        } else if (bypassMissing) {
+          if (Array.isArray(node.widgets_values) && node.widgets_values.length > 0 && (!node.widgets_values[0] || String(node.widgets_values[0]).includes("default"))) {
+            node.widgets_values[0] = placeholder;
+          }
+        }
+      }
+
+      // SaveVideo Node Target Injection
+      if (
+        (classType === "SaveVideo" || node.type === "SaveVideo" || strId === "92" || title.toLowerCase().includes("save video")) &&
+        saveVideoPrefix
+      ) {
+        if (Array.isArray(node.widgets_values) && node.widgets_values.length > 0) {
+          node.widgets_values[0] = saveVideoPrefix;
+        } else {
+          node.widgets_values = [saveVideoPrefix];
+        }
+        if (node.widgets_values_named && typeof node.widgets_values_named === "object") {
+          node.widgets_values_named.filename_prefix = saveVideoPrefix;
+        }
+      }
+
+      // Generation Parameter Overrides (Visual Canvas)
+      if (effectiveParams && effectiveParamNodes) {
+        // Steps
+        if (effectiveParamNodes.steps === strId && effectiveParams.steps !== undefined) {
+          const val = parseInt(String(effectiveParams.steps), 10);
+          if (!isNaN(val)) {
+            if (Array.isArray(node.widgets_values) && node.widgets_values.length > 0) {
+              node.widgets_values[0] = val;
+            } else {
+              node.widgets_values = [val];
+            }
+            if (node.widgets_values_named && typeof node.widgets_values_named === "object") {
+              node.widgets_values_named.steps = val;
+            }
+          }
+        }
+        // Megapixels
+        if (effectiveParamNodes.megapixels === strId && effectiveParams.megapixels !== undefined) {
+          const val = parseFloat(String(effectiveParams.megapixels));
+          if (!isNaN(val)) {
+            if (Array.isArray(node.widgets_values) && node.widgets_values.length > 0) {
+              node.widgets_values[0] = val;
+            } else {
+              node.widgets_values = [val];
+            }
+            if (node.widgets_values_named && typeof node.widgets_values_named === "object") {
+              node.widgets_values_named.megapixels = val;
+            }
+          }
+        }
+        // Frames
+        if (effectiveParamNodes.frames === strId && effectiveParams.frames !== undefined) {
+          const val = parseInt(String(effectiveParams.frames), 10);
+          if (!isNaN(val)) {
+            if (Array.isArray(node.widgets_values)) {
+              if (node.widgets_values.length > 1) node.widgets_values[1] = val;
+              else if (node.widgets_values.length > 0) node.widgets_values[0] = val;
+              else node.widgets_values = [val];
+            }
+            if (node.widgets_values_named && typeof node.widgets_values_named === "object") {
+              for (const k of ["frames", "length", "num_frames", "duration", "frame_count"]) {
+                if (k in node.widgets_values_named) {
+                  node.widgets_values_named[k] = val;
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return cloned;
+  }
+
+  // 2. Flat API Dictionary format
+  if (effectivePromptNodeId && cloned[effectivePromptNodeId]) {
+    const pNode = cloned[effectivePromptNodeId];
+    pNode.inputs = pNode.inputs || {};
+    if ("value" in pNode.inputs || pNode.class_type === "PrimitiveStringMultiline") {
+      pNode.inputs.value = effectivePrompt;
+    } else {
+      pNode.inputs.text = effectivePrompt;
+    }
+  } else if (effectivePrompt) {
+    for (const [, nData] of Object.entries<any>(cloned)) {
+      if (nData && ["PrimitiveStringMultiline", "CLIPTextEncode", "StringLiteral", "ShowText"].includes(nData.class_type)) {
+        nData.inputs = nData.inputs || {};
+        if ("value" in nData.inputs || nData.class_type === "PrimitiveStringMultiline") {
+          nData.inputs.value = effectivePrompt;
+        } else {
+          nData.inputs.text = effectivePrompt;
+        }
+        break;
+      }
+    }
+  }
+
+  for (const [nodeId, nodeData] of Object.entries<any>(cloned)) {
+    if (!nodeData || typeof nodeData !== "object") continue;
+    const classType = nodeData.class_type || "";
+    nodeData.inputs = nodeData.inputs || {};
+
+    if (["LoadImage", "LoadImageMask", "LoadImageFromUrl", "LoadImageBase64"].includes(classType) || classType.toLowerCase().includes("image") || nodeId in effectiveMappings) {
+      if (effectiveMappings[nodeId] && String(effectiveMappings[nodeId]).trim()) {
+        nodeData.inputs.image = String(effectiveMappings[nodeId]).trim();
+      } else {
+        const currentImg = nodeData.inputs.image;
+        if (!currentImg || currentImg === "example.png" || bypassMissing) {
+          nodeData.inputs.image = placeholder;
+        }
+      }
+    } else if (["LoadVideo", "VHS_LoadVideo", "VHS_LoadVideoPath"].includes(classType)) {
+      if (effectiveMappings[nodeId] && String(effectiveMappings[nodeId]).trim()) {
+        nodeData.inputs.video = String(effectiveMappings[nodeId]).trim();
+      } else if (bypassMissing && (!nodeData.inputs.video || String(nodeData.inputs.video).includes("default"))) {
+        nodeData.inputs.video = placeholder;
+      }
+    } else if (["LoadAudio", "VHS_LoadAudio"].includes(classType)) {
+      if (effectiveMappings[nodeId] && String(effectiveMappings[nodeId]).trim()) {
+        nodeData.inputs.audio = String(effectiveMappings[nodeId]).trim();
+      } else if (bypassMissing && (!nodeData.inputs.audio || String(nodeData.inputs.audio).includes("default"))) {
+        nodeData.inputs.audio = placeholder;
+      }
+    } else if (
+      classType === "SaveVideo" ||
+      nodeId === "92" ||
+      (nodeData._meta && String(nodeData._meta.title).toLowerCase().includes("save video"))
+    ) {
+      if (saveVideoPrefix) {
+        nodeData.inputs.filename_prefix = saveVideoPrefix;
+      }
+    }
+  }
+
+  if (effectiveParams && effectiveParamNodes) {
+    if (effectiveParamNodes.steps && cloned[effectiveParamNodes.steps] && effectiveParams.steps !== undefined) {
+      const sNode = cloned[effectiveParamNodes.steps];
+      sNode.inputs = sNode.inputs || {};
+      sNode.inputs.steps = Number(effectiveParams.steps);
+    }
+    if (effectiveParamNodes.megapixels && cloned[effectiveParamNodes.megapixels] && effectiveParams.megapixels !== undefined) {
+      const mNode = cloned[effectiveParamNodes.megapixels];
+      mNode.inputs = mNode.inputs || {};
+      mNode.inputs.megapixels = Number(effectiveParams.megapixels);
+    }
+    if (effectiveParamNodes.frames && cloned[effectiveParamNodes.frames] && effectiveParams.frames !== undefined) {
+      const fNode = cloned[effectiveParamNodes.frames];
+      fNode.inputs = fNode.inputs || {};
+      let matchedKey = "frames";
+      for (const k of ["frames", "length", "num_frames", "duration", "frame_count"]) {
+        if (k in fNode.inputs) {
+          matchedKey = k;
+          break;
+        }
+      }
+      fNode.inputs[matchedKey] = Number(effectiveParams.frames);
+    }
+  }
+
+  return cloned;
+}
 
 interface WorkflowSectionProps {
   activeSceneName: string;
@@ -39,8 +338,8 @@ interface WorkflowSectionProps {
   onUpdateParameterMapping: (key: keyof ParameterNodeMappings, nodeId: string) => void;
   activeShotId: string | null;
   onSelectShot: (id: string | null) => void;
-  sceneProject: import("../types").SceneProjectFile;
-  onUpdateShot: (updater: (prev: import("../types").ShotItem) => import("../types").ShotItem) => void;
+  sceneProject: SceneProjectFile;
+  onUpdateShot: (updater: (prev: ShotItem) => ShotItem) => void;
 }
 
 export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
@@ -71,10 +370,44 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [copiedJson, setCopiedJson] = useState(false);
 
+  const promptNodes = parsedWorkflow?.nodes_info?.prompt_nodes || [];
+  const imageNodes = parsedWorkflow?.nodes_info?.image_loader_nodes || [];
+  const videoNodes = parsedWorkflow?.nodes_info?.video_loader_nodes || [];
+  const audioNodes = parsedWorkflow?.nodes_info?.audio_loader_nodes || [];
+
+  const activeShot = sceneProject.shots.find((s) => s.id === activeShotId);
+
+  // Compute live in-memory injected workflow JSON for the active shot
+  const liveInjectedWorkflow = useMemo(() => {
+    return generateLiveInjectedWorkflow(
+      parsedWorkflow?.raw_json,
+      activeShot,
+      selectedPromptNodeId,
+      nodeMappings,
+      bypassMissing,
+      generationParams,
+      parameterNodeMappings,
+      activeSceneName || sceneProject.scene_name,
+      imageNodes
+    );
+  }, [
+    parsedWorkflow?.raw_json,
+    activeShot,
+    selectedPromptNodeId,
+    nodeMappings,
+    bypassMissing,
+    generationParams,
+    parameterNodeMappings,
+    activeSceneName,
+    sceneProject.scene_name,
+    imageNodes
+  ]);
+
   const handleCopyJson = async () => {
-    if (!parsedWorkflow?.raw_json) return;
+    const targetJson = liveInjectedWorkflow || parsedWorkflow?.raw_json;
+    if (!targetJson) return;
     try {
-      await navigator.clipboard.writeText(JSON.stringify(parsedWorkflow.raw_json, null, 2));
+      await navigator.clipboard.writeText(JSON.stringify(targetJson, null, 2));
       setCopiedJson(true);
       setTimeout(() => setCopiedJson(false), 2000);
     } catch (err) {
@@ -119,13 +452,6 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
       e.target.value = "";
     }
   };
-
-  const promptNodes = parsedWorkflow?.nodes_info?.prompt_nodes || [];
-  const imageNodes = parsedWorkflow?.nodes_info?.image_loader_nodes || [];
-  const videoNodes = parsedWorkflow?.nodes_info?.video_loader_nodes || [];
-  const audioNodes = parsedWorkflow?.nodes_info?.audio_loader_nodes || [];
-
-  const activeShot = sceneProject.shots.find((s) => s.id === activeShotId);
 
   return (
     <div id="workflow-section" className="space-y-5 flex flex-col min-h-0">
@@ -262,16 +588,19 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
       {/* Raw JSON inspection collapsible */}
       {showRawJson && parsedWorkflow && (
         <div className="p-3 rounded-lg bg-zinc-950 border-2 border-zinc-700 text-xs space-y-2">
-          <div className="flex items-center justify-between text-zinc-300 border-b border-zinc-800/80 pb-2">
-            <div className="flex items-center gap-2">
-              <FileJson className="w-4 h-4 text-amber-400" />
+          <div className="flex flex-wrap items-center justify-between gap-2 text-zinc-300 border-b border-zinc-800/80 pb-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <FileJson className="w-4 h-4 text-amber-400 shrink-0" />
               <span className="font-mono font-medium text-xs text-zinc-200">
-                {Array.isArray(parsedWorkflow.raw_json?.nodes)
-                  ? `Standard Visual Workflow Canvas (${parsedWorkflow.raw_json.nodes.length} nodes)`
-                  : `Flat ComfyUI Graph (${Object.keys(parsedWorkflow.raw_json || {}).length} nodes)`}
+                {Array.isArray(liveInjectedWorkflow?.nodes)
+                  ? `Live Injected Workflow Canvas (${liveInjectedWorkflow.nodes.length} nodes)`
+                  : `Live Injected Workflow Graph (${Object.keys(liveInjectedWorkflow || {}).length} nodes)`}
+              </span>
+              <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-mono">
+                Active Shot #{activeShot ? String(activeShot.shot_number).padStart(2, '0') : '01'} Live Data
               </span>
               <span className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono">
-                {Array.isArray(parsedWorkflow.raw_json?.nodes)
+                {Array.isArray(liveInjectedWorkflow?.nodes)
                   ? "Visual UI Workflow JSON"
                   : "API Prompt Format JSON"}
               </span>
@@ -280,7 +609,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
             <button
               onClick={handleCopyJson}
               className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 text-zinc-200 border border-zinc-600 transition-colors"
-              title="Copy JSON to clipboard"
+              title="Copy live injected workflow JSON to clipboard"
             >
               {copiedJson ? (
                 <>
@@ -295,8 +624,11 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
               )}
             </button>
           </div>
+          <p className="text-[11px] text-zinc-400">
+            Live in-memory preview of the workflow JSON populated with the active shot's assigned assets, expanded prompt, and generation parameters.
+          </p>
           <pre className="max-h-64 overflow-auto font-mono text-[11px] text-zinc-300 bg-zinc-900/80 p-3 rounded-lg border border-zinc-800">
-            {JSON.stringify(parsedWorkflow.raw_json, null, 2)}
+            {JSON.stringify(liveInjectedWorkflow || parsedWorkflow.raw_json, null, 2)}
           </pre>
         </div>
       )}

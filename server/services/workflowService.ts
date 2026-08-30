@@ -207,7 +207,7 @@ export function injectAndPrepareWorkflowData(
       // Prompt Node
       if (
         (promptNodeId && strId === String(promptNodeId)) ||
-        (!promptNodeId && ["PrimitiveStringMultiline", "CLIPTextEncode"].includes(classType))
+        (!promptNodeId && (["PrimitiveStringMultiline", "CLIPTextEncode", "StringLiteral", "ShowText"].includes(classType) || String(node.title || "").toLowerCase().includes("prompt")))
       ) {
         if (finalPrompt) {
           if (Array.isArray(node.widgets_values) && node.widgets_values.length > 0) {
@@ -215,12 +215,17 @@ export function injectAndPrepareWorkflowData(
           } else {
             node.widgets_values = [finalPrompt];
           }
+          if (node.widgets_values_named && typeof node.widgets_values_named === "object") {
+            node.widgets_values_named.value = finalPrompt;
+            node.widgets_values_named.text = finalPrompt;
+          }
         }
       }
 
       // Image Loaders
       if (
         ["LoadImage", "LoadImageMask", "LoadImageFromUrl", "LoadImageBase64"].includes(classType) ||
+        classType.toLowerCase().includes("image") ||
         strId in nodeMappings
       ) {
         if (nodeMappings[strId] && String(nodeMappings[strId]).trim()) {
@@ -246,6 +251,9 @@ export function injectAndPrepareWorkflowData(
             } else {
               node.widgets_values = [placeholder, "image"];
             }
+            if (node.widgets_values_named && typeof node.widgets_values_named === "object") {
+              node.widgets_values_named.image = placeholder;
+            }
           }
         }
       }
@@ -259,7 +267,14 @@ export function injectAndPrepareWorkflowData(
           } else {
             node.widgets_values = [assigned];
           }
+          if (node.widgets_values_named && typeof node.widgets_values_named === "object") {
+            node.widgets_values_named.video = assigned;
+          }
           if (node.mode === 2 || node.mode === 4) node.mode = 0;
+        } else if (bypassMissing) {
+          if (Array.isArray(node.widgets_values) && node.widgets_values.length > 0 && (!node.widgets_values[0] || String(node.widgets_values[0]).includes("default"))) {
+            node.widgets_values[0] = placeholder;
+          }
         }
       }
 
@@ -272,23 +287,61 @@ export function injectAndPrepareWorkflowData(
           } else {
             node.widgets_values = [assigned];
           }
+          if (node.widgets_values_named && typeof node.widgets_values_named === "object") {
+            node.widgets_values_named.audio = assigned;
+          }
           if (node.mode === 2 || node.mode === 4) node.mode = 0;
+        } else if (bypassMissing) {
+          if (Array.isArray(node.widgets_values) && node.widgets_values.length > 0 && (!node.widgets_values[0] || String(node.widgets_values[0]).includes("default"))) {
+            node.widgets_values[0] = placeholder;
+          }
         }
       }
 
       // Generation Parameter Overrides (Visual Canvas)
       if (parameterOverrides && parameterNodeMappings) {
         if (parameterNodeMappings.steps === strId && parameterOverrides.steps !== undefined) {
-          const val = Number(parameterOverrides.steps);
-          if (!isNaN(val) && Array.isArray(node.widgets_values) && node.widgets_values.length > 0) {
-            node.widgets_values[0] = val;
+          const val = parseInt(String(parameterOverrides.steps), 10);
+          if (!isNaN(val)) {
+            if (Array.isArray(node.widgets_values) && node.widgets_values.length > 0) {
+              node.widgets_values[0] = val;
+            } else {
+              node.widgets_values = [val];
+            }
+            if (node.widgets_values_named && typeof node.widgets_values_named === "object") {
+              node.widgets_values_named.steps = val;
+            }
+          }
+        }
+        if (parameterNodeMappings.megapixels === strId && parameterOverrides.megapixels !== undefined) {
+          const val = parseFloat(String(parameterOverrides.megapixels));
+          if (!isNaN(val)) {
+            if (Array.isArray(node.widgets_values) && node.widgets_values.length > 0) {
+              node.widgets_values[0] = val;
+            } else {
+              node.widgets_values = [val];
+            }
+            if (node.widgets_values_named && typeof node.widgets_values_named === "object") {
+              node.widgets_values_named.megapixels = val;
+            }
           }
         }
         if (parameterNodeMappings.frames === strId && parameterOverrides.frames !== undefined) {
-          const val = Number(parameterOverrides.frames);
-          if (!isNaN(val) && Array.isArray(node.widgets_values)) {
-            if (node.widgets_values.length > 1) node.widgets_values[1] = val;
-            else if (node.widgets_values.length > 0) node.widgets_values[0] = val;
+          const val = parseInt(String(parameterOverrides.frames), 10);
+          if (!isNaN(val)) {
+            if (Array.isArray(node.widgets_values)) {
+              if (node.widgets_values.length > 1) node.widgets_values[1] = val;
+              else if (node.widgets_values.length > 0) node.widgets_values[0] = val;
+              else node.widgets_values = [val];
+            }
+            if (node.widgets_values_named && typeof node.widgets_values_named === "object") {
+              for (const k of ["frames", "length", "num_frames", "duration", "frame_count"]) {
+                if (k in node.widgets_values_named) {
+                  node.widgets_values_named[k] = val;
+                  break;
+                }
+              }
+            }
           }
         }
       }

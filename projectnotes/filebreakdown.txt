@@ -297,8 +297,19 @@
   - Passes explicit `camera_movement` (e.g. "Locked Off (Static)", "Pan Left", etc.) to the LLM system prompt and context block as a hard constraint, strictly forbidding contradictory camera motions (e.g. push-ins or zooms when locked off).
   - Configured offline fallback generators to strictly respect static/dynamic camera movement directives.
   - Seamlessly returns the complete prompt assembled via Assembly Line: `Mandatory Header (Scene & Shot Header + Global Subject Definitions + Framing Directive) + LLM Multimodal Description + Mandatory Audio/Music Footer`.
-  - Refactored Python `camera_context_block` construction to use standard multi-line branching without embedded backslashes in f-strings, ensuring 100% compatibility with Python 3.11+. Validated clean syntax compilation across all backend modules (`backend/main.py`, `backend/routes/*.py`, `backend/services/*.py`, `backend/utils/*.py`).
-
-
-
+  - Refactored Python `camera_context_block` construction to use standard multi-line branching without embedded backslashes in f-strings, ensuring 100% compatibility with Python 3.11+. Validated clean syntax compilation across all backend modules (`backend/main.py`, `backend/routes/*.py`, `backend/services/*.py`, `backend/utils/*.py`).## Live Injected Workflow Preview, Dynamic Parameter Patching & Scene Persistence
+- **`src/components/WorkflowSection.tsx`**
+  - Implemented client-side live in-memory workflow injection (`generateLiveInjectedWorkflow` via `useMemo`) that dynamically populates:
+    - Target text prompt nodes with the active shot's `expanded_prompt`.
+    - Image, Video, and Audio loader nodes with actual assigned assets (`assigned_slots` and `node_mappings`) or `empty.png` placeholders when missing asset bypass is enabled.
+    - Generation parameter overrides (`steps`, `megapixels`, `frames`) mapped to respective node IDs.
+    - SaveVideo output node prefix formatted with the active scene and shot number (`video/{scene_name}_Shot_{shot_number}_`).
+  - Updated the JSON inspection viewer and "Copy JSON" button to preview and copy the fully assembled, ready-to-execute workflow JSON for the currently active shot with instant visual "Copied!" feedback.
+- **`server/services/workflowService.ts` & `backend/services/workflow_service.py`**
+  - Synchronized `inject_and_prepare_workflow` across TypeScript and Python to dynamically patch both Visual Canvas (`nodes` array) and API graph formats.
+  - Added support for auto-detecting and overriding generation parameters (`steps`, `megapixels`, `frames`) without requiring hardcoded node IDs.
+  - Automatically targets `SaveVideo` nodes to inject formatted scene/shot filename prefixes.
+- **`backend/routes/api.py` & `server/services/executionService.ts`**
+  - Updated workflow staging pipelines (`/api/workflow/stage` and multi-shot staging) to persist prepared workflow files directly into the active scene's directory: `assets/{scene_name}/workflows/{scene_name}_Shot_{shot_number}.json`.
+  - Staged workflows are properly synced via SSH to remote RunPod ComfyUI user directories (`{remote_root}/user/default/workflows/{scene_name}/`) and reported cleanly in transfer summaries.
 

@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { EMPTY_1X1_PNG_BUFFER, UPLOADS_DIR, WORKFLOWS_DIR } from "../config/constants";
+import { EMPTY_1X1_PNG_BUFFER, UPLOADS_DIR, WORKFLOWS_DIR, getSceneDirectories } from "../config/constants";
 import { ExecutionStepLog, ScenePlanningDTO, TransferFileSummary } from "../types";
 import {
   generatePromptPrefix,
@@ -181,10 +181,14 @@ export async function processAssetTransfer(options: AssetTransferOptions) {
         const activeSceneName = sanitizeFilenamePart(scene_name ?? scene_planning?.scene_name ?? planning?.scene_name ?? "Untitled_Scene");
         remoteWorkflowPath = `${cleanRemoteRoot}/user/default/workflows/${activeSceneName}/${finalFilename}`;
 
-        // Save staged workflow version locally
-        stagedWorkflowFilename = `staged_${finalFilename}`;
-        const stagedPath = path.join(WORKFLOWS_DIR, stagedWorkflowFilename);
+        // Save staged workflow version into active scene workflows directory
+        const sceneWfDir = getSceneDirectories(activeSceneName).workflows;
+        if (!fs.existsSync(sceneWfDir)) {
+          fs.mkdirSync(sceneWfDir, { recursive: true });
+        }
+        const stagedPath = path.join(sceneWfDir, finalFilename);
         fs.writeFileSync(stagedPath, JSON.stringify(updatedWorkflowJson, null, 2));
+        stagedWorkflowFilename = finalFilename;
 
         transferredSummary.push({
           filename: finalFilename,
@@ -336,9 +340,12 @@ export async function processSceneTransfer(options: SceneTransferOptions) {
           const remoteWorkflowPath = `${cleanRemoteRoot}/user/default/workflows/${activeSceneName}/${finalFilename}`;
           remoteWorkflowPaths.push(remoteWorkflowPath);
 
-          // Save staged workflow version locally
-          const stagedWorkflowFilename = `staged_${finalFilename}`;
-          const stagedPath = path.join(WORKFLOWS_DIR, stagedWorkflowFilename);
+          // Save staged workflow version into active scene workflows directory
+          const sceneWfDir = getSceneDirectories(activeSceneName).workflows;
+          if (!fs.existsSync(sceneWfDir)) {
+            fs.mkdirSync(sceneWfDir, { recursive: true });
+          }
+          const stagedPath = path.join(sceneWfDir, finalFilename);
           fs.writeFileSync(stagedPath, JSON.stringify(updatedWorkflowJson, null, 2));
 
           transferredSummary.push({

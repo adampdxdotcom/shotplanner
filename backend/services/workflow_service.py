@@ -176,7 +176,8 @@ def inject_and_prepare_workflow(
     bypass_missing: bool = True,
     safe_placeholder: str = "empty.png",
     parameter_overrides: Optional[Dict[str, Any]] = None,
-    parameter_node_mappings: Optional[Dict[str, str]] = None
+    parameter_node_mappings: Optional[Dict[str, str]] = None,
+    save_video_prefix: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Step B & C:
@@ -189,7 +190,7 @@ def inject_and_prepare_workflow(
          * If node was muted/bypassed (mode: 4 or mode: 2), set mode: 0 (unmuted/active).
        For unmapped LoadImage nodes:
          * Set widgets_values[0] = "empty.png" (or inputs["image"] = "empty.png").
-    3. Update Prompt and Generation Parameters.
+    3. Update Prompt and Generation Parameters (steps, megapixels, frames).
     """
     modified_wf = copy.deepcopy(workflow_data)
     placeholder = safe_placeholder if safe_placeholder else "empty.png"
@@ -201,19 +202,22 @@ def inject_and_prepare_workflow(
                 continue
 
             node_id_str = str(node.get("id", ""))
-            class_type = node.get("type", "")
+            class_type = str(node.get("type") or "")
             title = str(node.get("title") or "")
 
             # Update Prompt Node
-            if (prompt_node_id and node_id_str == str(prompt_node_id)) or (not prompt_node_id and class_type == "PrimitiveStringMultiline"):
+            if (prompt_node_id and node_id_str == str(prompt_node_id)) or (not prompt_node_id and (class_type in ["PrimitiveStringMultiline", "CLIPTextEncode", "StringLiteral", "ShowText"] or "prompt" in title.lower())):
                 if expanded_prompt:
                     if isinstance(node.get("widgets_values"), list) and len(node["widgets_values"]) > 0:
                         node["widgets_values"][0] = expanded_prompt
                     else:
                         node["widgets_values"] = [expanded_prompt]
+                    if "widgets_values_named" in node and isinstance(node["widgets_values_named"], dict):
+                        node["widgets_values_named"]["value"] = expanded_prompt
+                        node["widgets_values_named"]["text"] = expanded_prompt
 
             # Update Image Loader Nodes
-            if class_type in ["LoadImage", "LoadImageMask", "LoadImageFromUrl", "LoadImageBase64"] or node_id_str in node_mappings:
+            if class_type in ["LoadImage", "LoadImageMask", "LoadImageFromUrl", "LoadImageBase64"] or "image" in class_type.lower() or node_id_str in node_mappings:
                 if node_id_str in node_mappings and node_mappings[node_id_str] and str(node_mappings[node_id_str]).strip():
                     assigned_file = str(node_mappings[node_id_str]).strip()
                     if isinstance(node.get("widgets_values"), list) and len(node["widgets_values"]) > 0:
@@ -235,6 +239,8 @@ def inject_and_prepare_workflow(
                                 node["widgets_values"][0] = placeholder
                         else:
                             node["widgets_values"] = [placeholder, "image"]
+                        if "widgets_values_named" in node and isinstance(node["widgets_values_named"], dict):
+                            node["widgets_values_named"]["image"] = placeholder
 
             # Video Loader Nodes
             elif class_type in ["LoadVideo", "VHS_LoadVideo", "VHS_LoadVideoPath"]:
@@ -244,8 +250,13 @@ def inject_and_prepare_workflow(
                         node["widgets_values"][0] = assigned_file
                     else:
                         node["widgets_values"] = [assigned_file]
+                    if "widgets_values_named" in node and isinstance(node["widgets_values_named"], dict):
+                        node["widgets_values_named"]["video"] = assigned_file
                     if node.get("mode") in [2, 4]:
                         node["mode"] = 0
+                elif bypass_missing:
+                    if isinstance(node.get("widgets_values"), list) and len(node["widgets_values"]) > 0 and (not node["widgets_values"][0] or "default" in str(node["widgets_values"][0])):
+                        node["widgets_values"][0] = placeholder
 
             # Audio Loader Nodes
             elif class_type in ["LoadAudio", "VHS_LoadAudio"]:
@@ -255,26 +266,68 @@ def inject_and_prepare_workflow(
                         node["widgets_values"][0] = assigned_file
                     else:
                         node["widgets_values"] = [assigned_file]
+                    if "widgets_values_named" in node and isinstance(node["widgets_values_named"], dict):
+                        node["widgets_values_named"]["audio"] = assigned_file
                     if node.get("mode") in [2, 4]:
                         node["mode"] = 0
+                elif bypass_missing:
+                    if isinstance(node.get("widgets_values"), list) and len(node["widgets_values"]) > 0 and (not node["widgets_values"][0] or "default" in str(node["widgets_values"][0])):
+                        node["widgets_values"][0] = placeholder
+
+            # SaveVideo Prefix
+            if (class_type == "SaveVideo" or node.get("type") == "SaveVideo" or node_id_str == "92" or "save video" in title.lower()) and save_video_prefix:
+                clean_prefix = str(save_video_prefix).strip()
+                if isinstance(node.get("widgets_values"), list) and len(node["widgets_values"]) > 0:
+                    node["widgets_values"][0] = clean_prefix
+                else:
+                    node["widgets_values"] = [clean_prefix]
+                if "widgets_values_named" in node and isinstance(node["widgets_values_named"], dict):
+                    node["widgets_values_named"]["filename_prefix"] = clean_prefix
 
             # Generation Parameter Overrides (Visual Node)
             if parameter_overrides and parameter_node_mappings:
+                # Sampling Steps
                 if parameter_node_mappings.get("steps") == node_id_str and parameter_overrides.get("steps") is not None:
                     try:
                         val = int(parameter_overrides["steps"])
                         if isinstance(node.get("widgets_values"), list) and len(node["widgets_values"]) > 0:
                             node["widgets_values"][0] = val
+                        else:
+                            node["widgets_values"] = [val]
+                        if "widgets_values_named" in node and isinstance(node["widgets_values_named"], dict):
+                            node["widgets_values_named"]["steps"] = val
                     except Exception:
                         pass
 
+                # Megapixels Resolution
+                if parameter_node_mappings.get("megapixels") == node_id_str and parameter_overrides.get("megapixels") is not None:
+                    try:
+                        val = float(parameter_overrides["megapixels"])
+                        if isinstance(node.get("widgets_values"), list) and len(node["widgets_values"]) > 0:
+                            node["widgets_values"][0] = val
+                        else:
+                            node["widgets_values"] = [val]
+                        if "widgets_values_named" in node and isinstance(node["widgets_values_named"], dict):
+                            node["widgets_values_named"]["megapixels"] = val
+                    except Exception:
+                        pass
+
+                # Duration / Frames
                 if parameter_node_mappings.get("frames") == node_id_str and parameter_overrides.get("frames") is not None:
                     try:
                         val = int(parameter_overrides["frames"])
-                        if isinstance(node.get("widgets_values"), list) and len(node["widgets_values"]) > 1:
-                            node["widgets_values"][1] = val
-                        elif isinstance(node.get("widgets_values"), list) and len(node["widgets_values"]) > 0:
-                            node["widgets_values"][0] = val
+                        if isinstance(node.get("widgets_values"), list):
+                            if len(node["widgets_values"]) > 1:
+                                node["widgets_values"][1] = val
+                            elif len(node["widgets_values"]) > 0:
+                                node["widgets_values"][0] = val
+                            else:
+                                node["widgets_values"] = [val]
+                        if "widgets_values_named" in node and isinstance(node["widgets_values_named"], dict):
+                            for k in ["frames", "length", "num_frames", "duration", "frame_count"]:
+                                if k in node["widgets_values_named"]:
+                                    node["widgets_values_named"][k] = val
+                                    break
                     except Exception:
                         pass
 
@@ -291,18 +344,28 @@ def inject_and_prepare_workflow(
             inputs["text"] = expanded_prompt
         else:
             inputs["value"] = expanded_prompt
+    elif expanded_prompt:
+        # Auto-detect prompt node if prompt_node_id was not explicitly specified
+        for n_id, n_data in modified_wf.items():
+            if isinstance(n_data, dict) and n_data.get("class_type") in ["PrimitiveStringMultiline", "CLIPTextEncode", "StringLiteral", "ShowText"]:
+                inputs = n_data.setdefault("inputs", {})
+                if "value" in inputs or n_data.get("class_type") == "PrimitiveStringMultiline":
+                    inputs["value"] = expanded_prompt
+                else:
+                    inputs["text"] = expanded_prompt
+                break
 
     # Check every node in the graph for loader bypass / asset mapping (retaining all links and nodes)
     for node_id, node_data in modified_wf.items():
         if not isinstance(node_data, dict):
             continue
 
-        class_type = node_data.get("class_type", "")
+        class_type = str(node_data.get("class_type") or "")
         inputs = node_data.setdefault("inputs", {})
         str_id = str(node_id)
 
-        # Image loader nodes: Retain all 9 LoadImage nodes and links to Node #136
-        if class_type in ["LoadImage", "LoadImageMask", "LoadImageFromUrl", "LoadImageBase64"]:
+        # Image loader nodes: Retain all 9 LoadImage nodes and links
+        if class_type in ["LoadImage", "LoadImageMask", "LoadImageFromUrl", "LoadImageBase64"] or "image" in class_type.lower() or str_id in node_mappings:
             if str_id in node_mappings and node_mappings[str_id] and str(node_mappings[str_id]).strip():
                 # Asset is mapped
                 inputs["image"] = str(node_mappings[str_id]).strip()
@@ -325,6 +388,10 @@ def inject_and_prepare_workflow(
                 inputs["audio"] = str(node_mappings[str_id]).strip()
             elif bypass_missing and ("audio" not in inputs or not inputs["audio"] or "default" in str(inputs["audio"])):
                 inputs["audio"] = placeholder
+
+        # SaveVideo prefix
+        if (class_type == "SaveVideo" or str_id == "92" or "save video" in str(node_data.get("title", "")).lower()) and save_video_prefix:
+            inputs["filename_prefix"] = str(save_video_prefix).strip()
 
     # Inject Dynamic Generation Parameter Overrides (Step C)
     if parameter_overrides and parameter_node_mappings:

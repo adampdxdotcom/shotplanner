@@ -474,6 +474,11 @@ async def stage_scene_endpoint(req: StageSceneRequest):
             node_mappings={}
         )]
 
+    # Ensure active scene workflows directory exists
+    scene_dirs = get_scene_directories(scene_name)
+    scene_wf_dir = scene_dirs.get("workflows")
+    scene_wf_dir.mkdir(parents=True, exist_ok=True)
+
     # Collect all unique asset filenames
     all_mappings = {}
     for shot in shots:
@@ -496,6 +501,39 @@ async def stage_scene_endpoint(req: StageSceneRequest):
     skipped_count = 0
     uploaded_files = []
     skipped_files = []
+
+    # Prepare and stage workflow files directly in the active scene's workflows directory
+    staged_workflow_files: List[Path] = []
+    for shot in shots:
+        wf_file = shot.workflow_filename or req.workflow_filename
+        if not wf_file:
+            continue
+        try:
+            wf_data = load_workflow_json(wf_file, scene_name=scene_name)
+            shot_num_str = f"{int(shot.shot_number):02d}" if str(shot.shot_number).isdigit() else str(shot.shot_number)
+            final_wf_filename = f"{scene_name}_Shot_{shot_num_str}.json"
+            
+            injected_wf = inject_and_prepare_workflow(
+                workflow_data=wf_data,
+                prompt_node_id=shot.prompt_node_id,
+                expanded_prompt=shot.expanded_prompt or "",
+                node_mappings=shot.node_mappings or {},
+                bypass_missing=req.bypass_missing,
+                safe_placeholder=req.safe_placeholder,
+                parameter_overrides=shot.generation_parameters,
+                parameter_node_mappings=shot.parameter_node_mappings,
+                save_video_prefix=f"video/{scene_name}_Shot_{shot_num_str}_"
+            )
+            
+            # Save directly into active scene's workflows directory: assets/{scene_name}/workflows/{scene_name}_Shot_{shot_number}.json
+            target_file_path = scene_wf_dir / final_wf_filename
+            with open(target_file_path, "w", encoding="utf-8") as f:
+                json.dump(injected_wf, f, indent=2)
+            
+            if target_file_path.exists():
+                staged_workflow_files.append(target_file_path)
+        except Exception as wf_err:
+            print(f"Notice: Failed to prepare staged workflow for shot {shot.shot_number}: {wf_err}")
 
     # If host provided, connect via SSH and perform transfers
     if host:
@@ -521,36 +559,6 @@ async def stage_scene_endpoint(req: StageSceneRequest):
                 uploaded_files.extend(asset_results.get("uploaded_files", []))
                 skipped_files.extend(asset_results.get("skipped_files", []))
                 transferred_summary.extend(asset_results.get("files", []))
-            
-            # Prepare and stage workflow files for each shot
-            staged_workflow_files: List[Path] = []
-            for shot in shots:
-                wf_file = shot.workflow_filename or req.workflow_filename
-                if not wf_file:
-                    continue
-                try:
-                    wf_data = load_workflow_json(wf_file)
-                    shot_num_str = f"{int(shot.shot_number):02d}" if str(shot.shot_number).isdigit() else str(shot.shot_number)
-                    final_wf_filename = f"{scene_name}_Shot_{shot_num_str}.json"
-                    
-                    injected_wf = inject_and_prepare_workflow(
-                        workflow_data=wf_data,
-                        prompt_node_id=shot.prompt_node_id,
-                        expanded_prompt=shot.expanded_prompt or "",
-                        node_mappings=shot.node_mappings or {},
-                        bypass_missing=req.bypass_missing,
-                        safe_placeholder=req.safe_placeholder,
-                        parameter_node_mappings=shot.parameter_node_mappings
-                    )
-                    
-                    staged_local_name = f"staged_{final_wf_filename}"
-                    with open(WORKFLOWS_DIR / staged_local_name, "w", encoding="utf-8") as f:
-                        json.dump(injected_wf, f, indent=2)
-                    staged_path = WORKFLOWS_DIR / staged_local_name
-                    if staged_path.exists():
-                        staged_workflow_files.append(staged_path)
-                except Exception as wf_err:
-                    print(f"Notice: Failed to prepare staged workflow for shot {shot.shot_number}: {wf_err}")
 
             if staged_workflow_files:
                 remote_workflow_dir = f"{remote_root}/user/default/workflows/{scene_name}"
@@ -575,6 +583,15 @@ async def stage_scene_endpoint(req: StageSceneRequest):
                 "file": f.name,
                 "status": "staged_local",
                 "message": "Staged in local workspace."
+            })
+        for wf_p in staged_workflow_files:
+            transferred_count += 1
+            uploaded_files.append(wf_p.name)
+            transferred_summary.append({
+                "filename": wf_p.name,
+                "file": wf_p.name,
+                "status": "staged_local",
+                "message": f"Saved workflow into scene directory: {wf_p.relative_to(BASE_DIR) if wf_p.is_relative_to(BASE_DIR) else wf_p.name}"
             })
 
     return {
