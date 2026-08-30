@@ -932,6 +932,7 @@ export default function App() {
           <GallerySection
             assets={assets}
             subjects={subjects}
+            sceneName={sceneProject.scene_name || "scene01"}
             onRegisterSubject={handleRegisterSubject}
             onAssetUploaded={handleAssetUploaded}
             onAssetDeleted={handleAssetDeleted}

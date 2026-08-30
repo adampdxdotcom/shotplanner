@@ -42,6 +42,25 @@ export function getSceneDirectories(sceneName: string = "scene01") {
   };
 }
 
+/**
+ * Ensure all directories for a specific scene exist on disk
+ */
+export function ensureSceneDirectories(sceneName: string = "scene01"): {
+  images: string;
+  workflows: string;
+  videos: string;
+  audios: string;
+  uploads: string;
+} {
+  const dirs = getSceneDirectories(sceneName);
+  Object.values(dirs).forEach((dir) => {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+  });
+  return dirs;
+}
+
 export const SCENE_REFERENCE_DIRECTIVE = "Do not embellish the setting. Use the exact likeness of location.";
 
 // Standard 1x1 transparent pixel PNG buffer

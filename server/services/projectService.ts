@@ -3,7 +3,7 @@ import path from "path";
 import { Response } from "express";
 import { ZipArchive } from "archiver";
 import unzipper from "unzipper";
-import { PROJECTS_DIR, UPLOADS_DIR, WORKFLOWS_DIR } from "../config/constants";
+import { PROJECTS_DIR, UPLOADS_DIR, WORKFLOWS_DIR, ensureSceneDirectories, formatSceneFolderName } from "../config/constants";
 import { AssetRecord } from "../types";
 import { assetService } from "./assetService";
 
@@ -21,6 +21,11 @@ export function getProjectData(projectName: string): any | null {
   if (!fs.existsSync(p)) return null;
 
   const projectData = JSON.parse(fs.readFileSync(p, "utf-8"));
+  
+  // Ensure scene folders exist on load
+  const sceneName = projectData?.scene_name || projectData?.scene_planning?.scene_name || cleanName;
+  ensureSceneDirectories(sceneName);
+
   // Sync any saved assets into assetDatabase
   if (Array.isArray(projectData.assets)) {
     for (const item of projectData.assets) {
@@ -35,6 +40,10 @@ export function saveProjectData(projectName: string, projectData: any): string {
   const cleanName = projectName.replace(/\.json$/, "");
   const targetPath = path.join(PROJECTS_DIR, `${cleanName}.json`);
   fs.writeFileSync(targetPath, JSON.stringify(projectData, null, 2));
+
+  // Ensure scene folders exist immediately when saving scene
+  const sceneName = projectData?.scene_name || projectData?.scene_planning?.scene_name || cleanName;
+  ensureSceneDirectories(sceneName);
 
   // If project payload includes assets, sync them into assetDatabase
   if (projectData && Array.isArray(projectData.assets)) {

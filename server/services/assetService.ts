@@ -1,6 +1,16 @@
 import fs from "fs";
 import path from "path";
-import { ASSET_DB_FILE, UPLOADS_DIR } from "../config/constants";
+import { 
+  ASSET_DB_FILE, 
+  ASSETS_DIR, 
+  IMAGES_DIR, 
+  VIDEOS_DIR, 
+  AUDIOS_DIR, 
+  UPLOADS_DIR, 
+  TMP_DIR,
+  ensureSceneDirectories,
+  formatSceneFolderName 
+} from "../config/constants";
 import { AssetRecord } from "../types";
 import { sanitizeSlug } from "../utils/formatters";
 
@@ -47,20 +57,44 @@ class AssetService {
     return this.assetDatabase.find((a) => a.filename === filename);
   }
 
+  public getAssetFilePath(filename: string): string | null {
+    const cleanName = path.basename(filename);
+    const candidateDirs = [
+      IMAGES_DIR,
+      VIDEOS_DIR,
+      AUDIOS_DIR,
+      UPLOADS_DIR,
+      ASSETS_DIR
+    ];
+    for (const base of candidateDirs) {
+      if (fs.existsSync(base)) {
+        const direct = path.join(base, cleanName);
+        if (fs.existsSync(direct) && fs.statSync(direct).isFile()) return direct;
+        try {
+          const subdirs = fs.readdirSync(base, { withFileTypes: true }).filter((d) => d.isDirectory());
+          for (const s of subdirs) {
+            const subFile = path.join(base, s.name, cleanName);
+            if (fs.existsSync(subFile) && fs.statSync(subFile).isFile()) return subFile;
+          }
+        } catch {}
+      }
+    }
+    return null;
+  }
+
   public deleteAsset(filename: string): boolean {
     const assetIndex = this.assetDatabase.findIndex((a) => a.filename === filename);
     if (assetIndex !== -1) {
       this.assetDatabase.splice(assetIndex, 1);
-      const filePath = path.join(UPLOADS_DIR, filename);
-      if (fs.existsSync(filePath)) {
-        try {
-          fs.unlinkSync(filePath);
-        } catch (e) {}
-      }
-      this.saveAssetDatabase();
-      return true;
     }
-    return false;
+    const foundPath = this.getAssetFilePath(filename);
+    if (foundPath && fs.existsSync(foundPath)) {
+      try {
+        fs.unlinkSync(foundPath);
+      } catch (e) {}
+    }
+    this.saveAssetDatabase();
+    return true;
   }
 
   public updateAssetMetadata(
@@ -94,8 +128,8 @@ class AssetService {
     if (replaceFilename) {
       const oldIndex = this.assetDatabase.findIndex((a) => a.filename === replaceFilename);
       if (oldIndex !== -1) {
-        const oldPath = path.join(UPLOADS_DIR, replaceFilename);
-        if (fs.existsSync(oldPath)) {
+        const oldPath = this.getAssetFilePath(replaceFilename);
+        if (oldPath && fs.existsSync(oldPath)) {
           try {
             fs.unlinkSync(oldPath);
           } catch (e) {}
@@ -116,8 +150,8 @@ class AssetService {
       if (existingIdx !== -1) {
         const oldFile = this.assetDatabase[existingIdx].filename;
         if (oldFile && oldFile !== record.filename) {
-          const oldPath = path.join(UPLOADS_DIR, oldFile);
-          if (fs.existsSync(oldPath)) {
+          const oldPath = this.getAssetFilePath(oldFile);
+          if (oldPath && fs.existsSync(oldPath)) {
             try {
               fs.unlinkSync(oldPath);
             } catch (e) {}
@@ -143,12 +177,14 @@ class AssetService {
       subject_name?: string;
       description?: string;
       slot_index?: string | number;
+      scene_name?: string;
     }
   ): AssetRecord {
     const mediaType = (meta.media_type || "image") as "image" | "audio" | "video";
     const assetType = meta.type || "headshot";
     const subjectName = meta.subject_name || "subject";
     const description = meta.description || "";
+    const sceneName = meta.scene_name || "scene01";
 
     const cleanType = sanitizeSlug(assetType);
     const cleanName = sanitizeSlug(subjectName);
@@ -158,7 +194,24 @@ class AssetService {
       (mediaType === "image" ? ".png" : mediaType === "audio" ? ".mp3" : ".mp4");
 
     const targetFilename = `${cleanType}_${cleanName}_${timestamp}${ext}`;
-    const destinationPath = path.join(UPLOADS_DIR, targetFilename);
+
+    const sceneDirs = ensureSceneDirectories(sceneName);
+    let targetDir = sceneDirs.images;
+    if (mediaType === "video" || ext.match(/\.(mp4|mov|webm|mkv|avi)$/i)) {
+      targetDir = sceneDirs.videos;
+    } else if (mediaType === "audio" || ext.match(/\.(mp3|wav|ogg|flac|aac|m4a)$/i)) {
+      targetDir = sceneDirs.audios;
+    } else if (mediaType === "image" || ext.match(/\.(png|jpg|jpeg|webp|gif|bmp)$/i)) {
+      targetDir = sceneDirs.images;
+    } else {
+      targetDir = sceneDirs.uploads;
+    }
+
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+    }
+
+    const destinationPath = path.join(targetDir, targetFilename);
 
     fs.copyFileSync(file.path, destinationPath);
     try {
@@ -203,6 +256,7 @@ class AssetService {
       description?: string;
       replace_filename?: string;
       slot_index?: string | number;
+      scene_name?: string;
     }
   ): Promise<{ complete: boolean; asset?: AssetRecord }> {
     return new Promise((resolve, reject) => {
@@ -216,7 +270,8 @@ class AssetService {
         subject_name,
         description,
         replace_filename,
-        slot_index
+        slot_index,
+        scene_name
       } = payload;
 
       const chunkIdx = parseInt(String(chunk_index));
@@ -227,7 +282,12 @@ class AssetService {
       }
 
       const chunkArray = this.uploadChunks.get(upload_id)!;
-      const chunkPath = path.join(UPLOADS_DIR, `${upload_id}_${chunkIdx}`);
+      const chunksTempDir = path.join(TMP_DIR, "chunks");
+      if (!fs.existsSync(chunksTempDir)) {
+        fs.mkdirSync(chunksTempDir, { recursive: true });
+      }
+
+      const chunkPath = path.join(chunksTempDir, `${upload_id}_${chunkIdx}`);
 
       fs.copyFileSync(chunkFile.path, chunkPath);
       try {
@@ -242,13 +302,33 @@ class AssetService {
         return resolve({ complete: false });
       }
 
-      // Final chunk reached: reassemble file
+      // Final chunk reached: reassemble file into scene folder
       const cleanType = sanitizeSlug(type || "asset");
       const cleanName = sanitizeSlug(subject_name || "subject");
       const timestamp = Math.floor(Date.now() / 1000);
       const ext = path.extname(original_name || "") || "";
       const targetFilename = `${cleanType}_${cleanName}_${timestamp}${ext}`;
-      const finalPath = path.join(UPLOADS_DIR, targetFilename);
+
+      const resolvedSceneName = scene_name || "scene01";
+      const sceneDirs = ensureSceneDirectories(resolvedSceneName);
+
+      const mType = (media_type as "image" | "audio" | "video") || "image";
+      let targetDir = sceneDirs.images;
+      if (mType === "video" || ext.match(/\.(mp4|mov|webm|mkv|avi)$/i)) {
+        targetDir = sceneDirs.videos;
+      } else if (mType === "audio" || ext.match(/\.(mp3|wav|ogg|flac|aac|m4a)$/i)) {
+        targetDir = sceneDirs.audios;
+      } else if (mType === "image" || ext.match(/\.(png|jpg|jpeg|webp|gif|bmp)$/i)) {
+        targetDir = sceneDirs.images;
+      } else {
+        targetDir = sceneDirs.uploads;
+      }
+
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+      }
+
+      const finalPath = path.join(targetDir, targetFilename);
 
       const writeStream = fs.createWriteStream(finalPath);
       for (const cp of chunkArray) {
@@ -278,7 +358,7 @@ class AssetService {
           id: targetFilename,
           original_name: original_name || "unknown",
           filename: targetFilename,
-          media_type: (media_type as "image" | "audio" | "video") || "image",
+          media_type: mType,
           type: type || "unknown",
           subject_name: subject_name || "subject",
           description: description || "",

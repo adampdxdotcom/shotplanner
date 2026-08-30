@@ -930,7 +930,8 @@ async def upload_chunk(
     media_type: str = Form("image"),
     type: str = Form("headshot"),
     subject_name: str = Form("subject"),
-    description: str = Form("")
+    description: str = Form(""),
+    scene_name: str = Form("scene01")
 ):
     temp_assembly_path = TMP_UPLOAD_DIR / upload_id
     
@@ -940,9 +941,12 @@ async def upload_chunk(
         f.write(content)
         
     if chunk_index == total_chunks - 1:
-        # Final chunk, assemble and finalize
+        # Final chunk, assemble and finalize into scene folder
         target_filename = generate_target_filename(type, subject_name, original_name)
-        destination_path = UPLOADS_DIR / target_filename
+        scene_dirs = get_scene_directories(scene_name)
+        target_dir = scene_dirs.get("images" if media_type == "image" else "videos" if media_type == "video" else "audios", scene_dirs["uploads"])
+        target_dir.mkdir(parents=True, exist_ok=True)
+        destination_path = target_dir / target_filename
         
         # Move the fully assembled file
         shutil.copyfile(temp_assembly_path, destination_path)
@@ -958,8 +962,9 @@ async def upload_chunk(
             "subject_name": subject_name,
             "description": description,
             "size_bytes": size_bytes,
+            "scene_name": scene_name,
             "path": str(destination_path),
-            "preview_url": f"/assets/uploads/{target_filename}"
+            "preview_url": f"/api/uploads/{target_filename}"
         }
         in_memory_asset_metadata.append(asset_record)
         return {"success": True, "asset": asset_record}

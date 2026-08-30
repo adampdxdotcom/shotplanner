@@ -27,6 +27,7 @@ import {
 interface GallerySectionProps {
   assets: MediaAsset[];
   subjects: string[];
+  sceneName?: string;
   onRegisterSubject: (name: string) => void;
   onAssetUploaded: (asset: MediaAsset) => void;
   onAssetDeleted: (filename: string) => void;
@@ -36,6 +37,7 @@ interface GallerySectionProps {
 export const GallerySection: React.FC<GallerySectionProps> = ({
   assets,
   subjects,
+  sceneName = "scene01",
   onRegisterSubject,
   onAssetUploaded,
   onAssetDeleted,
@@ -343,6 +345,7 @@ export const GallerySection: React.FC<GallerySectionProps> = ({
           formData.append("total_chunks", totalChunks.toString());
           formData.append("original_name", file.name);
           formData.append("slot_index", "0"); // Default
+          formData.append("scene_name", sceneName);
 
           if (chunkIdx === totalChunks - 1) {
             formData.append("media_type", mediaType);
