@@ -1,7 +1,7 @@
 import express, { Request, Response } from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
-import { ASSETS_DIR, UPLOADS_DIR, initDirectories } from "./server/config/constants";
+import { ASSETS_DIR, LEGACY_UPLOADS_DIR, initDirectories } from "./server/config/constants";
 import assetRoutes, { serveAssetFile } from "./server/routes/assetRoutes";
 import executionRoutes from "./server/routes/executionRoutes";
 import projectRoutes from "./server/routes/projectRoutes";
@@ -53,9 +53,9 @@ app.get([
 ], serveAssetFile);
 
 // Static asset directories
-app.use("/assets/uploads", express.static(UPLOADS_DIR));
-app.use("/uploads", express.static(UPLOADS_DIR));
-app.use("/api/uploads", express.static(UPLOADS_DIR));
+app.use("/assets/uploads", express.static(LEGACY_UPLOADS_DIR));
+app.use("/uploads", express.static(LEGACY_UPLOADS_DIR));
+app.use("/api/uploads", express.static(LEGACY_UPLOADS_DIR));
 app.use("/assets", express.static(ASSETS_DIR));
 app.use("/user_assets", express.static(ASSETS_DIR));
 

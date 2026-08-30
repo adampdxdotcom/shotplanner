@@ -1,0 +1,44 @@
+# File Breakdown & Architecture Roles
+
+## Backend Services & Python Route Handlers (Scene-First Storage)
+- **`backend/routes/api.py`**
+  - **Role:** Main FastAPI entry point serving the orchestration endpoints (`/api/workflow/stage`, `/api/projects`, `/api/workflows/parse`, etc). 
+  - **Updates:** Now utilizes `find_asset_file_path` for unified cross-tier asset lookups when transferring resources via SSH, validating project files, or generating project export ZIP packages. Explicitly parses `scene_name` across endpoints to support the localized `assets/{scene_name}/{media_type}/` hierarchy.
+
+- **`backend/utils/file_handlers.py`**
+  - **Role:** File operations and string normalization module.
+  - **Updates:** Houses the core `find_asset_file_path` resolution utility which scans active scene subdirectories before falling back to legacy flat directories. Provides `get_scene_directories` to yield fully provisioned absolute paths on demand, guaranteeing folder existence prior to writes. Implements `format_scene_folder_name` to clean untrusted metadata inputs (e.g. standardizing "Scene 1" -> "scene01").
+
+## Node.js Express Server Middlewares (Uploads & Assets)
+- **`server/config/constants.ts`**
+  - **Role:** Configuration globals.
+  - **Updates:** Establishes the `assets/` schema constants alongside the legacy ones, exporting dynamic lookup utilities to bind the new structures.
+
+- **`server/services/assetService.ts`**
+  - **Role:** Handles multipart form uploads (single and chunked), maintains the active registry state, and bridges frontend requests to disk storage.
+  - **Updates:** Refactored `getAssetFilePath` to match Python's two-tier Scene-First resolution. Modified `handleSingleFileUpload` and `handleChunkUpload` to intercept `scene_name` metadata, dynamically calculating the destination write stream path (`assets/{scene_name}/{media_type}/{filename}`).
+
+- **`server/routes/assetRoutes.ts`**
+  - **Role:** Express route controllers for `/api/assets/*`.
+  - **Updates:** `serveAssetFile` strictly pipes files using `assetService.getAssetFilePath`, granting it the ability to seamlessly serve blobs across the localized or legacy hierarchies.
+
+- **`server/routes/workflowRoutes.ts`**
+  - **Role:** Express route controllers for `/api/workflows/*`.
+  - **Updates:** Extracts `scene_name` during the upload of ComfyUI JSON templates to direct them into the specific `assets/{scene_name}/workflows/` directory.
+
+## React Frontend Components (Metadata Binding)
+- **`src/App.tsx`**
+  - **Role:** Main application orchestrator mounting all contextual tabs and dispatching global API queries.
+  - **Updates:** Assures that `scene_name` metadata is bound and piped properly into `WorkflowSection`, `GallerySection`, and `AssetManagerSection`. Passes active `scene_name` to `/api/workflows/parse` to guarantee accurate ComfyUI JSON discovery.
+
+- **`src/components/AssetManagerSection.tsx`**
+  - **Role:** Core Shot-Level media planning panel.
+  - **Updates:** Enforces explicit injection of `scene_name` into the active `FormData` payload when uploading or editing assets, confirming files are properly routed to their respective contextual folder blocks rather than an orphaned flat directory.
+
+- **`src/components/GallerySection.tsx`**
+  - **Role:** Global library browser and bulk uploader interface.
+  - **Updates:** Incorporates `sceneName` fallback prop to correctly decorate `FormData` payloads during recursive batch uploads (`runBulkUpload`).
+
+- **`src/components/WorkflowSection.tsx`**
+  - **Role:** Pipeline graph manager supporting workflow staging and dynamic media overrides.
+  - **Updates:** Assures uploaded ComfyUI `.json` templates submit the active `scene_name` to guarantee the template is correctly nested inside `assets/{scene_name}/workflows/`.

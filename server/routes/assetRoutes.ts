@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import fs from "fs";
 import path from "path";
-import { ASSETS_DIR, IMAGES_DIR, VIDEOS_DIR, AUDIOS_DIR, UPLOADS_DIR, WORKFLOWS_DIR, upload } from "../config/constants";
+import { upload } from "../config/constants";
 import { assetService } from "../services/assetService";
 
 const router = Router();
@@ -16,37 +16,15 @@ export function serveAssetFile(req: Request, res: Response) {
   try {
     const rawFilename = req.params.filename;
     if (!rawFilename) return res.status(400).send("Filename is required");
-    const filename = path.basename(rawFilename);
 
-    const candidateDirs: string[] = [
-      UPLOADS_DIR,
-      ASSETS_DIR,
-      IMAGES_DIR,
-      VIDEOS_DIR,
-      AUDIOS_DIR,
-      WORKFLOWS_DIR
-    ];
+    const foundPath = assetService.getAssetFilePath(rawFilename);
 
-    [IMAGES_DIR, VIDEOS_DIR, AUDIOS_DIR, UPLOADS_DIR, WORKFLOWS_DIR].forEach((base) => {
-      if (fs.existsSync(base)) {
-        try {
-          const subdirs = fs.readdirSync(base, { withFileTypes: true })
-            .filter((d) => d.isDirectory())
-            .map((d) => path.join(base, d.name));
-          candidateDirs.push(...subdirs);
-        } catch {}
-      }
-    });
-
-    for (const dir of candidateDirs) {
-      const targetPath = path.join(dir, filename);
-      if (fs.existsSync(targetPath) && fs.statSync(targetPath).isFile()) {
-        res.setHeader("Cache-Control", "public, max-age=3600");
-        return res.sendFile(targetPath);
-      }
+    if (foundPath && fs.existsSync(foundPath)) {
+      res.setHeader("Cache-Control", "public, max-age=3600");
+      return res.sendFile(foundPath);
     }
 
-    res.status(404).json({ error: `Asset '${filename}' not found` });
+    res.status(404).json({ error: `Asset '${rawFilename}' not found` });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

@@ -4,15 +4,21 @@ import multer from "multer";
 
 export const ROOT_DIR = process.cwd();
 export const ASSETS_DIR = path.join(ROOT_DIR, "assets");
-export const IMAGES_DIR = path.join(ASSETS_DIR, "images");
-export const WORKFLOWS_DIR = path.join(ASSETS_DIR, "workflows");
-export const VIDEOS_DIR = path.join(ASSETS_DIR, "videos");
-export const AUDIOS_DIR = path.join(ASSETS_DIR, "audios");
-export const UPLOADS_DIR = path.join(ASSETS_DIR, "uploads");
 export const PROJECTS_DIR = path.join(ASSETS_DIR, "project_jsons");
 export const GEMINI_CONFIG_FILE = path.join(ASSETS_DIR, "gemini_config.json");
 export const ASSET_DB_FILE = path.join(ASSETS_DIR, "assets_db.json");
 export const TMP_DIR = path.join(ROOT_DIR, "tmp");
+
+// Legacy directories for backward compatibility
+export const LEGACY_IMAGES_DIR = path.join(ASSETS_DIR, "images");
+export const LEGACY_WORKFLOWS_DIR = path.join(ASSETS_DIR, "workflows");
+export const LEGACY_VIDEOS_DIR = path.join(ASSETS_DIR, "videos");
+export const LEGACY_AUDIOS_DIR = path.join(ASSETS_DIR, "audios");
+export const LEGACY_UPLOADS_DIR = path.join(ASSETS_DIR, "uploads");
+
+// Aliases for backward compatibility in imports
+export const WORKFLOWS_DIR = LEGACY_WORKFLOWS_DIR;
+export const UPLOADS_DIR = LEGACY_UPLOADS_DIR;
 
 /**
  * Standardize scene folder naming e.g., 'Scene 1' -> 'scene01'
@@ -33,12 +39,14 @@ export function formatSceneFolderName(sceneName?: string): string {
  */
 export function getSceneDirectories(sceneName: string = "scene01") {
   const sceneFolder = formatSceneFolderName(sceneName);
+  const scenePath = path.join(ASSETS_DIR, sceneFolder);
   return {
-    images: path.join(IMAGES_DIR, sceneFolder),
-    workflows: path.join(WORKFLOWS_DIR, sceneFolder),
-    videos: path.join(VIDEOS_DIR, sceneFolder),
-    audios: path.join(AUDIOS_DIR, sceneFolder),
-    uploads: path.join(UPLOADS_DIR, sceneFolder)
+    base: scenePath,
+    images: path.join(scenePath, "images"),
+    workflows: path.join(scenePath, "workflows"),
+    videos: path.join(scenePath, "videos"),
+    audios: path.join(scenePath, "audios"),
+    shared: path.join(scenePath, "shared")
   };
 }
 
@@ -46,11 +54,12 @@ export function getSceneDirectories(sceneName: string = "scene01") {
  * Ensure all directories for a specific scene exist on disk
  */
 export function ensureSceneDirectories(sceneName: string = "scene01"): {
+  base: string;
   images: string;
   workflows: string;
   videos: string;
   audios: string;
-  uploads: string;
+  shared: string;
 } {
   const dirs = getSceneDirectories(sceneName);
   Object.values(dirs).forEach((dir) => {
@@ -73,13 +82,13 @@ export const EMPTY_1X1_PNG_BUFFER = Buffer.from(
 export function initDirectories(): void {
   const baseDirs = [
     ASSETS_DIR,
-    IMAGES_DIR,
-    WORKFLOWS_DIR,
-    VIDEOS_DIR,
-    AUDIOS_DIR,
-    UPLOADS_DIR,
     PROJECTS_DIR,
-    TMP_DIR
+    TMP_DIR,
+    LEGACY_IMAGES_DIR,
+    LEGACY_WORKFLOWS_DIR,
+    LEGACY_VIDEOS_DIR,
+    LEGACY_AUDIOS_DIR,
+    LEGACY_UPLOADS_DIR
   ];
   
   baseDirs.forEach((dir) => {
@@ -96,7 +105,7 @@ export function initDirectories(): void {
     }
   });
 
-  const defaultEmptyPngPath = path.join(UPLOADS_DIR, "empty.png");
+  const defaultEmptyPngPath = path.join(defaultSceneDirs.shared, "empty.png");
   if (!fs.existsSync(defaultEmptyPngPath)) {
     fs.writeFileSync(defaultEmptyPngPath, EMPTY_1X1_PNG_BUFFER);
   }

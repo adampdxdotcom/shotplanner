@@ -3,10 +3,10 @@ import path from "path";
 import { 
   ASSET_DB_FILE, 
   ASSETS_DIR, 
-  IMAGES_DIR, 
-  VIDEOS_DIR, 
-  AUDIOS_DIR, 
-  UPLOADS_DIR, 
+  LEGACY_IMAGES_DIR, 
+  LEGACY_VIDEOS_DIR, 
+  LEGACY_AUDIOS_DIR, 
+  LEGACY_UPLOADS_DIR, 
   TMP_DIR,
   ensureSceneDirectories,
   formatSceneFolderName 
@@ -59,11 +59,31 @@ class AssetService {
 
   public getAssetFilePath(filename: string): string | null {
     const cleanName = path.basename(filename);
+    
+    // Scan all Scene folders first
+    if (fs.existsSync(ASSETS_DIR)) {
+      try {
+        const sceneDirs = fs.readdirSync(ASSETS_DIR, { withFileTypes: true })
+          .filter((d) => d.isDirectory() && d.name.startsWith("scene"));
+          
+        for (const scene of sceneDirs) {
+          const sceneBase = path.join(ASSETS_DIR, scene.name);
+          for (const sub of ["images", "videos", "audios", "workflows", "shared"]) {
+            const potentialFile = path.join(sceneBase, sub, cleanName);
+            if (fs.existsSync(potentialFile) && fs.statSync(potentialFile).isFile()) {
+              return potentialFile;
+            }
+          }
+        }
+      } catch {}
+    }
+    
+    // Fallback to legacy flat folders
     const candidateDirs = [
-      IMAGES_DIR,
-      VIDEOS_DIR,
-      AUDIOS_DIR,
-      UPLOADS_DIR,
+      LEGACY_IMAGES_DIR,
+      LEGACY_VIDEOS_DIR,
+      LEGACY_AUDIOS_DIR,
+      LEGACY_UPLOADS_DIR,
       ASSETS_DIR
     ];
     for (const base of candidateDirs) {
@@ -204,7 +224,7 @@ class AssetService {
     } else if (mediaType === "image" || ext.match(/\.(png|jpg|jpeg|webp|gif|bmp)$/i)) {
       targetDir = sceneDirs.images;
     } else {
-      targetDir = sceneDirs.uploads;
+      targetDir = sceneDirs.shared;
     }
 
     if (!fs.existsSync(targetDir)) {
@@ -218,27 +238,28 @@ class AssetService {
       fs.unlinkSync(file.path);
     } catch (e) {}
 
-    const parsedSlotIndex =
-      meta.slot_index !== undefined &&
-      meta.slot_index !== null &&
-      meta.slot_index !== "" &&
-      !isNaN(parseInt(String(meta.slot_index)))
-        ? parseInt(String(meta.slot_index))
-        : undefined;
+      const parsedSlotIndex =
+        meta.slot_index !== undefined &&
+        meta.slot_index !== null &&
+        meta.slot_index !== "" &&
+        !isNaN(parseInt(String(meta.slot_index)))
+          ? parseInt(String(meta.slot_index))
+          : undefined;
 
-    const assetRecord: AssetRecord = {
-      id: targetFilename,
-      original_name: file.originalname,
-      filename: targetFilename,
-      media_type: mediaType,
-      type: assetType,
-      subject_name: subjectName,
-      description,
-      size_bytes: file.size,
-      created_at: Date.now(),
-      preview_url: `/api/uploads/${targetFilename}`,
-      slot_index: parsedSlotIndex
-    };
+      const assetRecord: AssetRecord = {
+        id: targetFilename,
+        original_name: file.originalname,
+        filename: targetFilename,
+        media_type: mediaType,
+        type: assetType,
+        subject_name: subjectName,
+        description,
+        size_bytes: file.size,
+        created_at: Date.now(),
+        preview_url: `/api/uploads/${targetFilename}`,
+        slot_index: parsedSlotIndex,
+        scene_name: sceneName
+      };
 
     return this.upsertAsset(assetRecord);
   }
@@ -321,7 +342,7 @@ class AssetService {
       } else if (mType === "image" || ext.match(/\.(png|jpg|jpeg|webp|gif|bmp)$/i)) {
         targetDir = sceneDirs.images;
       } else {
-        targetDir = sceneDirs.uploads;
+        targetDir = sceneDirs.shared;
       }
 
       if (!fs.existsSync(targetDir)) {
@@ -365,7 +386,8 @@ class AssetService {
           size_bytes: stats.size,
           created_at: Date.now(),
           preview_url: `/api/uploads/${targetFilename}`,
-          slot_index: parsedSlotIndex
+          slot_index: parsedSlotIndex,
+          scene_name: resolvedSceneName
         };
 
         const savedRecord = this.upsertAsset(assetRecord, replace_filename);

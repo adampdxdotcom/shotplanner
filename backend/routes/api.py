@@ -15,7 +15,9 @@ from backend.utils.file_handlers import (
     UPLOADS_DIR,
     WORKFLOWS_DIR,
     PROJECTS_DIR,
-    TMP_UPLOAD_DIR
+    TMP_UPLOAD_DIR,
+    get_scene_directories,
+    find_asset_file_path
 )
 from backend.services.workflow_service import inspect_workflow_nodes, inject_and_prepare_workflow
 from backend.services.ssh_service import RunPodSSHService
@@ -271,12 +273,7 @@ async def transfer_assets_only(req: SSHTransferRequest):
             clean_name = str(filename_val).strip()
             if clean_name and clean_name not in seen_files:
                 seen_files.add(clean_name)
-                candidate_paths = [
-                    UPLOADS_DIR / clean_name,
-                    ASSETS_DIR / "uploads" / clean_name,
-                    ASSETS_DIR / clean_name,
-                ]
-                found_path = next((p for p in candidate_paths if p.exists() and p.is_file()), None)
+                found_path = find_asset_file_path(clean_name)
                 if found_path:
                     files_to_transfer.append(found_path)
 
@@ -286,12 +283,7 @@ async def transfer_assets_only(req: SSHTransferRequest):
             clean_name = str(fname).strip()
             if clean_name and clean_name not in seen_files:
                 seen_files.add(clean_name)
-                candidate_paths = [
-                    UPLOADS_DIR / clean_name,
-                    ASSETS_DIR / "uploads" / clean_name,
-                    ASSETS_DIR / clean_name,
-                ]
-                found_path = next((p for p in candidate_paths if p.exists() and p.is_file()), None)
+                found_path = find_asset_file_path(clean_name)
                 if found_path:
                     files_to_transfer.append(found_path)
 
@@ -411,21 +403,7 @@ async def stage_scene_endpoint(req: StageSceneRequest):
             clean_name = str(filename_val).strip()
             if clean_name and clean_name not in seen_files:
                 seen_files.add(clean_name)
-                candidate_paths = [
-                    UPLOADS_DIR / clean_name,
-                    ASSETS_DIR / "uploads" / clean_name,
-                    ASSETS_DIR / "images" / clean_name,
-                    ASSETS_DIR / "videos" / clean_name,
-                    ASSETS_DIR / "audios" / clean_name,
-                    ASSETS_DIR / clean_name,
-                ]
-                for sub_type in ["images", "videos", "audios", "uploads", "workflows"]:
-                    sub_base = ASSETS_DIR / sub_type
-                    if sub_base.exists():
-                        for scene_dir in sub_base.iterdir():
-                            if scene_dir.is_dir():
-                                candidate_paths.append(scene_dir / clean_name)
-                found_path = next((p for p in candidate_paths if p.exists() and p.is_file()), None)
+                found_path = find_asset_file_path(clean_name)
                 if found_path:
                     files_to_transfer.append(found_path)
 
@@ -601,8 +579,8 @@ async def execute_workflow(req: ExecuteWorkflowRequest):
     for node_id, filename in req.node_mappings.items():
         if filename and filename.strip() and filename.strip() not in seen_files:
             seen_files.add(filename.strip())
-            local_file = UPLOADS_DIR / filename.strip()
-            if local_file.exists():
+            local_file = find_asset_file_path(filename.strip())
+            if local_file:
                 files_to_transfer.append(local_file)
 
     # Transfer via SSH/SFTP with remote existence check
@@ -810,8 +788,8 @@ async def export_project_zip(filename: str):
                 if isinstance(asset, dict) and asset.get("filename"):
                     fn = asset["filename"].strip()
                     if fn and fn not in added_files:
-                        asset_path = UPLOADS_DIR / fn
-                        if asset_path.exists():
+                        asset_path = find_asset_file_path(fn)
+                        if asset_path:
                             zip_file.write(asset_path, arcname=f"uploads/{fn}")
                             added_files.add(fn)
                             
@@ -824,8 +802,8 @@ async def export_project_zip(filename: str):
                         if slot_fn and isinstance(slot_fn, str):
                             fn = slot_fn.strip()
                             if fn and fn not in added_files:
-                                asset_path = UPLOADS_DIR / fn
-                                if asset_path.exists():
+                                asset_path = find_asset_file_path(fn)
+                                if asset_path:
                                     zip_file.write(asset_path, arcname=f"uploads/{fn}")
                                     added_files.add(fn)
                                     
@@ -836,8 +814,8 @@ async def export_project_zip(filename: str):
                 if isinstance(sa, dict) and sa.get("filename"):
                     fn = sa["filename"].strip()
                     if fn and fn not in added_files:
-                        asset_path = UPLOADS_DIR / fn
-                        if asset_path.exists():
+                        asset_path = find_asset_file_path(fn)
+                        if asset_path:
                             zip_file.write(asset_path, arcname=f"uploads/{fn}")
                             added_files.add(fn)
                             
@@ -848,8 +826,8 @@ async def export_project_zip(filename: str):
                 if fn_val and isinstance(fn_val, str):
                     fn = fn_val.strip()
                     if fn and fn not in added_files:
-                        asset_path = UPLOADS_DIR / fn
-                        if asset_path.exists():
+                        asset_path = find_asset_file_path(fn)
+                        if asset_path:
                             zip_file.write(asset_path, arcname=f"uploads/{fn}")
                             added_files.add(fn)
                             

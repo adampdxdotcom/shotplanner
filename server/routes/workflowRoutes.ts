@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import fs from "fs";
 import path from "path";
-import { upload, WORKFLOWS_DIR, formatSceneFolderName } from "../config/constants";
+import { upload, LEGACY_WORKFLOWS_DIR, formatSceneFolderName, getSceneDirectories, ASSETS_DIR } from "../config/constants";
 import { listWorkflows, parseWorkflowData } from "../services/workflowService";
 
 const router = Router();
@@ -16,10 +16,12 @@ router.post("/upload", upload.single("file"), (req: Request, res: Response) => {
   if (!req.file) return res.status(400).json({ error: "No file" });
   const sceneName = (req.body.scene_name as string) || "scene01";
   const sceneFolder = formatSceneFolderName(sceneName);
-  const targetDir = path.join(WORKFLOWS_DIR, sceneFolder);
+  const targetDir = getSceneDirectories(sceneName).workflows;
+  
   if (!fs.existsSync(targetDir)) {
     fs.mkdirSync(targetDir, { recursive: true });
   }
+
   const target = path.join(targetDir, req.file.originalname);
   fs.copyFileSync(req.file.path, target);
   try {
@@ -36,20 +38,33 @@ router.post("/parse", (req: Request, res: Response) => {
     // Look in scene-specific directory first, then fallback to root workflows
     const cleanFilename = path.basename(filename);
     const sceneFolder = formatSceneFolderName(scene_name);
-    const candidatePaths = [
-      path.join(WORKFLOWS_DIR, sceneFolder, cleanFilename),
-      path.join(WORKFLOWS_DIR, "scene01", cleanFilename),
-      path.join(WORKFLOWS_DIR, cleanFilename)
-    ];
+    
+    const candidatePaths: string[] = [];
+    if (scene_name) {
+      candidatePaths.push(path.join(getSceneDirectories(scene_name).workflows, cleanFilename));
+    }
+    
+    // Add all scene folders
+    if (fs.existsSync(ASSETS_DIR)) {
+      const allSubdirs = fs.readdirSync(ASSETS_DIR, { withFileTypes: true })
+        .filter(d => d.isDirectory() && d.name.startsWith("scene"));
+      
+      allSubdirs.forEach(d => {
+        candidatePaths.push(path.join(ASSETS_DIR, d.name, "workflows", cleanFilename));
+      });
+    }
+
+    // Add legacy
+    candidatePaths.push(path.join(LEGACY_WORKFLOWS_DIR, cleanFilename));
+    if (fs.existsSync(LEGACY_WORKFLOWS_DIR)) {
+      const legacySubdirs = fs.readdirSync(LEGACY_WORKFLOWS_DIR, { withFileTypes: true })
+        .filter(d => d.isDirectory());
+      legacySubdirs.forEach(d => {
+        candidatePaths.push(path.join(LEGACY_WORKFLOWS_DIR, d.name, cleanFilename));
+      });
+    }
 
     let foundPath = candidatePaths.find(p => fs.existsSync(p));
-    if (!foundPath) {
-      // Deep scan all scene subdirectories in WORKFLOWS_DIR
-      const allSubdirs = fs.readdirSync(WORKFLOWS_DIR, { withFileTypes: true })
-        .filter(d => d.isDirectory())
-        .map(d => path.join(WORKFLOWS_DIR, d.name, cleanFilename));
-      foundPath = allSubdirs.find(p => fs.existsSync(p));
-    }
 
     if (!foundPath || !fs.existsSync(foundPath)) {
       return res.status(404).json({ error: `Workflow file '${cleanFilename}' not found.` });
@@ -57,7 +72,7 @@ router.post("/parse", (req: Request, res: Response) => {
 
     const workflow = JSON.parse(fs.readFileSync(foundPath, "utf-8"));
     const parsed = parseWorkflowData(workflow);
-
+    
     res.json({
       filename: cleanFilename,
       detected_nodes: parsed.detectedNodes,

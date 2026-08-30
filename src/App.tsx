@@ -615,7 +615,7 @@ export default function App() {
         const res = await fetch("/api/workflows/parse", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ filename: selectedWorkflowFile })
+          body: JSON.stringify({ filename: selectedWorkflowFile, scene_name: sceneProject.scene_name || "scene01" })
         });
         const data = await res.json();
         if (res.ok && data.nodes_info) {
