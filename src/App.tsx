@@ -441,13 +441,31 @@ export default function App() {
     const data = await res.json();
 
     if (data.schema_version === "1.0") {
+      setAssets([]);
+      setNodeMappings({});
+      setParameterNodeMappings({});
+      setBasicStub("");
+      setExpandedPrompt("");
+      setSubjects([]);
+      
       setSceneProject(data);
       setCurrentProjectName(filename.replace(/\.json$/i, ""));
+      setActiveShotId(data.shots && data.shots.length > 0 ? data.shots[0].id : null);
       setActiveSection("scene");
       setIsDirty(false);
+      
+      await fetchAssets(data.scene_name || filename.replace(/\.json$/i, ""));
       return;
     }
 
+    // 0. Reset state completely before hydrating
+    setAssets([]);
+    setNodeMappings({});
+    setParameterNodeMappings({});
+    setBasicStub("");
+    setExpandedPrompt("");
+    setSubjects([]);
+    
     // 1. Sync & set saved assets if present
     if (Array.isArray(data.assets) && data.assets.length > 0) {
       const normalizedAssets = data.assets.map((a: any, idx: number) => ({
@@ -554,10 +572,19 @@ export default function App() {
         throw new Error("Failed to save the new scene project.");
       }
       
+      setAssets([]);
+      setNodeMappings({});
+      setParameterNodeMappings({});
+      setBasicStub("");
+      setExpandedPrompt("");
+      setSubjects([]);
+      
       setSceneProject(newScene);
       setCurrentProjectName(cleanFilename);
       setActiveShotId(newScene.shots[0].id);
       setIsDirty(false);
+      
+      await fetchAssets(sceneName);
       
       // Refresh list
       const listRes = await fetch("/api/projects");
@@ -590,8 +617,10 @@ export default function App() {
 
   const fetchAssets = async (sceneName?: string) => {
     try {
-      const url = sceneName ? `/api/assets?scene_name=${encodeURIComponent(sceneName)}` : "/api/assets";
-      const res = await fetch(url);
+      const baseUrl = sceneName ? `/api/assets?scene_name=${encodeURIComponent(sceneName)}` : "/api/assets";
+      const cacheBuster = `&_t=${Date.now()}`;
+      const url = baseUrl.includes("?") ? `${baseUrl}${cacheBuster}` : `${baseUrl}?${cacheBuster}`;
+      const res = await fetch(url, { headers: { "Cache-Control": "no-store" } });
       const data = await res.json();
       if (data.assets) {
         setAssets(data.assets.map((a: any, idx: number) => ({
@@ -608,8 +637,11 @@ export default function App() {
 
   useEffect(() => {
     fetchWorkflows();
-    fetchAssets();
   }, []);
+
+  useEffect(() => {
+    fetchAssets(sceneProject.scene_name || currentProjectName);
+  }, [sceneProject.scene_name, currentProjectName]);
 
   // Parse workflow when selection changes
   useEffect(() => {
@@ -857,6 +889,7 @@ export default function App() {
 
         {activeSection === "assets" && (
           <AssetManagerSection
+            key={sceneProject.scene_id || currentProjectName}
             assets={assets}
             subjects={subjects}
             activeShotId={activeShotId}
@@ -938,6 +971,7 @@ export default function App() {
 
         {activeSection === "gallery" && (
           <GallerySection
+            key={sceneProject.scene_id || currentProjectName}
             assets={assets}
             subjects={subjects}
             sceneName={sceneProject.scene_name || currentProjectName || "Untitled_Scene"}

@@ -160,3 +160,10 @@
 ## Project Deletion Asset Cleanup Fix
 - **`backend/routes/api.py` & `server/services/projectService.ts`**
   - **Updates:** Modified the `DELETE /api/projects/{filename}` handlers to forcefully recursively delete the entire parent scene directory (`assets/{scene_name}`) using `shutil.rmtree` and `fs.rmSync(..., { recursive: true })` instead of a safe `rmdir()`. This ensures all isolated assets tied to the project are fully purged when the project itself is deleted.
+
+## Frontend Project Lifecycle & State Hydration Fixes
+- **`src/App.tsx`**
+  - **Updates:** Refactored project loading (`handleLoadProject`) and creation (`handleCreateNewProject`) handlers to synchronously flush all active memory states (`setAssets([])`, clear UI node mappings, reset subjects, and reset `activeShotId`) *before* hydrating the UI with the incoming scene data. This forcibly orphans any residual data from a previously active project.
+  - Upgraded the central `fetchAssets` pipeline to use aggressive cache-busting `&_t={Date.now()}` appended queries and explicit `"Cache-Control": "no-store"` headers to prevent Chromium from reusing stale scene assets from disk cache during project swapping.
+  - Linked `fetchAssets` execution strictly to a `useEffect` dependency array watching `sceneProject.scene_name` and `currentProjectName` to auto-synchronize on scene state changes.
+  - Handed `key={sceneProject.scene_id || currentProjectName}` overrides directly into the `<AssetManagerSection />` and `<GallerySection />` components during render. This forces React's reconciler to completely unmount and remount the DOM trees for these sub-apps upon scene transition, mathematically guaranteeing zero residual component-level state bleed (like lingering lightbox previews or stale search filters).
