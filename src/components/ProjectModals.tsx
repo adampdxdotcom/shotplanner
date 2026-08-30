@@ -283,7 +283,14 @@ export const LoadProjectModal: React.FC<LoadProjectModalProps> = ({ isOpen, onCl
         const err = await res.json();
         throw new Error(err.error || "Failed to delete project.");
       }
-      setProjects(prev => prev.filter(p => p !== filename));
+      setProjects(prev => prev.filter(p => p.filename !== filename));
+      const listRes = await fetch("/api/projects");
+      if (listRes.ok) {
+        const listData = await listRes.json();
+        if (listData.projects) {
+          setProjects(listData.projects);
+        }
+      }
     } catch (err: any) {
       setError(err.message || "Failed to delete project.");
     }

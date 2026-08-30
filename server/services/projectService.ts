@@ -3,24 +3,50 @@ import path from "path";
 import { Response } from "express";
 import { ZipArchive } from "archiver";
 import unzipper from "unzipper";
-import { PROJECTS_DIR, UPLOADS_DIR, WORKFLOWS_DIR, ensureSceneDirectories, formatSceneFolderName } from "../config/constants";
+import { ASSETS_DIR, PROJECTS_DIR, UPLOADS_DIR, WORKFLOWS_DIR, ensureSceneDirectories, formatSceneFolderName } from "../config/constants";
 import { AssetRecord } from "../types";
 import { assetService } from "./assetService";
 
 export function listProjects(): any[] {
-  if (!fs.existsSync(PROJECTS_DIR)) return [];
-  const files = fs.readdirSync(PROJECTS_DIR).filter((f) => f.endsWith(".json"));
+  const projects: any[] = [];
+  const seen = new Set<string>();
   
-  const projects = files.map((f) => {
-    const fullPath = path.join(PROJECTS_DIR, f);
-    const stats = fs.statSync(fullPath);
-    return {
-      filename: f,
-      display_name: f.replace(/\.json$/i, ""),
-      mtime: stats.mtime.toISOString(),
-      size: stats.size
-    };
-  });
+  const processFile = (dir: string, f: string, sceneName: string | null) => {
+    if (seen.has(f)) return;
+    seen.add(f);
+    const fullPath = path.join(dir, f);
+    try {
+      const stats = fs.statSync(fullPath);
+      projects.push({
+        filename: f,
+        display_name: f.replace(/\.json$/i, ""),
+        scene_name: sceneName,
+        mtime: stats.mtime.toISOString(),
+        size: stats.size
+      });
+    } catch(e) {}
+  };
+  
+  
+  if (fs.existsSync(ASSETS_DIR)) {
+    const dirs = fs.readdirSync(ASSETS_DIR);
+    for (const d of dirs) {
+      const dirPath = path.join(ASSETS_DIR, d);
+      if (fs.statSync(dirPath).isDirectory()) {
+        const files = fs.readdirSync(dirPath).filter((f) => f.endsWith(".json"));
+        for (const f of files) {
+          processFile(dirPath, f, d);
+        }
+      }
+    }
+  }
+  
+  if (fs.existsSync(PROJECTS_DIR)) {
+    const files = fs.readdirSync(PROJECTS_DIR).filter((f) => f.endsWith(".json"));
+    for (const f of files) {
+      processFile(PROJECTS_DIR, f, null);
+    }
+  }
   
   return projects.sort((a, b) => new Date(b.mtime).getTime() - new Date(a.mtime).getTime());
 }
@@ -57,12 +83,19 @@ export function sanitizeProjectName(name: string): string {
 
 export function saveProjectData(projectName: string, projectData: any): string {
   const cleanName = sanitizeProjectName(projectName);
-  const targetPath = path.join(PROJECTS_DIR, `${cleanName}.json`);
-  fs.writeFileSync(targetPath, JSON.stringify(projectData, null, 2));
-
-  // Ensure scene folders exist immediately when saving scene
+  
   const sceneName = projectData?.scene_name || projectData?.scene_planning?.scene_name || cleanName;
+  const sceneDirName = formatSceneFolderName(sceneName);
+  
   ensureSceneDirectories(sceneName);
+  
+  const targetDir = path.join(ASSETS_DIR, sceneDirName);
+  if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+  }
+  const targetPath = path.join(targetDir, `${cleanName}.json`);
+  
+  fs.writeFileSync(targetPath, JSON.stringify(projectData, null, 2));
 
   // If project payload includes assets, sync them into assetDatabase
   if (projectData && Array.isArray(projectData.assets)) {
@@ -77,7 +110,14 @@ export function saveProjectData(projectName: string, projectData: any): string {
 
 export function deleteProject(projectName: string): boolean {
   const cleanName = sanitizeProjectName(projectName);
-  const targetPath = path.join(PROJECTS_DIR, `${cleanName}.json`);
+  const jsonFileName = `${cleanName}.json`;
+  const sceneName = formatSceneFolderName(cleanName);
+  
+  let targetPath = path.join(ASSETS_DIR, sceneName, jsonFileName);
+  if (!fs.existsSync(targetPath)) {
+    targetPath = path.join(PROJECTS_DIR, jsonFileName);
+  }
+  
   if (fs.existsSync(targetPath)) {
     fs.unlinkSync(targetPath);
     return true;
@@ -88,7 +128,12 @@ export function deleteProject(projectName: string): boolean {
 export async function exportProjectZip(projectName: string, res: Response): Promise<void> {
   const cleanName = sanitizeProjectName(projectName);
   const jsonFileName = `${cleanName}.json`;
-  const filePath = path.join(PROJECTS_DIR, jsonFileName);
+  const sceneName = formatSceneFolderName(cleanName);
+  
+  let filePath = path.join(ASSETS_DIR, sceneName, jsonFileName);
+  if (!fs.existsSync(filePath)) {
+    filePath = path.join(PROJECTS_DIR, jsonFileName);
+  }
 
   if (!fs.existsSync(filePath)) {
     res.status(404).json({ error: `Project '${cleanName}' not found on server. Please save it first.` });

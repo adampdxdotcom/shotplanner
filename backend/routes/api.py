@@ -724,15 +724,17 @@ async def save_project(req: Dict[str, Any]):
     raw_name = str(req.get("filename") or req.get("name") or (req.get("data", {}).get("scene_name") if isinstance(req.get("data"), dict) else None) or "project")
     sanitized_name = sanitize_project_name(raw_name)
     final_filename = f"{sanitized_name}.json"
-    file_path = PROJECTS_DIR / final_filename
     
     data_to_save = req.get("data") if ("data" in req and isinstance(req["data"], dict)) else req
     
-    # Ensure scene directories exist immediately when saving scene
+    # Determine scene folder name
     scene_name = None
     if isinstance(data_to_save, dict):
         scene_name = data_to_save.get("scene_name") or data_to_save.get("scene_planning", {}).get("scene_name")
-    ensure_scene_directories(scene_name or raw_name)
+    scene_dir_name = format_scene_folder_name(scene_name or raw_name)
+    
+    dirs = ensure_scene_directories(scene_dir_name)
+    file_path = dirs["base"] / final_filename
 
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(data_to_save, f, indent=2)
@@ -750,20 +752,34 @@ async def save_project(req: Dict[str, Any]):
 async def list_projects():
     import os
     from datetime import datetime
-    if not PROJECTS_DIR.exists():
-        return {"projects": []}
     
     projects = []
-    for f in PROJECTS_DIR.glob("*.json"):
-        if f.is_file():
+    seen = set()
+    
+    def process_file(f, scene_name):
+        if f.is_file() and f.name not in seen:
+            seen.add(f.name)
             stat = f.stat()
             mtime = datetime.fromtimestamp(stat.st_mtime).isoformat() + "Z"
             projects.append({
                 "filename": f.name,
                 "display_name": f.name[:-5] if f.name.endswith(".json") else f.name,
+                "scene_name": scene_name,
                 "mtime": mtime,
                 "size": stat.st_size
             })
+            
+    # Scan scene directories first
+    if ASSETS_DIR.exists():
+        for d in ASSETS_DIR.iterdir():
+            if d.is_dir():
+                for f in d.glob("*.json"):
+                    process_file(f, d.name)
+                    
+    # Scan legacy projects dir
+    if PROJECTS_DIR.exists():
+        for f in PROJECTS_DIR.glob("*.json"):
+            process_file(f, None)
             
     projects.sort(key=lambda x: x["mtime"], reverse=True)
     return {"projects": projects}
@@ -772,7 +788,13 @@ async def list_projects():
 async def get_project(filename: str):
     sanitized_name = sanitize_project_name(filename)
     safe_filename = f"{sanitized_name}.json"
-    file_path = PROJECTS_DIR / safe_filename
+    scene_dir_name = format_scene_folder_name(sanitized_name)
+    
+    # Check scene folder first
+    file_path = ASSETS_DIR / scene_dir_name / safe_filename
+    if not file_path.exists():
+        # Fallback to legacy
+        file_path = PROJECTS_DIR / safe_filename
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="Project not found")
     with open(file_path, "r", encoding="utf-8") as f:
@@ -795,11 +817,20 @@ async def get_project(filename: str):
 async def delete_project_endpoint(filename: str):
     sanitized_name = sanitize_project_name(filename)
     safe_filename = f"{sanitized_name}.json"
-    file_path = PROJECTS_DIR / safe_filename
+    scene_dir_name = format_scene_folder_name(sanitized_name)
+    
+    file_path = ASSETS_DIR / scene_dir_name / safe_filename
+    if not file_path.exists():
+        file_path = PROJECTS_DIR / safe_filename
+        
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="Project not found")
     try:
         file_path.unlink()
+        
+        # Optional: attempt to remove scene directory if empty?
+        # Leaving that out for safety.
+        
         return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

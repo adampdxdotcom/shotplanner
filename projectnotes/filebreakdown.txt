@@ -127,3 +127,15 @@
   - **Updates:** Standardized the casing strategy globally by establishing a single deterministic `sanitize_project_name` (Python) / `sanitizeProjectName` (Node) utility. These functions enforce `.lower()` or `.toLowerCase()` on all raw project identifiers prior to replacing characters. This actively eliminates the creation of duplicate files caused by case inconsistencies (e.g., `scene_jjjal.json` versus `scene_JJjal.json`) on Linux filesystems, ensuring a single normalized target is written to disk.
 - **`src/App.tsx`** & Backend Handlers
   - **Updates:** Ensured the authoritative, sanitized filename (returned by the backend upon save) is cached verbatim within the frontend `currentProjectName` state. All subsequent auto-saves, scene staging payloads, and manual edits strictly inherit and transmit this exact filename, preventing diverging variants and seamlessly overwriting the physical JSON file.
+
+## Scene-Driven Storage Hierarchy
+- **`backend/routes/api.py`** & **`server/services/projectService.ts`**
+  - **Updates:** Refactored project configuration persistence to store each project JSON directly inside its localized scene directory (e.g., `assets/{scene_name}/{scene_name}.json`) instead of a flat project_jsons folder. Updated the `list_projects` / `listProjects` endpoints to aggressively scan nested scene folders within `ASSETS_DIR`, falling back to `PROJECTS_DIR` for backward compatibility. Retrieve, Save, and Delete routes now accurately resolve against these nested scene structures, automatically provisioning subdirectories upon Save, and cleanly clearing JSONs upon Delete. 
+- **`src/components/ProjectModals.tsx`**
+  - **Updates:** Hardened the `LoadProjectModal` delete logic to actively re-fetch and strictly refresh the local list state upon deletion, preventing any ghost UI entries or cached case-mismatch UI states.
+
+## Scene-Driven Storage Hierarchy
+- **`backend/routes/api.py`** & **`server/services/projectService.ts`**
+  - **Updates:** Refactored project configuration persistence to store each project JSON directly inside its localized scene directory (e.g., `assets/{scene_name}/{scene_name}.json`) instead of a flat project_jsons folder. Updated the `list_projects` / `listProjects` endpoints to aggressively scan nested scene folders within `ASSETS_DIR`, falling back to `PROJECTS_DIR` for backward compatibility. Retrieve, Save, and Delete routes now accurately resolve against these nested scene structures, automatically provisioning subdirectories upon Save, and cleanly clearing JSONs upon Delete. 
+- **`src/components/ProjectModals.tsx`**
+  - **Updates:** Hardened the `LoadProjectModal` delete logic to actively re-fetch and strictly refresh the local list state upon deletion, preventing any ghost UI entries or cached case-mismatch UI states.
