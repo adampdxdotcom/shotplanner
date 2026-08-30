@@ -423,9 +423,13 @@ export default function App() {
       throw new Error(err.error || "Failed to save project.");
     }
     
-    setCurrentProjectName(filename.replace(/\.json$/, ""));
+    const resData = await res.json();
+    const actualFilename = resData.filename || filename;
+    const cleanName = actualFilename.replace(/\.json$/i, "");
+    
+    setCurrentProjectName(cleanName);
     setIsDirty(false);
-    addToast(`Project "${filename}" saved successfully with ${assets.length} image asset(s) and ${consolidatedSubjects.length} subject(s).`, "success");
+    addToast(`Project "${cleanName}" saved successfully.`, "success");
   };
 
   const handleLoadProject = async (filename: string) => {
@@ -438,7 +442,7 @@ export default function App() {
 
     if (data.schema_version === "1.0") {
       setSceneProject(data);
-      setCurrentProjectName(filename);
+      setCurrentProjectName(filename.replace(/\.json$/i, ""));
       setActiveSection("scene");
       setIsDirty(false);
       return;
@@ -505,7 +509,7 @@ export default function App() {
     setExpandedPrompt(data.expandedPrompt || "");
     const loadedLlmProvider = data.llmProvider || data.llm_provider || data.llmChoice || data.providerChoice || "lm_studio";
     setLlmProvider(loadedLlmProvider === "gemini" ? "gemini" : "lm_studio");
-    setCurrentProjectName(filename.replace(/\.json$/, ""));
+    setCurrentProjectName(filename.replace(/\.json$/i, ""));
     
     await fetchWorkflows();
     

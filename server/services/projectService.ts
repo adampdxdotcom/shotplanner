@@ -16,7 +16,7 @@ export function listProjects(): string[] {
 }
 
 export function getProjectData(projectName: string): any | null {
-  const cleanName = projectName.replace(/\.json$/, "");
+  const cleanName = projectName.replace(/\.json$/i, "");
   const p = path.join(PROJECTS_DIR, `${cleanName}.json`);
   if (!fs.existsSync(p)) return null;
 
@@ -37,7 +37,16 @@ export function getProjectData(projectName: string): any | null {
 }
 
 export function saveProjectData(projectName: string, projectData: any): string {
-  const cleanName = projectName.replace(/\.json$/, "");
+  let cleanName = projectName;
+  if (cleanName.toLowerCase().endsWith(".json")) {
+    cleanName = cleanName.slice(0, -5);
+  }
+  
+  cleanName = cleanName.replace(/[^a-zA-Z0-9_-]/g, "");
+  if (!cleanName) {
+    cleanName = "project";
+  }
+  
   const targetPath = path.join(PROJECTS_DIR, `${cleanName}.json`);
   fs.writeFileSync(targetPath, JSON.stringify(projectData, null, 2));
 
@@ -57,7 +66,7 @@ export function saveProjectData(projectName: string, projectData: any): string {
 }
 
 export function deleteProject(projectName: string): boolean {
-  const cleanName = projectName.replace(/\.json$/, "");
+  const cleanName = projectName.replace(/\.json$/i, "");
   const targetPath = path.join(PROJECTS_DIR, `${cleanName}.json`);
   if (fs.existsSync(targetPath)) {
     fs.unlinkSync(targetPath);

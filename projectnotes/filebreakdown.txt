@@ -103,3 +103,9 @@
   - **Updates:** Refactored `find_asset_file_path` to implement a fully recursive search utilizing `rglob` across all directories and subdirectories underneath the base `ASSETS_DIR`. This guarantees immediate location of any asset by its filename, regardless of how deeply nested it is within `images/`, `videos/`, `workflows/`, or `shared/` under any scene folders.
 - **`backend/routes/api.py`**
   - **Updates:** Hardened the asset serving endpoint `/api/uploads/{filename}` by explicitly utilizing the `mimetypes` module to extract and pass appropriate MIME type headers directly into the `FileResponse`. This ensures robust cross-browser rendering for media assets resolved by the recursive finder.
+
+## Project Filename Sanitization & Overwrite Strategy
+- **`backend/routes/api.py`** & **`server/services/projectService.ts`**
+  - **Updates:** Refactored the core project save handlers (both in Python and Node modules) to safely separate any pre-existing `.json` file extension from the raw input before performing character sanitization. This fixes edge cases where saving an existing project implicitly generated duplicate mutated files (e.g., `my_projectjson.json` and `my_project.json`). The updated logic strips `.json`, preserves valid characters (alphanumeric, dashes, underscores), and statically appends exactly one `.json` extension, ensuring that existing projects overwrite cleanly without duplication.
+- **`src/App.tsx`**
+  - **Updates:** Realigned the frontend state trackers (`handleSaveProject`, `handleLoadProject`) to consume the dynamically sanitized filename explicitly returned by the backend. The UI state hooks (`setCurrentProjectName`) now correctly strip `.json` and sync seamlessly with the physical disk record, avoiding state mismatches across rapid save operations.

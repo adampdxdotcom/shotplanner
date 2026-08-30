@@ -720,11 +720,17 @@ class ProjectSaveRequest(BaseModel):
 
 @router.post("/projects")
 async def save_project(req: Dict[str, Any]):
-    raw_name = req.get("filename") or req.get("name") or (req.get("data", {}).get("scene_name") if isinstance(req.get("data"), dict) else None) or "project"
-    sanitized_name = "".join(c for c in str(raw_name) if c.isalnum() or c in ("_", "-"))
+    raw_name = str(req.get("filename") or req.get("name") or (req.get("data", {}).get("scene_name") if isinstance(req.get("data"), dict) else None) or "project")
+    
+    # Strip existing .json suffix if present before sanitization
+    if raw_name.lower().endswith(".json"):
+        raw_name = raw_name[:-5]
+        
+    sanitized_name = "".join(c for c in raw_name if c.isalnum() or c in ("_", "-"))
     if not sanitized_name:
         sanitized_name = "project"
-    final_filename = sanitized_name[:-5] + ".json" if sanitized_name.endswith("_json") else (sanitized_name if sanitized_name.endswith(".json") else f"{sanitized_name}.json")
+        
+    final_filename = f"{sanitized_name}.json"
     file_path = PROJECTS_DIR / final_filename
     
     data_to_save = req.get("data") if ("data" in req and isinstance(req["data"], dict)) else req
@@ -790,8 +796,12 @@ async def delete_project_endpoint(filename: str):
 
 @router.get("/projects/{filename}/export")
 async def export_project_zip(filename: str):
-    clean_name = filename[:-5] if filename.endswith(".json") else filename
+    clean_name = filename
+    if clean_name.lower().endswith(".json"):
+        clean_name = clean_name[:-5]
     clean_name = "".join(c for c in clean_name if c.isalnum() or c in ("_", "-"))
+    if not clean_name:
+        clean_name = "project"
     file_path = PROJECTS_DIR / f"{clean_name}.json"
     
     if not file_path.exists():
