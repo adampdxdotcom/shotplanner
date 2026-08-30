@@ -239,4 +239,32 @@
   - Updated `handleLoadProject` to automatically restore `config.lm_studio_url` and LLM provider choice whenever a saved scene project is loaded.
   - Connected `ConfigSection` changes to update project state and flag unsaved dirty states.
 
+## Dynamic Save Button State Styling
+- **`src/components/Navbar.tsx`**
+  - Added `isDirty?: boolean` prop to the navigation bar.
+  - Dynamically styled the **Save** button with an Emerald / Green theme (`bg-emerald-600 border-emerald-500/80 hover:bg-emerald-500`) when changes are saved and up to date (`!isDirty`).
+  - Dynamically styled the **Save** button with an Amber / Orange theme (`bg-amber-600 border-amber-500/80 hover:bg-amber-500`) when modifications or unsaved edits are present (`isDirty`).
+  - Retained full modal triggering functionality and updated tooltip descriptions.
+- **`src/App.tsx`**
+  - Passed `isDirty={isDirty}` to `Navbar` to maintain instantaneous synchronization with user edits and auto-save / manual save resolutions.
+
+## Assembly Line Prompt Pattern Refactoring
+- **`server/services/llm_service.ts`**
+  - Refactored `expandPrompt` to implement an Assembly Line prompt pattern.
+  - Programmatically constructs the Mandatory Header in TypeScript (`Scene Header` + `Global Subject Definitions` + hardcoded `SCENE_REFERENCE_DIRECTIVE` and `Single Subject Directive`).
+  - Programmatically constructs the Mandatory Footer in TypeScript (`overall_soundscape` + `non_diegetic_music`).
+  - Queries the LLM with a focused system prompt strictly requesting ONLY the `integrated_multimodal_description` with explicit constraints: "You are generating ONLY the integrated_multimodal_description content. Do not generate headers, footers, or subject definitions. Use exact asset tags (<Picture N>, <Video N>) provided in the context."
+  - Programmatically stitches `FinalPrompt = Header + "\n\n" + LLM_Description + "\n\n" + Footer`.
+  - Removed all regex post-processing logic; structural integrity is guaranteed by TypeScript programmatic assembly.
+- **`server/services/promptExpansionService.ts`**
+  - Re-exports all methods from `llm_service.ts` to ensure backward-compatible imports.
+- **`server/utils/formatters.ts` & `src/utils/formatters.ts`**
+  - Created `buildMandatoryHeader`, `buildMandatoryFooter`, and updated `assembleFinalPrompt` to cleanly concatenate prompt sections without relying on regex parsing or model-generated headers/footers.
+- **`src/types.ts`**
+  - Re-exports the assembly line formatters for clean frontend compilation and single source of truth.
+- **`backend/services/llm_service.py`**
+  - Updated Python backend implementation to mirror the Assembly Line prompt pattern with programmatic headers, footers, and isolated multimodal description generation.
+
+
+
 

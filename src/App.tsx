@@ -895,6 +895,7 @@ export default function App() {
       {/* Top Navbar */}
       <Navbar 
         projectName={sceneProject.scene_name}
+        isDirty={isDirty}
         activeSection={activeSection}
         onNavigate={scrollToSection}
         onSaveProject={() => setIsSaveModalOpen(true)}

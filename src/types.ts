@@ -1,86 +1,15 @@
 export const SCENE_REFERENCE_DIRECTIVE = "Do not embellish the setting. Use the exact likeness of location.";
 
-export function formatShotNumber(raw: string | number): string {
-  const str = String(raw !== undefined && raw !== null ? raw : "").trim().replace(/^shot\s*/i, "");
-  if (!str) return "01";
-  const num = parseInt(str, 10);
-  if (!isNaN(num)) {
-    return num.toString().padStart(2, "0");
-  }
-  return str;
-}
-
-export function sanitizeFilenamePart(str: string): string {
-  if (!str) return "";
-  return str
-    .replace(/[/\\:*?"<>|']/g, "") // strip invalid filesystem chars
-    .replace(/[\s-]+/g, "_") // replace spaces and hyphens with _
-    .replace(/_+/g, "_") // collapse multiple consecutive underscores
-    .replace(/^_+|_+$/g, ""); // trim leading and trailing underscores
-}
-
-export function generateSaveVideoPrefix(sceneName?: string, shotNumber?: string | number): string {
-  const sanitizedScene = sanitizeFilenamePart(sceneName || "");
-  const rawShot = shotNumber !== undefined && shotNumber !== null ? String(shotNumber).trim() : "";
-  const paddedShot = rawShot ? formatShotNumber(rawShot) : "";
-
-  if (sanitizedScene && paddedShot) {
-    return `video/${sanitizedScene}_Shot_${paddedShot}_`;
-  }
-  if (sanitizedScene) {
-    return `video/${sanitizedScene}_`;
-  }
-  if (paddedShot) {
-    return `video/Shot_${paddedShot}_`;
-  }
-  return "";
-}
-
-export function generatePromptPrefix(plan?: Partial<ScenePlanning> | null): string {
-  if (!plan) return "";
-  const parts: string[] = [];
-  
-  if (plan.scene_name && plan.scene_name.trim()) {
-    parts.push(plan.scene_name.trim());
-  }
-  
-  const rawShot = plan.shot_number !== undefined && plan.shot_number !== null ? String(plan.shot_number).trim() : "";
-  const shotNum = formatShotNumber(rawShot || "01");
-  parts.push(`Shot ${shotNum}`);
-  
-  if (plan.shot_type && plan.shot_type.trim()) {
-    parts.push(plan.shot_type.trim());
-  }
-  
-  if (plan.camera_movement && plan.camera_movement.trim()) {
-    parts.push(plan.camera_movement.trim());
-  }
-  
-  return parts.join(" - ");
-}
-
-export function assembleFinalPrompt(
-  expandedPrompt: string,
-  promptPrefix: string,
-  isSceneRefPresent: boolean = false
-): string {
-  let prompt = (expandedPrompt || "").trim();
-  const cleanPrefix = (promptPrefix || "").trim().replace(/\.+$/, "");
-
-  if (cleanPrefix) {
-    // If prompt doesn't start with the clean prefix, prepend it to the top
-    if (!prompt.startsWith(cleanPrefix)) {
-      prompt = prompt ? `${cleanPrefix}\n\n${prompt}` : cleanPrefix;
-    }
-  }
-
-  // Ensure Scene Reference Directive is on its own line if scene reference is present
-  if (isSceneRefPresent && !prompt.includes(SCENE_REFERENCE_DIRECTIVE)) {
-    prompt = prompt ? `${prompt}\n\n${SCENE_REFERENCE_DIRECTIVE}` : SCENE_REFERENCE_DIRECTIVE;
-  }
-
-  return prompt;
-}
+export { 
+  assembleFinalPrompt, 
+  buildMandatoryHeader, 
+  buildMandatoryFooter, 
+  generatePromptPrefix, 
+  formatShotNumber, 
+  sanitizeFilenamePart, 
+  generateSaveVideoPrefix 
+} from "./utils/formatters";
+export type { AssembleFinalPromptParams, MandatoryHeaderOptions, MandatoryFooterOptions } from "./utils/formatters";
 
 export function hasSceneReferencePhoto(assets: Array<{ type?: string; media_type?: string; filename?: string; subject_name?: string }>): boolean {
   if (!assets || !Array.isArray(assets)) return false;

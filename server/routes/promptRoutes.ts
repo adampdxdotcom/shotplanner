@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { expandPrompt } from "../services/promptExpansionService";
+import { expandPrompt } from "../services/llm_service";
 
 const router = Router();
 

@@ -15,6 +15,7 @@ import {
 
 interface NavbarProps {
   projectName?: string;
+  isDirty?: boolean;
   activeSection: string;
   onNavigate: (section: string) => void;
   onSaveProject: () => void;
@@ -26,6 +27,7 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({ 
   projectName = "Untitled Project",
+  isDirty = false,
   activeSection, 
   onNavigate, 
   onSaveProject, 
@@ -151,8 +153,12 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
           <button
             onClick={onSaveProject}
-            className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg shadow-xs transition-all flex items-center gap-1.5"
-            title="Save Project"
+            className={`px-3 py-1.5 text-xs font-semibold rounded-lg shadow-xs transition-all flex items-center gap-1.5 border cursor-pointer ${
+              isDirty
+                ? "bg-amber-600 hover:bg-amber-500 text-white border-amber-500/80 shadow-amber-950/30"
+                : "bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500/80 shadow-emerald-950/30"
+            }`}
+            title={isDirty ? "Unsaved changes — Click to Save" : "All changes saved — Up to date"}
           >
             <Save className="w-3.5 h-3.5" />
             <span>Save</span>
