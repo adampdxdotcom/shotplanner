@@ -114,6 +114,8 @@ export interface SceneProjectFile {
     is_location?: boolean;
   }[];
   shots: ShotItem[];
+  assets?: MediaAsset[];
+  subjects?: string[];
 }
 
 export interface ShotItem {

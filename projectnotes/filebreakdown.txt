@@ -177,3 +177,14 @@
   - **Updates:** Eliminated the hardcoded `scene_` prefix logic globally across the UI. Auto-saves, new project creations, and the dropdown menu filters now read, write, and display the exact sanitized project names specified by the user.
 - **`src/components/AssetManagerSection.tsx`**
   - **Updates:** Synchronized the "Physically stored in" UI path indicator to dynamically format and render the active path (e.g. `/assets/{activeSceneName}/images/`) matching the backend's strict isolated storage hierarchy.
+
+## Payload Consolidation & State Restoration
+- **`src/types.ts` & `src/App.tsx`**
+  - **Updates:** Expanded `SceneProjectFile` to natively type `assets` and `subjects`. Modified auto-save (`saveSceneProject`) and manual save (`handleSaveProject`) to comprehensively package the core `sceneProject` object together with the full `assets` metadata array (including filenames, semantic types, and descriptions) and the unified `subjects` registry.
+  - Hardened `handleLoadProject` to gracefully extract, normalize, and restore the `assets` metadata back into local state even if the payload is natively formatted as `schema_version: "1.0"`. Immediately fires `fetchAssets` following state restoration to perform a secondary verification of disk-level assets, ensuring absolute consistency between recorded configurations and physical files.
+- **Frontend Persistence**
+  - **Updates:** Wired `localStorage.setItem('shotplanner_last_project', currentProjectName)` into the main `App.tsx` lifecycle. The initial mount sequence natively probes for `shotplanner_last_project` and automatically executes `handleLoadProject` to resurrect the user's active context following hard browser refreshes.
+
+## Semantic Metadata Fallbacks
+- **`backend/routes/api.py` & `server/services/assetService.ts`**
+  - **Updates:** Re-engineered the core `get_assets`/`listAssets` directory scanning logic. Disk files missing from the active project JSON now inherently fallback to extracting semantic types and subject names directly from their structured `{type}_{subject}_{timestamp}.ext` filenames (e.g., `headshot_jackie_1234.png`), preventing "unknown" placeholders across the UI.

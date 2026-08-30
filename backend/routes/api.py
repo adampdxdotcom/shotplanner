@@ -224,9 +224,19 @@ async def get_assets(scene_name: Optional[str] = None):
         if ext in [".mp4", ".mov", ".webm", ".mkv", ".avi"]: media_type = "video"
         elif ext in [".mp3", ".wav", ".ogg", ".flac", ".m4a"]: media_type = "audio"
         else: media_type = "image"
+        
+        parts = f.stem.split('_')
+        asset_type = "unknown"
+        subject_name = "unknown"
+        if len(parts) >= 3:
+            asset_type = parts[0]
+            subject_name = "_".join(parts[1:-1])
+            
         assets.append({
             "filename": f.name,
             "media_type": media_type,
+            "type": asset_type,
+            "subject_name": subject_name,
             "scene_name": sn,
             "preview_url": f"/api/uploads/{f.name}"
         })

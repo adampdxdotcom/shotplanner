@@ -53,8 +53,7 @@ router.put("/:filename", (req: Request, res: Response) => {
 router.post("/sync", (req: Request, res: Response) => {
   try {
     const { assets } = req.body;
-    const synced = assetService.syncAssets(assets);
-    res.json({ success: true, assets: synced });
+    res.json({ success: true, assets: assets });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

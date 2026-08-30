@@ -153,26 +153,6 @@ export default function App() {
       .catch(e => console.error("Failed to load scene list", e));
   }, []);
 
-  const handleSelectScene = async (sceneFilename: string) => {
-    if (!sceneFilename) return;
-    try {
-      const res = await fetch(`/api/projects/${sceneFilename}`);
-      if (!res.ok) throw new Error("Failed to fetch scene");
-      const data = await res.json();
-      setSceneProject({
-        schema_version: "1.0",
-        scene_id: data.scene_id || "scene_" + Date.now(),
-        scene_name: data.scene_name || "New Scene",
-        workflow_file: data.workflow_file || "",
-        shared_assets: data.shared_assets || [],
-        shots: data.shots || []
-      });
-      setActiveShotId(null);
-      addToast(`Loaded scene: ${data.scene_name || sceneFilename}`, "success");
-    } catch (e: any) {
-      addToast(e.message || "Failed to load scene", "error");
-    }
-  };
 
   useEffect(() => {
     if (isInitialLoad) {
@@ -200,7 +180,11 @@ export default function App() {
       try {
         const payload = {
           name: sceneProject.scene_name.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_").replace(/_+/g, "_"),
-          data: sceneProject
+          data: {
+            ...sceneProject,
+            assets,
+            subjects
+          }
         };
         await fetch("/api/projects", {
           method: "POST",
@@ -214,7 +198,7 @@ export default function App() {
     
     const timer = setTimeout(saveSceneProject, 1000);
     return () => clearTimeout(timer);
-  }, [sceneProject, isInitialLoad]);
+  }, [sceneProject, assets, subjects, isInitialLoad]);
 
   const handleUpdateParam = (key: keyof GenerationParameters, value: number) => {
     setGenerationParams(prev => ({ ...prev, [key]: value }));
@@ -395,21 +379,9 @@ export default function App() {
     );
 
     const payload = {
-      config,
-      selectedWorkflowFile,
-      selectedPromptNodeId,
-      nodeMappings,
-      bypassMissing,
-      generationParams,
-      parameterNodeMappings,
-      scenePlanning,
-      scene_planning: scenePlanning,
-      basicStub,
-      expandedPrompt,
-      llmProvider, // Save user's choice of LLM
-      llm_provider: llmProvider,
-      assets, // Save media assets with the project
-      subjects: consolidatedSubjects // Save global subjects registry
+      ...sceneProject,
+      assets,
+      subjects: consolidatedSubjects
     };
     
     const res = await fetch("/api/projects", {
@@ -454,7 +426,25 @@ export default function App() {
       setActiveSection("scene");
       setIsDirty(false);
       
+      // Restore assets & subjects
+      if (Array.isArray(data.assets) && data.assets.length > 0) {
+        const normalizedAssets = data.assets.map((a: any, idx: number) => ({
+          ...a,
+          slot_index: a.slot_index !== undefined ? a.slot_index : idx,
+          media_type: a.media_type || (/\.(mp3|wav|ogg|m4a|flac)$/i.test(a.filename) ? "audio" : /\.(mp4|mov|webm|mkv)$/i.test(a.filename) ? "video" : "image"),
+          preview_url: getAssetMediaUrl(a.filename)
+        }));
+        setAssets(normalizedAssets);
+      }
+      if (Array.isArray(data.subjects)) {
+        setSubjects(data.subjects);
+      }
+      
       await fetchAssets(data.scene_name || filename.replace(/\.json$/i, ""));
+      
+      setTimeout(() => setIsDirty(false), 100);
+      const assetCount = Array.isArray(data.assets) ? data.assets.length : 0;
+      addToast(`Project "${filename}" loaded successfully (${assetCount} image assets restored).`, "success");
       return;
     }
 
@@ -485,7 +475,7 @@ export default function App() {
         console.error("Failed to sync project assets", e);
       }
     } else {
-      await fetchAssets(data.scene_name || cleanName);
+      await fetchAssets(data.scene_name || filename.replace(/\.json$/i, ""));
     }
     
     // 2. Restore subjects registry
@@ -637,7 +627,19 @@ export default function App() {
 
   useEffect(() => {
     fetchWorkflows();
+    const lastProject = localStorage.getItem('shotplanner_last_project');
+    if (lastProject) {
+      handleLoadProject(lastProject + ".json").catch(err => {
+        console.error("Failed to restore last project:", err);
+      });
+    }
   }, []);
+
+  useEffect(() => {
+    if (currentProjectName && currentProjectName !== "untitled_scene") {
+      localStorage.setItem('shotplanner_last_project', currentProjectName);
+    }
+  }, [currentProjectName]);
 
   useEffect(() => {
     fetchAssets(sceneProject.scene_name || currentProjectName);
@@ -846,7 +848,7 @@ export default function App() {
                     if (!sel) return;
                     const sceneFile = availableScenes.find(s => s === sel || s === `scene_${sel.replace(/[^a-zA-Z0-9_-]/g, "_")}`);
                     if (sceneFile) {
-                      handleSelectScene(sceneFile);
+                      handleLoadProject(sceneFile + ".json");
                     }
                   }}
                   className="bg-zinc-950 border border-zinc-800 rounded-md px-3 py-1.5 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none w-48"

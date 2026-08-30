@@ -193,7 +193,7 @@ export async function exportProjectZip(projectName: string, res: Response): Prom
   archive.pipe(res);
 
   // 1. Add project json
-  archive.file(filePath, { name: jsonFileName });
+  archive.file(filePath, { name: rawName + ".json" });
 
   // Helper to locate asset across scene folders and uploads
   const findAssetFile = (filename: string): string | null => {

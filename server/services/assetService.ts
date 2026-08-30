@@ -86,13 +86,22 @@ class AssetService {
               mtime = stats.mtimeMs;
             } catch(e) {}
             
+            let assetType = "unknown";
+            let subjectName = "unknown";
+            const parsed = path.parse(file.name);
+            const parts = parsed.name.split("_");
+            if (parts.length >= 3) {
+              assetType = parts[0];
+              subjectName = parts.slice(1, -1).join("_");
+            }
+
             assets.push({
               id: file.name,
               filename: file.name,
               original_name: file.name,
               media_type: mediaType as any,
-              type: "unknown",
-              subject_name: "subject",
+              type: assetType,
+              subject_name: subjectName,
               description: "",
               size_bytes: size,
               created_at: mtime,
