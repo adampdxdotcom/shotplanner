@@ -116,6 +116,10 @@ export interface SceneProjectFile {
   shots: ShotItem[];
   assets?: MediaAsset[];
   subjects?: string[];
+  lm_studio_url?: string;
+  local_llm_url?: string;
+  config?: Partial<AppConfig>;
+  llm_provider?: LLMProvider;
 }
 
 export interface ShotItem {

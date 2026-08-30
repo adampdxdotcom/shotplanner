@@ -181,7 +181,16 @@ export default function App() {
       try {
         const payload = {
           name: sceneProject.scene_name.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_").replace(/_+/g, "_"),
-          data: sceneProject
+          data: {
+            ...sceneProject,
+            lm_studio_url: config.lm_studio_url,
+            config: {
+              ...(sceneProject.config || {}),
+              ...config,
+              lm_studio_url: config.lm_studio_url
+            },
+            llm_provider: llmProvider
+          }
         };
         await fetch("/api/projects", {
           method: "POST",
@@ -376,8 +385,15 @@ export default function App() {
       ])
     );
 
-    const payload = {
+    const payload: SceneProjectFile = {
       ...sceneProject,
+      lm_studio_url: config.lm_studio_url,
+      config: {
+        ...(sceneProject.config || {}),
+        ...config,
+        lm_studio_url: config.lm_studio_url
+      },
+      llm_provider: llmProvider,
       assets,
       subjects: consolidatedSubjects
     };
@@ -410,12 +426,32 @@ export default function App() {
     }
     const data = await res.json();
 
+    // Restore local LLM IP / URL & provider
+    const restoredLlmUrl = data.lm_studio_url || data.config?.lm_studio_url || data.local_llm_url || data.llm_url || data.llm_endpoint;
+    if (restoredLlmUrl) {
+      setConfig(prev => ({
+        ...prev,
+        lm_studio_url: restoredLlmUrl
+      }));
+    }
+    const loadedLlmProvider = data.llmProvider || data.llm_provider || data.llmChoice || data.providerChoice || "lm_studio";
+    setLlmProvider(loadedLlmProvider === "gemini" ? "gemini" : "lm_studio");
+
     if (data.schema_version === "1.0") {
       setNodeMappings({});
       setParameterNodeMappings({});
       setBasicStub("");
       setExpandedPrompt("");
       
+      // Restore config if bundled
+      if (data.config) {
+        setConfig(prev => ({
+          ...prev,
+          ...data.config,
+          lm_studio_url: restoredLlmUrl || data.config.lm_studio_url || prev.lm_studio_url
+        }));
+      }
+
       setSceneProject(data);
       setCurrentProjectName(filename.replace(/\.json$/i, ""));
       setActiveShotId(data.shots && data.shots.length > 0 ? data.shots[0].id : null);
@@ -509,8 +545,6 @@ export default function App() {
     }
     setBasicStub(data.basicStub || "");
     setExpandedPrompt(data.expandedPrompt || "");
-    const loadedLlmProvider = data.llmProvider || data.llm_provider || data.llmChoice || data.providerChoice || "lm_studio";
-    setLlmProvider(loadedLlmProvider === "gemini" ? "gemini" : "lm_studio");
     setCurrentProjectName(filename.replace(/\.json$/i, ""));
     
     await fetchWorkflows();
@@ -530,6 +564,11 @@ export default function App() {
       shared_assets: [],
       assets: [],
       subjects: [],
+      lm_studio_url: config.lm_studio_url,
+      config: {
+        ...config
+      },
+      llm_provider: llmProvider,
       shots: [{
         id: "shot_" + Date.now(),
         shot_number: 1,
@@ -855,6 +894,7 @@ export default function App() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans selection:bg-indigo-500 selection:text-white flex flex-col">
       {/* Top Navbar */}
       <Navbar 
+        projectName={sceneProject.scene_name}
         activeSection={activeSection}
         onNavigate={scrollToSection}
         onSaveProject={() => setIsSaveModalOpen(true)}
@@ -869,42 +909,6 @@ export default function App() {
         {/* Tab Content Rendering */}
         {activeSection === "scene" && (
           <div className="flex flex-col gap-6 min-h-0 flex-1">
-            <div className="flex flex-wrap items-center gap-4 bg-zinc-900/40 p-4 rounded-xl border border-zinc-800">
-              <div className="flex items-center gap-3">
-                <label className="text-sm font-medium text-zinc-400">Load Project:</label>
-                <select
-                  value={""}
-                  onChange={(e) => {
-                    const sel = e.target.value;
-                    if (!sel) return;
-                    const sceneFile = availableScenes.find(s => s === sel || s === `scene_${sel.replace(/[^a-zA-Z0-9_-]/g, "_")}`);
-                    if (sceneFile) {
-                      handleLoadProject(sceneFile + ".json");
-                    }
-                  }}
-                  className="bg-zinc-950 border border-zinc-800 rounded-md px-3 py-1.5 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none w-48"
-                >
-                  <option value="" disabled>-- Select Project --</option>
-                  {availableScenes
-                    .filter(s => s !== `scene_${sceneProject.scene_name.replace(/[^a-zA-Z0-9_-]/g, "_")}`)
-                    .map(s => (
-                    <option key={s} value={s}>{s.replace(/^scene_/, "").replace(/_/g, " ")}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="w-px h-6 bg-zinc-800 hidden sm:block"></div>
-              <div className="flex items-center gap-3 flex-1">
-                <label className="text-sm font-medium text-zinc-400">Project Name:</label>
-                <input
-                  type="text"
-                  value={sceneProject.scene_name}
-                  onChange={(e) => setSceneProject(prev => ({ ...prev, scene_name: e.target.value }))}
-                  placeholder="e.g. My Movie Project"
-                  className="bg-zinc-950 border border-zinc-800 rounded-md px-3 py-1.5 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none flex-1 max-w-sm"
-                />
-              </div>
-            </div>
-            
             <SceneProjectHub
               project={sceneProject}
               onUpdateProject={setSceneProject}
@@ -1018,7 +1022,18 @@ export default function App() {
         {activeSection === "config" && (
           <ConfigSection 
             config={config} 
-            onChange={setConfig} 
+            onChange={(newConfig) => {
+              setConfig(newConfig);
+              setSceneProject(prev => ({
+                ...prev,
+                lm_studio_url: newConfig.lm_studio_url,
+                config: {
+                  ...(prev.config || {}),
+                  ...newConfig
+                }
+              }));
+              setIsDirty(true);
+            }} 
             onOpenCodeViewer={() => setIsCodeModalOpen(true)}
           />
         )}

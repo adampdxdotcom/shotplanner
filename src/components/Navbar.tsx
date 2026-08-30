@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 interface NavbarProps {
+  projectName?: string;
   activeSection: string;
   onNavigate: (section: string) => void;
   onSaveProject: () => void;
@@ -23,25 +24,26 @@ interface NavbarProps {
   onDismissToast?: (id: string) => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ activeSection, onNavigate, onSaveProject, onLoadProject, onNewProject, toasts = [], onDismissToast }) => {
+export const Navbar: React.FC<NavbarProps> = ({ 
+  projectName = "Untitled Project",
+  activeSection, 
+  onNavigate, 
+  onSaveProject, 
+  onLoadProject, 
+  onNewProject, 
+  toasts = [], 
+  onDismissToast 
+}) => {
   return (
-    <header className="sticky top-0 z-40 bg-zinc-900/90 backdrop-blur-md border-b border-zinc-800 px-4 lg:px-8 py-3.5 flex items-start justify-between shadow-sm">
+    <header className="sticky top-0 z-40 bg-zinc-900/90 backdrop-blur-md border-b border-zinc-800 px-4 lg:px-8 py-3.5 flex items-center justify-between shadow-sm">
       <div className="flex items-center gap-3">
         <div className="w-9 h-9 rounded-lg bg-gradient-to-tr from-amber-500 to-indigo-600 flex items-center justify-center shadow-inner">
           <Workflow className="w-5 h-5 text-white" />
         </div>
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-base font-semibold tracking-tight text-zinc-100">
-              ComfyUI Bridge &amp; Orchestrator
-            </h1>
-            <span className="px-2 py-0.5 text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full">
-              v1.0 Ready
-            </span>
-          </div>
-          <p className="text-xs text-zinc-400">
-            Local Assets ⇄ LM Studio Prompt Expansion ⇄ Remote ComfyUI
-          </p>
+          <h1 className="text-base font-bold tracking-tight text-white">
+            {projectName || "Untitled Project"}
+          </h1>
         </div>
       </div>
 

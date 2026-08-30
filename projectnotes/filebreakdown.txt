@@ -224,4 +224,19 @@
   - Updated shot card badge header in the Scene Project Hub carousel to dynamically render `"Shot Number - Scene Name"` (e.g. `"Shot 01 - Scene 1"` or `"Shot 01 - Hero Close-up"`).
   - Ensured that drag-and-drop reordering seamlessly updates shot numbers and maintains 1-to-1 sync across the shot carousel.
 
+## UI Header & Scene Hub Streamlining
+- **`src/components/Navbar.tsx`**
+  - Removed subtitle descriptions and version tags from the main header.
+  - Replaced the static header label with the active project's `projectName` (`sceneProject.scene_name`), styled in bold chunky white text.
+- **`src/App.tsx`**
+  - Removed the "Load Project" dropdown and "Project Name" input strip above the Scene Hub.
+
+## Project File Local LLM IP Persistence
+- **`src/types.ts`**
+  - Added `lm_studio_url?: string`, `local_llm_url?: string`, `config?: Partial<AppConfig>`, and `llm_provider?: LLMProvider` to the `SceneProjectFile` schema definition.
+- **`src/App.tsx`**
+  - Updated `handleSaveProject` and the auto-save worker to bundle `lm_studio_url` and the active config with project file JSON saves.
+  - Updated `handleLoadProject` to automatically restore `config.lm_studio_url` and LLM provider choice whenever a saved scene project is loaded.
+  - Connected `ConfigSection` changes to update project state and flag unsaved dirty states.
+
 
