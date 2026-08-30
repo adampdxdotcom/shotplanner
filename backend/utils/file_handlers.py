@@ -6,7 +6,9 @@ import aiofiles
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
+# Re-anchor base asset directory to resolve strictly to the container project root assets mount
+# Fallback to current working directory (e.g. for AI studio preview environment)
+BASE_DIR = Path("/app") if Path("/app/backend").exists() or Path("/app/assets").exists() else Path.cwd()
 ASSETS_DIR = BASE_DIR / "assets"
 PROJECTS_DIR = ASSETS_DIR / "project_jsons"
 TMP_UPLOAD_DIR = ASSETS_DIR / "tmp_uploads"

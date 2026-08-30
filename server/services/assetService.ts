@@ -368,6 +368,11 @@ class AssetService {
 
       writeStream.on("finish", () => {
         this.uploadChunks.delete(upload_id);
+        
+        if (!fs.existsSync(finalPath)) {
+          return reject(new Error("Failed to write assembled chunked file. File missing."));
+        }
+        
         const stats = fs.statSync(finalPath);
 
         const parsedSlotIndex =

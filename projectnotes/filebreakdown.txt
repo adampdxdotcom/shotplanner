@@ -68,3 +68,32 @@
 - **`backend/routes/api.py`**
   - **Role:** Exposes Python FastAPI routes under `/api/`.
   - **Updates:** Added a dynamic file serving proxy at `GET /api/uploads/{filename}` via `FileResponse` that taps into `find_asset_file_path()`. This successfully navigates nested Scene subdirectories (e.g. `assets/*/images/`) returning 200 statuses with proper Content-Type headers, bridging the NGINX routing gap.
+
+## Unified Asset File Resolver Integration
+- **`backend/utils/file_handlers.py`**
+  - **Updates:** Implemented and solidified `find_asset_file_path`, a unified asset file resolver utility. It locates any asset by filename across the entire Scene-First hierarchy (recursively scanning all scene directories under `assets/`, including `images/`, `videos/`, `audios/`, `workflows/`, `shared/`, as well as legacy flat upload locations).
+- **`backend/routes/api.py`**
+  - **Updates:** 
+    - **Project Export (`/projects/{filename}/export`):** Updated the project ZIP export endpoint to exclusively use the unified asset file resolver. All media assets referenced within the project JSON (assets lists, assigned shot input slots, shared assets, and node mappings) are accurately discovered in their dynamic scene subfolders and successfully packed into the ZIP archive.
+    - **SSH & Staging Endpoints (`/assets/sync_remote`, `/workflow/stage`, `/execute`):** Updated the SSH asset transfer, scene staging, and master execution endpoints. They now resolve local asset files using the unified file locator prior to dispatching them via SFTP to the remote ComfyUI input directory on RunPod, preventing "file not found" errors during complex staging tasks.
+    - **Project Import (`/projects/import`):** Refactored the ZIP import endpoint using a two-pass mechanism. It now reads the project JSON metadata and `assets_db.json` first, determines the active scene name, provisions the correct directories via `ensure_scene_directories`, and subsequently extracts all workflows and uploads directly into their proper contextual scene subdirectories rather than indiscriminately dumping them into legacy flat folders.
+
+## Container Mount Path Anchoring
+- **`backend/utils/file_handlers.py`** & **`server/config/constants.ts`**
+  - **Updates:** Re-anchored the root project asset path to explicitly use the Docker mount boundary (`/app/assets` if detected) rather than resolving relative to the `backend/utils/` subfolder. This enforces that all derived paths (`project_jsons`, `scene01`, `tmp_uploads`) strictly generate and build their Scene-First directories directly onto the mounted `/app/assets` host volume, solving missing data persistence on container restart.
+
+## Chunked Upload Pipeline Finalization
+- **`src/components/AssetManagerSection.tsx`** & **`src/components/GallerySection.tsx`**
+  - **Updates:** Updated the chunked upload iterators to actively append `scene_name` to every chunk `FormData` object. This guarantees that when the final file chunk executes, the backend correctly places the fully stitched file within the `scene_name` target directory.
+- **`backend/routes/api.py`** & **`server/services/assetService.ts`**
+  - **Updates:** Modified the chunk assembly handler to consume the `scene_name` metadata, resolve the proper nested media directory, stitch the file into its final scene path on disk, and explicitly verify file existence via an `fs.existsSync` or `os.path.exists()` assertion prior to emitting the successful `AssetRecord` back to the frontend.
+
+## Container Mount Path Anchoring
+- **`backend/utils/file_handlers.py`** & **`server/config/constants.ts`**
+  - **Updates:** Re-anchored the root project asset path to explicitly use the Docker mount boundary (`/app/assets` if detected) rather than resolving relative to the `backend/utils/` subfolder. This enforces that all derived paths (`project_jsons`, `scene01`, `tmp_uploads`) strictly generate and build their Scene-First directories directly onto the mounted `/app/assets` host volume, solving missing data persistence on container restart.
+
+## Chunked Upload Pipeline Finalization
+- **`src/components/AssetManagerSection.tsx`** & **`src/components/GallerySection.tsx`**
+  - **Updates:** Updated the chunked upload iterators to actively append `scene_name` to every chunk `FormData` object. This guarantees that when the final file chunk executes, the backend correctly places the fully stitched file within the `scene_name` target directory.
+- **`backend/routes/api.py`** & **`server/services/assetService.ts`**
+  - **Updates:** Modified the chunk assembly handler to consume the `scene_name` metadata, resolve the proper nested media directory, stitch the file into its final scene path on disk, and explicitly verify file existence via an `fs.existsSync` or `os.path.exists()` assertion prior to emitting the successful `AssetRecord` back to the frontend.
