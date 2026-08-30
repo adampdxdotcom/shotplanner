@@ -899,6 +899,8 @@ async def export_project_zip(filename: str):
     
     with open(file_path, "r", encoding="utf-8") as f:
         project_data = json.load(f)
+        
+    clean_name = file_path.stem
     
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:

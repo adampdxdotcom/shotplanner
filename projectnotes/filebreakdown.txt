@@ -167,3 +167,13 @@
   - Upgraded the central `fetchAssets` pipeline to use aggressive cache-busting `&_t={Date.now()}` appended queries and explicit `"Cache-Control": "no-store"` headers to prevent Chromium from reusing stale scene assets from disk cache during project swapping.
   - Linked `fetchAssets` execution strictly to a `useEffect` dependency array watching `sceneProject.scene_name` and `currentProjectName` to auto-synchronize on scene state changes.
   - Handed `key={sceneProject.scene_id || currentProjectName}` overrides directly into the `<AssetManagerSection />` and `<GallerySection />` components during render. This forces React's reconciler to completely unmount and remount the DOM trees for these sub-apps upon scene transition, mathematically guaranteeing zero residual component-level state bleed (like lingering lightbox previews or stale search filters).
+
+## Refined Scene and Naming Isolation
+- **`backend/utils/file_handlers.py` & `server/config/constants.ts`**
+  - **Updates:** Reworked `format_scene_folder_name` (and its TS equivalent) to perform simple, deterministic sanitization (lowercasing and replacing invalid characters with underscores) without destructively extracting numbers. User-defined names like "act1_chase" or "movie_2026" are preserved natively instead of being mangled into "scene01" or "scene2026".
+- **`backend/routes/api.py` & `server/services/projectService.ts`**
+  - **Updates:** Repaired the project export handlers (`GET /api/projects/{filename}/export`) to properly derive `clean_name` / `rawName` dynamically from the target file path, resolving undefined variable crashes when compiling ZIP archives.
+- **`src/App.tsx`**
+  - **Updates:** Eliminated the hardcoded `scene_` prefix logic globally across the UI. Auto-saves, new project creations, and the dropdown menu filters now read, write, and display the exact sanitized project names specified by the user.
+- **`src/components/AssetManagerSection.tsx`**
+  - **Updates:** Synchronized the "Physically stored in" UI path indicator to dynamically format and render the active path (e.g. `/assets/{activeSceneName}/images/`) matching the backend's strict isolated storage hierarchy.

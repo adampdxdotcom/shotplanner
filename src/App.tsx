@@ -147,7 +147,7 @@ export default function App() {
       .then(res => res.json())
       .then(data => {
         if (data.projects) {
-          setAvailableScenes(data.projects.map((p: any) => typeof p === 'string' ? p : p.filename).filter((p: string) => p.startsWith("scene_")));
+          setAvailableScenes(data.projects.map((p: any) => typeof p === 'string' ? p : p.filename).filter((p: string) => p.endsWith(".json")).map((p: string) => p.replace(/\.json$/i, "")));
         }
       })
       .catch(e => console.error("Failed to load scene list", e));
@@ -199,7 +199,7 @@ export default function App() {
     const saveSceneProject = async () => {
       try {
         const payload = {
-          name: `scene_${sceneProject.scene_name.replace(/[^a-zA-Z0-9_-]/g, "_")}`,
+          name: sceneProject.scene_name.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_").replace(/_+/g, "_"),
           data: sceneProject
         };
         await fetch("/api/projects", {
@@ -557,7 +557,7 @@ export default function App() {
       }]
     };
 
-    const cleanFilename = `scene_${sceneName.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_").replace(/_+/g, "_")}`;
+    const cleanFilename = sceneName.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_").replace(/_+/g, "_") || "untitled_scene";
     try {
       const payload = {
         name: cleanFilename,
@@ -590,7 +590,7 @@ export default function App() {
       const listRes = await fetch("/api/projects");
       const listData = await listRes.json();
       if (listData.projects) {
-        setAvailableScenes(listData.projects.map((p: any) => typeof p === 'string' ? p : p.filename).filter((p: string) => p.startsWith("scene_")));
+        setAvailableScenes(listData.projects.map((p: any) => typeof p === 'string' ? p : p.filename).filter((p: string) => p.endsWith(".json")).map((p: string) => p.replace(/\.json$/i, "")));
       }
       
       addToast(`New scene "${sceneName}" created and auto-saved successfully!`, "success");

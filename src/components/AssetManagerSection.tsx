@@ -727,7 +727,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
               Project Library Total: <span className="text-zinc-300 font-medium">{images.length} image(s)</span>, <span className="text-zinc-300 font-medium">{videos.length} video(s)</span>, <span className="text-zinc-300 font-medium">{audios.length} audio(s)</span>
             </p>
           </div>
-          <span className="text-[11px] text-zinc-400">Physically stored in <code className="text-zinc-300 bg-zinc-800 px-1 py-0.5 rounded">/assets/images/{activeSceneName ? (activeSceneName.match(/\d+/) ? `scene${parseInt(activeSceneName.match(/\d+/)![0]) < 10 ? '0' + parseInt(activeSceneName.match(/\d+/)![0]) : parseInt(activeSceneName.match(/\d+/)![0])}` : activeSceneName.toLowerCase().replace(/[^a-z0-9_-]/g, '_')) : 'scene01'}/</code></span>
+          <span className="text-[11px] text-zinc-400">Physically stored in <code className="text-zinc-300 bg-zinc-800 px-1 py-0.5 rounded">/assets/{activeSceneName ? activeSceneName.toLowerCase().replace(/[^a-z0-9_-]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '') || "scene01" : "scene01"}/images/</code></span>
         </div>
 
         {/* Images Section */}

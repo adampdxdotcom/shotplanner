@@ -177,6 +177,7 @@ export async function exportProjectZip(projectName: string, res: Response): Prom
 
   const projectData = JSON.parse(fs.readFileSync(filePath, "utf-8"));
 
+  const rawName = path.parse(filePath).name;
   res.setHeader("Content-Type", "application/zip");
   res.setHeader("Content-Disposition", `attachment; filename="${rawName}.zip"`);
 

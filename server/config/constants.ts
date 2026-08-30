@@ -25,11 +25,6 @@ export const UPLOADS_DIR = LEGACY_UPLOADS_DIR;
  */
 export function formatSceneFolderName(sceneName?: string): string {
   if (!sceneName) return "scene01";
-  const numMatch = sceneName.match(/\d+/);
-  if (numMatch) {
-    const num = parseInt(numMatch[0], 10);
-    return `scene${num < 10 ? "0" + num : num}`;
-  }
   const clean = sceneName.toLowerCase().replace(/[^a-z0-9_-]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
   return clean || "scene01";
 }

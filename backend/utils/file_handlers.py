@@ -71,13 +71,9 @@ def sanitize_project_name(name: str) -> str:
     return clean or "project"
 
 def format_scene_folder_name(scene_name: Optional[str] = "scene01") -> str:
-    """Standardize scene folder naming e.g., 'Scene 1' -> 'scene01'"""
+    """Standardize scene folder naming cleanly without destroying numbers"""
     if not scene_name:
         return "scene01"
-    match = re.search(r'\d+', scene_name)
-    if match:
-        num = int(match.group(0))
-        return f"scene{num:02d}"
     clean = re.sub(r'[^a-z0-9_-]', '_', scene_name.strip().lower())
     clean = re.sub(r'_+', '_', clean).strip('_')
     return clean or "scene01"
