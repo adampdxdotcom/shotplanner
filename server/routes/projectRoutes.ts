@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { upload } from "../config/constants";
-import { exportProjectZip, getProjectData, importProjectZip, listProjects, saveProjectData } from "../services/projectService";
+import { exportProjectZip, getProjectData, importProjectZip, listProjects, saveProjectData, deleteProject } from "../services/projectService";
 
 const router = Router();
 
@@ -62,6 +62,20 @@ router.post("/import", upload.single("file"), async (req: Request, res: Response
   } catch (err: any) {
     console.error("Import error:", err);
     res.status(500).json({ error: err.message || "Failed to import zip" });
+  }
+});
+
+// Delete a project
+router.delete("/:filename", (req: Request, res: Response) => {
+  try {
+    const rawName = req.params.filename.replace(/\.json$/, "");
+    const success = deleteProject(rawName);
+    if (!success) {
+      return res.status(404).json({ error: `Project '${rawName}' not found` });
+    }
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 

@@ -1,3 +1,4 @@
+import os
 import httpx
 from typing import List, Dict, Any, Optional
 
@@ -84,16 +85,92 @@ def generate_header_definitions(assets: List[Dict[str, Any]]) -> str:
             lines.append(f"{name} ({tag}): {desc.rstrip('.')}.")
     return "\n".join(lines) + "\n\n"
 
+def _get_fallback_prompt(basic_stub: str, assets: List[Dict[str, Any]], defs_header: str) -> str:
+    tags_preview = " ".join([f"<Picture {i+1}>" for i in range(min(len(assets), 3))])
+    return (
+        f"{defs_header}integrated_multimodal_description: [Shot 1] Live-action, cinematic 4K shot based on '{basic_stub}'. "
+        f"Featuring {tags_preview} with lifelike volumetric lighting, photorealistic textures, "
+        f"and ultra-detailed focal continuity. The camera pushes in with small amplitude at slow speed.\n\n"
+        f"overall_soundscape: Soft room ambience and atmospheric audio.\n\n"
+        f"non_diegetic_music: N/A"
+    )
+
 async def expand_prompt_with_llm(
     basic_stub: str,
     assets: List[Dict[str, Any]],
     lm_studio_url: str = "http://localhost:1234/v1",
-    model: Optional[str] = None
+    model: Optional[str] = None,
+    provider: Optional[str] = None,
+    prompt_prefix: Optional[str] = None,
+    gemini_api_key: Optional[str] = None
 ) -> str:
     """
-    Call the local LM Studio OpenAI-compatible endpoint to expand the prompt.
-    Includes fallback heuristics if the local endpoint is unreachable.
+    Call LM Studio or Gemini API to expand the prompt.
+    Includes fallback heuristics if the endpoints are offline/unreachable.
     """
+    system_instruction = SYSTEM_PROMPT
+    if prompt_prefix:
+        system_instruction = f"{prompt_prefix}\n\n{system_instruction}"
+
+    provider_name = (provider or "lm_studio").lower().strip()
+    defs_header = generate_header_definitions(assets)
+
+    if provider_name == "gemini":
+        api_key = gemini_api_key or os.environ.get("GEMINI_API_KEY") or ""
+        if not api_key:
+            # Fallback early if API key is completely missing
+            return _get_fallback_prompt(basic_stub, assets, defs_header)
+
+        gemini_model = model or "gemini-2.5-flash"
+        if "/" not in gemini_model:
+            if "gemini-" not in gemini_model:
+                gemini_model = "gemini-2.5-flash"
+
+        endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_model}:generateContent?key={api_key}"
+        context_str = format_asset_context(assets)
+        user_content = f"""USER BASIC STUB / CONCEPT:
+\"\"\"{basic_stub}\"\"\"
+
+{context_str}
+
+Please expand this basic stub into a rich, cohesive generation prompt, weaving in reference tags (<Picture 1>, etc.) for the subject identities and scene cues."""
+
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {
+                            "text": f"System Instructions:\n{system_instruction}\n\nUser Input:\n{user_content}"
+                        }
+                    ]
+                }
+            ],
+            "generationConfig": {
+                "temperature": 0.7,
+                "maxOutputTokens": 1500
+            }
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(endpoint, json=payload)
+                if response.status_code == 200:
+                    data = response.json()
+                    try:
+                        content = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                    except (KeyError, IndexError):
+                        raise Exception("Failed to parse response structure from Gemini API.")
+                    
+                    if defs_header and "global subject definitions" not in content.lower():
+                        return defs_header + content
+                    return content
+                else:
+                    raise Exception(f"Gemini API returned status code {response.status_code}: {response.text}")
+        except Exception as e:
+            print(f"Gemini expansion failed, using local fallback prompt: {e}")
+            return _get_fallback_prompt(basic_stub, assets, defs_header)
+
+    # Default provider: LM Studio
     url = lm_studio_url.rstrip("/")
     if not url.endswith("/chat/completions"):
         if not url.endswith("/v1"):
@@ -113,14 +190,13 @@ Please expand this basic stub into a rich, cohesive generation prompt, weaving i
     payload = {
         "model": model or "local-model",
         "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": system_instruction},
             {"role": "user", "content": user_content}
         ],
         "temperature": 0.7,
         "max_tokens": 1000
     }
 
-    defs_header = generate_header_definitions(assets)
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(endpoint, json=payload)
@@ -133,13 +209,5 @@ Please expand this basic stub into a rich, cohesive generation prompt, weaving i
             else:
                 raise Exception(f"LM Studio API returned status code {response.status_code}: {response.text}")
     except Exception as e:
-        # Generate intelligent local template expansion if LM Studio is offline
-        tags_preview = " ".join([f"<Picture {i+1}>" for i in range(min(len(assets), 3))])
-        fallback_prompt = (
-            f"{defs_header}integrated_multimodal_description: [Shot 1] Live-action, cinematic 4K shot based on '{basic_stub}'. "
-            f"Featuring {tags_preview} with lifelike volumetric lighting, photorealistic textures, "
-            f"and ultra-detailed focal continuity. The camera pushes in with small amplitude at slow speed.\n\n"
-            f"overall_soundscape: Soft room ambience and atmospheric audio.\n\n"
-            f"non_diegetic_music: N/A"
-        )
-        return fallback_prompt
+        print(f"LM Studio expansion failed, using local fallback prompt: {e}")
+        return _get_fallback_prompt(basic_stub, assets, defs_header)

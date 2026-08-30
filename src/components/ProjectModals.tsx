@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { X, Save, FolderOpen, AlertCircle, Download, Upload, Plus } from "lucide-react";
+import { X, Save, FolderOpen, AlertCircle, Download, Upload, Plus, Trash2 } from "lucide-react";
 
 interface SaveProjectModalProps {
   currentProjectName?: string;
@@ -249,6 +249,25 @@ export const LoadProjectModal: React.FC<LoadProjectModalProps> = ({ isOpen, onCl
     }
   };
 
+  const handleDelete = async (filename: string) => {
+    const confirmDelete = window.confirm(`Are you sure you want to delete the project "${filename}"? This action cannot be undone.`);
+    if (!confirmDelete) return;
+
+    setError(null);
+    try {
+      const res = await fetch(`/api/projects/${filename}`, {
+        method: "DELETE"
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to delete project.");
+      }
+      setProjects(prev => prev.filter(p => p !== filename));
+    } catch (err: any) {
+      setError(err.message || "Failed to delete project.");
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-zinc-900 border-2 border-zinc-700 rounded-xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
@@ -285,19 +304,31 @@ export const LoadProjectModal: React.FC<LoadProjectModalProps> = ({ isOpen, onCl
           ) : (
             <div className="space-y-2">
               {projects.map((p) => (
-                <button
-                  key={p}
-                  onClick={() => handleLoad(p)}
-                  disabled={loadingFile !== null}
-                  className="w-full text-left px-4 py-3 bg-zinc-950/50 hover:bg-zinc-800 border-2 border-zinc-700 hover:border-zinc-700 rounded-lg transition-colors flex items-center justify-between group"
-                >
-                  <span className="text-sm text-zinc-200 truncate">{p}</span>
-                  {loadingFile === p ? (
-                    <span className="text-xs text-indigo-400">Loading...</span>
-                  ) : (
-                    <span className="text-xs text-zinc-500 group-hover:text-zinc-300 transition-colors">Load</span>
-                  )}
-                </button>
+                <div key={p} className="flex items-center gap-2 group/row">
+                  <button
+                    onClick={() => handleLoad(p)}
+                    disabled={loadingFile !== null}
+                    className="flex-1 text-left px-4 py-3 bg-zinc-950/50 hover:bg-zinc-800 border-2 border-zinc-700/80 hover:border-zinc-700 rounded-lg transition-colors flex items-center justify-between min-w-0"
+                  >
+                    <span className="text-sm text-zinc-200 truncate">{p}</span>
+                    {loadingFile === p ? (
+                      <span className="text-xs text-indigo-400">Loading...</span>
+                    ) : (
+                      <span className="text-[11px] text-zinc-500 group-hover:text-zinc-300 transition-colors">Load</span>
+                    )}
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(p);
+                    }}
+                    disabled={loadingFile !== null}
+                    className="p-3 bg-zinc-950/50 hover:bg-red-950/60 text-zinc-500 hover:text-red-400 border-2 border-zinc-700/80 hover:border-red-900/50 rounded-lg transition-colors shrink-0"
+                    title="Delete Project"
+                  >
+                    <Trash2 className="w-4.5 h-4.5" />
+                  </button>
+                </div>
               ))}
             </div>
           )}

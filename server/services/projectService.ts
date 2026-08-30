@@ -47,6 +47,16 @@ export function saveProjectData(projectName: string, projectData: any): string {
   return cleanName;
 }
 
+export function deleteProject(projectName: string): boolean {
+  const cleanName = projectName.replace(/\.json$/, "");
+  const targetPath = path.join(PROJECTS_DIR, `${cleanName}.json`);
+  if (fs.existsSync(targetPath)) {
+    fs.unlinkSync(targetPath);
+    return true;
+  }
+  return false;
+}
+
 export async function exportProjectZip(projectName: string, res: Response): Promise<void> {
   const rawName = projectName.replace(/\.json$/, "");
   const jsonFileName = `${rawName}.json`;
