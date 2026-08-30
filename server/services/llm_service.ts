@@ -25,6 +25,7 @@ export interface ExpandPromptOptions {
   camera_movement?: string;
   ots_anchor_subject?: string;
   ots_focus_subject?: string;
+  ots_side?: "Left" | "Right";
   framing_directive?: string;
 }
 
@@ -92,6 +93,7 @@ export async function expandPrompt(
     camera_movement,
     ots_anchor_subject,
     ots_focus_subject,
+    ots_side,
     framing_directive
   } = options;
 
@@ -130,6 +132,14 @@ export async function expandPrompt(
     ""
   ).trim();
 
+  const sideChoice = (
+    active_shot?.ots_side ||
+    ots_side ||
+    (scene_planning as any)?.ots_side ||
+    (planning as any)?.ots_side ||
+    ""
+  ).trim();
+
   const isOTS =
     effectiveShotType === "Over-the-shoulder (OTS)" ||
     effectiveShotType === "Over-the-Shoulder (OTS)" ||
@@ -139,12 +149,13 @@ export async function expandPrompt(
 
   let resolvedFramingDirective = (framing_directive || "").trim();
   if (!resolvedFramingDirective && isOTS && (anchorSubject || focusSubject)) {
+    const positionSuffix = (sideChoice === "Left" || sideChoice === "Right") ? ` (positioned on ${sideChoice})` : "";
     if (anchorSubject && focusSubject) {
-      resolvedFramingDirective = `Framing: Over-the-shoulder (OTS) angle looking past the shoulder of ${anchorSubject} toward ${focusSubject}.`;
+      resolvedFramingDirective = `Framing: Over-the-shoulder (OTS) angle looking past the shoulder of ${anchorSubject} toward ${focusSubject}${positionSuffix}.`;
     } else if (anchorSubject) {
-      resolvedFramingDirective = `Framing: Over-the-shoulder (OTS) angle looking past the shoulder of ${anchorSubject}.`;
+      resolvedFramingDirective = `Framing: Over-the-shoulder (OTS) angle looking past the shoulder of ${anchorSubject}${positionSuffix}.`;
     } else if (focusSubject) {
-      resolvedFramingDirective = `Framing: Over-the-shoulder (OTS) angle looking toward ${focusSubject}.`;
+      resolvedFramingDirective = `Framing: Over-the-shoulder (OTS) angle looking toward ${focusSubject}${positionSuffix}.`;
     }
   }
 

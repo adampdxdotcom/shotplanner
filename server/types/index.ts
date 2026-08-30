@@ -24,6 +24,7 @@ export interface ShotItem {
   updated_at: string;
   ots_anchor_subject?: string;
   ots_focus_subject?: string;
+  ots_side?: "Left" | "Right";
 }
 
 export interface AssetRecord {
@@ -74,6 +75,7 @@ export interface ScenePlanningDTO {
   camera_movement?: string;
   ots_anchor_subject?: string;
   ots_focus_subject?: string;
+  ots_side?: "Left" | "Right";
 }
 
 export interface SSHKeyPair {

@@ -156,6 +156,23 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
     });
   };
 
+  const handleUpdateSide = (val: "Left" | "Right" | "") => {
+    if (!activeShotId) return;
+    onUpdateProject(prev => {
+      const shots = [...prev.shots];
+      const idx = shots.findIndex(s => s.id === activeShotId);
+      if (idx !== -1) {
+        shots[idx] = {
+          ...shots[idx],
+          ots_side: (val === "Left" || val === "Right") ? val : undefined,
+          staged: false,
+          updated_at: new Date().toISOString()
+        };
+      }
+      return { ...prev, shots };
+    });
+  };
+
   const isOTSShot = activeShot
     ? activeShot.shot_type === "Over-the-shoulder (OTS)" ||
       activeShot.shot_type === "Over-the-Shoulder (OTS)" ||
@@ -784,7 +801,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {/* Anchor Subject Dropdown */}
                 <div className="space-y-1.5">
                   <label htmlFor="ots-anchor-subject-select" className="text-xs font-medium text-zinc-300 flex items-center justify-between">
@@ -832,6 +849,27 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
                     ))}
                   </select>
                 </div>
+
+                {/* Framing Side Dropdown */}
+                <div className="space-y-1.5">
+                  <label htmlFor="ots-side-select" className="text-xs font-medium text-zinc-300 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Sliders className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>Framing Side</span>
+                    </span>
+                    <span className="text-[10px] text-zinc-500">Focus position</span>
+                  </label>
+                  <select
+                    id="ots-side-select"
+                    value={activeShot.ots_side || ""}
+                    onChange={(e) => handleUpdateSide(e.target.value as "Left" | "Right" | "")}
+                    className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-indigo-500 focus:outline-hidden text-zinc-100 text-xs px-3 py-2 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <option value="">-- Unspecified Side --</option>
+                    <option value="Left">Left</option>
+                    <option value="Right">Right</option>
+                  </select>
+                </div>
               </div>
 
               {/* Directive Preview Banner */}
@@ -841,7 +879,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
                   <div className="space-y-0.5">
                     <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wide">Generated Framing Directive:</span>
                     <p className="font-mono text-zinc-200">
-                      Framing: Over-the-shoulder (OTS) angle looking past the shoulder of <strong className="text-amber-300">{activeShot.ots_anchor_subject || "[Unassigned]"}</strong> toward <strong className="text-emerald-300">{activeShot.ots_focus_subject || "[Unassigned]"}</strong>.
+                      Framing: Over-the-shoulder (OTS) angle looking past the shoulder of <strong className="text-amber-300">{activeShot.ots_anchor_subject || "[Unassigned]"}</strong> toward <strong className="text-emerald-300">{activeShot.ots_focus_subject || "[Unassigned]"}</strong>{activeShot.ots_side ? <> (positioned on <strong className="text-indigo-300">{activeShot.ots_side}</strong>)</> : ""}.
                     </p>
                   </div>
                 </div>

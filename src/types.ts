@@ -64,6 +64,7 @@ export interface ShotItem {
   updated_at: string;
   ots_anchor_subject?: string;
   ots_focus_subject?: string;
+  ots_side?: "Left" | "Right";
   workflow_file?: string;
   prompt_node_id?: string;
   node_mappings?: Record<string, string>;
@@ -86,6 +87,7 @@ export interface ScenePlanning {
   camera_movement: string;
   ots_anchor_subject?: string;
   ots_focus_subject?: string;
+  ots_side?: "Left" | "Right";
 }
 
 export interface AppConfig {

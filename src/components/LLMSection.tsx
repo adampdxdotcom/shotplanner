@@ -102,6 +102,7 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
           shot_type: activeShot ? activeShot.shot_type : planning?.shot_type,
           ots_anchor_subject: activeShot?.ots_anchor_subject || planning?.ots_anchor_subject,
           ots_focus_subject: activeShot?.ots_focus_subject || planning?.ots_focus_subject,
+          ots_side: activeShot?.ots_side || planning?.ots_side,
           gemini_api_key: geminiApiKey
         })
       });

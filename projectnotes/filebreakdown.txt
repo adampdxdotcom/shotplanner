@@ -265,24 +265,23 @@
 - **`backend/services/llm_service.py`**
   - Updated Python backend implementation to mirror the Assembly Line prompt pattern with programmatic headers, footers, and isolated multimodal description generation.
 
-## Over-The-Shoulder (OTS) Framing Directives & Shot Controls
+## Over-The-Shoulder (OTS) Framing Directives, Framing Side & Hard Injection
 - **`src/types.ts` & `server/types/index.ts`**
-  - Updated `ShotItem` and `ScenePlanning` / `ScenePlanningDTO` interfaces to include `ots_anchor_subject?: string` and `ots_focus_subject?: string`.
+  - Updated `ShotItem` and `ScenePlanning` / `ScenePlanningDTO` interfaces to include `ots_anchor_subject?: string`, `ots_focus_subject?: string`, and `ots_side?: "Left" | "Right"`.
 - **`src/components/AssetManagerSection.tsx`**
   - Implemented conditional "Shot Controls" UI row rendered when the active shot's `shot_type` is `"Over-the-shoulder (OTS)"`.
-  - Added "Anchor Subject" and "Focus Subject" dropdown selects populated by the project's subjects registry (`sceneProject.subjects`, `subjects` prop, and existing asset subjects).
-  - Wired selection events to update `activeShot.ots_anchor_subject` and `activeShot.ots_focus_subject` in the project state via `onUpdateProject`, flagging the project as dirty for auto-save.
-  - Added live preview indicator displaying the constructed framing directive and visual confirmation badge.
+  - Added "Anchor Subject", "Focus Subject", and "Framing Side" (`Left` / `Right`) dropdown selectors in a 3-column responsive grid.
+  - Wired selection events to update `activeShot.ots_anchor_subject`, `activeShot.ots_focus_subject`, and `activeShot.ots_side` in the project state via `onUpdateProject`, flagging the project as dirty for auto-save.
+  - Updated live preview indicator displaying the full framing directive: `"Framing: Over-the-shoulder (OTS) angle looking past the shoulder of {Anchor} toward {Focus} (positioned on {Left/Right})."`
 - **`src/components/ScenePlanningHeader.tsx`**
-  - Updated `SHOT_TYPES` to standardize `"Over-the-shoulder (OTS)"` with backward-compatible mapping.
-- **`server/services/llm_service.ts` & `backend/services/llm_service.py`**
-  - Programmatically constructs deterministic OTS Framing Directive: `"Framing: Over-the-shoulder (OTS) angle looking past the shoulder of {AnchorSubject} toward {FocusSubject}."`
-  - Injects the framing directive directly into the deterministic Header section before description body.
-  - Updated LLM context prompts and constraints: `"A Framing Directive is provided; utilize the specific anchor and focus subject likenesses provided in the Global Subject Definitions to execute this framing."`
-- **`server/utils/formatters.ts` & `src/utils/formatters.ts`**
-  - Added `framingDirective` parameter support to `buildMandatoryHeader` and `assembleFinalPrompt`.
+  - Standardized `"Over-the-shoulder (OTS)"` shot type selection with backward-compatible mapping.
+- **`server/services/llm_service.ts` & `backend/services/llm_service.py` (Hard Injection Architecture)**
+  - Implemented deterministic Hard Injection of the OTS Framing Directive into the prompt's Header block.
+  - Programmatically constructs the directive string from the selected subjects and side (`"Framing: Over-the-shoulder (OTS) angle looking past the shoulder of {Anchor} toward {Focus} (positioned on {Side})."`).
+  - The LLM is never tasked with generating framing boilerplate; it is queried strictly for the `integrated_multimodal_description` body.
+  - Programmatically concatenates `FinalPrompt = Header + FramingDirective + LLM_Description + Footer`, mathematically guaranteeing framing presence in every prompt output.
 - **`src/components/LLMSection.tsx` & `src/App.tsx`**
-  - Ensured `active_shot`, `ots_anchor_subject`, and `ots_focus_subject` payload parameters are forwarded to `/api/generate-prompt`.
+  - Ensured `active_shot`, `ots_anchor_subject`, `ots_focus_subject`, and `ots_side` payload parameters are forwarded to `/api/generate-prompt`.
 
 
 

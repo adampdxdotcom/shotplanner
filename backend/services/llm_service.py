@@ -106,6 +106,7 @@ async def expand_prompt_with_llm(
     shot_type: Optional[str] = None,
     ots_anchor_subject: Optional[str] = None,
     ots_focus_subject: Optional[str] = None,
+    ots_side: Optional[str] = None,
     framing_directive: Optional[str] = None
 ) -> str:
     """
@@ -120,16 +121,18 @@ async def expand_prompt_with_llm(
     effective_shot_type = (active_shot.get("shot_type") if active_shot else None) or shot_type or ""
     anchor = (active_shot.get("ots_anchor_subject") if active_shot else None) or ots_anchor_subject or ""
     focus = (active_shot.get("ots_focus_subject") if active_shot else None) or ots_focus_subject or ""
+    side_choice = (active_shot.get("ots_side") if active_shot else None) or ots_side or ""
     is_ots = "over-the-shoulder" in effective_shot_type.lower() or "ots" in effective_shot_type.lower()
 
     resolved_framing = (framing_directive or "").strip()
     if not resolved_framing and is_ots and (anchor or focus):
+        pos_suffix = f" (positioned on {side_choice})" if side_choice in ["Left", "Right"] else ""
         if anchor and focus:
-            resolved_framing = f"Framing: Over-the-shoulder (OTS) angle looking past the shoulder of {anchor} toward {focus}."
+            resolved_framing = f"Framing: Over-the-shoulder (OTS) angle looking past the shoulder of {anchor} toward {focus}{pos_suffix}."
         elif anchor:
-            resolved_framing = f"Framing: Over-the-shoulder (OTS) angle looking past the shoulder of {anchor}."
+            resolved_framing = f"Framing: Over-the-shoulder (OTS) angle looking past the shoulder of {anchor}{pos_suffix}."
         elif focus:
-            resolved_framing = f"Framing: Over-the-shoulder (OTS) angle looking toward {focus}."
+            resolved_framing = f"Framing: Over-the-shoulder (OTS) angle looking toward {focus}{pos_suffix}."
     
     is_scene_ref = any(
         (a.get("type") or "").lower() in ["scene reference", "location", "environment"]

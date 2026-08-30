@@ -278,7 +278,8 @@ export default function App() {
         active_shot: shot,
         shot_type: shot.shot_type,
         ots_anchor_subject: shot.ots_anchor_subject,
-        ots_focus_subject: shot.ots_focus_subject
+        ots_focus_subject: shot.ots_focus_subject,
+        ots_side: shot.ots_side
       }),
     });
     const data = await response.json();
