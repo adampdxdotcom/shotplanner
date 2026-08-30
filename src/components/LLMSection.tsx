@@ -329,6 +329,8 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
             <span>
               {generating 
                 ? `Synthesizing with ${providerChoice === "gemini" ? "Gemini 3.6 Flash..." : "LM Studio..."}` 
+                : expandedPrompt && expandedPrompt.trim()
+                ? `Regenerate Prompt with ${providerChoice === "gemini" ? "Gemini 3.6 Flash" : "LM Studio"}`
                 : `Generate Prompt with ${providerChoice === "gemini" ? "Gemini 3.6 Flash" : "LM Studio"}`}
             </span>
           </button>

@@ -49,15 +49,20 @@ class SSHTestRequest(BaseModel):
     remote_dir: str = "/workspace/runpod-slim/ComfyUI/input"
 
 class SSHTransferRequest(BaseModel):
-    runpod_ip: str
+    runpod_ip: Optional[str] = None
+    remote_host: Optional[str] = None  # Frontend compatibility
     ssh_port: int = 22
     ssh_username: str = "root"
     ssh_password: Optional[str] = None
     ssh_key_path: Optional[str] = None
     ssh_private_key: Optional[str] = None
-    remote_input_dir: str = "/workspace/runpod-slim/ComfyUI/input"
+    remote_input_dir: Optional[str] = None
+    remote_comfyui_root: Optional[str] = None  # Frontend compatibility
     node_mappings: Dict[str, str] = Field(default_factory=dict)
     filenames: List[str] = Field(default_factory=list)
+
+    class Config:
+        extra = "allow"
 
 class ExecuteWorkflowRequest(BaseModel):
     # Remote RunPod & SSH Config
@@ -200,8 +205,18 @@ async def transfer_assets_only(req: SSHTransferRequest):
     Iterates over all assigned shot input slots, checks remote existence via sftp.stat,
     and returns a detailed count of new files transferred vs existing files skipped.
     """
-    if not req.runpod_ip:
+    # Robustly resolve runpod_ip
+    host = req.runpod_ip or req.remote_host
+    if not host:
         raise HTTPException(status_code=400, detail="RunPod Host/IP is required for remote transfer.")
+
+    # Robustly resolve remote_input_dir
+    remote_dir = req.remote_input_dir
+    if not remote_dir:
+        if req.remote_comfyui_root:
+            remote_dir = f"{req.remote_comfyui_root.rstrip('/')}/input"
+        else:
+            remote_dir = "/workspace/runpod-slim/ComfyUI/input"
 
     files_to_transfer: List[Path] = []
     seen_files = set()
@@ -231,19 +246,19 @@ async def transfer_assets_only(req: SSHTransferRequest):
     if not files_to_transfer:
         return {
             "success": True,
-            "remote_dir": req.remote_input_dir,
+            "remote_dir": remote_dir,
             "transferred_count": 0,
             "skipped_count": 0,
             "total_checked": 0,
             "uploaded_files": [],
             "skipped_files": [],
             "transferred_files": [],
-            "message": f"No active assets found to transfer into {req.remote_input_dir}. Assign assets to input slots in Step 2."
+            "message": f"No active assets found to transfer into {remote_dir}. Assign assets to input slots in Step 2."
         }
 
     try:
         ssh_service = RunPodSSHService(
-            host=req.runpod_ip,
+            host=host,
             port=req.ssh_port,
             username=req.ssh_username,
             password=req.ssh_password,
@@ -252,7 +267,7 @@ async def transfer_assets_only(req: SSHTransferRequest):
         )
         transfer_results = ssh_service.transfer_files_to_runpod(
             local_files=files_to_transfer,
-            remote_dir=req.remote_input_dir,
+            remote_dir=remote_dir,
             overwrite=False
         )
         return {
