@@ -291,6 +291,7 @@
     - `scene_name`: `sceneProject.scene_name`
 - **`backend/routes/api.py`**
   - Updated `LLMGenerateRequest` schema and `/api/generate-prompt` / `/api/llm/expand` endpoints to accept and forward `shot_type`, `camera_movement`, `ots_anchor_subject`, `ots_focus_subject`, `ots_side`, `shot_number`, `scene_name`, and `framing_directive` to `expand_prompt_with_llm`.
+  - Imported `Union` from `typing` (`from typing import Dict, Any, List, Optional, Union`) to resolve `NameError` on `shot_number: Optional[Union[str, int]] = None`. Verified all type annotations across backend routes, services, and utils have their corresponding typing symbols properly imported.
 - **`server/services/llm_service.ts` & `backend/services/llm_service.py` (Camera Motion Hard Constraints & Prompt Assembly)**
   - Resolves framing directives from `shot_type`, `ots_anchor_subject`, `ots_focus_subject`, and `ots_side` and hard-injects them directly into the Mandatory Header block.
   - Passes explicit `camera_movement` (e.g. "Locked Off (Static)", "Pan Left", etc.) to the LLM system prompt and context block as a hard constraint, strictly forbidding contradictory camera motions (e.g. push-ins or zooms when locked off).
