@@ -13,6 +13,7 @@ import {
   ArrowRight, 
   Code, 
   Check, 
+  Copy,
   FileJson,
   AlertTriangle,
   RefreshCw
@@ -66,6 +67,18 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
   const [uploading, setUploading] = useState(false);
   const [showRawJson, setShowRawJson] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [copiedJson, setCopiedJson] = useState(false);
+
+  const handleCopyJson = async () => {
+    if (!parsedWorkflow?.raw_json) return;
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(parsedWorkflow.raw_json, null, 2));
+      setCopiedJson(true);
+      setTimeout(() => setCopiedJson(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy JSON:", err);
+    }
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -245,12 +258,41 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
 
       {/* Raw JSON inspection collapsible */}
       {showRawJson && parsedWorkflow && (
-        <div className="p-3 rounded-lg bg-zinc-950 border-2 border-zinc-700 text-xs space-y-1.5">
-          <div className="flex items-center justify-between text-zinc-400 border-b border-zinc-800/60 pb-1.5">
-            <span className="font-mono">Flat Dictionary Graph ({Object.keys(parsedWorkflow.raw_json).length} total nodes)</span>
-            <span className="text-[11px]">workflow_api.json structure</span>
+        <div className="p-3 rounded-lg bg-zinc-950 border-2 border-zinc-700 text-xs space-y-2">
+          <div className="flex items-center justify-between text-zinc-300 border-b border-zinc-800/80 pb-2">
+            <div className="flex items-center gap-2">
+              <FileJson className="w-4 h-4 text-amber-400" />
+              <span className="font-mono font-medium text-xs text-zinc-200">
+                {Array.isArray(parsedWorkflow.raw_json?.nodes)
+                  ? `Standard Visual Workflow Canvas (${parsedWorkflow.raw_json.nodes.length} nodes)`
+                  : `Flat ComfyUI Graph (${Object.keys(parsedWorkflow.raw_json || {}).length} nodes)`}
+              </span>
+              <span className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono">
+                {Array.isArray(parsedWorkflow.raw_json?.nodes)
+                  ? "Visual UI Workflow JSON"
+                  : "API Prompt Format JSON"}
+              </span>
+            </div>
+
+            <button
+              onClick={handleCopyJson}
+              className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 text-zinc-200 border border-zinc-600 transition-colors"
+              title="Copy JSON to clipboard"
+            >
+              {copiedJson ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="text-emerald-400 font-semibold">Copied!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5 text-zinc-400" />
+                  <span>Copy JSON</span>
+                </>
+              )}
+            </button>
           </div>
-          <pre className="max-h-56 overflow-auto font-mono text-[11px] text-zinc-300 bg-zinc-900/60 p-2.5 rounded border-2 border-zinc-700/50">
+          <pre className="max-h-64 overflow-auto font-mono text-[11px] text-zinc-300 bg-zinc-900/80 p-3 rounded-lg border border-zinc-800">
             {JSON.stringify(parsedWorkflow.raw_json, null, 2)}
           </pre>
         </div>
