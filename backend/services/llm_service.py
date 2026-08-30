@@ -177,7 +177,16 @@ async def expand_prompt_with_llm(
     footer = build_mandatory_footer()
 
     context_str = format_asset_context(assets)
-    camera_context_block = f"\nCAMERA MOVEMENT DIRECTIVE:\n{'LOCKED OFF (STATIC) - The camera must remain completely stationary. Strictly FORBID any camera push-in, zoom, pan, tilt, or tracking.' if is_static else f'The camera movement is \"{effective_cam}\". Execute ONLY this movement without introducing conflicting motions.'}\n" if effective_cam else ""
+    
+    if effective_cam:
+        if is_static:
+            cam_dir_text = "LOCKED OFF (STATIC) - The camera must remain completely stationary. Strictly FORBID any camera push-in, zoom, pan, tilt, or tracking."
+        else:
+            cam_dir_text = f"The camera movement is '{effective_cam}'. Execute ONLY this movement without introducing conflicting motions."
+        camera_context_block = f"\nCAMERA MOVEMENT DIRECTIVE:\n{cam_dir_text}\n"
+    else:
+        camera_context_block = ""
+
     framing_context_block = f"\nFRAMING DIRECTIVE:\n{resolved_framing}\nA Framing Directive is provided; utilize the specific anchor and focus subject likenesses provided in the Global Subject Definitions to execute this framing.\n" if resolved_framing else ""
 
     camera_constraint_instruction = (

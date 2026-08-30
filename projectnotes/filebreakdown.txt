@@ -296,6 +296,7 @@
   - Passes explicit `camera_movement` (e.g. "Locked Off (Static)", "Pan Left", etc.) to the LLM system prompt and context block as a hard constraint, strictly forbidding contradictory camera motions (e.g. push-ins or zooms when locked off).
   - Configured offline fallback generators to strictly respect static/dynamic camera movement directives.
   - Seamlessly returns the complete prompt assembled via Assembly Line: `Mandatory Header (Scene & Shot Header + Global Subject Definitions + Framing Directive) + LLM Multimodal Description + Mandatory Audio/Music Footer`.
+  - Refactored Python `camera_context_block` construction to use standard multi-line branching without embedded backslashes in f-strings, ensuring 100% compatibility with Python 3.11+. Validated clean syntax compilation across all backend modules (`backend/main.py`, `backend/routes/*.py`, `backend/services/*.py`, `backend/utils/*.py`).
 
 
 
