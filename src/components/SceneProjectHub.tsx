@@ -110,12 +110,12 @@ export default function SceneProjectHub({
 
   const getAssetFilenameForSlot = (slotIndex: number) => {
     // 1. Check shot-level overrides first
-    return activeShot?.assigned_slots[slotIndex] || activeShot?.assigned_slots[slotIndex + 1] || "";
+    return activeShot?.assigned_slots[slotIndex] || activeShot?.assigned_slots[String(slotIndex)] || "";
   };
 
   const getAssetForSlot = (slotIndex: number) => {
     // 1. Check if the shot overrides this slot specifically
-    const shotFilenameOverride = activeShot?.assigned_slots[slotIndex] || activeShot?.assigned_slots[slotIndex + 1];
+    const shotFilenameOverride = activeShot?.assigned_slots[slotIndex] || activeShot?.assigned_slots[String(slotIndex)];
     
     if (shotFilenameOverride) {
        // Look up the full asset by filename

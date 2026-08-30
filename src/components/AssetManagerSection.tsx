@@ -484,17 +484,16 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
   };
 
   const getAssetForSlot = (type: "image" | "audio" | "video", slotIdx: number): MediaAsset | undefined => {
-    if (!activeShot) return undefined;
+    if (!activeShot || !activeShot.assigned_slots) return undefined;
     
     const globalSlot = getGlobalSlotIndex(type, slotIdx);
 
-    // 1. Look up the assigned identifier for this slot from the ACTIVE SHOT ONLY
-    const assignedIdentifier = activeShot.assigned_slots?.[globalSlot] 
-                            || activeShot.assigned_slots?.[globalSlot + 1]
-                            || activeShot.assigned_slots?.[`slot_${globalSlot}`];
+    // 1. Look up the assigned filename strictly from the ACTIVE SHOT's assigned_slots
+    const assignedIdentifier = activeShot.assigned_slots[globalSlot] 
+                            || activeShot.assigned_slots[String(globalSlot)];
 
     if (!assignedIdentifier) {
-      // If the active shot has nothing mapped to this slot, it MUST remain empty!
+      // If activeShot.assigned_slots does not have an explicit entry for that globalSlot, it MUST remain blank
       return undefined;
     }
 
