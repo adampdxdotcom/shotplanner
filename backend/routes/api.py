@@ -11,6 +11,7 @@ from backend.utils.file_handlers import (
     format_scene_folder_name,
     ensure_scene_directories,
     sanitize_project_name,
+    find_project_file,
     save_uploaded_file,
     generate_target_filename,
     list_workflows,
@@ -788,16 +789,8 @@ async def list_projects():
 
 @router.get("/projects/{filename}")
 async def get_project(filename: str):
-    sanitized_name = sanitize_project_name(filename)
-    safe_filename = f"{sanitized_name}.json"
-    scene_dir_name = format_scene_folder_name(sanitized_name)
-    
-    # Check scene folder first
-    file_path = ASSETS_DIR / scene_dir_name / safe_filename
-    if not file_path.exists():
-        # Fallback to legacy
-        file_path = PROJECTS_DIR / safe_filename
-    if not file_path.exists():
+    file_path = find_project_file(filename)
+    if not file_path or not file_path.exists():
         raise HTTPException(status_code=404, detail="Project not found")
     with open(file_path, "r", encoding="utf-8") as f:
         data = json.load(f)
@@ -817,21 +810,19 @@ async def get_project(filename: str):
 
 @router.delete("/projects/{filename}")
 async def delete_project_endpoint(filename: str):
-    sanitized_name = sanitize_project_name(filename)
-    safe_filename = f"{sanitized_name}.json"
-    scene_dir_name = format_scene_folder_name(sanitized_name)
-    
-    file_path = ASSETS_DIR / scene_dir_name / safe_filename
-    if not file_path.exists():
-        file_path = PROJECTS_DIR / safe_filename
-        
-    if not file_path.exists():
+    file_path = find_project_file(filename)
+    if not file_path or not file_path.exists():
         raise HTTPException(status_code=404, detail="Project not found")
     try:
+        parent_dir = file_path.parent
         file_path.unlink()
         
-        # Optional: attempt to remove scene directory if empty?
-        # Leaving that out for safety.
+        # Optional: attempt to remove scene directory if empty
+        if parent_dir != ASSETS_DIR and parent_dir != PROJECTS_DIR:
+            try:
+                parent_dir.rmdir()
+            except Exception:
+                pass # Not empty or cannot remove
         
         return {"success": True}
     except Exception as e:
@@ -839,11 +830,11 @@ async def delete_project_endpoint(filename: str):
 
 @router.get("/projects/{filename}/export")
 async def export_project_zip(filename: str):
-    clean_name = sanitize_project_name(filename)
-    file_path = PROJECTS_DIR / f"{clean_name}.json"
+    file_path = find_project_file(filename)
+    if not file_path or not file_path.exists():
+        raise HTTPException(status_code=404, detail="Project not found")
     
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail=f"Project '{clean_name}' not found on server. Please save it first.")
+
     
     with open(file_path, "r", encoding="utf-8") as f:
         project_data = json.load(f)
