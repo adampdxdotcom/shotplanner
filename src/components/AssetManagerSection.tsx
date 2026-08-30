@@ -508,9 +508,14 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
   const MAX_AUDIOS = 2;
   const MAX_VIDEOS = 1;
 
-  const currentCount = activeTab === "image" ? images.length : activeTab === "audio" ? audios.length : videos.length;
+  const activeShotImageCount = Array.from({ length: MAX_IMAGES }).filter((_, idx) => getAssetForSlot("image", idx) !== undefined).length;
+  const activeShotAudioCount = Array.from({ length: MAX_AUDIOS }).filter((_, idx) => getAssetForSlot("audio", idx) !== undefined).length;
+  const activeShotVideoCount = Array.from({ length: MAX_VIDEOS }).filter((_, idx) => getAssetForSlot("video", idx) !== undefined).length;
+
+  const currentCount = activeTab === "image" ? activeShotImageCount : activeTab === "audio" ? activeShotAudioCount : activeShotVideoCount;
   const currentMax = activeTab === "image" ? MAX_IMAGES : activeTab === "audio" ? MAX_AUDIOS : MAX_VIDEOS;
-  const isLimitReached = currentCount >= currentMax;
+  // The global library is unlimited; limits only apply to the active shot slots.
+  const isLimitReached = false;
   
   const isMetadataIncomplete = !subjectName.trim() || !description.trim();
   const isUploadDisabled = uploading || isLimitReached || isMetadataIncomplete;
@@ -709,10 +714,15 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
 
       {/* Uploaded Assets Grid */}
       <div className="space-y-6 pt-4 border-t border-zinc-800">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-zinc-200">
-            Uploaded Media Library
-          </h2>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-semibold text-zinc-200">
+              Shot-Level Assigned Assets & Media Library
+            </h2>
+            <p className="text-xs text-zinc-500 mt-0.5">
+              Project Library Total: <span className="text-zinc-300 font-medium">{images.length} image(s)</span>, <span className="text-zinc-300 font-medium">{videos.length} video(s)</span>, <span className="text-zinc-300 font-medium">{audios.length} audio(s)</span>
+            </p>
+          </div>
           <span className="text-[11px] text-zinc-400">Physically stored in <code className="text-zinc-300 bg-zinc-800 px-1 py-0.5 rounded">/assets/uploads/</code></span>
         </div>
 
@@ -721,7 +731,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
           <div className="flex items-center gap-2 text-amber-300">
             <ImageIcon className="w-4 h-4" />
             <h3 className="text-xs font-semibold uppercase tracking-wider">
-              Images ({images.length} / {MAX_IMAGES})
+              Images Assigned ({activeShotImageCount} / {MAX_IMAGES})
             </h3>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
@@ -738,7 +748,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
           <div className="flex items-center gap-2 text-indigo-300">
             <VideoIcon className="w-4 h-4" />
             <h3 className="text-xs font-semibold uppercase tracking-wider">
-              Video ({videos.length} / {MAX_VIDEOS})
+              Video Assigned ({activeShotVideoCount} / {MAX_VIDEOS})
             </h3>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
@@ -755,7 +765,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
           <div className="flex items-center gap-2 text-emerald-300">
             <Music className="w-4 h-4" />
             <h3 className="text-xs font-semibold uppercase tracking-wider">
-              Audio ({audios.length} / {MAX_AUDIOS})
+              Audio Assigned ({activeShotAudioCount} / {MAX_AUDIOS})
             </h3>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
