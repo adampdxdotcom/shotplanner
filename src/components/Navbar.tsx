@@ -9,7 +9,8 @@ import {
   Sparkles,
   Save,
   FolderOpen,
-  Plus
+  Plus,
+  Image
 } from "lucide-react";
 
 interface NavbarProps {
@@ -100,6 +101,17 @@ export const Navbar: React.FC<NavbarProps> = ({ activeSection, onNavigate, onSav
         >
           <Cpu className="w-3.5 h-3.5" />
           Upload
+        </button>
+        <button
+          onClick={() => onNavigate("gallery")}
+          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
+            activeSection === "gallery" 
+              ? "bg-zinc-800 text-zinc-100 shadow-xs border border-zinc-700" 
+              : "text-zinc-400 hover:text-zinc-200"
+          }`}
+        >
+          <Image className="w-3.5 h-3.5 text-amber-400" />
+          Gallery
         </button>
       </nav>
 

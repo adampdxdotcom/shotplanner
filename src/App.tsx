@@ -5,6 +5,7 @@ import { Navbar } from "./components/Navbar";
 import { ConfigSection } from "./components/ConfigSection";
 import { WorkflowSection } from "./components/WorkflowSection";
 import { AssetManagerSection } from "./components/AssetManagerSection";
+import { GallerySection } from "./components/GallerySection";
 import { generatePromptPrefix } from "./components/ScenePlanningHeader";
 import { LLMSection } from "./components/LLMSection";
 import { ExecutionSection } from "./components/ExecutionSection";
@@ -924,6 +925,17 @@ export default function App() {
             onUpdateShot={updateActiveShot}
             onUpdateSceneProject={setSceneProject}
             onShowToast={addToast}
+          />
+        )}
+
+        {activeSection === "gallery" && (
+          <GallerySection
+            assets={assets}
+            subjects={subjects}
+            onRegisterSubject={handleRegisterSubject}
+            onAssetUploaded={handleAssetUploaded}
+            onAssetDeleted={handleAssetDeleted}
+            onAssetUpdated={handleAssetUpdated}
           />
         )}
 
