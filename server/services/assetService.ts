@@ -300,18 +300,32 @@ class AssetService {
       }
       const finalPath = path.join(targetDir, targetFilename);
       const writeStream = fs.createWriteStream(finalPath);
-      for (const cp of chunkArray) {
-        if (fs.existsSync(cp)) {
-          const data = fs.readFileSync(cp);
-          writeStream.write(data);
-          try {
-            fs.unlinkSync(cp);
-          } catch (e) {}
+      
+      const appendNext = (i: number) => {
+        if (i >= total) {
+          writeStream.end();
+          return;
         }
-      }
-      writeStream.end();
+        const cp = path.join(chunksTempDir, `${upload_id}_${i}.part`);
+        if (fs.existsSync(cp)) {
+          const rs = fs.createReadStream(cp);
+          rs.pipe(writeStream, { end: false });
+          rs.on("end", () => {
+            try { fs.unlinkSync(cp); } catch (e) {}
+            appendNext(i + 1);
+          });
+          rs.on("error", reject);
+        } else {
+          appendNext(i + 1);
+        }
+      };
+      
+      appendNext(0);
+      
       writeStream.on("finish", () => {
-        this.uploadChunks.delete(upload_id);
+        if (this.uploadChunks) {
+            this.uploadChunks.delete(upload_id);
+        }
         if (!fs.existsSync(finalPath)) {
           return reject(new Error("Failed to write assembled chunked file. File missing."));
         }

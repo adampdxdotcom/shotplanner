@@ -196,3 +196,19 @@
   - Re-wrote `fetchAssets` reconciliation: Physical gallery files pulled from the backend now intelligently reconcile against the embedded `sceneProject.assets` metadata. `fetchAssets` preserves existing shot assignments, labels, and slot configurations rather than blindly overwriting with generic disk paths.
 - **`src/components/AssetManagerSection.tsx`**
   - Hardened library assignments: `handleAssignExistingAsset` now immediately synchronizes both the active shot's `assigned_slots` AND updates the embedded `sceneProject.assets` global slot mapping to ensure UI consistency and force auto-save triggers.
+
+## Upload Chunk Processing Refactor
+- **`server/services/assetService.ts`**
+  - Refactored `handleChunkUpload` to utilize indexed part file staging. Chunks are explicitly written to `[upload_id]_[chunk_index].part` inside the `tmp/chunks` directory, resolving race conditions and preventing memory leaks associated with blind binary appending into memory loops.
+  - Implemented sequential pipe streaming for final file assembly. Once all expected chunks are verified on disk, they are streamed in strict sequential order `0` to `total_chunks - 1` into the final destination using `createReadStream().pipe(writeStream)`.
+  - Added robust cleanup to remove the `.part` files immediately after successful stream pipe completion.
+- **`src/components/AssetManagerSection.tsx` & `src/components/GallerySection.tsx`**
+  - Confirmed and verified that the chunk iteration logic strictly utilizes `await fetch(...)` for sequential uploading. Each chunk blocks execution until the server HTTP response completes, preventing network overloading and ensuring the backend receives chunks synchronously or handles out-of-order staging safely.
+
+## Upload Chunk Processing Refactor
+- **`server/services/assetService.ts`**
+  - Refactored `handleChunkUpload` to utilize indexed part file staging. Chunks are explicitly written to `[upload_id]_[chunk_index].part` inside the `tmp/chunks` directory, resolving race conditions and preventing memory leaks associated with blind binary appending into memory loops.
+  - Implemented sequential pipe streaming for final file assembly. Once all expected chunks are verified on disk, they are streamed in strict sequential order `0` to `total_chunks - 1` into the final destination using `createReadStream().pipe(writeStream)`.
+  - Added robust cleanup to remove the `.part` files immediately after successful stream pipe completion.
+- **`src/components/AssetManagerSection.tsx` & `src/components/GallerySection.tsx`**
+  - Confirmed and verified that the chunk iteration logic strictly utilizes `await fetch(...)` for sequential uploading. Each chunk blocks execution until the server HTTP response completes, preventing network overloading and ensuring the backend receives chunks synchronously or handles out-of-order staging safely.
