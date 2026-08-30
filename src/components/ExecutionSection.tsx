@@ -121,7 +121,13 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
         })
       });
       
-      const data = await res.json();
+      const resText = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(resText);
+      } catch {
+        data = { detail: resText || `Server returned HTTP status ${res.status} (${res.statusText})` };
+      }
       clearProgress();
       setProgressPercent(100);
       
@@ -132,7 +138,7 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
         onUpdateShot(prev => ({ ...prev, staged: true }));
         onShowToast?.("Shot staged successfully!", "success");
       } else {
-        const errorMsg = data.detail || data.error || data.message || (typeof data === "string" ? data : "Failed to stage shot.");
+        const errorMsg = data.detail || data.error || data.message || (typeof data === "string" ? data : `Failed to stage shot (HTTP ${res.status}).`);
         setError(errorMsg);
         setTransferState("error");
       }
@@ -175,7 +181,13 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
         })
       });
       
-      const data = await res.json();
+      const resText = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(resText);
+      } catch {
+        data = { detail: resText || `Server returned HTTP status ${res.status} (${res.statusText})` };
+      }
       clearProgress();
       setProgressPercent(100);
       
@@ -189,7 +201,7 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
         }));
         onShowToast?.("Scene staged successfully!", "success");
       } else {
-        const errorMsg = data.detail || data.error || data.message || (typeof data === "string" ? data : "Failed to stage scene.");
+        const errorMsg = data.detail || data.error || data.message || (typeof data === "string" ? data : `Failed to stage scene (HTTP ${res.status}).`);
         setError(errorMsg);
         setTransferState("error");
       }

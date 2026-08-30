@@ -11,6 +11,7 @@ from backend.utils.file_handlers import (
     list_workflows,
     load_workflow_json,
     save_workflow_json,
+    ASSETS_DIR,
     UPLOADS_DIR,
     WORKFLOWS_DIR,
     PROJECTS_DIR,
@@ -60,6 +61,45 @@ class SSHTransferRequest(BaseModel):
     remote_comfyui_root: Optional[str] = None  # Frontend compatibility
     node_mappings: Dict[str, str] = Field(default_factory=dict)
     filenames: List[str] = Field(default_factory=list)
+
+    class Config:
+        extra = "allow"
+
+class StageSceneShot(BaseModel):
+    shot_number: Any = 1
+    shot_type: Optional[str] = None
+    camera_movement: Optional[str] = None
+    expanded_prompt: Optional[str] = None
+    prompt_node_id: Optional[str] = None
+    node_mappings: Dict[str, str] = Field(default_factory=dict)
+    workflow_filename: Optional[str] = None
+    generation_parameters: Optional[Dict[str, Any]] = None
+    parameter_node_mappings: Optional[Dict[str, str]] = None
+
+    class Config:
+        extra = "allow"
+
+class StageSceneRequest(BaseModel):
+    remote_host: Optional[str] = None
+    runpod_ip: Optional[str] = None
+    ssh_port: int = 22
+    ssh_username: str = "root"
+    ssh_password: Optional[str] = None
+    ssh_key_path: Optional[str] = None
+    ssh_private_key: Optional[str] = None
+    remote_comfyui_root: Optional[str] = "/workspace/runpod-slim/ComfyUI"
+    remote_input_dir: Optional[str] = None
+    scene_name: Optional[str] = "Scene"
+    workflow_filename: Optional[str] = None
+    shots: List[StageSceneShot] = Field(default_factory=list)
+    bypass_missing: bool = True
+    safe_placeholder: str = "empty.png"
+
+    class Config:
+        extra = "allow"
+
+class GeminiSettingsRequest(BaseModel):
+    api_key: Optional[str] = None
 
     class Config:
         extra = "allow"
@@ -297,6 +337,182 @@ async def transfer_assets_only(req: SSHTransferRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"SSH Asset Transfer Failed: {str(e)}")
+
+@router.get("/settings/gemini")
+async def get_gemini_settings():
+    gemini_file = ASSETS_DIR / "gemini_config.json"
+    key = None
+    if gemini_file.exists():
+        try:
+            import json
+            with open(gemini_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                key = data.get("api_key")
+        except Exception:
+            pass
+    if not key:
+        key = os.environ.get("GEMINI_API_KEY")
+    return {
+        "configured": bool(key),
+        "api_key": f"{key[:5]}..." if key else None
+    }
+
+@router.post("/settings/gemini")
+async def save_gemini_settings(req: GeminiSettingsRequest):
+    import json
+    gemini_file = ASSETS_DIR / "gemini_config.json"
+    try:
+        with open(gemini_file, "w", encoding="utf-8") as f:
+            json.dump({"api_key": req.api_key or ""}, f, indent=2)
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/workflow/stage-scene")
+@router.post("/workflow/stage")
+@router.post("/ssh/transfer-scene")
+async def stage_scene_endpoint(req: StageSceneRequest):
+    """
+    Stage all shots in a scene or a single shot:
+    1. Collect and SFTP-transfer all unique asset files mapped across shots into remote input directory
+    2. Inject prompts, node mappings, and parameters into each shot's workflow JSON
+    3. Save staged workflow JSONs locally in WORKFLOWS_DIR
+    4. SFTP-transfer staged workflow JSONs into remote ComfyUI user workflow and input directories
+    """
+    import json
+    host = req.runpod_ip or req.remote_host
+    remote_root = (req.remote_comfyui_root or "/workspace/runpod-slim/ComfyUI").rstrip('/')
+    remote_input_dir = req.remote_input_dir or f"{remote_root}/input"
+    scene_name = req.scene_name or "Scene"
+
+    # Collect shots to stage
+    shots = req.shots
+    if not shots and req.workflow_filename:
+        shots = [StageSceneShot(
+            shot_number=1,
+            workflow_filename=req.workflow_filename,
+            node_mappings={}
+        )]
+
+    # Collect all unique asset filenames
+    all_mappings = {}
+    for shot in shots:
+        if shot.node_mappings:
+            all_mappings.update(shot.node_mappings)
+
+    files_to_transfer: List[Path] = []
+    seen_files = set()
+    for filename_val in all_mappings.values():
+        if filename_val:
+            clean_name = str(filename_val).strip()
+            if clean_name and clean_name not in seen_files:
+                seen_files.add(clean_name)
+                candidate_paths = [
+                    UPLOADS_DIR / clean_name,
+                    ASSETS_DIR / "uploads" / clean_name,
+                    ASSETS_DIR / clean_name,
+                ]
+                found_path = next((p for p in candidate_paths if p.exists() and p.is_file()), None)
+                if found_path:
+                    files_to_transfer.append(found_path)
+
+    transferred_summary = []
+    transferred_count = 0
+    skipped_count = 0
+    uploaded_files = []
+    skipped_files = []
+
+    # If host provided, connect via SSH and perform transfers
+    if host:
+        try:
+            ssh_service = RunPodSSHService(
+                host=host,
+                port=req.ssh_port,
+                username=req.ssh_username,
+                password=req.ssh_password,
+                key_path=req.ssh_key_path,
+                private_key=req.ssh_private_key
+            )
+            
+            # Transfer assets if any
+            if files_to_transfer:
+                asset_results = ssh_service.transfer_files_to_runpod(
+                    local_files=files_to_transfer,
+                    remote_dir=remote_input_dir,
+                    overwrite=False
+                )
+                transferred_count += asset_results.get("transferred_count", 0)
+                skipped_count += asset_results.get("skipped_count", 0)
+                uploaded_files.extend(asset_results.get("uploaded_files", []))
+                skipped_files.extend(asset_results.get("skipped_files", []))
+                transferred_summary.extend(asset_results.get("files", []))
+            
+            # Prepare and stage workflow files for each shot
+            staged_workflow_files: List[Path] = []
+            for shot in shots:
+                wf_file = shot.workflow_filename or req.workflow_filename
+                if not wf_file:
+                    continue
+                try:
+                    wf_data = load_workflow_json(wf_file)
+                    shot_num_str = f"{int(shot.shot_number):02d}" if str(shot.shot_number).isdigit() else str(shot.shot_number)
+                    final_wf_filename = f"{scene_name}_Shot_{shot_num_str}.json"
+                    
+                    injected_wf = inject_and_prepare_workflow(
+                        workflow_data=wf_data,
+                        prompt_node_id=shot.prompt_node_id,
+                        expanded_prompt=shot.expanded_prompt or "",
+                        node_mappings=shot.node_mappings or {},
+                        bypass_missing=req.bypass_missing,
+                        safe_placeholder=req.safe_placeholder,
+                        parameter_node_mappings=shot.parameter_node_mappings
+                    )
+                    
+                    staged_local_name = f"staged_{final_wf_filename}"
+                    with open(WORKFLOWS_DIR / staged_local_name, "w", encoding="utf-8") as f:
+                        json.dump(injected_wf, f, indent=2)
+                    staged_path = WORKFLOWS_DIR / staged_local_name
+                    if staged_path.exists():
+                        staged_workflow_files.append(staged_path)
+                except Exception as wf_err:
+                    print(f"Notice: Failed to prepare staged workflow for shot {shot.shot_number}: {wf_err}")
+
+            if staged_workflow_files:
+                remote_workflow_dir = f"{remote_root}/user/default/workflows/{scene_name}"
+                wf_transfer_res = ssh_service.transfer_files_to_runpod(
+                    local_files=staged_workflow_files,
+                    remote_dir=remote_workflow_dir,
+                    overwrite=True
+                )
+                transferred_count += wf_transfer_res.get("transferred_count", 0)
+                uploaded_files.extend(wf_transfer_res.get("uploaded_files", []))
+                transferred_summary.extend(wf_transfer_res.get("files", []))
+
+        except Exception as ssh_err:
+            raise HTTPException(status_code=500, detail=f"Staging failed via SSH: {str(ssh_err)}")
+    else:
+        # Local-only staging mode
+        for f in files_to_transfer:
+            transferred_count += 1
+            uploaded_files.append(f.name)
+            transferred_summary.append({
+                "filename": f.name,
+                "file": f.name,
+                "status": "staged_local",
+                "message": "Staged in local workspace."
+            })
+
+    return {
+        "success": True,
+        "remote_dir": remote_input_dir,
+        "transferred_count": transferred_count,
+        "skipped_count": skipped_count,
+        "total_checked": len(files_to_transfer),
+        "uploaded_files": uploaded_files,
+        "skipped_files": skipped_files,
+        "transferred_files": transferred_summary,
+        "message": f"Successfully staged scene '{scene_name}' ({len(shots)} shot(s))."
+    }
 
 @router.post("/execute")
 async def execute_workflow(req: ExecuteWorkflowRequest):
