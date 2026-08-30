@@ -198,7 +198,8 @@ async def upload_asset(
         "description": description,
         "size_bytes": len(content),
         "scene_name": scene_name,
-        "path": str(saved_path)
+        "path": str(saved_path),
+        "preview_url": f"/api/uploads/{target_filename}"
     }
 
     in_memory_asset_metadata.append(asset_record)
@@ -944,7 +945,13 @@ async def upload_chunk(
         # Final chunk, assemble and finalize into scene folder
         target_filename = generate_target_filename(type, subject_name, original_name)
         scene_dirs = get_scene_directories(scene_name)
-        target_dir = scene_dirs.get("images" if media_type == "image" else "videos" if media_type == "video" else "audios", scene_dirs["uploads"])
+        
+        # Safely resolve subfolder without direct indexing to prevent KeyError
+        subfolder_key = f"{media_type}s"
+        target_dir = scene_dirs.get(subfolder_key)
+        if not target_dir:
+            target_dir = scene_dirs.get("images")
+            
         target_dir.mkdir(parents=True, exist_ok=True)
         destination_path = target_dir / target_filename
         

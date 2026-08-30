@@ -85,14 +85,12 @@ def generate_target_filename(asset_type: str, subject_name: str, original_filena
 async def save_uploaded_file(file_bytes: bytes, target_filename: str, scene_name: Optional[str] = "scene01", media_type: str = "image") -> Path:
     """Save uploaded media file into the scene-specific directory."""
     scene_dirs = get_scene_directories(scene_name)
-    if media_type == "image":
-        target_dir = scene_dirs["images"]
-    elif media_type == "video":
-        target_dir = scene_dirs["videos"]
-    elif media_type == "audio":
-        target_dir = scene_dirs["audios"]
-    else:
-        target_dir = scene_dirs["shared"]
+    
+    # Safely resolve subfolder without direct indexing to prevent KeyError
+    subfolder_key = f"{media_type}s"
+    target_dir = scene_dirs.get(subfolder_key)
+    if not target_dir:
+        target_dir = scene_dirs.get("images")
         
     target_dir.mkdir(parents=True, exist_ok=True)
     destination = target_dir / target_filename
@@ -134,7 +132,7 @@ def list_workflows(scene_name: Optional[str] = None) -> List[Dict[str, Any]]:
     # 1. Scan requested scene specifically first
     if scene_name:
         scene_dirs = get_scene_directories(scene_name)
-        scan_dir(scene_dirs["workflows"], format_scene_folder_name(scene_name))
+        scan_dir(scene_dirs.get("workflows"), format_scene_folder_name(scene_name))
 
     # 2. Scan all top-level scene directories inside ASSETS_DIR
     if ASSETS_DIR.exists():
@@ -162,7 +160,7 @@ def load_workflow_json(filename: str, scene_name: Optional[str] = None) -> Dict[
     
     if scene_name:
         scene_dirs = get_scene_directories(scene_name)
-        candidate_paths.append(scene_dirs["workflows"] / clean_name)
+        candidate_paths.append(scene_dirs.get("workflows") / clean_name)
     
     # Add all other scene folders
     if ASSETS_DIR.exists():
@@ -223,7 +221,7 @@ async def save_workflow_json(filename: str, content: Dict[str, Any], scene_name:
     if not filename.endswith(".json"):
         filename = f"{filename}.json"
     scene_dirs = get_scene_directories(scene_name)
-    target_dir = scene_dirs["workflows"]
+    target_dir = scene_dirs.get("workflows")
     target_dir.mkdir(parents=True, exist_ok=True)
     file_path = target_dir / filename
     async with aiofiles.open(file_path, "w", encoding="utf-8") as f:

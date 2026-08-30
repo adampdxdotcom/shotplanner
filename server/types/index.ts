@@ -37,6 +37,7 @@ export interface AssetRecord {
   preview_url?: string;
   slot_index?: number;
   scene_name?: string;
+  path?: string;
 }
 
 export interface WorkflowNodeInfo {

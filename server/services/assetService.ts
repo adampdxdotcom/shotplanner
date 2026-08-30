@@ -216,7 +216,8 @@ class AssetService {
     const targetFilename = `${cleanType}_${cleanName}_${timestamp}${ext}`;
 
     const sceneDirs = ensureSceneDirectories(sceneName);
-    let targetDir = sceneDirs.images;
+    // Safely resolve subfolder without direct indexing
+    let targetDir = sceneDirs.images; // safe default
     if (mediaType === "video" || ext.match(/\.(mp4|mov|webm|mkv|avi)$/i)) {
       targetDir = sceneDirs.videos;
     } else if (mediaType === "audio" || ext.match(/\.(mp3|wav|ogg|flac|aac|m4a)$/i)) {
@@ -224,7 +225,7 @@ class AssetService {
     } else if (mediaType === "image" || ext.match(/\.(png|jpg|jpeg|webp|gif|bmp)$/i)) {
       targetDir = sceneDirs.images;
     } else {
-      targetDir = sceneDirs.shared;
+      targetDir = sceneDirs.shared || sceneDirs.images;
     }
 
     if (!fs.existsSync(targetDir)) {
@@ -258,7 +259,8 @@ class AssetService {
         created_at: Date.now(),
         preview_url: `/api/uploads/${targetFilename}`,
         slot_index: parsedSlotIndex,
-        scene_name: sceneName
+        scene_name: sceneName,
+        path: destinationPath
       };
 
     return this.upsertAsset(assetRecord);
@@ -334,7 +336,8 @@ class AssetService {
       const sceneDirs = ensureSceneDirectories(resolvedSceneName);
 
       const mType = (media_type as "image" | "audio" | "video") || "image";
-      let targetDir = sceneDirs.images;
+      // Safely resolve subfolder without direct indexing
+      let targetDir = sceneDirs.images; // safe default
       if (mType === "video" || ext.match(/\.(mp4|mov|webm|mkv|avi)$/i)) {
         targetDir = sceneDirs.videos;
       } else if (mType === "audio" || ext.match(/\.(mp3|wav|ogg|flac|aac|m4a)$/i)) {
@@ -342,7 +345,7 @@ class AssetService {
       } else if (mType === "image" || ext.match(/\.(png|jpg|jpeg|webp|gif|bmp)$/i)) {
         targetDir = sceneDirs.images;
       } else {
-        targetDir = sceneDirs.shared;
+        targetDir = sceneDirs.shared || sceneDirs.images;
       }
 
       if (!fs.existsSync(targetDir)) {
@@ -387,7 +390,8 @@ class AssetService {
           created_at: Date.now(),
           preview_url: `/api/uploads/${targetFilename}`,
           slot_index: parsedSlotIndex,
-          scene_name: resolvedSceneName
+          scene_name: resolvedSceneName,
+          path: finalPath
         };
 
         const savedRecord = this.upsertAsset(assetRecord, replace_filename);

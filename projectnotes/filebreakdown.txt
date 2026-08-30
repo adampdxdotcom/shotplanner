@@ -47,3 +47,8 @@
 - **`server/services/projectService.ts`** & **`backend/routes/api.py`**
   - **Role:** Handles saving, loading, and importing `project.json` payloads.
   - **Updates:** Automatically intercepts and inspects incoming project data to extract the nested `scene_name` metadata. Invokes the `ensureSceneDirectories` subroutine to recursively provision all Scene-First storage folders immediately upon creation, saving, fetching, or importing of a project. Ensures isolated `assets/{scene_name}/*` sandboxes are physically available before media starts rolling in.
+
+## Upload Handlers hardened
+- **`backend/routes/api.py`** & **`server/services/assetService.ts`** & **`backend/utils/file_handlers.py`**
+  - **Role:** Handles multipart form uploads (single and chunked), maintains the active registry state, and bridges frontend requests to disk storage.
+  - **Updates:** Fixed strict dictionary lookups triggering KeyErrors when dynamically resolving scene storage blocks. Upload destinations now safely fallback using `get()` and safely handle unexpected content payloads (like generic files, workflow scripts) into `.shared` or `.images` directories rather than throwing Exceptions. Included `path` and `preview_url` properly onto all synthesized AssetRecord returns. Guaranteed `mkdir` recursive initialization right before file move actions across all single-file and chunked handlers to avoid racing conditions where the folder isn't fully staged.
