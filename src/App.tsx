@@ -51,38 +51,7 @@ export default function App() {
   });
 
   // 3. Asset Management State
-  const [assets, setAssets] = useState<MediaAsset[]>([]);
-  const [subjects, setSubjects] = useState<string[]>([]);
 
-  // Function to register subject in project registry
-  const handleRegisterSubject = (name: string) => {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    setSubjects(prev => {
-      if (prev.some(s => s.toLowerCase() === trimmed.toLowerCase())) return prev;
-      return [...prev, trimmed];
-    });
-  };
-
-  // Sync subjects when assets change
-  useEffect(() => {
-    if (assets.length > 0) {
-      setSubjects(prev => {
-        let changed = false;
-        const currentLower = new Set(prev.map(s => s.toLowerCase()));
-        const next = [...prev];
-        for (const a of assets) {
-          const s = (a.subject_name || "").trim();
-          if (s && !currentLower.has(s.toLowerCase())) {
-            currentLower.add(s.toLowerCase());
-            next.push(s);
-            changed = true;
-          }
-        }
-        return changed ? next : prev;
-      });
-    }
-  }, [assets]);
 
   // 4. LLM Prompt Expansion & Scene Planning State
   // Scene Hub State
@@ -104,6 +73,37 @@ export default function App() {
       updated_at: new Date().toISOString()
     }]
   });
+  const assets = sceneProject?.assets || [];
+  const subjects = sceneProject?.subjects || [];
+  // Function to register subject in project registry
+  const handleRegisterSubject = (name: string) => {
+    const trimmed = name.trim();
+    if (trimmed && !subjects.includes(trimmed)) {
+      setSceneProject(prev => ({ ...prev, subjects: [...(prev.subjects || []), trimmed] }));
+      setIsDirty(true);
+    }
+  };
+
+  // Sync subjects when assets change
+  useEffect(() => {
+    if (assets.length > 0) {
+      setSceneProject(prevProject => {
+        const prev = prevProject.subjects || [];
+        let changed = false;
+        const currentLower = new Set(prev.map(s => s.toLowerCase()));
+        const next = [...prev];
+        for (const a of assets) {
+          const s = (a.subject_name || "").trim();
+          if (s && !currentLower.has(s.toLowerCase())) {
+            currentLower.add(s.toLowerCase());
+            next.push(s);
+            changed = true;
+          }
+        }
+        return changed ? { ...prevProject, subjects: next } : prevProject;
+      });
+    }
+  }, [assets]);
 
   const [scenePlanning, setScenePlanning] = useState<ScenePlanning>({
     scene_name: "",
@@ -124,6 +124,7 @@ export default function App() {
 
   // Project Save/Load State
   const [isDirty, setIsDirty] = useState(false);
+  const [hasLoadedProject, setHasLoadedProject] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
@@ -155,12 +156,12 @@ export default function App() {
 
 
   useEffect(() => {
-    if (isInitialLoad) {
+    if (isInitialLoad || !hasLoadedProject) {
       setIsInitialLoad(false);
       return;
     }
     setIsDirty(true);
-  }, [config, selectedWorkflowFile, selectedPromptNodeId, nodeMappings, bypassMissing, basicStub, expandedPrompt, generationParams, parameterNodeMappings, subjects, llmProvider, scenePlanning]);
+  }, [sceneProject, config, selectedWorkflowFile, selectedPromptNodeId, nodeMappings, bypassMissing, basicStub, expandedPrompt, generationParams, parameterNodeMappings, llmProvider, scenePlanning]);
 
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -175,22 +176,19 @@ export default function App() {
 
   // Auto-save sceneProject to disk
   useEffect(() => {
-    if (isInitialLoad) return;
+    if (isInitialLoad || !hasLoadedProject || !isDirty) return;
     const saveSceneProject = async () => {
       try {
         const payload = {
           name: sceneProject.scene_name.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_").replace(/_+/g, "_"),
-          data: {
-            ...sceneProject,
-            assets,
-            subjects
-          }
+          data: sceneProject
         };
         await fetch("/api/projects", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         });
+        setIsDirty(false);
       } catch (err) {
         console.error("Auto-save failed:", err);
       }
@@ -198,7 +196,7 @@ export default function App() {
     
     const timer = setTimeout(saveSceneProject, 1000);
     return () => clearTimeout(timer);
-  }, [sceneProject, assets, subjects, isInitialLoad]);
+  }, [sceneProject, isInitialLoad, hasLoadedProject, isDirty]);
 
   const handleUpdateParam = (key: keyof GenerationParameters, value: number) => {
     setGenerationParams(prev => ({ ...prev, [key]: value }));
@@ -413,12 +411,10 @@ export default function App() {
     const data = await res.json();
 
     if (data.schema_version === "1.0") {
-      setAssets([]);
       setNodeMappings({});
       setParameterNodeMappings({});
       setBasicStub("");
       setExpandedPrompt("");
-      setSubjects([]);
       
       setSceneProject(data);
       setCurrentProjectName(filename.replace(/\.json$/i, ""));
@@ -427,19 +423,22 @@ export default function App() {
       setIsDirty(false);
       
       // Restore assets & subjects
+      let restoredAssets = [];
       if (Array.isArray(data.assets) && data.assets.length > 0) {
-        const normalizedAssets = data.assets.map((a: any, idx: number) => ({
+        restoredAssets = data.assets.map((a: any, idx: number) => ({
           ...a,
           slot_index: a.slot_index !== undefined ? a.slot_index : idx,
           media_type: a.media_type || (/\.(mp3|wav|ogg|m4a|flac)$/i.test(a.filename) ? "audio" : /\.(mp4|mov|webm|mkv)$/i.test(a.filename) ? "video" : "image"),
           preview_url: getAssetMediaUrl(a.filename)
         }));
-        setAssets(normalizedAssets);
       }
+      let restoredSubjects = [];
       if (Array.isArray(data.subjects)) {
-        setSubjects(data.subjects);
+        restoredSubjects = data.subjects;
       }
       
+      setSceneProject(prev => ({ ...prev, assets: restoredAssets, subjects: restoredSubjects }));
+      setHasLoadedProject(true);
       await fetchAssets(data.scene_name || filename.replace(/\.json$/i, ""));
       
       setTimeout(() => setIsDirty(false), 100);
@@ -449,12 +448,12 @@ export default function App() {
     }
 
     // 0. Reset state completely before hydrating
-    setAssets([]);
+
     setNodeMappings({});
     setParameterNodeMappings({});
     setBasicStub("");
     setExpandedPrompt("");
-    setSubjects([]);
+
     
     // 1. Sync & set saved assets if present
     if (Array.isArray(data.assets) && data.assets.length > 0) {
@@ -464,7 +463,7 @@ export default function App() {
         media_type: a.media_type || (/\.(mp3|wav|ogg|m4a|flac)$/i.test(a.filename) ? "audio" : /\.(mp4|mov|webm|mkv)$/i.test(a.filename) ? "video" : "image"),
         preview_url: getAssetMediaUrl(a.filename)
       }));
-      setAssets(normalizedAssets);
+      // It's handled by setSceneProject later in V2 block.
       try {
         await fetch("/api/assets/sync", {
           method: "POST",
@@ -478,12 +477,7 @@ export default function App() {
       await fetchAssets(data.scene_name || filename.replace(/\.json$/i, ""));
     }
     
-    // 2. Restore subjects registry
-    if (Array.isArray(data.subjects)) {
-      setSubjects(data.subjects);
-    } else if (Array.isArray(data.assets)) {
-      setSubjects(Array.from(new Set(data.assets.map((a: any) => (a.subject_name || "").trim()).filter(Boolean))));
-    }
+    // 2. Restore subjects registry is handled by setSceneProject
 
     if (data.config) {
       setConfig(prev => ({
@@ -534,6 +528,8 @@ export default function App() {
       scene_name: sceneName,
       workflow_file: selectedWorkflowFile || "",
       shared_assets: [],
+      assets: [],
+      subjects: [],
       shots: [{
         id: "shot_" + Date.now(),
         shot_number: 1,
@@ -546,6 +542,7 @@ export default function App() {
         updated_at: new Date().toISOString()
       }]
     };
+    setHasLoadedProject(true);
 
     const cleanFilename = sceneName.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_").replace(/_+/g, "_") || "untitled_scene";
     try {
@@ -562,12 +559,10 @@ export default function App() {
         throw new Error("Failed to save the new scene project.");
       }
       
-      setAssets([]);
       setNodeMappings({});
       setParameterNodeMappings({});
       setBasicStub("");
       setExpandedPrompt("");
-      setSubjects([]);
       
       setSceneProject(newScene);
       setCurrentProjectName(cleanFilename);
@@ -613,12 +608,22 @@ export default function App() {
       const res = await fetch(url, { headers: { "Cache-Control": "no-store" } });
       const data = await res.json();
       if (data.assets) {
-        setAssets(data.assets.map((a: any, idx: number) => ({
-          ...a,
-          slot_index: a.slot_index !== undefined ? a.slot_index : idx,
-          media_type: a.media_type || (/\.(mp3|wav|ogg|m4a|flac)$/i.test(a.filename) ? "audio" : /\.(mp4|mov|webm|mkv)$/i.test(a.filename) ? "video" : "image"),
-          preview_url: getAssetMediaUrl(a.filename)
-        })));
+        setSceneProject(prev => {
+          const currentAssets = prev.assets || [];
+          const newAssets = data.assets.map((a: any, idx: number) => {
+            const existing = currentAssets.find(ca => ca.filename === a.filename);
+            if (existing) {
+              return existing; // KEEP full metadata & slot assignment!
+            }
+            return {
+              ...a,
+              slot_index: a.slot_index !== undefined ? a.slot_index : idx,
+              media_type: a.media_type || (/\.(mp3|wav|ogg|m4a|flac)$/i.test(a.filename) ? "audio" : /\.(mp4|mov|webm|mkv)$/i.test(a.filename) ? "video" : "image"),
+              preview_url: getAssetMediaUrl(a.filename)
+            };
+          });
+          return { ...prev, assets: newAssets };
+        });
       }
     } catch (e) {
       console.error("Failed to load assets", e);
@@ -720,16 +725,18 @@ export default function App() {
       media_type: mType
     };
 
-    setAssets(prev => {
-      // Find if this exact asset file already exists
-      const exactMatch = prev.findIndex(a => a.filename === newAsset.filename);
+    setSceneProject(prevProject => {
+      const prevAssets = prevProject.assets || [];
+      const exactMatch = prevAssets.findIndex(a => a.filename === newAsset.filename);
+      let nextAssets = [...prevAssets];
       if (exactMatch !== -1) {
-        const next = [...prev];
-        next[exactMatch] = assetWithSlot; // update its latest slot assignment globally
-        return next;
+        nextAssets[exactMatch] = assetWithSlot;
+      } else {
+        nextAssets.push(assetWithSlot);
       }
-      return [...prev, assetWithSlot];
+      return { ...prevProject, assets: nextAssets };
     });
+    setIsDirty(true);
 
     // Auto-map if there's a loader node for this slot type and index
     if (parsedWorkflow) {
@@ -752,7 +759,14 @@ export default function App() {
   };
 
   const handleAssetUpdated = (oldFilename: string, newAsset: MediaAsset) => {
-    setAssets(prev => prev.map(a => a.filename === oldFilename ? { ...newAsset, slot_index: a.slot_index ?? newAsset.slot_index } : a));
+    setSceneProject(prev => {
+      const prevAssets = prev.assets || [];
+      return {
+        ...prev,
+        assets: prevAssets.map(a => a.filename === oldFilename ? { ...newAsset, slot_index: a.slot_index ?? newAsset.slot_index } : a)
+      };
+    });
+    setIsDirty(true);
     // Update nodeMappings if the filename changed
     if (oldFilename !== newAsset.filename) {
       setNodeMappings(prev => {
@@ -766,7 +780,14 @@ export default function App() {
   };
 
   const handleAssetDeleted = (filename: string) => {
-    setAssets(prev => prev.filter(a => a.filename !== filename));
+    setSceneProject(prev => {
+      const prevAssets = prev.assets || [];
+      return {
+        ...prev,
+        assets: prevAssets.filter(a => a.filename !== filename)
+      };
+    });
+    setIsDirty(true);
     // Clear mappings referencing this deleted asset
     setNodeMappings(prev => {
       const updated = { ...prev };

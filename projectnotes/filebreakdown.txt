@@ -188,3 +188,11 @@
 ## Semantic Metadata Fallbacks
 - **`backend/routes/api.py` & `server/services/assetService.ts`**
   - **Updates:** Re-engineered the core `get_assets`/`listAssets` directory scanning logic. Disk files missing from the active project JSON now inherently fallback to extracting semantic types and subject names directly from their structured `{type}_{subject}_{timestamp}.ext` filenames (e.g., `headshot_jackie_1234.png`), preventing "unknown" placeholders across the UI.
+
+## State Consistency & Auto-Save Hardening
+- **`src/App.tsx`**
+  - Eliminated redundant `[assets, setAssets]` and `[subjects, setSubjects]` local states, directly embedding the metadata array natively within `sceneProject.assets` and `sceneProject.subjects`. This ensures full atomicity when saving/loading projects (shots, slots, and assets are permanently bound together).
+  - Hardened Auto-Save mechanism: Auto-save is now strictly guarded by `hasLoadedProject` and `isDirty` flags, completely eliminating the race condition where blank/initial state overwrote existing projects on mount. Auto-save clears `isDirty` on success and `sceneProject` triggers `isDirty(true)` on any nested modification.
+  - Re-wrote `fetchAssets` reconciliation: Physical gallery files pulled from the backend now intelligently reconcile against the embedded `sceneProject.assets` metadata. `fetchAssets` preserves existing shot assignments, labels, and slot configurations rather than blindly overwriting with generic disk paths.
+- **`src/components/AssetManagerSection.tsx`**
+  - Hardened library assignments: `handleAssignExistingAsset` now immediately synchronizes both the active shot's `assigned_slots` AND updates the embedded `sceneProject.assets` global slot mapping to ensure UI consistency and force auto-save triggers.
