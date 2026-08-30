@@ -144,3 +144,7 @@
 - **`backend/utils/file_handlers.py` & `server/services/projectService.ts`**
   - **Updates:** Implemented a new deterministic `find_project_file` / `findProjectFile` utility that globally scans for a requested project identifier. It supports case-insensitive and prefix-insensitive resolution by walking through `assets/{scene_name}/{scene_name}.json`, `assets/*/*.json`, and gracefully backing up to legacy flat `project_jsons` paths. 
   - **Endpoint Enhancements:** Applied the resilient locator utility into `GET /api/projects/{filename}`, `DELETE /api/projects/{filename}`, and `GET /api/projects/{filename}/export`, guaranteeing projects returned in UI listings are always resolved successfully on disk regardless of historical scene-directory placement or subtle case mismatches. The `DELETE` endpoint is now empowered to cleanly remove the returned JSON pointer and silently purge its enclosing parent scene directory if left emptied.
+
+## Bug Fixes
+- **`backend/routes/api.py`**
+  - **Updates:** Fixed `NameError: name 'safe_filename' is not defined` in `get_project` that arose after migrating to the resilient locator utility. Updated the fallback scene directory provisioning step to use `file_path.stem` dynamically during load.

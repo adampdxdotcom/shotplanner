@@ -799,7 +799,7 @@ async def get_project(filename: str):
         scene_name = None
         if isinstance(data, dict):
             scene_name = data.get("scene_name") or data.get("scene_planning", {}).get("scene_name")
-        ensure_scene_directories(scene_name or safe_filename.replace(".json", ""))
+        ensure_scene_directories(scene_name or file_path.stem)
 
         if isinstance(data, dict) and isinstance(data.get("assets"), list):
             for asset in data["assets"]:
