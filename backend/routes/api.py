@@ -8,6 +8,8 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from backend.utils.file_handlers import (
+    format_scene_folder_name,
+    ensure_scene_directories,
     sanitize_project_name,
     save_uploaded_file,
     generate_target_filename,
