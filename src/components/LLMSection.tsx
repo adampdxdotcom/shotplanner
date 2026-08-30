@@ -103,9 +103,10 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
 
       const data = await res.json();
       if (res.ok && data.expanded_prompt) {
-        onChangeExpandedPrompt(data.expanded_prompt);
+        const assembled = assembleFinalPrompt(data.expanded_prompt, activeShotPrefix, isSceneRefPresent);
+        onChangeExpandedPrompt(assembled);
         if (data.provider) setProviderUsed(data.provider);
-        onShowToast?.("Prompt expanded successfully with " + (data.provider || "LLM"), "success");
+        onShowToast?.("Prompt expanded and auto-compiled successfully!", "success");
       } else {
         setError(data.error || "Failed to generate prompt from LLM");
       }
@@ -116,8 +117,25 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
     }
   };
 
+  // Auto-inject header and photo statement once when shot changes
+  const lastLoadedShotIdRef = React.useRef<string | null>(null);
+
+  React.useEffect(() => {
+    if (activeShotId && expandedPrompt && expandedPrompt.trim()) {
+      if (lastLoadedShotIdRef.current !== activeShotId) {
+        const assembled = assembleFinalPrompt(expandedPrompt, activeShotPrefix, isSceneRefPresent);
+        if (assembled !== expandedPrompt) {
+          onChangeExpandedPrompt(assembled);
+        }
+        lastLoadedShotIdRef.current = activeShotId;
+      }
+    } else if (!expandedPrompt) {
+      lastLoadedShotIdRef.current = null;
+    }
+  }, [activeShotId, expandedPrompt, activeShotPrefix, isSceneRefPresent, onChangeExpandedPrompt]);
+
   const handleCopy = async () => {
-    const textToCopy = assembleFinalPrompt(expandedPrompt, activeShotPrefix, isSceneRefPresent);
+    const textToCopy = expandedPrompt;
     if (!textToCopy || !textToCopy.trim()) {
       onShowToast?.("No prompt text to copy.", "info");
       return;
@@ -351,83 +369,8 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
               </div>
             </div>
 
-            {/* Scene & Camera Planning Prefix Live Preview Field */}
-            {activeShotPrefix ? (
-              <div className="bg-indigo-950/30 border border-indigo-700/50 rounded-lg p-2.5 space-y-1.5 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-semibold text-indigo-300 flex items-center gap-1.5">
-                    <Film className="w-3.5 h-3.5 text-indigo-400" />
-                    Scene &amp; Camera Header (Positioned at Top of Prompt)
-                  </span>
-                  <span className="text-[10px] font-mono text-indigo-300 bg-indigo-900/60 px-1.5 py-0.5 rounded border border-indigo-700/60">
-                    Shot {activeShot?.shot_number ? formatShotNumber(activeShot.shot_number) : "01"}
-                  </span>
-                </div>
-                <div className="font-mono text-[11px] text-indigo-200 bg-zinc-950/80 p-2 rounded border border-indigo-900/40 break-words select-all">
-                  {activeShotPrefix}
-                </div>
-                <div className="text-[10px] text-zinc-400 flex flex-wrap items-center justify-between gap-1 pt-0.5">
-                  <span className="text-zinc-400">
-                    Auto-injected at the top: <code className="text-zinc-300">"{activeShotPrefix}\n\n[Prompt Body]"</code>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!expandedPrompt.startsWith(activeShotPrefix)) {
-                        const newPrompt = expandedPrompt.trim() ? `${activeShotPrefix}\n\n${expandedPrompt.trim()}` : `${activeShotPrefix}\n\n`;
-                        onChangeExpandedPrompt(newPrompt);
-                      }
-                    }}
-                    className="text-[10px] text-indigo-400 hover:text-indigo-300 underline cursor-pointer font-medium"
-                  >
-                    Insert at top of editor box
-                  </button>
-                </div>
-              </div>
-            ) : null}
-
-            {/* Scene Reference Photo Exact Likeness Directive */}
-            {isSceneRefPresent && (
-              <div className="bg-amber-950/30 border border-amber-600/50 rounded-lg p-2.5 space-y-1.5 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-semibold text-amber-300 flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5 text-amber-400" />
-                    Scene Reference Photo Directive (Active)
-                  </span>
-                  <span className="text-[10px] font-mono text-amber-300 bg-amber-900/60 px-1.5 py-0.5 rounded border border-amber-600/60">
-                    Exact Likeness Rule
-                  </span>
-                </div>
-                <div className="font-mono text-[11px] text-amber-200 bg-zinc-950/80 p-2 rounded border border-amber-800/40 select-all font-medium">
-                  {SCENE_REFERENCE_DIRECTIVE}
-                </div>
-                <div className="text-[10px] text-zinc-400 flex flex-wrap items-center justify-between gap-1 pt-0.5">
-                  <span className="text-zinc-400">
-                    {expandedPrompt.includes(SCENE_REFERENCE_DIRECTIVE) 
-                      ? "✓ Directive is present in prompt editor on its own line."
-                      : "Auto-baked on prompt generation & workflow staging."}
-                  </span>
-                  {!expandedPrompt.includes(SCENE_REFERENCE_DIRECTIVE) && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const trimmed = expandedPrompt.trim();
-                        const updated = trimmed 
-                          ? `${trimmed}\n${SCENE_REFERENCE_DIRECTIVE}` 
-                          : SCENE_REFERENCE_DIRECTIVE;
-                        onChangeExpandedPrompt(updated);
-                      }}
-                      className="text-[10px] text-amber-400 hover:text-amber-300 underline cursor-pointer font-medium"
-                    >
-                      Insert line into editor box
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-
             <textarea
-              rows={8}
+              rows={18}
               placeholder="The expanded, tagged prompt will appear here ready for editing before execution..."
               value={expandedPrompt}
               onChange={(e) => onChangeExpandedPrompt(e.target.value)}

@@ -508,6 +508,18 @@ async def get_project(filename: str):
                         in_memory_asset_metadata.append(asset)
         return data
 
+@router.delete("/projects/{filename}")
+async def delete_project_endpoint(filename: str):
+    safe_filename = filename if filename.endswith(".json") else f"{filename}.json"
+    file_path = PROJECTS_DIR / safe_filename
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Project not found")
+    try:
+        file_path.unlink()
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/projects/{filename}/export")
 async def export_project_zip(filename: str):
     clean_name = filename[:-5] if filename.endswith(".json") else filename
