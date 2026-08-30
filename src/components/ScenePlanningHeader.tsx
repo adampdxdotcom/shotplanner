@@ -23,7 +23,7 @@ export const SHOT_TYPES = [
   { label: "Medium Close-Up (MCU)", value: "Medium Close-Up" },
   { label: "Close-Up (CU)", value: "Close-Up" },
   { label: "Extreme Close-Up (ECU)", value: "Extreme Close-Up" },
-  { label: "Over-the-Shoulder (OTS)", value: "Over-the-Shoulder" },
+  { label: "Over-the-shoulder (OTS)", value: "Over-the-shoulder (OTS)" },
   { label: "Low Angle", value: "Low Angle" },
   { label: "High Angle", value: "High Angle" },
   { label: "Bird's Eye View", value: "Bird's Eye View" }
@@ -156,7 +156,7 @@ export const ScenePlanningHeader: React.FC<ScenePlanningHeaderProps> = ({
             <span>Shot Type</span>
           </label>
           <select
-            value={planning.shot_type}
+            value={planning.shot_type === "Over-the-Shoulder" ? "Over-the-shoulder (OTS)" : planning.shot_type}
             onChange={handleShotTypeChange}
             className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-indigo-500 focus:outline-hidden text-zinc-100 text-xs px-3 py-2 rounded-lg transition-colors cursor-pointer"
           >

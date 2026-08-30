@@ -1,5 +1,5 @@
 import { SCENE_REFERENCE_DIRECTIVE } from "../config/constants";
-import { ScenePlanningDTO } from "../types";
+import { ScenePlanningDTO, ShotItem } from "../types";
 import {
   assembleFinalPrompt,
   buildMandatoryFooter,
@@ -18,10 +18,14 @@ export interface ExpandPromptOptions {
   prompt_prefix?: string;
   scene_planning?: ScenePlanningDTO;
   planning?: ScenePlanningDTO;
+  active_shot?: ShotItem;
   scene_name?: string;
   shot_number?: string | number;
   shot_type?: string;
   camera_movement?: string;
+  ots_anchor_subject?: string;
+  ots_focus_subject?: string;
+  framing_directive?: string;
 }
 
 /**
@@ -81,10 +85,14 @@ export async function expandPrompt(
     prompt_prefix = "",
     scene_planning,
     planning,
+    active_shot,
     scene_name,
     shot_number,
     shot_type,
-    camera_movement
+    camera_movement,
+    ots_anchor_subject,
+    ots_focus_subject,
+    framing_directive
   } = options;
 
   if (!basic_stub) {
@@ -98,6 +106,47 @@ export async function expandPrompt(
   const resolvedPromptPrefix =
     (prompt_prefix || "").trim() ||
     generatePromptPrefix(scene_planning || planning || { scene_name, shot_number, shot_type, camera_movement });
+
+  const effectiveShotType =
+    active_shot?.shot_type ||
+    scene_planning?.shot_type ||
+    planning?.shot_type ||
+    shot_type ||
+    "";
+
+  const anchorSubject = (
+    active_shot?.ots_anchor_subject ||
+    ots_anchor_subject ||
+    (scene_planning as any)?.ots_anchor_subject ||
+    (planning as any)?.ots_anchor_subject ||
+    ""
+  ).trim();
+
+  const focusSubject = (
+    active_shot?.ots_focus_subject ||
+    ots_focus_subject ||
+    (scene_planning as any)?.ots_focus_subject ||
+    (planning as any)?.ots_focus_subject ||
+    ""
+  ).trim();
+
+  const isOTS =
+    effectiveShotType === "Over-the-shoulder (OTS)" ||
+    effectiveShotType === "Over-the-Shoulder (OTS)" ||
+    effectiveShotType === "Over-the-Shoulder" ||
+    effectiveShotType.toLowerCase().includes("over-the-shoulder") ||
+    effectiveShotType.toLowerCase().includes("ots");
+
+  let resolvedFramingDirective = (framing_directive || "").trim();
+  if (!resolvedFramingDirective && isOTS && (anchorSubject || focusSubject)) {
+    if (anchorSubject && focusSubject) {
+      resolvedFramingDirective = `Framing: Over-the-shoulder (OTS) angle looking past the shoulder of ${anchorSubject} toward ${focusSubject}.`;
+    } else if (anchorSubject) {
+      resolvedFramingDirective = `Framing: Over-the-shoulder (OTS) angle looking past the shoulder of ${anchorSubject}.`;
+    } else if (focusSubject) {
+      resolvedFramingDirective = `Framing: Over-the-shoulder (OTS) angle looking toward ${focusSubject}.`;
+    }
+  }
 
   const subjectDefinitions = buildSubjectDefinitionsHeader(assets);
   const isSceneRefPresent = hasSceneReferencePhoto(assets);
@@ -115,13 +164,15 @@ export async function expandPrompt(
 
   const singleSubjectKeywords = /\b(alone|solo|by himself|by herself|one person|single person|just one person)\b/i;
   const isSingleSubject =
-    nonLocationAssets.length === 1 ||
-    singleSubjectKeywords.test(basic_stub) ||
-    singleSubjectKeywords.test(resolvedPromptPrefix);
+    !isOTS &&
+    (nonLocationAssets.length === 1 ||
+      singleSubjectKeywords.test(basic_stub) ||
+      singleSubjectKeywords.test(resolvedPromptPrefix));
 
   const mandatoryHeader = buildMandatoryHeader({
     promptPrefix: resolvedPromptPrefix,
     subjectDefinitions,
+    framingDirective: resolvedFramingDirective,
     isSceneRefPresent,
     isSingleSubject
   });
@@ -137,16 +188,21 @@ Your task is to generate ONLY the integrated_multimodal_description content. Do 
 ### Strict Output Constraints:
 - Spatial Initialization: Always define the subject's exact spatial position and initial posture at the very beginning (e.g., "[Shot 1] Live-action, cinematic... At the start of the shot, [Subject] is positioned at...").
 - Exact Tags: Differentiate between facial likeness and styling using the exact tags provided (e.g., "<Picture 1>"). Do NOT invent new tags or reference off-screen characters.
+- Framing Directives: When a Framing Directive is provided in context, utilize the specific anchor and focus subject likenesses provided in the Global Subject Definitions to execute this framing.
 - Camera Motion: Describe camera motion naturally (Motion Type + Amplitude + Speed, e.g., "The camera pushes in with small amplitude at slow speed...").
 - Dialogue: If dialogue is present, format as <d>[Language] Dialogue text</d> with speaker tags like (S1).
 - No Boilerplate: Output ONLY the narrative visual description. Do NOT output "Global Subject Definitions:", "overall_soundscape:", or "non_diegetic_music:".`;
+
+  const framingContextBlock = resolvedFramingDirective
+    ? `\nFRAMING DIRECTIVE:\n${resolvedFramingDirective}\nA Framing Directive is provided; utilize the specific anchor and focus subject likenesses provided in the Global Subject Definitions to execute this framing.\n`
+    : "";
 
   const userPrompt = `CREATIVE CONCEPT / STUB:
 "${basic_stub}"
 
 SHOT PLANNING CONTEXT:
 ${resolvedPromptPrefix || "Shot 01"}
-
+${framingContextBlock}
 AVAILABLE MULTIMODAL REFERENCE ASSETS:
 ${subjectDefinitions || "No reference definitions"}
 
@@ -216,7 +272,8 @@ Generate ONLY the integrated_multimodal_description paragraph incorporating the 
   // Fallback if both LLM endpoints are unreachable
   if (!rawLlmDescription) {
     const tagsList = assets.map((_: any, i: number) => `<Picture ${i + 1}>`).slice(0, 3).join(" and ");
-    rawLlmDescription = `[Shot 1] Live-action, cinematic 4K sequence capturing ${basic_stub.trim()}. Featuring ${
+    const framingStub = resolvedFramingDirective ? `Framed with ${resolvedFramingDirective.replace(/^Framing:\s*/i, "")} ` : "";
+    rawLlmDescription = `[Shot 1] Live-action, cinematic 4K sequence capturing ${basic_stub.trim()}. ${framingStub}Featuring ${
       tagsList || "<Picture 1>"
     } with authentic facial expressions, realistic skin texture, and seamless character identity preservation. The camera pushes in with small amplitude at slow speed.`;
     providerUsed = "Smart Offline Generator";

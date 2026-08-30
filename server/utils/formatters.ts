@@ -67,6 +67,7 @@ export function generatePromptPrefix(plan?: ScenePlanningDTO | null): string {
 export interface MandatoryHeaderOptions {
   promptPrefix?: string;
   subjectDefinitions?: string;
+  framingDirective?: string;
   isSceneRefPresent?: boolean;
   isSingleSubject?: boolean;
   customDirectives?: string[];
@@ -83,6 +84,9 @@ export function buildMandatoryHeader(options: MandatoryHeaderOptions): string {
     parts.push(defs);
   }
   const directives: string[] = [];
+  if (options.framingDirective && options.framingDirective.trim()) {
+    directives.push(options.framingDirective.trim());
+  }
   if (options.isSceneRefPresent) {
     directives.push(SCENE_REFERENCE_DIRECTIVE);
   }
@@ -113,6 +117,7 @@ export interface AssembleFinalPromptParams {
   header?: string;
   promptPrefix?: string;
   subjectDefinitions?: string;
+  framingDirective?: string;
   directives?: string[];
   isSceneRefPresent?: boolean;
   isSingleSubject?: boolean;
@@ -142,6 +147,7 @@ export function assembleFinalPrompt(
     header = opts.header || buildMandatoryHeader({
       promptPrefix: opts.promptPrefix,
       subjectDefinitions: opts.subjectDefinitions,
+      framingDirective: opts.framingDirective,
       isSceneRefPresent: opts.isSceneRefPresent,
       isSingleSubject: opts.isSingleSubject,
       customDirectives: opts.directives

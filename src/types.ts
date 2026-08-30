@@ -62,6 +62,8 @@ export interface ShotItem {
   assigned_slots: Record<number, string>;
   staged: boolean;
   updated_at: string;
+  ots_anchor_subject?: string;
+  ots_focus_subject?: string;
   workflow_file?: string;
   prompt_node_id?: string;
   node_mappings?: Record<string, string>;
@@ -82,6 +84,8 @@ export interface ScenePlanning {
   shot_number: string | number;
   shot_type: string;
   camera_movement: string;
+  ots_anchor_subject?: string;
+  ots_focus_subject?: string;
 }
 
 export interface AppConfig {

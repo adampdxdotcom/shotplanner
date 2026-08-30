@@ -11,6 +11,7 @@ Your task is to generate ONLY the integrated_multimodal_description content. Do 
 ### Strict Output Constraints:
 - Spatial Initialization: Always define the subject's exact spatial position and initial posture at the very beginning (e.g., "[Shot 1] Live-action, cinematic... At the start of the shot, [Subject] is positioned at...").
 - Exact Tags: Differentiate between facial likeness and styling using the exact tags provided (e.g., "<Picture 1>"). Do NOT invent new tags or reference off-screen characters.
+- Framing Directives: When a Framing Directive is provided in context, utilize the specific anchor and focus subject likenesses provided in the Global Subject Definitions to execute this framing.
 - Camera Motion: Describe camera motion naturally (Motion Type + Amplitude + Speed, e.g., "The camera pushes in with small amplitude at slow speed...").
 - Dialogue: If dialogue is present, format as <d>[Language] Dialogue text</d> with speaker tags like (S1).
 - No Boilerplate: Output ONLY the narrative visual description. Do NOT output "Global Subject Definitions:", "overall_soundscape:", or "non_diegetic_music:"."""
@@ -54,6 +55,7 @@ def generate_header_definitions(assets: List[Dict[str, Any]]) -> str:
 def build_mandatory_header(
     prompt_prefix: Optional[str],
     defs_header: str,
+    framing_directive: Optional[str] = None,
     is_scene_ref: bool = False,
     is_single_subject: bool = False
 ) -> str:
@@ -63,6 +65,8 @@ def build_mandatory_header(
     if defs_header and defs_header.strip():
         parts.append(defs_header.strip())
     directives = []
+    if framing_directive and framing_directive.strip():
+        directives.append(framing_directive.strip())
     if is_scene_ref:
         directives.append(SCENE_REFERENCE_DIRECTIVE)
     if is_single_subject:
@@ -81,10 +85,11 @@ def assemble_final_prompt(header: str, description: str, footer: str) -> str:
     parts = [p for p in [header, desc, footer] if p]
     return "\n\n".join(parts)
 
-def _get_fallback_description(basic_stub: str, assets: List[Dict[str, Any]]) -> str:
+def _get_fallback_description(basic_stub: str, assets: List[Dict[str, Any]], framing_directive: Optional[str] = None) -> str:
     tags_preview = " ".join([f"<Picture {i+1}>" for i in range(min(len(assets), 3))])
+    framing_stub = f"Framed with {framing_directive.replace('Framing:', '').strip()} " if framing_directive else ""
     return (
-        f"[Shot 1] Live-action, cinematic 4K shot based on '{basic_stub}'. "
+        f"[Shot 1] Live-action, cinematic 4K shot based on '{basic_stub}'. {framing_stub}"
         f"Featuring {tags_preview or '<Picture 1>'} with lifelike volumetric lighting, photorealistic textures, "
         f"and ultra-detailed focal continuity. The camera pushes in with small amplitude at slow speed."
     )
@@ -96,7 +101,12 @@ async def expand_prompt_with_llm(
     model: Optional[str] = None,
     provider: Optional[str] = None,
     prompt_prefix: Optional[str] = None,
-    gemini_api_key: Optional[str] = None
+    gemini_api_key: Optional[str] = None,
+    active_shot: Optional[Dict[str, Any]] = None,
+    shot_type: Optional[str] = None,
+    ots_anchor_subject: Optional[str] = None,
+    ots_focus_subject: Optional[str] = None,
+    framing_directive: Optional[str] = None
 ) -> str:
     """
     Assembly Line prompt expansion:
@@ -106,22 +116,38 @@ async def expand_prompt_with_llm(
     """
     provider_name = (provider or "lm_studio").lower().strip()
     defs_header = generate_header_definitions(assets)
+
+    effective_shot_type = (active_shot.get("shot_type") if active_shot else None) or shot_type or ""
+    anchor = (active_shot.get("ots_anchor_subject") if active_shot else None) or ots_anchor_subject or ""
+    focus = (active_shot.get("ots_focus_subject") if active_shot else None) or ots_focus_subject or ""
+    is_ots = "over-the-shoulder" in effective_shot_type.lower() or "ots" in effective_shot_type.lower()
+
+    resolved_framing = (framing_directive or "").strip()
+    if not resolved_framing and is_ots and (anchor or focus):
+        if anchor and focus:
+            resolved_framing = f"Framing: Over-the-shoulder (OTS) angle looking past the shoulder of {anchor} toward {focus}."
+        elif anchor:
+            resolved_framing = f"Framing: Over-the-shoulder (OTS) angle looking past the shoulder of {anchor}."
+        elif focus:
+            resolved_framing = f"Framing: Over-the-shoulder (OTS) angle looking toward {focus}."
     
     is_scene_ref = any(
         (a.get("type") or "").lower() in ["scene reference", "location", "environment"]
         for a in assets
     )
-    is_single_subject = len([a for a in assets if "location" not in (a.get("type") or "").lower()]) == 1
+    is_single_subject = (not is_ots) and (len([a for a in assets if "location" not in (a.get("type") or "").lower()]) == 1)
 
-    header = build_mandatory_header(prompt_prefix, defs_header, is_scene_ref, is_single_subject)
+    header = build_mandatory_header(prompt_prefix, defs_header, resolved_framing, is_scene_ref, is_single_subject)
     footer = build_mandatory_footer()
 
     context_str = format_asset_context(assets)
+    framing_context_block = f"\nFRAMING DIRECTIVE:\n{resolved_framing}\nA Framing Directive is provided; utilize the specific anchor and focus subject likenesses provided in the Global Subject Definitions to execute this framing.\n" if resolved_framing else ""
+
     user_content = f"""CREATIVE CONCEPT / STUB:
 \"\"\"{basic_stub}\"\"\"
 
 {context_str}
-
+{framing_context_block}
 Generate ONLY the integrated_multimodal_description paragraph incorporating the reference tags naturally."""
 
     raw_description = ""
@@ -129,7 +155,7 @@ Generate ONLY the integrated_multimodal_description paragraph incorporating the 
     if provider_name == "gemini":
         api_key = gemini_api_key or os.environ.get("GEMINI_API_KEY") or ""
         if not api_key:
-            desc = _get_fallback_description(basic_stub, assets)
+            desc = _get_fallback_description(basic_stub, assets, resolved_framing)
             return assemble_final_prompt(header, desc, footer)
 
         gemini_model = model or "gemini-2.5-flash"

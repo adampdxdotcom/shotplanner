@@ -274,7 +274,11 @@ export default function App() {
         prompt_prefix: shotPrefix,
         provider: llmProvider,
         lm_studio_url: config.lm_studio_url,
-        gemini_api_key: config.gemini_api_key
+        gemini_api_key: config.gemini_api_key,
+        active_shot: shot,
+        shot_type: shot.shot_type,
+        ots_anchor_subject: shot.ots_anchor_subject,
+        ots_focus_subject: shot.ots_focus_subject
       }),
     });
     const data = await response.json();

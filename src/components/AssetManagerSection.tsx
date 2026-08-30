@@ -22,7 +22,10 @@ import {
   Loader2,
   RefreshCw,
   Undo2,
-  FileImage
+  FileImage,
+  Sliders,
+  Eye,
+  Camera
 } from "lucide-react";
 
 interface AssetManagerSectionProps {
@@ -118,6 +121,58 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
       return { ...prev, shots };
     });
   };
+
+  const handleUpdateAnchorSubject = (val: string) => {
+    if (!activeShotId) return;
+    onUpdateProject(prev => {
+      const shots = [...prev.shots];
+      const idx = shots.findIndex(s => s.id === activeShotId);
+      if (idx !== -1) {
+        shots[idx] = {
+          ...shots[idx],
+          ots_anchor_subject: val,
+          staged: false,
+          updated_at: new Date().toISOString()
+        };
+      }
+      return { ...prev, shots };
+    });
+  };
+
+  const handleUpdateFocusSubject = (val: string) => {
+    if (!activeShotId) return;
+    onUpdateProject(prev => {
+      const shots = [...prev.shots];
+      const idx = shots.findIndex(s => s.id === activeShotId);
+      if (idx !== -1) {
+        shots[idx] = {
+          ...shots[idx],
+          ots_focus_subject: val,
+          staged: false,
+          updated_at: new Date().toISOString()
+        };
+      }
+      return { ...prev, shots };
+    });
+  };
+
+  const isOTSShot = activeShot
+    ? activeShot.shot_type === "Over-the-shoulder (OTS)" ||
+      activeShot.shot_type === "Over-the-Shoulder (OTS)" ||
+      activeShot.shot_type === "Over-the-Shoulder" ||
+      (activeShot.shot_type || "").toLowerCase().includes("over-the-shoulder") ||
+      (activeShot.shot_type || "").toLowerCase().includes("ots")
+    : false;
+
+  const projectSubjects = Array.from(
+    new Set([
+      ...(sceneProject.subjects || []),
+      ...(subjects || []),
+      ...assets.map(a => a.subject_name).filter(Boolean),
+      ...(activeShot?.ots_anchor_subject ? [activeShot.ots_anchor_subject] : []),
+      ...(activeShot?.ots_focus_subject ? [activeShot.ots_focus_subject] : [])
+    ])
+  ).filter(s => s && typeof s === "string" && s.trim().length > 0) as string[];
 
   const renderAssetCard = (asset: MediaAsset, idx: number, type: string) => {
     const isImage = asset.media_type === "image" || (!asset.media_type && !/\.(mp3|wav|ogg|m4a|mp4|mov|webm)$/i.test(asset.filename)) || /\.(png|jpe?g|webp|gif|svg|avif|bmp)$/i.test(asset.filename);
@@ -699,6 +754,103 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
               }} 
               onChangePlanning={handlePlanningChange} 
             />
+          )}
+
+          {/* Conditional Shot Controls: Over-the-shoulder (OTS) Framing Configuration */}
+          {activeShot && isOTSShot && (
+            <div id="shot-controls-ots-row" className="bg-zinc-900/80 border-2 border-indigo-500/40 rounded-xl p-4 shadow-sm space-y-3.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-800/80 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <div className="p-1 rounded-md bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                    <Sliders className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-semibold text-zinc-100 uppercase tracking-wider flex items-center gap-2">
+                      <span>Shot Controls</span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                        Over-the-shoulder (OTS)
+                      </span>
+                    </h3>
+                    <p className="text-xs text-zinc-400">
+                      Configure foreground anchor and primary focus subjects for deterministic prompt framing.
+                    </p>
+                  </div>
+                </div>
+                {activeShot.ots_anchor_subject && activeShot.ots_focus_subject && (
+                  <span className="text-[11px] font-mono text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 px-2.5 py-1 rounded-md flex items-center gap-1.5 self-start sm:self-auto">
+                    <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+                    OTS Framing Configured
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Anchor Subject Dropdown */}
+                <div className="space-y-1.5">
+                  <label htmlFor="ots-anchor-subject-select" className="text-xs font-medium text-zinc-300 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <User className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Anchor Subject</span>
+                    </span>
+                    <span className="text-[10px] text-zinc-500">Camera looks past shoulder</span>
+                  </label>
+                  <select
+                    id="ots-anchor-subject-select"
+                    value={activeShot.ots_anchor_subject || ""}
+                    onChange={(e) => handleUpdateAnchorSubject(e.target.value)}
+                    className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-indigo-500 focus:outline-hidden text-zinc-100 text-xs px-3 py-2 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <option value="">-- Select Anchor Subject --</option>
+                    {projectSubjects.map((s) => (
+                      <option key={`anchor-${s}`} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Focus Subject Dropdown */}
+                <div className="space-y-1.5">
+                  <label htmlFor="ots-focus-subject-select" className="text-xs font-medium text-zinc-300 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Eye className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Focus Subject</span>
+                    </span>
+                    <span className="text-[10px] text-zinc-500">Camera focuses toward</span>
+                  </label>
+                  <select
+                    id="ots-focus-subject-select"
+                    value={activeShot.ots_focus_subject || ""}
+                    onChange={(e) => handleUpdateFocusSubject(e.target.value)}
+                    className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-indigo-500 focus:outline-hidden text-zinc-100 text-xs px-3 py-2 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <option value="">-- Select Focus Subject --</option>
+                    {projectSubjects.map((s) => (
+                      <option key={`focus-${s}`} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Directive Preview Banner */}
+              {(activeShot.ots_anchor_subject || activeShot.ots_focus_subject) ? (
+                <div className="p-2.5 rounded-lg bg-zinc-950/70 border border-zinc-800 text-xs text-zinc-300 flex items-start gap-2">
+                  <Camera className="w-3.5 h-3.5 text-indigo-400 shrink-0 mt-0.5" />
+                  <div className="space-y-0.5">
+                    <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wide">Generated Framing Directive:</span>
+                    <p className="font-mono text-zinc-200">
+                      Framing: Over-the-shoulder (OTS) angle looking past the shoulder of <strong className="text-amber-300">{activeShot.ots_anchor_subject || "[Unassigned]"}</strong> toward <strong className="text-emerald-300">{activeShot.ots_focus_subject || "[Unassigned]"}</strong>.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-[11px] text-zinc-500 italic">
+                  Select an anchor and focus subject to automatically generate and inject the OTS framing directive into your Assembly Line prompts.
+                </p>
+              )}
+            </div>
           )}
 
           {/* Main Asset Management Card */}

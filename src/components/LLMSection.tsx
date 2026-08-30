@@ -97,7 +97,12 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
           provider: providerChoice,
           prompt_prefix: activeShotPrefix,
           scene_planning: planning,
-          planning: planning
+          planning: planning,
+          active_shot: activeShot || undefined,
+          shot_type: activeShot ? activeShot.shot_type : planning?.shot_type,
+          ots_anchor_subject: activeShot?.ots_anchor_subject || planning?.ots_anchor_subject,
+          ots_focus_subject: activeShot?.ots_focus_subject || planning?.ots_focus_subject,
+          gemini_api_key: geminiApiKey
         })
       });
 
