@@ -132,7 +132,8 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
         onUpdateShot(prev => ({ ...prev, staged: true }));
         onShowToast?.("Shot staged successfully!", "success");
       } else {
-        setError(data.error || "Failed to stage shot.");
+        const errorMsg = data.detail || data.error || data.message || (typeof data === "string" ? data : "Failed to stage shot.");
+        setError(errorMsg);
         setTransferState("error");
       }
     } catch (err: any) {
@@ -155,6 +156,11 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           remote_host: config.remote_host,
+          ssh_port: config.ssh_port,
+          ssh_username: config.ssh_username,
+          ssh_password: config.ssh_password,
+          ssh_key_path: config.ssh_key_path,
+          ssh_private_key: config.ssh_private_key,
           remote_comfyui_root: config.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI",
           scene_name: sanitizedSceneName,
           shots: sceneProject.shots.map(s => ({
@@ -183,7 +189,8 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
         }));
         onShowToast?.("Scene staged successfully!", "success");
       } else {
-        setError(data.error || "Failed to stage scene.");
+        const errorMsg = data.detail || data.error || data.message || (typeof data === "string" ? data : "Failed to stage scene.");
+        setError(errorMsg);
         setTransferState("error");
       }
     } catch (err: any) {

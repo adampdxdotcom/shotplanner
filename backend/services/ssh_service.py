@@ -196,13 +196,20 @@ class RunPodSSHService:
         client = self.connect()
 
         try:
-            # Ensure remote directory exists on host
-            client.exec_command(f"mkdir -p {clean_remote_dir}")
+            # Ensure remote directory exists on host synchronously
+            try:
+                _stdin, stdout, _stderr = client.exec_command(f"mkdir -p {clean_remote_dir}")
+                stdout.channel.recv_exit_status()
+            except Exception as cmd_err:
+                print(f"Notice: Remote mkdir -p execution exception: {cmd_err}")
 
             sftp = client.open_sftp()
             try:
                 # Automatic input validation: ensure empty.png is present in remote input/ folder
-                ensure_remote_empty_png(sftp, clean_remote_dir)
+                try:
+                    ensure_remote_empty_png(sftp, clean_remote_dir)
+                except Exception as png_err:
+                    print(f"Warning: ensure_remote_empty_png error: {png_err}")
 
                 for file_path in local_files:
                     filename = file_path.name
@@ -222,9 +229,9 @@ class RunPodSSHService:
                     # Check if file already exists remotely
                     if not overwrite:
                         try:
-                            remote_stat = sftp.stat(remote_file_path)
+                            sftp.stat(remote_file_path)
                             file_exists_remotely = True
-                        except (IOError, FileNotFoundError, Exception):
+                        except Exception:
                             file_exists_remotely = False
 
                     if file_exists_remotely and not overwrite:
@@ -233,26 +240,36 @@ class RunPodSSHService:
                             "filename": filename,
                             "file": filename,
                             "status": "skipped_existing",
-                            "size_bytes": file_path.stat().st_size,
+                            "size_bytes": file_path.stat().st_size if file_path.exists() else 0,
                             "remote_path": remote_file_path,
                             "message": "File already exists in remote input directory. Skipped upload."
                         })
                     else:
-                        # Upload file sequentially via SFTP
-                        def sftp_callback(transferred: int, total: int):
-                            if progress_callback:
-                                progress_callback(filename, total, transferred)
+                        try:
+                            # Upload file sequentially via SFTP
+                            def sftp_callback(transferred: int, total: int):
+                                if progress_callback:
+                                    progress_callback(filename, total, transferred)
 
-                        sftp.put(str(file_path), remote_file_path, callback=sftp_callback if progress_callback else None)
-                        uploaded_files.append(filename)
-                        results.append({
-                            "filename": filename,
-                            "file": filename,
-                            "status": "transferred",
-                            "size_bytes": file_path.stat().st_size,
-                            "remote_path": remote_file_path,
-                            "message": "Transferred successfully via SFTP."
-                        })
+                            sftp.put(str(file_path), remote_file_path, callback=sftp_callback if progress_callback else None)
+                            uploaded_files.append(filename)
+                            results.append({
+                                "filename": filename,
+                                "file": filename,
+                                "status": "transferred",
+                                "size_bytes": file_path.stat().st_size if file_path.exists() else 0,
+                                "remote_path": remote_file_path,
+                                "message": "Transferred successfully via SFTP."
+                            })
+                        except Exception as put_err:
+                            results.append({
+                                "filename": filename,
+                                "file": filename,
+                                "status": "failed",
+                                "size_bytes": 0,
+                                "remote_path": remote_file_path,
+                                "message": f"Upload failed: {str(put_err)}"
+                            })
             finally:
                 sftp.close()
 

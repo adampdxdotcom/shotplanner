@@ -222,20 +222,34 @@ async def transfer_assets_only(req: SSHTransferRequest):
     seen_files = set()
 
     # 1. Collect all non-empty asset filenames mapped across all active shot input slots
-    for node_id, filename in req.node_mappings.items():
-        if filename and filename.strip() and filename.strip() not in seen_files:
-            seen_files.add(filename.strip())
-            local_file = UPLOADS_DIR / filename.strip()
-            if local_file.exists():
-                files_to_transfer.append(local_file)
+    for node_id, filename_val in req.node_mappings.items():
+        if filename_val:
+            clean_name = str(filename_val).strip()
+            if clean_name and clean_name not in seen_files:
+                seen_files.add(clean_name)
+                candidate_paths = [
+                    UPLOADS_DIR / clean_name,
+                    ASSETS_DIR / "uploads" / clean_name,
+                    ASSETS_DIR / clean_name,
+                ]
+                found_path = next((p for p in candidate_paths if p.exists() and p.is_file()), None)
+                if found_path:
+                    files_to_transfer.append(found_path)
 
     # 2. Also check any explicitly requested filenames
     for fname in req.filenames:
-        if fname and fname.strip() and fname.strip() not in seen_files:
-            seen_files.add(fname.strip())
-            local_file = UPLOADS_DIR / fname.strip()
-            if local_file.exists():
-                files_to_transfer.append(local_file)
+        if fname:
+            clean_name = str(fname).strip()
+            if clean_name and clean_name not in seen_files:
+                seen_files.add(clean_name)
+                candidate_paths = [
+                    UPLOADS_DIR / clean_name,
+                    ASSETS_DIR / "uploads" / clean_name,
+                    ASSETS_DIR / clean_name,
+                ]
+                found_path = next((p for p in candidate_paths if p.exists() and p.is_file()), None)
+                if found_path:
+                    files_to_transfer.append(found_path)
 
     # 3. Fallback to all local uploads if no mappings or filenames were specified
     if not seen_files and UPLOADS_DIR.exists():
