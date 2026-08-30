@@ -3,6 +3,7 @@ import httpx
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from backend.utils.file_handlers import (
@@ -209,6 +210,16 @@ async def upload_asset(
 async def get_assets():
     """List all registered uploaded assets."""
     return {"assets": in_memory_asset_metadata}
+
+@router.get("/uploads/{filename}")
+async def serve_upload_file(filename: str):
+    """Dynamic file serving endpoint that scans all scene subdirectories."""
+    file_path = find_asset_file_path(filename)
+    if not file_path or not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    # We use FileResponse to handle proper Content-Type deduction and caching headers
+    return FileResponse(path=file_path, headers={"Cache-Control": "public, max-age=3600"})
 
 @router.post("/generate-prompt")
 @router.post("/llm/expand")

@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 
 interface AssetManagerSectionProps {
+  activeSceneName: string;
   assets: MediaAsset[];
   activeShotId: string | null;
   onSelectShot: (id: string | null) => void;
@@ -43,6 +44,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
   activeShotId,
   onSelectShot,
   sceneProject,
+  activeSceneName,
   onUpdateProject,
   subjects = [],
   onRegisterSubject = (_name: string) => {},
@@ -380,7 +382,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
           formData.append("total_chunks", totalChunks.toString());
           formData.append("original_name", editFile.name);
           formData.append("replace_filename", editingAsset.filename);
-          formData.append("scene_name", sceneProject.scene_name || "scene01");
+          formData.append("scene_name", activeSceneName);
           
           if (i === totalChunks - 1) {
             formData.append("media_type", editingAsset.media_type);
@@ -561,7 +563,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
         formData.append("total_chunks", totalChunks.toString());
         formData.append("original_name", file.name);
         formData.append("slot_index", targetSlotIndex.toString());
-        formData.append("scene_name", sceneProject.scene_name || "scene01");
+        formData.append("scene_name", activeSceneName);
         
         // Always send metadata on the final chunk so the server knows what to do
         if (i === totalChunks - 1) {
@@ -725,7 +727,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
               Project Library Total: <span className="text-zinc-300 font-medium">{images.length} image(s)</span>, <span className="text-zinc-300 font-medium">{videos.length} video(s)</span>, <span className="text-zinc-300 font-medium">{audios.length} audio(s)</span>
             </p>
           </div>
-          <span className="text-[11px] text-zinc-400">Physically stored in <code className="text-zinc-300 bg-zinc-800 px-1 py-0.5 rounded">/assets/images/{sceneProject.scene_name ? (sceneProject.scene_name.match(/\d+/) ? `scene${parseInt(sceneProject.scene_name.match(/\d+/)![0]) < 10 ? '0' + parseInt(sceneProject.scene_name.match(/\d+/)![0]) : parseInt(sceneProject.scene_name.match(/\d+/)![0])}` : sceneProject.scene_name.toLowerCase().replace(/[^a-z0-9_-]/g, '_')) : 'scene01'}/</code></span>
+          <span className="text-[11px] text-zinc-400">Physically stored in <code className="text-zinc-300 bg-zinc-800 px-1 py-0.5 rounded">/assets/images/{activeSceneName ? (activeSceneName.match(/\d+/) ? `scene${parseInt(activeSceneName.match(/\d+/)![0]) < 10 ? '0' + parseInt(activeSceneName.match(/\d+/)![0]) : parseInt(activeSceneName.match(/\d+/)![0])}` : activeSceneName.toLowerCase().replace(/[^a-z0-9_-]/g, '_')) : 'scene01'}/</code></span>
         </div>
 
         {/* Images Section */}

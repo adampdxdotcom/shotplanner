@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 
 interface WorkflowSectionProps {
+  activeSceneName: string;
   workflows: WorkflowItem[];
   selectedWorkflowFile: string;
   onSelectWorkflow: (filename: string) => void;
@@ -62,7 +63,8 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
   activeShotId,
   onSelectShot,
   sceneProject,
-  onUpdateShot
+  onUpdateShot,
+  activeSceneName
 }) => {
   const [uploading, setUploading] = useState(false);
   const [showRawJson, setShowRawJson] = useState(false);
@@ -93,7 +95,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
     setUploadError(null);
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("scene_name", sceneProject.scene_name || "scene01");
+    formData.append("scene_name", activeSceneName);
 
     try {
       const res = await fetch("/api/workflows/upload", {

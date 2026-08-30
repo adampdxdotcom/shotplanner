@@ -612,10 +612,11 @@ export default function App() {
 
     const parseSelectedWorkflow = async () => {
       try {
+        const activeSceneName = sceneProject.scene_name || currentProjectName || "Untitled_Scene";
         const res = await fetch("/api/workflows/parse", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ filename: selectedWorkflowFile, scene_name: sceneProject.scene_name || "scene01" })
+          body: JSON.stringify({ filename: selectedWorkflowFile, scene_name: activeSceneName })
         });
         const data = await res.json();
         if (res.ok && data.nodes_info) {
@@ -856,6 +857,7 @@ export default function App() {
             activeShotId={activeShotId}
             onSelectShot={setActiveShotId}
             sceneProject={sceneProject}
+            activeSceneName={sceneProject.scene_name || currentProjectName || "Untitled_Scene"}
             onUpdateProject={setSceneProject}
             onRegisterSubject={handleRegisterSubject}
             onAssetUploaded={handleAssetUploaded}
@@ -886,6 +888,7 @@ export default function App() {
             onSelectShot={setActiveShotId}
             sceneProject={sceneProject}
             onUpdateShot={updateActiveShot}
+            activeSceneName={sceneProject.scene_name || currentProjectName || "Untitled_Scene"}
           />
         )}
 
@@ -932,7 +935,7 @@ export default function App() {
           <GallerySection
             assets={assets}
             subjects={subjects}
-            sceneName={sceneProject.scene_name || "scene01"}
+            sceneName={sceneProject.scene_name || currentProjectName || "Untitled_Scene"}
             onRegisterSubject={handleRegisterSubject}
             onAssetUploaded={handleAssetUploaded}
             onAssetDeleted={handleAssetDeleted}

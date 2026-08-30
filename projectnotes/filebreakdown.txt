@@ -52,3 +52,19 @@
 - **`backend/routes/api.py`** & **`server/services/assetService.ts`** & **`backend/utils/file_handlers.py`**
   - **Role:** Handles multipart form uploads (single and chunked), maintains the active registry state, and bridges frontend requests to disk storage.
   - **Updates:** Fixed strict dictionary lookups triggering KeyErrors when dynamically resolving scene storage blocks. Upload destinations now safely fallback using `get()` and safely handle unexpected content payloads (like generic files, workflow scripts) into `.shared` or `.images` directories rather than throwing Exceptions. Included `path` and `preview_url` properly onto all synthesized AssetRecord returns. Guaranteed `mkdir` recursive initialization right before file move actions across all single-file and chunked handlers to avoid racing conditions where the folder isn't fully staged.
+
+## Upload Serving and UI References fixed
+- **`src/components/AssetManagerSection.tsx`**, **`src/components/GallerySection.tsx`**, **`src/components/WorkflowSection.tsx`**, and **`src/App.tsx`**
+  - **Role:** Handles attaching metadata (like active scene identifiers) onto UI components and HTTP forms.
+  - **Updates:** Eliminated static `scene01` fallbacks. Extracted an `activeSceneName` derivation (favoring `sceneProject.scene_name`, then `currentProjectName`, then `Untitled_Scene`) in `App.tsx` and cascaded it consistently through all media components and visually into the physical storage path UI indicator.
+- **`backend/routes/api.py`**
+  - **Role:** Exposes Python FastAPI routes under `/api/`.
+  - **Updates:** Added a dynamic file serving proxy at `GET /api/uploads/{filename}` via `FileResponse` that taps into `find_asset_file_path()`. This successfully navigates nested Scene subdirectories (e.g. `assets/*/images/`) returning 200 statuses with proper Content-Type headers, bridging the NGINX routing gap.
+
+## Upload Serving and UI References fixed
+- **`src/components/AssetManagerSection.tsx`**, **`src/components/GallerySection.tsx`**, **`src/components/WorkflowSection.tsx`**, and **`src/App.tsx`**
+  - **Role:** Handles attaching metadata (like active scene identifiers) onto UI components and HTTP forms.
+  - **Updates:** Eliminated static `scene01` fallbacks. Extracted an `activeSceneName` derivation (favoring `sceneProject.scene_name`, then `currentProjectName`, then `Untitled_Scene`) in `App.tsx` and cascaded it consistently through all media components and visually into the physical storage path UI indicator.
+- **`backend/routes/api.py`**
+  - **Role:** Exposes Python FastAPI routes under `/api/`.
+  - **Updates:** Added a dynamic file serving proxy at `GET /api/uploads/{filename}` via `FileResponse` that taps into `find_asset_file_path()`. This successfully navigates nested Scene subdirectories (e.g. `assets/*/images/`) returning 200 statuses with proper Content-Type headers, bridging the NGINX routing gap.
