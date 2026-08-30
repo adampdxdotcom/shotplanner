@@ -26,7 +26,7 @@ export function listProjects(): any[] {
 }
 
 export function getProjectData(projectName: string): any | null {
-  const cleanName = projectName.replace(/\.json$/i, "");
+  const cleanName = sanitizeProjectName(projectName);
   const p = path.join(PROJECTS_DIR, `${cleanName}.json`);
   if (!fs.existsSync(p)) return null;
 
@@ -46,17 +46,17 @@ export function getProjectData(projectName: string): any | null {
   return projectData;
 }
 
+export function sanitizeProjectName(name: string): string {
+  let clean = name.trim();
+  if (clean.toLowerCase().endsWith(".json")) {
+    clean = clean.slice(0, -5);
+  }
+  clean = clean.toLowerCase().replace(/[^a-z0-9_-]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
+  return clean || "project";
+}
+
 export function saveProjectData(projectName: string, projectData: any): string {
-  let cleanName = projectName;
-  if (cleanName.toLowerCase().endsWith(".json")) {
-    cleanName = cleanName.slice(0, -5);
-  }
-  
-  cleanName = cleanName.replace(/[^a-zA-Z0-9_-]/g, "");
-  if (!cleanName) {
-    cleanName = "project";
-  }
-  
+  const cleanName = sanitizeProjectName(projectName);
   const targetPath = path.join(PROJECTS_DIR, `${cleanName}.json`);
   fs.writeFileSync(targetPath, JSON.stringify(projectData, null, 2));
 
@@ -76,7 +76,7 @@ export function saveProjectData(projectName: string, projectData: any): string {
 }
 
 export function deleteProject(projectName: string): boolean {
-  const cleanName = projectName.replace(/\.json$/i, "");
+  const cleanName = sanitizeProjectName(projectName);
   const targetPath = path.join(PROJECTS_DIR, `${cleanName}.json`);
   if (fs.existsSync(targetPath)) {
     fs.unlinkSync(targetPath);
@@ -86,12 +86,12 @@ export function deleteProject(projectName: string): boolean {
 }
 
 export async function exportProjectZip(projectName: string, res: Response): Promise<void> {
-  const rawName = projectName.replace(/\.json$/, "");
-  const jsonFileName = `${rawName}.json`;
+  const cleanName = sanitizeProjectName(projectName);
+  const jsonFileName = `${cleanName}.json`;
   const filePath = path.join(PROJECTS_DIR, jsonFileName);
 
   if (!fs.existsSync(filePath)) {
-    res.status(404).json({ error: `Project '${rawName}' not found on server. Please save it first.` });
+    res.status(404).json({ error: `Project '${cleanName}' not found on server. Please save it first.` });
     return;
   }
 

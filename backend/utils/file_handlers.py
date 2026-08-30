@@ -22,6 +22,16 @@ LEGACY_UPLOADS_DIR = ASSETS_DIR / "uploads"
 UPLOADS_DIR = LEGACY_UPLOADS_DIR  # Aliased for backward compatibility in some modules
 WORKFLOWS_DIR = LEGACY_WORKFLOWS_DIR
 
+def sanitize_project_name(name: str) -> str:
+    if not name:
+        return "project"
+    clean = name.strip()
+    if clean.lower().endswith(".json"):
+        clean = clean[:-5]
+    clean = re.sub(r'[^a-z0-9_-]', '_', clean.lower())
+    clean = re.sub(r'_+', '_', clean).strip('_')
+    return clean or "project"
+
 def format_scene_folder_name(scene_name: Optional[str] = "scene01") -> str:
     """Standardize scene folder naming e.g., 'Scene 1' -> 'scene01'"""
     if not scene_name:

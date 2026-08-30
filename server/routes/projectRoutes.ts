@@ -25,7 +25,7 @@ router.post("/", (req: Request, res: Response) => {
 // Load a specific project
 router.get("/:filename", (req: Request, res: Response) => {
   try {
-    const rawName = req.params.filename.replace(/\.json$/, "");
+    const rawName = req.params.filename;
     const projectData = getProjectData(rawName);
     if (!projectData) {
       return res.status(404).json({ error: `Project '${rawName}' not found` });
@@ -68,7 +68,7 @@ router.post("/import", upload.single("file"), async (req: Request, res: Response
 // Delete a project
 router.delete("/:filename", (req: Request, res: Response) => {
   try {
-    const rawName = req.params.filename.replace(/\.json$/, "");
+    const rawName = req.params.filename;
     const success = deleteProject(rawName);
     if (!success) {
       return res.status(404).json({ error: `Project '${rawName}' not found` });
