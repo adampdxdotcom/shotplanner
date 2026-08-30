@@ -212,3 +212,11 @@
   - Added robust cleanup to remove the `.part` files immediately after successful stream pipe completion.
 - **`src/components/AssetManagerSection.tsx` & `src/components/GallerySection.tsx`**
   - Confirmed and verified that the chunk iteration logic strictly utilizes `await fetch(...)` for sequential uploading. Each chunk blocks execution until the server HTTP response completes, preventing network overloading and ensuring the backend receives chunks synchronously or handles out-of-order staging safely.
+
+## Slot Assignment and Key Resolution Fixes
+- **`src/components/AssetManagerSection.tsx`**
+  - Updated `getAssetForSlot` to use strict 1-to-1 slot indexing by relying exactly on `globalSlot` keys within the `activeShot.assigned_slots` dictionary. Removed all fuzzy offset indexing (`globalSlot + 1`), guaranteeing that if no asset is rigidly assigned to an exact index, it cleanly renders as an empty slot.
+  - Refactored `renderAssetCard` map loops to assign robust unique React keys (`key={"slot-" + type + "-" + idx + "-" + asset.filename}`) to the UI grid mapping. This resolves duplicate rendering crashes and mitigates React reconciliation errors when assigning the same library asset to multiple slot coordinates.
+  - Hardened the inline Trash unassign/delete function so it fully clears both String and Numeric object keys from the active shot's `assigned_slots`, instantaneously resetting the card block back to an empty slot.
+- **`src/App.tsx`**
+  - Hardened the global `handleAssetDeleted` to exhaustively iterate over every registered shot and recursively strip the deleted `filename` from all `assigned_slots` mappings. The frontend now safely wipes the deleted file comprehensively across all stored timeline metadata contexts.

@@ -782,9 +782,19 @@ export default function App() {
   const handleAssetDeleted = (filename: string) => {
     setSceneProject(prev => {
       const prevAssets = prev.assets || [];
+      const nextShots = (prev.shots || []).map(shot => {
+        const nextSlots = { ...(shot.assigned_slots || {}) };
+        for (const key of Object.keys(nextSlots)) {
+          if (nextSlots[key] === filename) {
+            delete nextSlots[key];
+          }
+        }
+        return { ...shot, assigned_slots: nextSlots };
+      });
       return {
         ...prev,
-        assets: prevAssets.filter(a => a.filename !== filename)
+        assets: prevAssets.filter(a => a.filename !== filename),
+        shots: nextShots
       };
     });
     setIsDirty(true);

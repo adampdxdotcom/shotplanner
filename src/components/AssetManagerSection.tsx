@@ -127,7 +127,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
 
     return (
       <div 
-        key={asset.filename} 
+        key={`slot-${type}-${idx}-${asset.filename}`} 
         className="bg-zinc-950 p-3 rounded-xl border-2 border-zinc-700 hover:border-zinc-600 transition-all space-y-2 relative group flex flex-col"
       >
         <div className="flex items-start justify-between gap-2">
@@ -160,6 +160,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
                     if (shotIdx !== -1) {
                       const nextSlots = { ...shots[shotIdx].assigned_slots };
                       delete nextSlots[globalSlot];
+                      delete nextSlots[String(globalSlot)];
                       shots[shotIdx] = { ...shots[shotIdx], assigned_slots: nextSlots , staged: false };
                     }
                     return { ...prev, shots };
