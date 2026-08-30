@@ -8,7 +8,8 @@ import {
   HardDrive,
   Sparkles,
   Save,
-  FolderOpen
+  FolderOpen,
+  Plus
 } from "lucide-react";
 
 interface NavbarProps {
@@ -16,11 +17,12 @@ interface NavbarProps {
   onNavigate: (section: string) => void;
   onSaveProject: () => void;
   onLoadProject: () => void;
+  onNewProject?: () => void;
   toasts?: ToastMessage[];
   onDismissToast?: (id: string) => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ activeSection, onNavigate, onSaveProject, onLoadProject, toasts = [], onDismissToast }) => {
+export const Navbar: React.FC<NavbarProps> = ({ activeSection, onNavigate, onSaveProject, onLoadProject, onNewProject, toasts = [], onDismissToast }) => {
   return (
     <header className="sticky top-0 z-40 bg-zinc-900/90 backdrop-blur-md border-b border-zinc-800 px-4 lg:px-8 py-3.5 flex items-start justify-between shadow-sm">
       <div className="flex items-center gap-3">
@@ -115,6 +117,16 @@ export const Navbar: React.FC<NavbarProps> = ({ activeSection, onNavigate, onSav
             <Server className="w-3.5 h-3.5" />
             <span>Config</span>
           </button>
+          {onNewProject && (
+            <button
+              onClick={onNewProject}
+              className="px-3 py-1.5 text-xs font-medium text-zinc-300 bg-zinc-800/80 hover:bg-zinc-700 hover:text-white rounded-lg border border-zinc-700/80 transition-all flex items-center gap-1.5 shadow-xs"
+              title="New Scene"
+            >
+              <Plus className="w-3.5 h-3.5 text-amber-500" />
+              <span>New</span>
+            </button>
+          )}
           <button
             onClick={onLoadProject}
             className="px-3 py-1.5 text-xs font-medium text-zinc-300 bg-zinc-800/80 hover:bg-zinc-700 hover:text-white rounded-lg border border-zinc-700/80 transition-all flex items-center gap-1.5 shadow-xs"

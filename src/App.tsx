@@ -9,7 +9,7 @@ import { generatePromptPrefix } from "./components/ScenePlanningHeader";
 import { LLMSection } from "./components/LLMSection";
 import { ExecutionSection } from "./components/ExecutionSection";
 import { CodeViewerModal } from "./components/CodeViewerModal";
-import { SaveProjectModal, LoadProjectModal } from "./components/ProjectModals";
+import { SaveProjectModal, LoadProjectModal, NewProjectModal } from "./components/ProjectModals";
 import SceneProjectHub from "./components/SceneProjectHub";
 import { SceneProjectFile, ShotItem } from "./types";
 import { Sparkles, ArrowDown, HelpCircle, Terminal } from "lucide-react";
@@ -124,6 +124,7 @@ export default function App() {
   // Project Save/Load State
   const [isDirty, setIsDirty] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isLoadModalOpen, setIsLoadModalOpen] = useState(false);
   const [currentProjectName, setCurrentProjectName] = useState<string>("");
@@ -512,6 +513,60 @@ export default function App() {
     addToast(`Project "${filename}" loaded successfully (${assetCount} image assets restored).`, "success");
   };
 
+  const handleCreateNewProject = async (sceneName: string) => {
+    const newSceneId = "scene_" + Date.now();
+    const newScene: SceneProjectFile = {
+      schema_version: "1.0",
+      scene_id: newSceneId,
+      scene_name: sceneName,
+      workflow_file: selectedWorkflowFile || "",
+      shared_assets: [],
+      shots: [{
+        id: "shot_" + Date.now(),
+        shot_number: 1,
+        shot_type: "Medium Shot",
+        camera_movement: "Locked Off",
+        basic_stub: "",
+        expanded_prompt: "",
+        assigned_slots: {},
+        staged: false,
+        updated_at: new Date().toISOString()
+      }]
+    };
+
+    const cleanFilename = `scene_${sceneName.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_").replace(/_+/g, "_")}`;
+    try {
+      const payload = {
+        name: cleanFilename,
+        data: newScene
+      };
+      const res = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        throw new Error("Failed to save the new scene project.");
+      }
+      
+      setSceneProject(newScene);
+      setCurrentProjectName(cleanFilename);
+      setActiveShotId(newScene.shots[0].id);
+      setIsDirty(false);
+      
+      // Refresh list
+      const listRes = await fetch("/api/projects");
+      const listData = await listRes.json();
+      if (listData.projects) {
+        setAvailableScenes(listData.projects.filter((p: string) => p.startsWith("scene_")));
+      }
+      
+      addToast(`New scene "${sceneName}" created and auto-saved successfully!`, "success");
+    } catch (err: any) {
+      addToast(err.message || "Failed to auto-save new scene.", "error");
+    }
+  };
+
   // Fetch workflows and assets on initial mount
   const fetchWorkflows = async () => {
     try {
@@ -732,6 +787,7 @@ export default function App() {
         onNavigate={scrollToSection}
         onSaveProject={() => setIsSaveModalOpen(true)}
         onLoadProject={() => setIsLoadModalOpen(true)}
+        onNewProject={() => setIsNewModalOpen(true)}
         toasts={toasts}
         onDismissToast={(id) => setToasts(prev => prev.filter(t => t.id !== id))}
       />
@@ -897,6 +953,12 @@ export default function App() {
         isOpen={isLoadModalOpen}
         onClose={() => setIsLoadModalOpen(false)}
         onLoad={handleLoadProject}
+      />
+
+      <NewProjectModal
+        isOpen={isNewModalOpen}
+        onClose={() => setIsNewModalOpen(false)}
+        onCreate={handleCreateNewProject}
       />
 
       {/* Footer */}
