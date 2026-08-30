@@ -17,6 +17,7 @@ from backend.utils.file_handlers import (
     PROJECTS_DIR,
     TMP_UPLOAD_DIR,
     get_scene_directories,
+    ensure_scene_directories,
     find_asset_file_path
 )
 from backend.services.workflow_service import inspect_workflow_nodes, inject_and_prepare_workflow
@@ -710,6 +711,13 @@ async def save_project(req: Dict[str, Any]):
     file_path = PROJECTS_DIR / final_filename
     
     data_to_save = req.get("data") if ("data" in req and isinstance(req["data"], dict)) else req
+    
+    # Ensure scene directories exist immediately when saving scene
+    scene_name = None
+    if isinstance(data_to_save, dict):
+        scene_name = data_to_save.get("scene_name") or data_to_save.get("scene_planning", {}).get("scene_name")
+    ensure_scene_directories(scene_name or raw_name)
+
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(data_to_save, f, indent=2)
 
@@ -737,6 +745,13 @@ async def get_project(filename: str):
         raise HTTPException(status_code=404, detail="Project not found")
     with open(file_path, "r", encoding="utf-8") as f:
         data = json.load(f)
+        
+        # Ensure scene folders exist on load
+        scene_name = None
+        if isinstance(data, dict):
+            scene_name = data.get("scene_name") or data.get("scene_planning", {}).get("scene_name")
+        ensure_scene_directories(scene_name or safe_filename.replace(".json", ""))
+
         if isinstance(data, dict) and isinstance(data.get("assets"), list):
             for asset in data["assets"]:
                 if isinstance(asset, dict) and asset.get("filename"):
@@ -888,6 +903,13 @@ async def import_project_zip(file: UploadFile = File(...)):
                 imported_project = out_name[:-5]
                 try:
                     p_data = json.loads(file_bytes.decode("utf-8"))
+                    
+                    # Ensure scene folders exist on load
+                    scene_name = None
+                    if isinstance(p_data, dict):
+                        scene_name = p_data.get("scene_name") or p_data.get("scene_planning", {}).get("scene_name")
+                    ensure_scene_directories(scene_name or imported_project)
+
                     if isinstance(p_data, dict) and isinstance(p_data.get("assets"), list):
                         for a in p_data["assets"]:
                             if isinstance(a, dict) and a.get("filename"):

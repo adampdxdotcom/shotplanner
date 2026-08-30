@@ -45,6 +45,14 @@ def get_scene_directories(scene_name: Optional[str] = "scene01") -> Dict[str, Pa
         "shared": scene_base / "shared"
     }
 
+def ensure_scene_directories(scene_name: Optional[str] = "scene01") -> Dict[str, Path]:
+    """Ensure all directories for a specific scene exist on disk."""
+    dirs = get_scene_directories(scene_name)
+    for p in dirs.values():
+        if isinstance(p, Path):
+            p.mkdir(parents=True, exist_ok=True)
+    return dirs
+
 # Ensure base directories exist
 for base in [ASSETS_DIR, PROJECTS_DIR, TMP_UPLOAD_DIR, LEGACY_IMAGES_DIR, LEGACY_WORKFLOWS_DIR, LEGACY_VIDEOS_DIR, LEGACY_AUDIOS_DIR, LEGACY_UPLOADS_DIR]:
     base.mkdir(parents=True, exist_ok=True)

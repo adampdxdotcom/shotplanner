@@ -42,3 +42,8 @@
 - **`src/components/WorkflowSection.tsx`**
   - **Role:** Pipeline graph manager supporting workflow staging and dynamic media overrides.
   - **Updates:** Assures uploaded ComfyUI `.json` templates submit the active `scene_name` to guarantee the template is correctly nested inside `assets/{scene_name}/workflows/`.
+
+## Project Persistence Extensions
+- **`server/services/projectService.ts`** & **`backend/routes/api.py`**
+  - **Role:** Handles saving, loading, and importing `project.json` payloads.
+  - **Updates:** Automatically intercepts and inspects incoming project data to extract the nested `scene_name` metadata. Invokes the `ensureSceneDirectories` subroutine to recursively provision all Scene-First storage folders immediately upon creation, saving, fetching, or importing of a project. Ensures isolated `assets/{scene_name}/*` sandboxes are physically available before media starts rolling in.

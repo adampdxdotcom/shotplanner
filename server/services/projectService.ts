@@ -230,6 +230,11 @@ export async function importProjectZip(uploadedFilePath: string): Promise<string
       importedProject = fname.replace(/\.json$/, "");
       try {
         const pData = JSON.parse(buffer.toString("utf-8"));
+        
+        // Ensure scene folders exist on load
+        const sceneName = pData?.scene_name || pData?.scene_planning?.scene_name || importedProject;
+        ensureSceneDirectories(sceneName);
+
         if (Array.isArray(pData.assets)) {
           for (const item of pData.assets) {
             if (!item || !item.filename) continue;
