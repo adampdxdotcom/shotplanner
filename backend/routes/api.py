@@ -1,3 +1,4 @@
+import shutil
 import mimetypes
 import os
 import httpx
@@ -877,12 +878,12 @@ async def delete_project_endpoint(filename: str):
         parent_dir = file_path.parent
         file_path.unlink()
         
-        # Optional: attempt to remove scene directory if empty
+        # Recursively remove the entire scene directory to clean up all assets
         if parent_dir != ASSETS_DIR and parent_dir != PROJECTS_DIR:
             try:
-                parent_dir.rmdir()
+                shutil.rmtree(parent_dir)
             except Exception:
-                pass # Not empty or cannot remove
+                pass
         
         return {"success": True}
     except Exception as e:

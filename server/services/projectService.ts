@@ -153,12 +153,13 @@ export function deleteProject(projectName: string): boolean {
     const parentDir = path.dirname(targetPath);
     fs.unlinkSync(targetPath);
     
-    // Optional: attempt to remove scene directory if empty
+    // Recursively remove the entire scene directory to clean up all assets
     if (parentDir !== ASSETS_DIR && parentDir !== PROJECTS_DIR) {
       try {
-        fs.rmdirSync(parentDir);
+        fs.rmSync(parentDir, { recursive: true, force: true });
       } catch(e) {
-        // Not empty or cannot remove
+        // Fallback for older Node versions if needed
+        try { fs.rmdirSync(parentDir, { recursive: true }); } catch (err) {}
       }
     }
     return true;
