@@ -45,6 +45,15 @@ class LLMGenerateRequest(BaseModel):
     scene_planning: Optional[Dict[str, Any]] = None
     planning: Optional[Dict[str, Any]] = None
     gemini_api_key: Optional[str] = None
+    active_shot: Optional[Dict[str, Any]] = None
+    shot_type: Optional[str] = None
+    camera_movement: Optional[str] = None
+    ots_anchor_subject: Optional[str] = None
+    ots_focus_subject: Optional[str] = None
+    ots_side: Optional[str] = None
+    shot_number: Optional[Union[str, int]] = None
+    scene_name: Optional[str] = None
+    framing_directive: Optional[str] = None
 
     class Config:
         extra = "allow"
@@ -290,7 +299,16 @@ async def generate_prompt_endpoint(req: LLMGenerateRequest):
         model=req.model,
         provider=req.provider,
         prompt_prefix=req.prompt_prefix,
-        gemini_api_key=req.gemini_api_key
+        gemini_api_key=req.gemini_api_key,
+        active_shot=req.active_shot,
+        shot_type=req.shot_type,
+        camera_movement=req.camera_movement,
+        ots_anchor_subject=req.ots_anchor_subject,
+        ots_focus_subject=req.ots_focus_subject,
+        ots_side=req.ots_side,
+        shot_number=req.shot_number,
+        scene_name=req.scene_name,
+        framing_directive=req.framing_directive
     )
     return {"expanded_prompt": expanded, "provider": req.provider or "lm_studio"}
 

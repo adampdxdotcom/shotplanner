@@ -85,13 +85,26 @@ def assemble_final_prompt(header: str, description: str, footer: str) -> str:
     parts = [p for p in [header, desc, footer] if p]
     return "\n\n".join(parts)
 
-def _get_fallback_description(basic_stub: str, assets: List[Dict[str, Any]], framing_directive: Optional[str] = None) -> str:
+def _get_fallback_description(
+    basic_stub: str,
+    assets: List[Dict[str, Any]],
+    framing_directive: Optional[str] = None,
+    camera_movement: Optional[str] = None
+) -> str:
     tags_preview = " ".join([f"<Picture {i+1}>" for i in range(min(len(assets), 3))])
     framing_stub = f"Framed with {framing_directive.replace('Framing:', '').strip()} " if framing_directive else ""
+    cam_str = (camera_movement or "").strip()
+    if "locked" in cam_str.lower() or "static" in cam_str.lower():
+        camera_stub = "The camera remains completely locked off and static on a tripod."
+    elif cam_str:
+        camera_stub = f"The camera executes a smooth {cam_str.lower()} with subtle amplitude at slow speed."
+    else:
+        camera_stub = "The camera pushes in with small amplitude at slow speed."
+
     return (
         f"[Shot 1] Live-action, cinematic 4K shot based on '{basic_stub}'. {framing_stub}"
         f"Featuring {tags_preview or '<Picture 1>'} with lifelike volumetric lighting, photorealistic textures, "
-        f"and ultra-detailed focal continuity. The camera pushes in with small amplitude at slow speed."
+        f"and ultra-detailed focal continuity. {camera_stub}"
     )
 
 async def expand_prompt_with_llm(
@@ -104,9 +117,12 @@ async def expand_prompt_with_llm(
     gemini_api_key: Optional[str] = None,
     active_shot: Optional[Dict[str, Any]] = None,
     shot_type: Optional[str] = None,
+    camera_movement: Optional[str] = None,
     ots_anchor_subject: Optional[str] = None,
     ots_focus_subject: Optional[str] = None,
     ots_side: Optional[str] = None,
+    shot_number: Optional[Any] = None,
+    scene_name: Optional[str] = None,
     framing_directive: Optional[str] = None
 ) -> str:
     """
@@ -124,6 +140,9 @@ async def expand_prompt_with_llm(
     side_choice = (active_shot.get("ots_side") if active_shot else None) or ots_side or ""
     is_ots = "over-the-shoulder" in effective_shot_type.lower() or "ots" in effective_shot_type.lower()
 
+    effective_cam = (active_shot.get("camera_movement") if active_shot else None) or camera_movement or ""
+    is_static = "locked" in effective_cam.lower() or "static" in effective_cam.lower()
+
     resolved_framing = (framing_directive or "").strip()
     if not resolved_framing and is_ots and (anchor or focus):
         pos_suffix = f" (positioned on {side_choice})" if side_choice in ["Left", "Right"] else ""
@@ -140,25 +159,63 @@ async def expand_prompt_with_llm(
     )
     is_single_subject = (not is_ots) and (len([a for a in assets if "location" not in (a.get("type") or "").lower()]) == 1)
 
-    header = build_mandatory_header(prompt_prefix, defs_header, resolved_framing, is_scene_ref, is_single_subject)
+    resolved_prefix = (prompt_prefix or "").strip()
+    if not resolved_prefix and (scene_name or shot_number or effective_shot_type or effective_cam):
+        parts = []
+        if scene_name:
+            parts.append(scene_name)
+        if shot_number is not None:
+            s_num = str(shot_number).zfill(2) if str(shot_number).isdigit() else str(shot_number)
+            parts.append(f"Shot {s_num}")
+        if effective_shot_type:
+            parts.append(effective_shot_type)
+        if effective_cam:
+            parts.append(effective_cam)
+        resolved_prefix = " - ".join(parts)
+
+    header = build_mandatory_header(resolved_prefix, defs_header, resolved_framing, is_scene_ref, is_single_subject)
     footer = build_mandatory_footer()
 
     context_str = format_asset_context(assets)
+    camera_context_block = f"\nCAMERA MOVEMENT DIRECTIVE:\n{'LOCKED OFF (STATIC) - The camera must remain completely stationary. Strictly FORBID any camera push-in, zoom, pan, tilt, or tracking.' if is_static else f'The camera movement is \"{effective_cam}\". Execute ONLY this movement without introducing conflicting motions.'}\n" if effective_cam else ""
     framing_context_block = f"\nFRAMING DIRECTIVE:\n{resolved_framing}\nA Framing Directive is provided; utilize the specific anchor and focus subject likenesses provided in the Global Subject Definitions to execute this framing.\n" if resolved_framing else ""
+
+    camera_constraint_instruction = (
+        "The camera is strictly LOCKED OFF / STATIC. The camera must remain completely fixed and motionless with ZERO camera motion. You are STRICTLY FORBIDDEN from describing any camera movement (NO push-ins, NO pull-backs, NO zooms, NO pans, NO tilts, and NO tracking)."
+        if is_static
+        else f"The camera movement is strictly '{effective_cam}'. Describe camera motion naturally matching ONLY this specified movement. Contradictory camera movements are STRICTLY FORBIDDEN."
+        if effective_cam
+        else "Describe camera motion naturally (Motion Type + Amplitude + Speed, e.g., 'The camera pushes in with small amplitude at slow speed...')."
+    )
+
+    custom_system_prompt = f"""You are an expert AI Screenwriter and Prompt Engineer specializing in advanced multimodal video generation frameworks (MiniMax-H3 / Ref2VA pipelines).
+
+Your task is to generate ONLY the integrated_multimodal_description content. Do not generate headers, footers, or subject definitions. Use exact asset tags (<Picture N>, <Video N>) provided in the context.
+
+### Strict Output Constraints:
+- Spatial Initialization: Always define the subject's exact spatial position and initial posture at the very beginning (e.g., "[Shot 1] Live-action, cinematic... At the start of the shot, [Subject] is positioned at...").
+- Exact Tags: Differentiate between facial likeness and styling using the exact tags provided (e.g., "<Picture 1>"). Do NOT invent new tags or reference off-screen characters.
+- Framing Directives: When a Framing Directive is provided in context, utilize the specific anchor and focus subject likenesses provided in the Global Subject Definitions to execute this framing.
+- Camera Motion Hard Constraint: {camera_constraint_instruction}
+- Dialogue: If dialogue is present, format as <d>[Language] Dialogue text</d> with speaker tags like (S1).
+- No Boilerplate: Output ONLY the narrative visual description. Do NOT output "Global Subject Definitions:", "overall_soundscape:", or "non_diegetic_music:"."""
 
     user_content = f"""CREATIVE CONCEPT / STUB:
 \"\"\"{basic_stub}\"\"\"
 
+SHOT PLANNING CONTEXT:
+{resolved_prefix or "Shot 01"}
+{camera_context_block}{framing_context_block}
 {context_str}
-{framing_context_block}
-Generate ONLY the integrated_multimodal_description paragraph incorporating the reference tags naturally."""
+
+Generate ONLY the integrated_multimodal_description paragraph incorporating the reference tags naturally while strictly adhering to all camera and framing constraints."""
 
     raw_description = ""
 
     if provider_name == "gemini":
         api_key = gemini_api_key or os.environ.get("GEMINI_API_KEY") or ""
         if not api_key:
-            desc = _get_fallback_description(basic_stub, assets, resolved_framing)
+            desc = _get_fallback_description(basic_stub, assets, resolved_framing, effective_cam)
             return assemble_final_prompt(header, desc, footer)
 
         gemini_model = model or "gemini-2.5-flash"
@@ -171,7 +228,7 @@ Generate ONLY the integrated_multimodal_description paragraph incorporating the 
                 {
                     "parts": [
                         {
-                            "text": f"System Instructions:\n{SYSTEM_PROMPT}\n\nUser Input:\n{user_content}"
+                            "text": f"System Instructions:\n{custom_system_prompt}\n\nUser Input:\n{user_content}"
                         }
                     ]
                 }
@@ -192,7 +249,7 @@ Generate ONLY the integrated_multimodal_description paragraph incorporating the 
                     raise Exception(f"Gemini error {response.status_code}")
         except Exception as e:
             print(f"Gemini expansion failed, using fallback: {e}")
-            raw_description = _get_fallback_description(basic_stub, assets)
+            raw_description = _get_fallback_description(basic_stub, assets, resolved_framing, effective_cam)
 
     else:
         # Default: LM Studio
@@ -207,7 +264,7 @@ Generate ONLY the integrated_multimodal_description paragraph incorporating the 
         payload = {
             "model": model or "local-model",
             "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "system", "content": custom_system_prompt},
                 {"role": "user", "content": user_content}
             ],
             "temperature": 0.7,
@@ -224,9 +281,9 @@ Generate ONLY the integrated_multimodal_description paragraph incorporating the 
                     raise Exception(f"LM Studio status {response.status_code}")
         except Exception as e:
             print(f"LM Studio failed, using fallback: {e}")
-            raw_description = _get_fallback_description(basic_stub, assets)
+            raw_description = _get_fallback_description(basic_stub, assets, resolved_framing, effective_cam)
 
     if not raw_description:
-        raw_description = _get_fallback_description(basic_stub, assets)
+        raw_description = _get_fallback_description(basic_stub, assets, resolved_framing, effective_cam)
 
     return assemble_final_prompt(header, raw_description, footer)

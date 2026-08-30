@@ -281,7 +281,21 @@
   - The LLM is never tasked with generating framing boilerplate; it is queried strictly for the `integrated_multimodal_description` body.
   - Programmatically concatenates `FinalPrompt = Header + FramingDirective + LLM_Description + Footer`, mathematically guaranteeing framing presence in every prompt output.
 - **`src/components/LLMSection.tsx` & `src/App.tsx`**
-  - Ensured `active_shot`, `ots_anchor_subject`, `ots_focus_subject`, and `ots_side` payload parameters are forwarded to `/api/generate-prompt`.
+  - Updated LLM expansion callers across the frontend to pass the complete active shot planning payload in `POST /api/generate-prompt` and `POST /api/llm/expand`:
+    - `shot_type`: `shot.shot_type`
+    - `camera_movement`: `shot.camera_movement`
+    - `ots_anchor_subject`: `shot.ots_anchor_subject`
+    - `ots_focus_subject`: `shot.ots_focus_subject`
+    - `ots_side`: `shot.ots_side`
+    - `shot_number`: `shot.shot_number`
+    - `scene_name`: `sceneProject.scene_name`
+- **`backend/routes/api.py`**
+  - Updated `LLMGenerateRequest` schema and `/api/generate-prompt` / `/api/llm/expand` endpoints to accept and forward `shot_type`, `camera_movement`, `ots_anchor_subject`, `ots_focus_subject`, `ots_side`, `shot_number`, `scene_name`, and `framing_directive` to `expand_prompt_with_llm`.
+- **`server/services/llm_service.ts` & `backend/services/llm_service.py` (Camera Motion Hard Constraints & Prompt Assembly)**
+  - Resolves framing directives from `shot_type`, `ots_anchor_subject`, `ots_focus_subject`, and `ots_side` and hard-injects them directly into the Mandatory Header block.
+  - Passes explicit `camera_movement` (e.g. "Locked Off (Static)", "Pan Left", etc.) to the LLM system prompt and context block as a hard constraint, strictly forbidding contradictory camera motions (e.g. push-ins or zooms when locked off).
+  - Configured offline fallback generators to strictly respect static/dynamic camera movement directives.
+  - Seamlessly returns the complete prompt assembled via Assembly Line: `Mandatory Header (Scene & Shot Header + Global Subject Definitions + Framing Directive) + LLM Multimodal Description + Mandatory Audio/Music Footer`.
 
 
 

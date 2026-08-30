@@ -100,17 +100,19 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
           planning: planning,
           active_shot: activeShot || undefined,
           shot_type: activeShot ? activeShot.shot_type : planning?.shot_type,
+          camera_movement: activeShot ? activeShot.camera_movement : planning?.camera_movement,
           ots_anchor_subject: activeShot?.ots_anchor_subject || planning?.ots_anchor_subject,
           ots_focus_subject: activeShot?.ots_focus_subject || planning?.ots_focus_subject,
           ots_side: activeShot?.ots_side || planning?.ots_side,
+          shot_number: activeShot ? activeShot.shot_number : planning?.shot_number,
+          scene_name: sceneProject?.scene_name || planning?.scene_name,
           gemini_api_key: geminiApiKey
         })
       });
 
       const data = await res.json();
       if (res.ok && data.expanded_prompt) {
-        const assembled = assembleFinalPrompt(data.expanded_prompt, activeShotPrefix, isSceneRefPresent);
-        onChangeExpandedPrompt(assembled);
+        onChangeExpandedPrompt(data.expanded_prompt);
         if (data.provider) setProviderUsed(data.provider);
         onShowToast?.("Prompt expanded and auto-compiled successfully!", "success");
       } else {

@@ -188,10 +188,29 @@ export async function expandPrompt(
     isSingleSubject
   });
 
-  // 2. Programmatic Footer Construction
+  // 2. Camera Motion & Framing Hard Constraints
+  const effectiveCameraMovement = (
+    active_shot?.camera_movement ||
+    camera_movement ||
+    scene_planning?.camera_movement ||
+    planning?.camera_movement ||
+    ""
+  ).trim();
+
+  const isStatic =
+    effectiveCameraMovement.toLowerCase().includes("locked") ||
+    effectiveCameraMovement.toLowerCase().includes("static");
+
+  const cameraConstraintInstruction = effectiveCameraMovement
+    ? isStatic
+      ? `The camera is strictly LOCKED OFF / STATIC. The camera must remain completely fixed and motionless with ZERO camera motion. You are STRICTLY FORBIDDEN from describing any camera movement (NO push-ins, NO pull-backs, NO zooms, NO pans, NO tilts, and NO tracking).`
+      : `The camera movement is strictly "${effectiveCameraMovement}". Describe camera motion naturally matching ONLY this specified movement (Motion Type + Amplitude + Speed). Contradictory camera movements (such as push-ins or zooms when panning, or moving when static) are STRICTLY FORBIDDEN.`
+    : `Describe camera motion naturally (Motion Type + Amplitude + Speed, e.g., "The camera pushes in with small amplitude at slow speed...").`;
+
+  // 3. Programmatic Footer Construction
   const mandatoryFooter = buildMandatoryFooter();
 
-  // 3. Structured Request to LLM for Integrated Multimodal Description ONLY
+  // 4. Structured Request to LLM for Integrated Multimodal Description ONLY
   const systemPrompt = `You are an expert AI Screenwriter and Prompt Engineer specializing in advanced multimodal video generation frameworks (MiniMax-H3 / Ref2VA pipelines).
 
 Your task is to generate ONLY the integrated_multimodal_description content. Do not generate headers, footers, or subject definitions. Use exact asset tags (<Picture N>, <Video N>) provided in the context.
@@ -200,9 +219,13 @@ Your task is to generate ONLY the integrated_multimodal_description content. Do 
 - Spatial Initialization: Always define the subject's exact spatial position and initial posture at the very beginning (e.g., "[Shot 1] Live-action, cinematic... At the start of the shot, [Subject] is positioned at...").
 - Exact Tags: Differentiate between facial likeness and styling using the exact tags provided (e.g., "<Picture 1>"). Do NOT invent new tags or reference off-screen characters.
 - Framing Directives: When a Framing Directive is provided in context, utilize the specific anchor and focus subject likenesses provided in the Global Subject Definitions to execute this framing.
-- Camera Motion: Describe camera motion naturally (Motion Type + Amplitude + Speed, e.g., "The camera pushes in with small amplitude at slow speed...").
+- Camera Motion Hard Constraint: ${cameraConstraintInstruction}
 - Dialogue: If dialogue is present, format as <d>[Language] Dialogue text</d> with speaker tags like (S1).
 - No Boilerplate: Output ONLY the narrative visual description. Do NOT output "Global Subject Definitions:", "overall_soundscape:", or "non_diegetic_music:".`;
+
+  const cameraContextBlock = effectiveCameraMovement
+    ? `\nCAMERA MOVEMENT DIRECTIVE:\n${isStatic ? "LOCKED OFF (STATIC) - The camera must remain completely stationary. Strictly FORBID any camera push-in, zoom, pan, tilt, or tracking." : `The camera movement is "${effectiveCameraMovement}". Execute ONLY this movement without introducing conflicting motions.`}\n`
+    : "";
 
   const framingContextBlock = resolvedFramingDirective
     ? `\nFRAMING DIRECTIVE:\n${resolvedFramingDirective}\nA Framing Directive is provided; utilize the specific anchor and focus subject likenesses provided in the Global Subject Definitions to execute this framing.\n`
@@ -213,11 +236,11 @@ Your task is to generate ONLY the integrated_multimodal_description content. Do 
 
 SHOT PLANNING CONTEXT:
 ${resolvedPromptPrefix || "Shot 01"}
-${framingContextBlock}
+${cameraContextBlock}${framingContextBlock}
 AVAILABLE MULTIMODAL REFERENCE ASSETS:
 ${subjectDefinitions || "No reference definitions"}
 
-Generate ONLY the integrated_multimodal_description paragraph incorporating the reference tags naturally.`;
+Generate ONLY the integrated_multimodal_description paragraph incorporating the reference tags naturally while strictly adhering to all camera and framing constraints.`;
 
   let rawLlmDescription = "";
   let providerUsed = "Local LM Studio";
@@ -284,9 +307,14 @@ Generate ONLY the integrated_multimodal_description paragraph incorporating the 
   if (!rawLlmDescription) {
     const tagsList = assets.map((_: any, i: number) => `<Picture ${i + 1}>`).slice(0, 3).join(" and ");
     const framingStub = resolvedFramingDirective ? `Framed with ${resolvedFramingDirective.replace(/^Framing:\s*/i, "")} ` : "";
+    const cameraStub = isStatic
+      ? "The camera remains completely locked off and static on a tripod."
+      : effectiveCameraMovement
+      ? `The camera executes a smooth ${effectiveCameraMovement.toLowerCase()} with subtle amplitude at slow speed.`
+      : "The camera pushes in with small amplitude at slow speed.";
     rawLlmDescription = `[Shot 1] Live-action, cinematic 4K sequence capturing ${basic_stub.trim()}. ${framingStub}Featuring ${
       tagsList || "<Picture 1>"
-    } with authentic facial expressions, realistic skin texture, and seamless character identity preservation. The camera pushes in with small amplitude at slow speed.`;
+    } with authentic facial expressions, realistic skin texture, and seamless character identity preservation. ${cameraStub}`;
     providerUsed = "Smart Offline Generator";
   }
 

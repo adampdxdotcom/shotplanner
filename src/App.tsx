@@ -277,9 +277,12 @@ export default function App() {
         gemini_api_key: config.gemini_api_key,
         active_shot: shot,
         shot_type: shot.shot_type,
+        camera_movement: shot.camera_movement,
         ots_anchor_subject: shot.ots_anchor_subject,
         ots_focus_subject: shot.ots_focus_subject,
-        ots_side: shot.ots_side
+        ots_side: shot.ots_side,
+        shot_number: shot.shot_number,
+        scene_name: sceneProject.scene_name
       }),
     });
     const data = await response.json();
