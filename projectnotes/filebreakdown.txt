@@ -109,3 +109,15 @@
   - **Updates:** Refactored the core project save handlers (both in Python and Node modules) to safely separate any pre-existing `.json` file extension from the raw input before performing character sanitization. This fixes edge cases where saving an existing project implicitly generated duplicate mutated files (e.g., `my_projectjson.json` and `my_project.json`). The updated logic strips `.json`, preserves valid characters (alphanumeric, dashes, underscores), and statically appends exactly one `.json` extension, ensuring that existing projects overwrite cleanly without duplication.
 - **`src/App.tsx`**
   - **Updates:** Realigned the frontend state trackers (`handleSaveProject`, `handleLoadProject`) to consume the dynamically sanitized filename explicitly returned by the backend. The UI state hooks (`setCurrentProjectName`) now correctly strip `.json` and sync seamlessly with the physical disk record, avoiding state mismatches across rapid save operations.
+
+## Enriched Project Metadata & List Rendering
+- **`backend/routes/api.py`** & **`server/services/projectService.ts`**
+  - **Updates:** Re-engineered the `list_projects` (Python) and `listProjects` (Node) functions. Instead of a flat list of filenames, the endpoints now calculate and return detailed metadata objects containing `filename`, a cleanly derived `display_name`, `mtime` (ISO formatted last-modified timestamp), and `size` in bytes. The array is pre-sorted on the server by `mtime` descending, placing the most recently updated projects at the top.
+- **`src/components/ProjectModals.tsx`** & **`src/App.tsx`**
+  - **Updates:** Updated the frontend interfaces and data mapping hooks to accept the enriched `ProjectMetadata` payload while retaining backward compatibility. Transformed the `LoadProjectModal` row items to visually display the `display_name` stacked cleanly above a `dateStr • sizeStr` human-readable secondary text row. `App.tsx` scene dropdowns and references map gracefully to the objects extracting just the `filename` as needed.
+
+## Enriched Project Metadata & List Rendering
+- **`backend/routes/api.py`** & **`server/services/projectService.ts`**
+  - **Updates:** Re-engineered the `list_projects` (Python) and `listProjects` (Node) functions. Instead of a flat list of filenames, the endpoints now calculate and return detailed metadata objects containing `filename`, a cleanly derived `display_name`, `mtime` (ISO formatted last-modified timestamp), and `size` in bytes. The array is pre-sorted on the server by `mtime` descending, placing the most recently updated projects at the top.
+- **`src/components/ProjectModals.tsx`** & **`src/App.tsx`**
+  - **Updates:** Updated the frontend interfaces and data mapping hooks to accept the enriched `ProjectMetadata` payload while retaining backward compatibility. Transformed the `LoadProjectModal` row items to visually display the `display_name` stacked cleanly above a `dateStr • sizeStr` human-readable secondary text row. `App.tsx` scene dropdowns and references map gracefully to the objects extracting just the `filename` as needed.

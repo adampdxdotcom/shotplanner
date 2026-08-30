@@ -755,10 +755,25 @@ async def save_project(req: Dict[str, Any]):
 
 @router.get("/projects")
 async def list_projects():
+    import os
+    from datetime import datetime
     if not PROJECTS_DIR.exists():
         return {"projects": []}
-    files = [f.name for f in PROJECTS_DIR.glob("*.json")]
-    return {"projects": files}
+    
+    projects = []
+    for f in PROJECTS_DIR.glob("*.json"):
+        if f.is_file():
+            stat = f.stat()
+            mtime = datetime.fromtimestamp(stat.st_mtime).isoformat() + "Z"
+            projects.append({
+                "filename": f.name,
+                "display_name": f.name[:-5] if f.name.endswith(".json") else f.name,
+                "mtime": mtime,
+                "size": stat.st_size
+            })
+            
+    projects.sort(key=lambda x: x["mtime"], reverse=True)
+    return {"projects": projects}
 
 @router.get("/projects/{filename}")
 async def get_project(filename: str):

@@ -147,7 +147,7 @@ export default function App() {
       .then(res => res.json())
       .then(data => {
         if (data.projects) {
-          setAvailableScenes(data.projects.filter((p: string) => p.startsWith("scene_")));
+          setAvailableScenes(data.projects.map((p: any) => typeof p === 'string' ? p : p.filename).filter((p: string) => p.startsWith("scene_")));
         }
       })
       .catch(e => console.error("Failed to load scene list", e));
@@ -563,7 +563,7 @@ export default function App() {
       const listRes = await fetch("/api/projects");
       const listData = await listRes.json();
       if (listData.projects) {
-        setAvailableScenes(listData.projects.filter((p: string) => p.startsWith("scene_")));
+        setAvailableScenes(listData.projects.map((p: any) => typeof p === 'string' ? p : p.filename).filter((p: string) => p.startsWith("scene_")));
       }
       
       addToast(`New scene "${sceneName}" created and auto-saved successfully!`, "success");
