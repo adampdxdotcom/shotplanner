@@ -254,6 +254,8 @@ export default function SceneProjectHub({
         >
           {project.shots.map((shot, idx) => {
             const thumbnailUrl = getShotThumbnailUrl(shot);
+            const sceneName = (shot.shot_name && shot.shot_name.trim()) || (project.scene_name && project.scene_name.trim()) || "Scene";
+            const shotNumberDisplay = shot.shot_number.toString().padStart(2, "0");
             
             return (
               <div
@@ -277,9 +279,12 @@ export default function SceneProjectHub({
                 )}
                 
                 {/* Badges */}
-                <div className="absolute top-2 left-2 flex flex-col gap-1 z-10">
-                  <span className="px-2 py-0.5 bg-black/80 backdrop-blur text-white text-xs font-semibold rounded shadow">
-                    Shot {shot.shot_number.toString().padStart(2, "0")}
+                <div className="absolute top-2 left-2 flex flex-col items-start gap-1 z-10 max-w-[calc(100%-4rem)]">
+                  <span 
+                    className="px-2 py-0.5 bg-black/80 backdrop-blur text-white text-xs font-semibold rounded shadow truncate max-w-full"
+                    title={`Shot ${shotNumberDisplay} - ${sceneName}`}
+                  >
+                    Shot {shotNumberDisplay} - {sceneName}
                   </span>
                   <span className={`px-2 py-0.5 text-[10px] font-bold rounded shadow uppercase tracking-wider ${shot.staged ? "bg-emerald-500/90 text-white" : "bg-orange-500/90 text-white"}`}>
                     {shot.staged ? "✓ Staged" : "Unstaged"}

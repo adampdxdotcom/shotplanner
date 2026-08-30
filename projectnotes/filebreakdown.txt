@@ -221,4 +221,7 @@
   - Verified that `handleFileSelect` and `handleAssignExistingAsset` strictly mutate ONLY key `globalSlot` in `activeShot.assigned_slots`, leaving all other slot keys completely intact.
 - **`src/components/SceneProjectHub.tsx`**
   - Aligned slot filename lookups to strictly check `assigned_slots[slotIndex] || assigned_slots[String(slotIndex)]` without fuzzy offset fallbacks.
+  - Updated shot card badge header in the Scene Project Hub carousel to dynamically render `"Shot Number - Scene Name"` (e.g. `"Shot 01 - Scene 1"` or `"Shot 01 - Hero Close-up"`).
+  - Ensured that drag-and-drop reordering seamlessly updates shot numbers and maintains 1-to-1 sync across the shot carousel.
+
 
