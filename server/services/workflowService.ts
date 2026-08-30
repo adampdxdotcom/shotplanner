@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { WORKFLOWS_DIR } from "../config/constants";
+import { WORKFLOWS_DIR, formatSceneFolderName } from "../config/constants";
 import { ParsedWorkflowData, WorkflowNodeInfo } from "../types";
 import { assembleFinalPrompt, hasSceneReferencePhoto } from "../utils/formatters";
 import { assetService } from "./assetService";
@@ -394,26 +394,73 @@ export function injectAndPrepareWorkflowData(
   return modifiedWf;
 }
 
-export function listWorkflows() {
-  const files = fs.readdirSync(WORKFLOWS_DIR).filter((f) => f.endsWith(".json"));
-  const workflowItems = files.map((f) => {
-    try {
-      const content = JSON.parse(fs.readFileSync(path.join(WORKFLOWS_DIR, f), "utf-8"));
-      const parsed = parseWorkflowData(content);
-      return {
-        filename: f,
-        path: `/assets/workflows/${f}`,
-        node_count: parsed.totalNodes,
-        title: f.replace(/\.json$/, "").replace(/[_-]/g, " ")
-      };
-    } catch {
-      return {
-        filename: f,
-        path: `/assets/workflows/${f}`,
-        node_count: 0,
-        title: f.replace(/\.json$/, "")
-      };
+export function listWorkflows(sceneName?: string) {
+  if (!fs.existsSync(WORKFLOWS_DIR)) return { workflows: [], workflow_items: [] };
+
+  const workflowMap = new Map<string, { filename: string; path: string; node_count: number; title: string }>();
+
+  // 1. Check scene-specific workflows folder if specified or default
+  const sceneFolders = sceneName
+    ? [formatSceneFolderName(sceneName)]
+    : fs
+        .readdirSync(WORKFLOWS_DIR, { withFileTypes: true })
+        .filter((d) => d.isDirectory())
+        .map((d) => d.name);
+
+  sceneFolders.forEach((folder) => {
+    const sceneWfDir = path.join(WORKFLOWS_DIR, folder);
+    if (fs.existsSync(sceneWfDir)) {
+      const files = fs.readdirSync(sceneWfDir).filter((f) => f.endsWith(".json"));
+      files.forEach((f) => {
+        try {
+          const content = JSON.parse(fs.readFileSync(path.join(sceneWfDir, f), "utf-8"));
+          const parsed = parseWorkflowData(content);
+          workflowMap.set(f, {
+            filename: f,
+            path: `/assets/workflows/${folder}/${f}`,
+            node_count: parsed.totalNodes,
+            title: `[${folder}] ${f.replace(/\.json$/, "").replace(/[_-]/g, " ")}`
+          });
+        } catch {
+          workflowMap.set(f, {
+            filename: f,
+            path: `/assets/workflows/${folder}/${f}`,
+            node_count: 0,
+            title: `[${folder}] ${f.replace(/\.json$/, "")}`
+          });
+        }
+      });
     }
   });
+
+  // 2. Also check root workflows directory
+  const rootFiles = fs.readdirSync(WORKFLOWS_DIR, { withFileTypes: true })
+    .filter((d) => d.isFile() && d.name.endsWith(".json"))
+    .map((d) => d.name);
+
+  rootFiles.forEach((f) => {
+    if (!workflowMap.has(f)) {
+      try {
+        const content = JSON.parse(fs.readFileSync(path.join(WORKFLOWS_DIR, f), "utf-8"));
+        const parsed = parseWorkflowData(content);
+        workflowMap.set(f, {
+          filename: f,
+          path: `/assets/workflows/${f}`,
+          node_count: parsed.totalNodes,
+          title: f.replace(/\.json$/, "").replace(/[_-]/g, " ")
+        });
+      } catch {
+        workflowMap.set(f, {
+          filename: f,
+          path: `/assets/workflows/${f}`,
+          node_count: 0,
+          title: f.replace(/\.json$/, "")
+        });
+      }
+    }
+  });
+
+  const workflowItems = Array.from(workflowMap.values());
+  const files = workflowItems.map((item) => item.filename);
   return { workflows: files, workflow_items: workflowItems };
 }

@@ -155,10 +155,11 @@ async def upload_workflow(file: UploadFile = File(...)):
 async def parse_workflow(payload: Dict[str, str]):
     """Parse workflow JSON to identify prompt nodes and media loader nodes."""
     filename = payload.get("filename")
+    scene_name = payload.get("scene_name")
     if not filename:
         raise HTTPException(status_code=400, detail="Filename is required")
     
-    data = load_workflow_json(filename)
+    data = load_workflow_json(filename, scene_name=scene_name)
     nodes_info = inspect_workflow_nodes(data)
     return {
         "filename": filename,
@@ -172,15 +173,17 @@ async def upload_asset(
     media_type: str = Form("image"), # image, audio, video
     asset_type: str = Form("headshot"), # headshot, body_ref, scene_ref, object_ref, etc.
     subject_name: str = Form("jackie"),
-    description: str = Form("")
+    description: str = Form(""),
+    scene_name: str = Form("scene01")
 ):
     """
     Upload and rename asset according to format:
     {type}_{name}_{timestamp}.ext
+    Saved to assets/images/{sceneXX}/ or assets/videos/{sceneXX}/
     """
     content = await file.read()
     target_filename = generate_target_filename(asset_type, subject_name, file.filename or "media")
-    saved_path = await save_uploaded_file(content, target_filename)
+    saved_path = await save_uploaded_file(content, target_filename, scene_name=scene_name, media_type=media_type)
 
     asset_record = {
         "id": target_filename,
@@ -191,6 +194,7 @@ async def upload_asset(
         "subject_name": subject_name,
         "description": description,
         "size_bytes": len(content),
+        "scene_name": scene_name,
         "path": str(saved_path)
     }
 
@@ -410,8 +414,17 @@ async def stage_scene_endpoint(req: StageSceneRequest):
                 candidate_paths = [
                     UPLOADS_DIR / clean_name,
                     ASSETS_DIR / "uploads" / clean_name,
+                    ASSETS_DIR / "images" / clean_name,
+                    ASSETS_DIR / "videos" / clean_name,
+                    ASSETS_DIR / "audios" / clean_name,
                     ASSETS_DIR / clean_name,
                 ]
+                for sub_type in ["images", "videos", "audios", "uploads", "workflows"]:
+                    sub_base = ASSETS_DIR / sub_type
+                    if sub_base.exists():
+                        for scene_dir in sub_base.iterdir():
+                            if scene_dir.is_dir():
+                                candidate_paths.append(scene_dir / clean_name)
                 found_path = next((p for p in candidate_paths if p.exists() and p.is_file()), None)
                 if found_path:
                     files_to_transfer.append(found_path)

@@ -93,6 +93,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
     setUploadError(null);
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("scene_name", sceneProject.scene_name || "scene01");
 
     try {
       const res = await fetch("/api/workflows/upload", {

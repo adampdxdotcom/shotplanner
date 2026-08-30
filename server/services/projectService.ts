@@ -86,11 +86,49 @@ export async function exportProjectZip(projectName: string, res: Response): Prom
   // 1. Add project json
   archive.file(filePath, { name: jsonFileName });
 
+  // Helper to locate asset across scene folders and uploads
+  const findAssetFile = (filename: string): string | null => {
+    const candidateDirs = [
+      UPLOADS_DIR,
+      path.join(process.cwd(), "assets", "images"),
+      path.join(process.cwd(), "assets", "videos"),
+      path.join(process.cwd(), "assets", "audios")
+    ];
+    // Check scene subdirectories
+    for (const base of candidateDirs) {
+      if (fs.existsSync(base)) {
+        const direct = path.join(base, filename);
+        if (fs.existsSync(direct)) return direct;
+        try {
+          const subdirs = fs.readdirSync(base, { withFileTypes: true }).filter(d => d.isDirectory());
+          for (const s of subdirs) {
+            const subFile = path.join(base, s.name, filename);
+            if (fs.existsSync(subFile)) return subFile;
+          }
+        } catch {}
+      }
+    }
+    return null;
+  };
+
   // 2. Add workflow if selected
   if (projectData.selectedWorkflowFile) {
-    const wfPath = path.join(WORKFLOWS_DIR, projectData.selectedWorkflowFile);
-    if (fs.existsSync(wfPath)) {
-      archive.file(wfPath, { name: `workflows/${projectData.selectedWorkflowFile}` });
+    const cleanWf = path.basename(projectData.selectedWorkflowFile);
+    let wfFound = path.join(WORKFLOWS_DIR, cleanWf);
+    if (!fs.existsSync(wfFound)) {
+      try {
+        const subdirs = fs.readdirSync(WORKFLOWS_DIR, { withFileTypes: true }).filter(d => d.isDirectory());
+        for (const s of subdirs) {
+          const cand = path.join(WORKFLOWS_DIR, s.name, cleanWf);
+          if (fs.existsSync(cand)) {
+            wfFound = cand;
+            break;
+          }
+        }
+      } catch {}
+    }
+    if (fs.existsSync(wfFound)) {
+      archive.file(wfFound, { name: `workflows/${cleanWf}` });
     }
   }
 
@@ -98,29 +136,26 @@ export async function exportProjectZip(projectName: string, res: Response): Prom
   const addedFiles = new Set<string>();
   const rawDb = assetService.getRawDatabase();
 
+  const collectAsset = (filename?: string) => {
+    if (!filename || typeof filename !== "string" || addedFiles.has(filename)) return;
+    const foundPath = findAssetFile(filename);
+    if (foundPath && fs.existsSync(foundPath)) {
+      archive.file(foundPath, { name: `uploads/${filename}` });
+      addedFiles.add(filename);
+    }
+  };
+
   if (Array.isArray(projectData.assets)) {
     for (const asset of projectData.assets) {
-      if (asset && asset.filename && !addedFiles.has(asset.filename)) {
-        const assetPath = path.join(UPLOADS_DIR, asset.filename);
-        if (fs.existsSync(assetPath)) {
-          archive.file(assetPath, { name: `uploads/${asset.filename}` });
-          addedFiles.add(asset.filename);
-        }
-      }
+      if (asset?.filename) collectAsset(asset.filename);
     }
   }
 
   if (Array.isArray(projectData.shots)) {
     for (const shot of projectData.shots) {
-      if (shot && shot.assigned_slots && typeof shot.assigned_slots === "object") {
+      if (shot?.assigned_slots && typeof shot.assigned_slots === "object") {
         for (const slotFn of Object.values(shot.assigned_slots)) {
-          if (slotFn && typeof slotFn === "string" && !addedFiles.has(slotFn)) {
-            const assetPath = path.join(UPLOADS_DIR, slotFn);
-            if (fs.existsSync(assetPath)) {
-              archive.file(assetPath, { name: `uploads/${slotFn}` });
-              addedFiles.add(slotFn);
-            }
-          }
+          if (typeof slotFn === "string") collectAsset(slotFn);
         }
       }
     }
@@ -128,25 +163,13 @@ export async function exportProjectZip(projectName: string, res: Response): Prom
 
   if (Array.isArray(projectData.shared_assets)) {
     for (const sa of projectData.shared_assets) {
-      if (sa && sa.filename && !addedFiles.has(sa.filename)) {
-        const assetPath = path.join(UPLOADS_DIR, sa.filename);
-        if (fs.existsSync(assetPath)) {
-          archive.file(assetPath, { name: `uploads/${sa.filename}` });
-          addedFiles.add(sa.filename);
-        }
-      }
+      if (sa?.filename) collectAsset(sa.filename);
     }
   }
 
   if (projectData.nodeMappings) {
     for (const assetFile of Object.values(projectData.nodeMappings)) {
-      if (assetFile && typeof assetFile === "string" && !addedFiles.has(assetFile)) {
-        const assetPath = path.join(UPLOADS_DIR, assetFile);
-        if (fs.existsSync(assetPath)) {
-          archive.file(assetPath, { name: `uploads/${assetFile}` });
-          addedFiles.add(assetFile);
-        }
-      }
+      if (typeof assetFile === "string") collectAsset(assetFile);
     }
   }
 
