@@ -525,7 +525,7 @@ export const GallerySection: React.FC<GallerySectionProps> = ({
             const isImage = asset.media_type === "image" || (!asset.media_type && !/\.(mp3|wav|ogg|m4a|flac|mp4|mov|webm|mkv)$/i.test(asset.filename));
             const isAudio = asset.media_type === "audio" || /\.(mp3|wav|ogg|m4a|flac)$/i.test(asset.filename);
             const isVideo = asset.media_type === "video" || /\.(mp4|mov|webm|mkv)$/i.test(asset.filename);
-            const mediaUrl = getAssetMediaUrl(asset.filename);
+            const mediaUrl = getAssetMediaUrl(asset.filename, true);
 
             return (
               <div 
@@ -659,7 +659,7 @@ export const GallerySection: React.FC<GallerySectionProps> = ({
               {sortedAssets.map(asset => {
                 const isImage = asset.media_type === "image" || (!asset.media_type && !/\.(mp3|wav|ogg|m4a|flac|mp4|mov|webm|mkv)$/i.test(asset.filename));
                 const isAudio = asset.media_type === "audio" || /\.(mp3|wav|ogg|m4a|flac)$/i.test(asset.filename);
-                const mediaUrl = getAssetMediaUrl(asset.filename);
+                const mediaUrl = getAssetMediaUrl(asset.filename, true);
 
                 return (
                   <tr key={asset.filename} className="hover:bg-zinc-800/40 transition-colors">

@@ -198,11 +198,11 @@ export async function exportProjectZip(projectName: string, res: Response): Prom
   // 1. Add Master Project JSON at root
   archive.append(JSON.stringify(projectData, null, 2), { name: `${rawName}.json` });
 
-  // Helper to locate asset across scene folders and uploads
+  // Helper to locate asset across scene folders and uploads (excluding thumbnails)
   const findAssetFile = (filename: string): string | null => {
     if (!filename) return null;
     const cleanFn = path.basename(filename.trim());
-    if (!cleanFn) return null;
+    if (!cleanFn || cleanFn === "thumbnails" || cleanFn === ".DS_Store") return null;
     const candidateDirs = [
       UPLOADS_DIR,
       path.join(process.cwd(), "assets", "images"),
@@ -214,7 +214,7 @@ export async function exportProjectZip(projectName: string, res: Response): Prom
         const direct = path.join(base, cleanFn);
         if (fs.existsSync(direct)) return direct;
         try {
-          const subdirs = fs.readdirSync(base, { withFileTypes: true }).filter(d => d.isDirectory());
+          const subdirs = fs.readdirSync(base, { withFileTypes: true }).filter(d => d.isDirectory() && d.name !== "thumbnails");
           for (const s of subdirs) {
             const subFile = path.join(base, s.name, cleanFn);
             if (fs.existsSync(subFile)) return subFile;
@@ -289,9 +289,9 @@ export async function exportProjectZip(projectName: string, res: Response): Prom
   const collectAsset = (filename?: string) => {
     if (!filename || typeof filename !== "string") return;
     const cleanFn = path.basename(filename.trim());
-    if (!cleanFn || addedFiles.has(cleanFn)) return;
+    if (!cleanFn || addedFiles.has(cleanFn) || cleanFn === "thumbnails" || cleanFn === ".DS_Store") return;
     const foundPath = findAssetFile(cleanFn);
-    if (foundPath && fs.existsSync(foundPath)) {
+    if (foundPath && fs.existsSync(foundPath) && !foundPath.includes(`${path.sep}thumbnails${path.sep}`)) {
       archive.file(foundPath, { name: `uploads/${cleanFn}` });
       addedFiles.add(cleanFn);
     }

@@ -6,6 +6,11 @@ import aiofiles
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 
+try:
+    from PIL import Image
+except ImportError:
+    Image = None
+
 # Re-anchor base asset directory to resolve strictly to the container project root assets mount
 # Fallback to current working directory (e.g. for AI studio preview environment)
 BASE_DIR = Path("/app") if Path("/app/backend").exists() or Path("/app/assets").exists() else Path.cwd()
@@ -128,6 +133,41 @@ def generate_target_filename(asset_type: str, subject_name: str, original_filena
         
     return f"{clean_type}_{clean_name}_{timestamp}{ext}"
 
+def generate_thumbnail(image_path: Path, max_size: int = 384) -> Optional[Path]:
+    """Generates a lightweight, optimized thumbnail for the given image preserving aspect ratio."""
+    if not Image or not image_path.exists():
+        return None
+    try:
+        thumb_dir = image_path.parent / "thumbnails"
+        thumb_dir.mkdir(parents=True, exist_ok=True)
+        thumb_path = thumb_dir / image_path.name
+        
+        if thumb_path.exists():
+            return thumb_path
+            
+        with Image.open(image_path) as img:
+            # Preserve aspect ratio while fitting within max_size x max_size box
+            img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+            
+            ext = thumb_path.suffix.lower()
+            if ext in ('.jpg', '.jpeg'):
+                if img.mode != 'RGB':
+                    img = img.convert('RGB')
+                img.save(thumb_path, format='JPEG', optimize=True, quality=85)
+            elif ext == '.png':
+                if img.mode not in ('RGBA', 'RGB', 'L'):
+                    img = img.convert('RGBA')
+                img.save(thumb_path, format='PNG', optimize=True)
+            elif ext == '.webp':
+                img.save(thumb_path, format='WEBP', quality=85)
+            else:
+                img.save(thumb_path, optimize=True)
+                
+            return thumb_path
+    except Exception as e:
+        print(f"Error generating thumbnail for {image_path}: {e}")
+        return None
+
 async def save_uploaded_file(file_bytes: bytes, target_filename: str, scene_name: Optional[str] = "scene01", media_type: str = "image") -> Path:
     """Save uploaded media file into the scene-specific directory."""
     scene_dirs = get_scene_directories(scene_name)
@@ -142,6 +182,9 @@ async def save_uploaded_file(file_bytes: bytes, target_filename: str, scene_name
     destination = target_dir / target_filename
     async with aiofiles.open(destination, "wb") as f:
         await f.write(file_bytes)
+        
+    if media_type == "image" or target_filename.lower().endswith(('.png', '.jpg', '.jpeg', '.webp', '.bmp', '.gif')):
+        generate_thumbnail(destination)
     
     # Also write into legacy uploads for flat fallback
     flat_dest = LEGACY_UPLOADS_DIR / target_filename
@@ -228,14 +271,23 @@ def load_workflow_json(filename: str, scene_name: Optional[str] = None) -> Dict[
                 
     raise FileNotFoundError(f"Workflow file '{filename}' not found in any workflow directory.")
 
-def find_asset_file_path(filename: str) -> Optional[Path]:
-    """Finds an asset file path checking recursively across the entire assets directory."""
+def find_asset_file_path(filename: str, include_thumbnails: bool = False) -> Optional[Path]:
+    """Finds an asset file path checking recursively across the entire assets directory, prioritizing full-resolution media."""
     clean_name = os.path.basename(filename)
+    if not clean_name:
+        return None
     if ASSETS_DIR.exists():
-        # Recursive search across all directories and subdirectories under the base assets directory
+        # First pass: look for non-thumbnail files
         for path in ASSETS_DIR.rglob(clean_name):
             if path.is_file():
+                if "thumbnails" in path.parts:
+                    continue
                 return path
+        # Fallback to thumbnail only if explicitly permitted
+        if include_thumbnails:
+            for path in ASSETS_DIR.rglob(clean_name):
+                if path.is_file():
+                    return path
     return None
 
 async def save_workflow_json(filename: str, content: Dict[str, Any], scene_name: Optional[str] = "scene01") -> str:

@@ -121,12 +121,12 @@ export default function SceneProjectHub({
        // Look up the full asset by filename
        const matchedAsset = assets.find(a => a.filename === shotFilenameOverride || (a as any).name === shotFilenameOverride);
        if (matchedAsset) {
-           return { ...matchedAsset, preview_url: getAssetMediaUrl(matchedAsset) };
+           return { ...matchedAsset, preview_url: getAssetMediaUrl(matchedAsset, true) };
        }
        // Fallback for missing asset metadata but assigned filename
        return {
          filename: shotFilenameOverride,
-         preview_url: getAssetMediaUrl(shotFilenameOverride),
+         preview_url: getAssetMediaUrl(shotFilenameOverride, true),
          label: `Slot ${slotIndex + 1}`
        } as any;
     }
@@ -164,7 +164,7 @@ export default function SceneProjectHub({
 
       // 5. Removed fallback to random project images so empty shots look empty
 
-      return getAssetMediaUrl(filename);
+      return getAssetMediaUrl(filename, true);
   };
 
   const handleClearSlot = (slotIndex: number) => {

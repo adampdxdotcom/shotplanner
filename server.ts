@@ -2,7 +2,7 @@ import express, { Request, Response } from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { ASSETS_DIR, LEGACY_UPLOADS_DIR, initDirectories } from "./server/config/constants";
-import assetRoutes, { serveAssetFile } from "./server/routes/assetRoutes";
+import assetRoutes, { serveAssetFile, serveThumbnailFile } from "./server/routes/assetRoutes";
 import executionRoutes from "./server/routes/executionRoutes";
 import projectRoutes from "./server/routes/projectRoutes";
 import promptRoutes from "./server/routes/promptRoutes";
@@ -44,6 +44,14 @@ app.use("/api", executionRoutes);
 app.post("/api/assets/sync_remote", handleAssetTransfer);
 app.post("/api/workflow/stage", handleAssetTransfer);
 app.post("/api/workflow/stage-scene", handleSceneTransferController);
+
+// Direct thumbnail serving fallback routes
+app.get([
+  "/api/uploads/thumb/:filename",
+  "/uploads/thumb/:filename",
+  "/api/assets/thumb/:filename",
+  "/assets/thumb/:filename"
+], serveThumbnailFile);
 
 // Direct file serving fallback routes
 app.get([

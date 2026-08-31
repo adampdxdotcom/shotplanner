@@ -195,7 +195,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
     const isImage = asset.media_type === "image" || (!asset.media_type && !/\.(mp3|wav|ogg|m4a|mp4|mov|webm)$/i.test(asset.filename)) || /\.(png|jpe?g|webp|gif|svg|avif|bmp)$/i.test(asset.filename);
     const isAudio = asset.media_type === "audio" || /\.(mp3|wav|ogg|m4a|flac)$/i.test(asset.filename);
     const isVideo = asset.media_type === "video" || /\.(mp4|mov|webm|mkv)$/i.test(asset.filename);
-    const imageSrc = getAssetMediaUrl(asset);
+    const imageSrc = getAssetMediaUrl(asset, true);
 
     return (
       <div 
@@ -1200,9 +1200,9 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
                                     className={`relative aspect-square rounded-lg border-2 cursor-pointer overflow-hidden transition-all group ${selectedLibraryAsset?.filename === asset.filename ? "border-amber-500 ring-2 ring-amber-500/20" : "border-zinc-800 hover:border-zinc-600"}`}
                                   >
                                     {uploadModalSlot?.type === "image" ? (
-                                      <img src={getAssetMediaUrl(asset)} className="absolute inset-0 w-full h-full object-cover" alt="" />
+                                      <img src={getAssetMediaUrl(asset, true)} className="absolute inset-0 w-full h-full object-cover" alt="" />
                                     ) : uploadModalSlot?.type === "video" ? (
-                                      <video src={getAssetMediaUrl(asset)} className="absolute inset-0 w-full h-full object-cover" />
+                                      <video src={getAssetMediaUrl(asset, true)} className="absolute inset-0 w-full h-full object-cover" />
                                     ) : (
                                       <div className="absolute inset-0 bg-zinc-800 flex items-center justify-center">
                                         <Music className="w-8 h-8 text-zinc-500" />
@@ -1323,7 +1323,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
                     {(editingAsset.media_type === "image" || !editingAsset.media_type || /\.(png|jpe?g|webp|gif|svg|avif|bmp)$/i.test(editingAsset.filename)) ? (
                       <div className="relative w-full h-44 bg-zinc-950/80 flex items-center justify-center overflow-hidden">
                         <img
-                          src={getAssetMediaUrl(editingAsset)}
+                          src={getAssetMediaUrl(editingAsset, true)}
                           alt={editingAsset.subject_name}
                           className="w-full h-full object-contain"
                         />
@@ -1341,7 +1341,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
                       <div className="relative w-full h-44 bg-zinc-950/80 flex items-center justify-center overflow-hidden">
                         <video 
                           controls
-                          src={getAssetMediaUrl(editingAsset)}
+                          src={getAssetMediaUrl(editingAsset, true)}
                           className="w-full h-full object-contain"
                         />
                       </div>

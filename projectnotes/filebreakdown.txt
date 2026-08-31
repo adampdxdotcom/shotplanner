@@ -343,3 +343,41 @@
   - Enhanced the Shot Context dropdown to display each shot's number, title, and assigned workflow (`[Custom Workflow]` vs `[Scene Default]`), with active badge indicators.
   - Seamlessly updates and persists that specific shot's `workflow_file`, prompt node ID, node mappings, generation parameters, and parameter node mappings in project state across saves and project switches.
 
+## Automated Lightweight Thumbnail Generation, Dedicated Serving & ZIP Export Exclusion
+- **`backend/utils/file_handlers.py`**
+  - Implemented `generate_thumbnail(image_path: Path, max_size: int = 384) -> Optional[Path]` using Pillow (PIL) with `Image.Resampling.LANCZOS` and format-aware optimizations (JPEG 85% quality with RGB conversion, PNG optimization, WebP quality). Thumbnails are stored in dedicated `thumbnails/` subdirectories under each scene's media folders (e.g. `assets/{scene_name}/{media_type}/thumbnails/{filename}`).
+  - Updated `save_uploaded_file` to automatically trigger companion thumbnail creation upon single-file upload completion.
+  - Hardened `find_asset_file_path(filename, include_thumbnails=False)` to prioritize full-resolution assets and filter out `thumbnails/` subdirectories during asset resolution.
+- **`backend/routes/api.py`**
+  - Integrated automatic thumbnail generation into chunked upload assembly (`upload_chunk`).
+  - Added dedicated thumbnail serving endpoints (`GET /api/uploads/thumb/{filename}` and `GET /api/assets/thumb/{filename}`) that return cached thumbnails with long-term browser cache headers (`Cache-Control: public, max-age=31536000`) or generate thumbnails on-demand if missing.
+  - Updated `delete_asset_endpoint` to clean up companion thumbnail files when assets are deleted.
+  - Explicitly excluded `thumbnails/` subdirectories and thumbnail files from project ZIP exports (`/api/projects/{filename}/export`), ensuring only full-resolution media is bundled.
+- **`server/routes/assetRoutes.ts` & `server.ts` & `server/services/projectService.ts`**
+  - Added `serveThumbnailFile` fallback handler for Express backend serving `/api/uploads/thumb/:filename` and `/uploads/thumb/:filename`.
+  - Updated `findAssetFile` and `collectAsset` in `server/services/projectService.ts` to exclude `thumbnails` subdirectories during project archive generation.
+- **`src/utils/assetUrl.ts`**
+  - Updated `getAssetMediaUrl(assetOrFilename, useThumbnail = false)` to route to `/api/uploads/thumb/{filename}` when `useThumbnail: true` is requested.
+- **`src/components/AssetManagerSection.tsx`, `src/components/GallerySection.tsx`, `src/components/SceneProjectHub.tsx`, & `src/components/WorkflowSection.tsx`**
+  - Configured media grid cards, slot previews, node mapping icons, and list views to request lightweight thumbnails (`useThumbnail: true`), dramatically reducing network bandwidth and rendering overhead while preserving crisp full-resolution media in the full-screen Lightbox viewer.
+
+## Python FastAPI Modular Architecture & Service Decoupling
+- **`backend/services/workflow_service.py`**
+  - Encapsulated ComfyUI graph parsing, parameter and media slot detection (`inspect_workflow_nodes`), dynamic parameter and prompt injection (`inject_and_prepare_workflow`), and centralized shot workflow synthesis (`build_shot_workflow`).
+  - `build_shot_workflow(project_data, shot, scene_name)` resolves all numeric and string-keyed media slots (image slots 0-8, audio 9-10, video 11, and shared assets fallback), prompt node IDs, expanded prompts, and generation parameter overrides, generating ready-to-run workflows for individual shots.
+- **`backend/services/project_service.py`**
+  - Encapsulated project persistence, scene directory resolution, multi-workflow production bundle ZIP packaging (`export_project_zip_buffer` invoking `build_shot_workflow` for every shot), and multi-pass project ZIP archive decompression/routing (`extract_project_zip_buffer`).
+- **`backend/services/asset_service.py`**
+  - Encapsulated single and multi-chunk media upload processing (`handle_chunk_upload`), MIME resolution and response caching, on-demand and cached thumbnail delivery (`get_thumbnail_file_response`), and companion thumbnail deletion.
+- **`backend/services/execution_service.py`**
+  - Encapsulated RunPod SSH/SFTP staging pipelines (`stage_scene_pipeline`), decoupled asset syncing (`transfer_assets_to_remote`), ComfyUI `/prompt` HTTP dispatching with bypass logic, and modern Ed25519 SSH keypair generation.
+- **`backend/routes/` Domain Sub-Routers**
+  - **`workflow_routes.py`**: Handles workflow scanning (`GET /api/workflows`), upload (`POST /api/workflows/upload`), JSON AST slot parsing (`POST /api/workflows/parse`), and workflow staging (`POST /api/workflow/stage`).
+  - **`asset_routes.py`**: Handles asset listing (`GET /api/assets`), single/chunked uploads (`POST /api/assets/upload`, `POST /api/assets/upload_chunk`), remote asset synchronization, asset/thumbnail serving (`GET /api/uploads/{filename}`, `GET /api/uploads/thumb/{filename}`), metadata updates, and deletion.
+  - **`project_routes.py`**: Handles project CRUD (`GET /api/projects`, `POST /api/projects`, `GET /api/projects/{filename}`, `DELETE /api/projects/{filename}`), production bundle ZIP export (`GET /api/projects/{filename}/export`), and two-pass ZIP import (`POST /api/projects/import`).
+  - **`prompt_routes.py`**: Handles multimodal prompt expansion via LM Studio/Gemini (`POST /api/generate-prompt`, `POST /api/generate`, `POST /api/llm/expand`) and Gemini API key configuration (`GET`/`POST /api/settings/gemini`).
+  - **`execution_routes.py`**: Handles SSH connectivity tests (`POST /api/ssh/test`), remote asset staging (`POST /api/assets/sync_remote`), scene/shot staging, full workflow dispatch (`POST /api/execute`), and SSH keypair creation (`POST /api/ssh/generate_keypair`).
+- **`backend/routes/__init__.py` & `backend/routes/api.py`**
+  - Assembles all domain sub-routers under the consolidated `APIRouter(prefix="/api")` while maintaining 100% backwards compatibility for legacy imports.
+
+

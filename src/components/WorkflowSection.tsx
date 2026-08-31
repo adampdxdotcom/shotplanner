@@ -718,7 +718,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
                       <ArrowRight className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
                       {mappedAsset && (
                         <img 
-                          src={getAssetMediaUrl(mappedAsset)} 
+                          src={getAssetMediaUrl(mappedAsset, true)} 
                           alt={mappedAsset.subject_name} 
                           className="w-7 h-7 rounded object-cover border border-zinc-700 shrink-0" 
                         />

@@ -31,7 +31,31 @@ export function serveAssetFile(req: Request, res: Response) {
   }
 }
 
+// Dedicated thumbnail serving route with caching and fallback
+export function serveThumbnailFile(req: Request, res: Response) {
+  try {
+    const rawFilename = req.params.filename;
+    if (!rawFilename) return res.status(400).send("Filename is required");
+
+    const foundPath = assetService.getAssetFilePath(rawFilename);
+
+    if (foundPath && fs.existsSync(foundPath)) {
+      const parentDir = path.dirname(foundPath);
+      const thumbPath = path.join(parentDir, "thumbnails", path.basename(foundPath));
+      
+      const fileToServe = fs.existsSync(thumbPath) ? thumbPath : foundPath;
+      res.setHeader("Cache-Control", "public, max-age=31536000");
+      return res.sendFile(fileToServe);
+    }
+
+    res.status(404).json({ error: `Asset '${rawFilename}' not found` });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+}
+
 router.get("/file/:filename", serveAssetFile);
+router.get("/thumb/:filename", serveThumbnailFile);
 
 // Delete an asset
 router.delete("/:filename", (req: Request, res: Response) => {
