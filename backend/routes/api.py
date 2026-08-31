@@ -1193,10 +1193,9 @@ async def export_project_zip(filename: str):
                 expanded_prompt=effective_prompt,
                 node_mappings=effective_mappings,
                 bypass_missing=bool(bypass_missing),
-                placeholder="empty.png",
+                safe_placeholder="empty.png",
                 parameter_overrides=effective_params,
                 parameter_node_mappings=effective_param_nodes,
-                prompt_prefix=prompt_prefix,
                 save_video_prefix=save_video_prefix
             )
 

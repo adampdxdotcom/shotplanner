@@ -202,6 +202,7 @@ def inject_and_prepare_workflow(
     safe_placeholder: str = "empty.png",
     parameter_overrides: Optional[Dict[str, Any]] = None,
     parameter_node_mappings: Optional[Dict[str, str]] = None,
+    prompt_prefix: str = "",
     save_video_prefix: Optional[str] = None
 ) -> Dict[str, Any]:
     """
@@ -233,13 +234,14 @@ def inject_and_prepare_workflow(
             # Update Prompt Node
             if (prompt_node_id and node_id_str == str(prompt_node_id)) or (not prompt_node_id and (class_type in ["PrimitiveStringMultiline", "CLIPTextEncode", "StringLiteral", "ShowText"] or "prompt" in title.lower())):
                 if expanded_prompt:
+                    final_prompt = f"{prompt_prefix}\n\n{expanded_prompt}" if prompt_prefix else expanded_prompt
                     if isinstance(node.get("widgets_values"), list) and len(node["widgets_values"]) > 0:
-                        node["widgets_values"][0] = expanded_prompt
+                        node["widgets_values"][0] = final_prompt
                     else:
-                        node["widgets_values"] = [expanded_prompt]
+                        node["widgets_values"] = [final_prompt]
                     if "widgets_values_named" in node and isinstance(node["widgets_values_named"], dict):
-                        node["widgets_values_named"]["value"] = expanded_prompt
-                        node["widgets_values_named"]["text"] = expanded_prompt
+                        node["widgets_values_named"]["value"] = final_prompt
+                        node["widgets_values_named"]["text"] = final_prompt
 
             # Update Image Loader Nodes
             if class_type in ["LoadImage", "LoadImageMask", "LoadImageFromUrl", "LoadImageBase64"] or "image" in class_type.lower() or node_id_str in node_mappings:
@@ -363,21 +365,23 @@ def inject_and_prepare_workflow(
     if prompt_node_id and str(prompt_node_id) in modified_wf:
         target_node = modified_wf[str(prompt_node_id)]
         inputs = target_node.setdefault("inputs", {})
+        final_prompt = f"{prompt_prefix}\n\n{expanded_prompt}" if prompt_prefix else expanded_prompt
         if "value" in inputs or target_node.get("class_type") == "PrimitiveStringMultiline":
-            inputs["value"] = expanded_prompt
+            inputs["value"] = final_prompt
         elif "text" in inputs or target_node.get("class_type") == "CLIPTextEncode":
-            inputs["text"] = expanded_prompt
+            inputs["text"] = final_prompt
         else:
-            inputs["value"] = expanded_prompt
+            inputs["value"] = final_prompt
     elif expanded_prompt:
+        final_prompt = f"{prompt_prefix}\n\n{expanded_prompt}" if prompt_prefix else expanded_prompt
         # Auto-detect prompt node if prompt_node_id was not explicitly specified
         for n_id, n_data in modified_wf.items():
             if isinstance(n_data, dict) and n_data.get("class_type") in ["PrimitiveStringMultiline", "CLIPTextEncode", "StringLiteral", "ShowText"]:
                 inputs = n_data.setdefault("inputs", {})
                 if "value" in inputs or n_data.get("class_type") == "PrimitiveStringMultiline":
-                    inputs["value"] = expanded_prompt
+                    inputs["value"] = final_prompt
                 else:
-                    inputs["text"] = expanded_prompt
+                    inputs["text"] = final_prompt
                 break
 
     # Check every node in the graph for loader bypass / asset mapping (retaining all links and nodes)
