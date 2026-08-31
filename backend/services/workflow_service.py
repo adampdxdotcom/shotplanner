@@ -88,7 +88,7 @@ def inspect_workflow_nodes(workflow: Dict[str, Any]) -> Dict[str, Any]:
 
             # Broad duration/frame pattern matching
             duration_keywords = ["frame", "length", "duration", "videolength", "emptylatent", "latentvideo", "vhs", "minimax"]
-            is_duration_candidate = any(kw in class_type.lower() or kw in title.lower() for kw in duration_keywords)
+            is_duration_candidate = any(kw in class_type.lower() or kw in meta_title.lower() for kw in duration_keywords)
 
             if detected_nodes["frames"] is None and is_duration_candidate:
                 detected_nodes["frames"] = node_id
