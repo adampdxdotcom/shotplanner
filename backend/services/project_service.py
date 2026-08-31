@@ -267,30 +267,49 @@ def export_project_zip_buffer(filename: str) -> io.BytesIO:
     zip_buffer.seek(0)
     return zip_buffer
 
-def extract_project_zip_buffer(content_bytes: bytes) -> str:
-    """Extract uploaded ZIP archive into dedicated Scene directories."""
-    zip_buffer = io.BytesIO(content_bytes)
+def extract_project_zip_buffer(zip_source: Any) -> str:
+    """
+    Extract uploaded ZIP archive into dedicated Scene directories.
+    Streams large media files and assets in 1MB chunks to avoid memory exhaustion on up to 500MB archives.
+    Supports file paths, file-like objects (e.g. FastAPI SpooledTemporaryFile / UploadFile.file), and bytes buffers.
+    """
     imported_project = ""
     project_json_data = {}
     assets_db_meta = []
     
-    with zipfile.ZipFile(zip_buffer, "r") as zip_file:
-        # Pass 1: Extract project JSON and assets_db.json
-        for member in zip_file.infolist():
+    # Normalize zip_source to ZipFile compatible source
+    if isinstance(zip_source, bytes):
+        zip_file_obj = zipfile.ZipFile(io.BytesIO(zip_source), "r")
+    elif isinstance(zip_source, (str, Path)):
+        zip_file_obj = zipfile.ZipFile(str(zip_source), "r")
+    else:
+        # File-like object (e.g. SpooledTemporaryFile, BytesIO, etc.)
+        if hasattr(zip_source, "seek"):
+            try:
+                zip_source.seek(0)
+            except Exception:
+                pass
+        zip_file_obj = zipfile.ZipFile(zip_source, "r")
+
+    try:
+        # Pass 1: Extract project JSON and assets_db.json metadata (small text files)
+        for member in zip_file_obj.infolist():
             if member.is_dir():
                 continue
             filename = member.filename
             if filename == "assets_db.json":
                 try:
-                    assets_arr = json.loads(zip_file.read(member).decode("utf-8"))
-                    if isinstance(assets_arr, list):
-                        assets_db_meta = assets_arr
+                    with zip_file_obj.open(member) as f:
+                        assets_arr = json.loads(f.read().decode("utf-8"))
+                        if isinstance(assets_arr, list):
+                            assets_db_meta = assets_arr
                 except Exception:
                     pass
             elif filename.endswith(".json") and "/" not in filename and "\\" not in filename:
                 imported_project = os.path.basename(filename)[:-5]
                 try:
-                    project_json_data = json.loads(zip_file.read(member).decode("utf-8"))
+                    with zip_file_obj.open(member) as f:
+                        project_json_data = json.loads(f.read().decode("utf-8"))
                 except Exception:
                     pass
 
@@ -311,20 +330,20 @@ def extract_project_zip_buffer(content_bytes: bytes) -> str:
                 if isinstance(a, dict) and a.get("filename"):
                     media_type_map[a["filename"]] = a.get("media_type", "image")
         
-        # Pass 2: Extract files to scene subdirectories
-        for member in zip_file.infolist():
+        # Pass 2: Stream extract files to scene subdirectories in 1MB chunks
+        for member in zip_file_obj.infolist():
             if member.is_dir():
                 continue
             
             filename = member.filename
-            file_bytes = zip_file.read(member)
             out_name = os.path.basename(filename)
             if not out_name:
                 continue
             
             if (filename.startswith("workflows/") or filename.startswith("staged_workflows/")) and out_name:
-                with open(scene_dirs["workflows"] / out_name, "wb") as f:
-                    f.write(file_bytes)
+                dest_path = scene_dirs["workflows"] / out_name
+                with zip_file_obj.open(member) as src_file, open(dest_path, "wb") as dest_file:
+                    shutil.copyfileobj(src_file, dest_file, length=1024 * 1024)
             
             elif filename.startswith("uploads/") and out_name:
                 m_type = media_type_map.get(out_name, "image")
@@ -332,15 +351,23 @@ def extract_project_zip_buffer(content_bytes: bytes) -> str:
                 target_dir = scene_dirs.get(sub_key, scene_dirs.get("images"))
                 target_dir.mkdir(parents=True, exist_ok=True)
                 dest_path = target_dir / out_name
-                with open(dest_path, "wb") as f:
-                    f.write(file_bytes)
+                with zip_file_obj.open(member) as src_file, open(dest_path, "wb") as dest_file:
+                    shutil.copyfileobj(src_file, dest_file, length=1024 * 1024)
                         
             elif filename.endswith(".json") and "/" not in filename and "\\" not in filename:
                 out_name = os.path.basename(filename)
                 # Store in both scene directory base and legacy projects dir
-                with open(scene_dirs["base"] / out_name, "wb") as f:
-                    f.write(file_bytes)
-                with open(PROJECTS_DIR / out_name, "wb") as f:
-                    f.write(file_bytes)
+                dest_base = scene_dirs["base"] / out_name
+                with zip_file_obj.open(member) as src_file, open(dest_base, "wb") as dest_file:
+                    shutil.copyfileobj(src_file, dest_file, length=1024 * 1024)
+                
+                PROJECTS_DIR.mkdir(parents=True, exist_ok=True)
+                dest_legacy = PROJECTS_DIR / out_name
+                try:
+                    shutil.copyfile(dest_base, dest_legacy)
+                except Exception:
+                    pass
+    finally:
+        zip_file_obj.close()
                                 
     return imported_project

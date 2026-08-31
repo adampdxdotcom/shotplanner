@@ -97,19 +97,25 @@ def get_scene_directories(scene_name: Optional[str] = "scene01") -> Dict[str, Pa
     }
 
 def ensure_scene_directories(scene_name: Optional[str] = "scene01") -> Dict[str, Path]:
-    """Ensure all directories for a specific scene exist on disk."""
+    """Ensure all directories for a specific scene exist on disk Just-In-Time."""
     dirs = get_scene_directories(scene_name)
     for p in dirs.values():
         if isinstance(p, Path):
             p.mkdir(parents=True, exist_ok=True)
+            
+    # Provision 1x1 empty.png bypass in scene shared folder Just-In-Time
+    empty_png = dirs["shared"] / "empty.png"
+    if not empty_png.exists():
+        try:
+            empty_png.write_bytes(bytes.fromhex("89504e470d0a1a0a0000000d49484452000000010000000108060000001f1563340000000d49444154789c636000000002000148afa4710000000049454e44ae426082"))
+        except Exception:
+            pass
+            
     return dirs
 
-# Ensure base directories exist
-for base in [ASSETS_DIR, PROJECTS_DIR, TMP_UPLOAD_DIR, LEGACY_IMAGES_DIR, LEGACY_WORKFLOWS_DIR, LEGACY_VIDEOS_DIR, LEGACY_AUDIOS_DIR, LEGACY_UPLOADS_DIR]:
-    base.mkdir(parents=True, exist_ok=True)
-
-for p in get_scene_directories("scene01").values():
-    p.mkdir(parents=True, exist_ok=True)
+# Ensure only root base ASSETS_DIR and TMP_UPLOAD_DIR exist on server boot
+ASSETS_DIR.mkdir(parents=True, exist_ok=True)
+TMP_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 def sanitize_filename(name: str) -> str:
     """Sanitize subject names or labels to be safe in filenames."""

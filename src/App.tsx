@@ -606,46 +606,22 @@ export default function App() {
         updated_at: new Date().toISOString()
       }]
     };
-    setHasLoadedProject(true);
 
     const cleanFilename = sceneName.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_").replace(/_+/g, "_") || "untitled_scene";
-    try {
-      const payload = {
-        name: cleanFilename,
-        data: newScene
-      };
-      const res = await fetch("/api/projects", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      if (!res.ok) {
-        throw new Error("Failed to save the new scene project.");
-      }
-      
-      setNodeMappings({});
-      setParameterNodeMappings({});
-      setBasicStub("");
-      setExpandedPrompt("");
-      
-      setSceneProject(newScene);
-      setCurrentProjectName(cleanFilename);
-      setActiveShotId(newScene.shots[0].id);
-      setIsDirty(false);
-      
-      await fetchAssets(sceneName);
-      
-      // Refresh list
-      const listRes = await fetch("/api/projects");
-      const listData = await listRes.json();
-      if (listData.projects) {
-        setAvailableScenes(listData.projects.map((p: any) => typeof p === 'string' ? p : p.filename).filter((p: string) => p.endsWith(".json")).map((p: string) => p.replace(/\.json$/i, "")));
-      }
-      
-      addToast(`New scene "${sceneName}" created and auto-saved successfully!`, "success");
-    } catch (err: any) {
-      addToast(err.message || "Failed to auto-save new scene.", "error");
-    }
+    
+    // Initialize clean in-memory state without writing to disk
+    setNodeMappings({});
+    setParameterNodeMappings({});
+    setBasicStub("");
+    setExpandedPrompt("");
+    
+    setSceneProject(newScene);
+    setCurrentProjectName(cleanFilename);
+    setActiveShotId(newScene.shots[0].id);
+    setHasLoadedProject(true);
+    setIsDirty(false);
+    
+    addToast(`New scene "${sceneName}" created in-memory. Save when ready!`, "info");
   };
 
   // Fetch workflows and assets on initial mount

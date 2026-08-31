@@ -397,4 +397,26 @@
 - **`backend/routes/execution_routes.py`**
   - Updated `StageSceneRequest` and `ExecuteWorkflowRequest` to support optional `project_data`, `assigned_slots`, and `shared_assets` payloads for high-fidelity workflow construction.
 
+## Large Multi-Megabyte Archive Ingestion & High-Capacity Streaming (500MB)
+- **`nginx.conf`**
+  - Configured `client_max_body_size 500M;` within the `server` block to permit large multi-megabyte project ZIP archives, 4K image uploads, and heavy media assets without triggering HTTP 413 (Request Entity Too Large) reverse proxy rejections.
+- **`backend/services/project_service.py` & `backend/routes/project_routes.py`**
+  - Enhanced `extract_project_zip_buffer(zip_source)` to accept file-like objects (e.g., FastAPI's `SpooledTemporaryFile` / `file.file`) and stream file extraction to disk in 1MB chunks (`shutil.copyfileobj(src, dest, length=1024*1024)`).
+  - Bypasses reading multi-hundred-megabyte archives into RAM in single byte buffers, eliminating memory exhaustion, RAM spikes, and timeouts during large archive extractions.
+- **`server/config/constants.ts` & `server/services/projectService.ts`**
+  - Configured multer with a 500MB `fileSize` limit (`limits: { fileSize: 500 * 1024 * 1024 }`) to support equivalent high-capacity archive ingestion on the Node/Express backend.
+- **`src/components/ProjectModals.tsx` (`LoadProjectModal`)**
+  - Integrated rich loading feedback and animated spinning indicators (`Loader2`) during project ZIP archive uploads and extractions.
+  - Added descriptive status messaging informing users during multi-megabyte archive imports, disabled concurrent actions during upload, and added clear error handling for HTTP 413, invalid archives, or server extraction issues.
+
+## Boot-Time Directory Cleanup, JIT Scene Provisioning & In-Memory Project State
+- **`backend/utils/file_handlers.py` & `server/config/constants.ts`**
+  - Removed all startup/boot-time legacy directory creation loops (flat legacy folders `project_jsons`, `audios`, `images`, `uploads`, `videos`).
+  - Removed automatic module-level creation of the hardcoded `scene01` placeholder folder.
+  - Ensured only the fundamental root `ASSETS_DIR` and `TMP_UPLOAD_DIR` / `TMP_DIR` are initialized on server boot.
+  - Enforced Just-In-Time (JIT) directory provisioning in `ensure_scene_directories` / `ensureSceneDirectories`: scene folders (`assets/{scene_name}/images/`, `videos/`, `workflows/`, `shared/`, etc.) and the `empty.png` bypass pixel are only created on disk when a project is explicitly saved or provisioned.
+- **`src/App.tsx`**
+  - Updated `handleCreateNewProject` to instantiate a clean, in-memory blank project state without immediate disk I/O, writing to disk only when saved explicitly via the Save modal or auto-saved under its user-specified scene name.
+
+
 

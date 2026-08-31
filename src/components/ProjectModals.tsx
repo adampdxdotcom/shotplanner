@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { X, Save, FolderOpen, AlertCircle, Download, Upload, Plus, Trash2 } from "lucide-react";
+import { X, Save, FolderOpen, AlertCircle, Download, Upload, Plus, Trash2, Loader2, FileArchive } from "lucide-react";
 
 interface SaveProjectModalProps {
   currentProjectName?: string;
@@ -184,6 +184,7 @@ interface LoadProjectModalProps {
 
 export const LoadProjectModal: React.FC<LoadProjectModalProps> = ({ isOpen, onClose, onLoad }) => {
   const [uploadingZip, setUploadingZip] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [projects, setProjects] = useState<ProjectInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingFile, setLoadingFile] = useState<string | null>(null);
@@ -209,14 +210,17 @@ export const LoadProjectModal: React.FC<LoadProjectModalProps> = ({ isOpen, onCl
     } else {
       setError(null);
       setLoadingFile(null);
+      setUploadStatus(null);
+      setUploadingZip(false);
     }
   }, [isOpen]);
 
   const handleZipUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
-    setUploadingZip(true);
-    setError(null);
     const file = e.target.files[0];
+    setUploadingZip(true);
+    setUploadStatus(`Uploading and extracting "${file.name}"... Large archives up to 500MB may take a few moments.`);
+    setError(null);
     const formData = new FormData();
     formData.append("file", file);
 
@@ -225,22 +229,35 @@ export const LoadProjectModal: React.FC<LoadProjectModalProps> = ({ isOpen, onCl
         method: "POST",
         body: formData
       });
+
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Failed to import project.");
+        let errMessage = `Failed to import project (HTTP ${res.status})`;
+        try {
+          const errData = await res.json();
+          errMessage = errData.detail || errData.error || errMessage;
+        } catch {
+          if (res.status === 413) {
+            errMessage = "File exceeds maximum upload limit (HTTP 413: Entity Too Large). Maximum archive size is 500MB.";
+          }
+        }
+        throw new Error(errMessage);
       }
+
       const data = await res.json();
+      setUploadStatus("Extraction complete! Refreshing projects...");
       
       // refresh list
       const listRes = await fetch("/api/projects");
-      const listData = await listRes.json();
-      if (listData.projects) {
-        const mapped = listData.projects.map((p: any) => 
-          typeof p === "string" 
-            ? { filename: p, display_name: p.replace(/\.json$/i, ""), mtime: "", size: 0 } 
-            : p
-        );
-        setProjects(mapped);
+      if (listRes.ok) {
+        const listData = await listRes.json();
+        if (listData.projects) {
+          const mapped = listData.projects.map((p: any) => 
+            typeof p === "string" 
+              ? { filename: p, display_name: p.replace(/\.json$/i, ""), mtime: "", size: 0 } 
+              : p
+          );
+          setProjects(mapped);
+        }
       }
       
       // automatically load it
@@ -248,9 +265,11 @@ export const LoadProjectModal: React.FC<LoadProjectModalProps> = ({ isOpen, onCl
         await handleLoad(data.filename);
       }
     } catch (err: any) {
-      setError(err.message || "Failed to import zip.");
+      console.error("ZIP import error:", err);
+      setError(err.message || "Failed to import project archive.");
     } finally {
       setUploadingZip(false);
+      setUploadStatus(null);
       e.target.value = ''; // reset
     }
   };
@@ -306,18 +325,38 @@ export const LoadProjectModal: React.FC<LoadProjectModalProps> = ({ isOpen, onCl
             Load Project
           </h3>
           <div className="flex items-center gap-2">
-            <label className="cursor-pointer px-3 py-1.5 text-xs font-medium text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 rounded-lg transition-colors flex items-center gap-1.5 border border-emerald-500/20">
-              <Upload className="w-3.5 h-3.5" />
-              {uploadingZip ? "Uploading..." : "Upload Zip"}
-              <input type="file" accept=".zip" className="hidden" onChange={handleZipUpload} disabled={uploadingZip} />
+            <label className={`cursor-pointer px-3 py-1.5 text-xs font-medium text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 rounded-lg transition-colors flex items-center gap-1.5 border border-emerald-500/20 ${uploadingZip ? "opacity-50 pointer-events-none cursor-not-allowed" : ""}`}>
+              {uploadingZip ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+                  <span>Extracting...</span>
+                </>
+              ) : (
+                <>
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Upload Zip</span>
+                </>
+              )}
+              <input type="file" accept=".zip" className="hidden" onChange={handleZipUpload} disabled={uploadingZip || loadingFile !== null} />
             </label>
-            <button onClick={onClose} className="text-zinc-400 hover:text-white transition-colors">
+            <button onClick={onClose} disabled={uploadingZip} className="text-zinc-400 hover:text-white disabled:opacity-50 transition-colors">
               <X className="w-4 h-4" />
             </button>
           </div>
         </div>
 
         <div className="p-4 overflow-y-auto space-y-2 flex-1">
+          {/* ZIP Import Loading Feedback Banner */}
+          {uploadingZip && (
+            <div className="p-3.5 mb-3 bg-emerald-950/40 border border-emerald-500/30 rounded-lg flex items-center gap-3 animate-pulse">
+              <Loader2 className="w-5 h-5 text-emerald-400 animate-spin shrink-0" />
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-emerald-300">Importing Project Archive</p>
+                <p className="text-[11px] text-zinc-400 truncate mt-0.5">{uploadStatus || "Streaming and unpacking media assets..."}</p>
+              </div>
+            </div>
+          )}
+
           {error && (
             <div className="p-3 mb-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-start gap-2">
               <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
@@ -326,9 +365,16 @@ export const LoadProjectModal: React.FC<LoadProjectModalProps> = ({ isOpen, onCl
           )}
 
           {loading ? (
-            <p className="text-xs text-zinc-500 text-center py-4">Loading projects...</p>
+            <div className="flex flex-col items-center justify-center py-8 gap-2">
+              <Loader2 className="w-5 h-5 text-indigo-400 animate-spin" />
+              <p className="text-xs text-zinc-500">Loading saved projects...</p>
+            </div>
           ) : projects.length === 0 ? (
-            <p className="text-xs text-zinc-500 text-center py-4">No projects saved yet.</p>
+            <div className="text-center py-8 space-y-2">
+              <FileArchive className="w-8 h-8 text-zinc-600 mx-auto" />
+              <p className="text-xs text-zinc-400">No projects saved yet.</p>
+              <p className="text-[11px] text-zinc-500">Click &quot;Upload Zip&quot; above to import a project archive up to 500MB.</p>
+            </div>
           ) : (
             <div className="space-y-2">
               {projects.map((p) => {
@@ -339,8 +385,8 @@ export const LoadProjectModal: React.FC<LoadProjectModalProps> = ({ isOpen, onCl
                 <div key={p.filename} className="flex items-center gap-2 group/row">
                   <button
                     onClick={() => handleLoad(p.filename)}
-                    disabled={loadingFile !== null}
-                    className="flex-1 text-left px-4 py-3 bg-zinc-950/50 hover:bg-zinc-800 border-2 border-zinc-700/80 hover:border-zinc-700 rounded-lg transition-colors flex items-center justify-between min-w-0"
+                    disabled={loadingFile !== null || uploadingZip}
+                    className="flex-1 text-left px-4 py-3 bg-zinc-950/50 hover:bg-zinc-800 disabled:opacity-50 border-2 border-zinc-700/80 hover:border-zinc-700 rounded-lg transition-colors flex items-center justify-between min-w-0 cursor-pointer"
                   >
                     <div className="flex flex-col truncate">
                       <span className="text-sm text-zinc-200 truncate">{p.display_name}</span>
@@ -351,7 +397,10 @@ export const LoadProjectModal: React.FC<LoadProjectModalProps> = ({ isOpen, onCl
                       )}
                     </div>
                     {loadingFile === p.filename ? (
-                      <span className="text-xs text-indigo-400 ml-2 shrink-0">Loading...</span>
+                      <div className="flex items-center gap-1.5 text-xs text-indigo-400 ml-2 shrink-0">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Loading...</span>
+                      </div>
                     ) : (
                       <span className="text-[11px] text-zinc-500 group-hover:text-zinc-300 transition-colors ml-2 shrink-0">Load</span>
                     )}
@@ -361,8 +410,8 @@ export const LoadProjectModal: React.FC<LoadProjectModalProps> = ({ isOpen, onCl
                       e.stopPropagation();
                       handleDelete(p.filename);
                     }}
-                    disabled={loadingFile !== null}
-                    className="p-3 bg-zinc-950/50 hover:bg-red-950/60 text-zinc-500 hover:text-red-400 border-2 border-zinc-700/80 hover:border-red-900/50 rounded-lg transition-colors shrink-0"
+                    disabled={loadingFile !== null || uploadingZip}
+                    className="p-3 bg-zinc-950/50 hover:bg-red-950/60 disabled:opacity-50 text-zinc-500 hover:text-red-400 border-2 border-zinc-700/80 hover:border-red-900/50 rounded-lg transition-colors shrink-0 cursor-pointer"
                     title="Delete Project"
                   >
                     <Trash2 className="w-4.5 h-4.5" />

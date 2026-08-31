@@ -46,7 +46,7 @@ export function getSceneDirectories(sceneName: string = "scene01") {
 }
 
 /**
- * Ensure all directories for a specific scene exist on disk
+ * Ensure all directories for a specific scene exist on disk Just-In-Time
  */
 export function ensureSceneDirectories(sceneName: string = "scene01"): {
   base: string;
@@ -62,6 +62,12 @@ export function ensureSceneDirectories(sceneName: string = "scene01"): {
       fs.mkdirSync(dir, { recursive: true });
     }
   });
+
+  const emptyPngPath = path.join(dirs.shared, "empty.png");
+  if (!fs.existsSync(emptyPngPath)) {
+    fs.writeFileSync(emptyPngPath, EMPTY_1X1_PNG_BUFFER);
+  }
+
   return dirs;
 }
 
@@ -73,17 +79,11 @@ export const EMPTY_1X1_PNG_BUFFER = Buffer.from(
   "hex"
 );
 
-// Ensure all fundamental runtime directories exist
+// Ensure only fundamental runtime root base directories exist on server boot
 export function initDirectories(): void {
   const baseDirs = [
     ASSETS_DIR,
-    PROJECTS_DIR,
-    TMP_DIR,
-    LEGACY_IMAGES_DIR,
-    LEGACY_WORKFLOWS_DIR,
-    LEGACY_VIDEOS_DIR,
-    LEGACY_AUDIOS_DIR,
-    LEGACY_UPLOADS_DIR
+    TMP_DIR
   ];
   
   baseDirs.forEach((dir) => {
@@ -91,20 +91,12 @@ export function initDirectories(): void {
       fs.mkdirSync(dir, { recursive: true });
     }
   });
-
-  // Ensure default scene01 folders exist
-  const defaultSceneDirs = getSceneDirectories("scene01");
-  Object.values(defaultSceneDirs).forEach((dir) => {
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-  });
-
-  const defaultEmptyPngPath = path.join(defaultSceneDirs.shared, "empty.png");
-  if (!fs.existsSync(defaultEmptyPngPath)) {
-    fs.writeFileSync(defaultEmptyPngPath, EMPTY_1X1_PNG_BUFFER);
-  }
 }
 
-// Multer upload handler using the temporary directory
-export const upload = multer({ dest: TMP_DIR });
+// Multer upload handler using the temporary directory with 500MB limit for large archives and 4K media
+export const upload = multer({
+  dest: TMP_DIR,
+  limits: {
+    fileSize: 500 * 1024 * 1024 // 500MB
+  }
+});
