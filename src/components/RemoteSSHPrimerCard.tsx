@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { copyToClipboard } from "../utils/clipboard";
 import { 
   Key, 
   Terminal, 
@@ -25,17 +26,8 @@ const CopyButton: React.FC<CopyButtonProps> = ({ text }) => {
 
   const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      const textArea = document.createElement("textarea");
-      textArea.value = text;
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand("copy");
-      document.body.removeChild(textArea);
+    const success = await copyToClipboard(text);
+    if (success) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { WorkflowItem, ParsedWorkflow, MediaAsset, GenerationParameters, ParameterNodeMappings, ShotItem, SceneProjectFile } from "../types";
 import { getAssetMediaUrl } from "../utils/assetUrl";
 import { formatShotNumber, generateSaveVideoPrefix } from "../utils/formatters";
+import { copyToClipboard } from "../utils/clipboard";
 import { GenerationParametersSection } from "./GenerationParametersSection";
 import { 
   Workflow, 
@@ -407,9 +408,12 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
     const targetJson = liveInjectedWorkflow || parsedWorkflow?.raw_json;
     if (!targetJson) return;
     try {
-      await navigator.clipboard.writeText(JSON.stringify(targetJson, null, 2));
-      setCopiedJson(true);
-      setTimeout(() => setCopiedJson(false), 2000);
+      const textToCopy = JSON.stringify(targetJson, null, 2);
+      const success = await copyToClipboard(textToCopy);
+      if (success) {
+        setCopiedJson(true);
+        setTimeout(() => setCopiedJson(false), 2000);
+      }
     } catch (err) {
       console.error("Failed to copy JSON:", err);
     }

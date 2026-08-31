@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { copyToClipboard } from "../utils/clipboard";
 import { 
   X, 
   Copy, 
@@ -195,10 +196,12 @@ See README.md in root for complete instructions and setup guide.`
 
   const currentFile = codeFiles[activeTab] || codeFiles["main.py"];
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(currentFile.content);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopy = async () => {
+    const success = await copyToClipboard(currentFile.content);
+    if (success) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   return (

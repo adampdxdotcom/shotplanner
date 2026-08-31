@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { ScenePlanning, formatShotNumber, generateSaveVideoPrefix, sanitizeFilenamePart, generatePromptPrefix, assembleFinalPrompt } from "../types";
+import { copyToClipboard } from "../utils/clipboard";
 import { 
   Clapperboard, 
   Camera, 
@@ -75,11 +76,13 @@ export const ScenePlanningHeader: React.FC<ScenePlanningHeaderProps> = ({
     onChangePlanning({ ...planning, camera_movement: e.target.value });
   };
 
-  const handleCopy = () => {
+  const handleCopy = async () => {
     if (!prefix) return;
-    navigator.clipboard.writeText(prefix);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    const success = await copyToClipboard(prefix);
+    if (success) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   return (

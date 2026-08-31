@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { MediaAsset, LLMProvider, ScenePlanning, hasSceneReferencePhoto, SCENE_REFERENCE_DIRECTIVE, assembleFinalPrompt } from "../types";
 import { formatShotNumber } from "./ScenePlanningHeader";
+import { copyToClipboard } from "../utils/clipboard";
 import { 
   Sparkles, 
   Bot, 
@@ -149,32 +150,7 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
       return;
     }
 
-    let success = false;
-
-    try {
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(textToCopy);
-        success = true;
-      } else {
-        throw new Error("Clipboard API not available");
-      }
-    } catch {
-      // Fallback for iframe / non-focused context
-      try {
-        const textArea = document.createElement("textarea");
-        textArea.value = textToCopy;
-        textArea.style.position = "fixed";
-        textArea.style.left = "-999999px";
-        textArea.style.top = "-999999px";
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        success = document.execCommand("copy");
-        document.body.removeChild(textArea);
-      } catch (err) {
-        console.error("ExecCommand copy failed:", err);
-      }
-    }
+    const success = await copyToClipboard(textToCopy);
 
     if (success) {
       setCopied(true);

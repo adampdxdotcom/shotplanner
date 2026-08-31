@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { AppConfig } from "../types";
+import { copyToClipboard } from "../utils/clipboard";
 import { RemoteSSHPrimerCard, CodeBlock } from "./RemoteSSHPrimerCard";
 import { 
   Server, 
@@ -165,17 +166,8 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({ config, onChange, 
 
   const handleCopyPublicKey = async () => {
     if (!generatedKeyPair?.public_key) return;
-    try {
-      await navigator.clipboard.writeText(generatedKeyPair.public_key);
-      setHasCopiedPublicKey(true);
-      setTimeout(() => setHasCopiedPublicKey(false), 2500);
-    } catch {
-      const textArea = document.createElement("textarea");
-      textArea.value = generatedKeyPair.public_key;
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand("copy");
-      document.body.removeChild(textArea);
+    const success = await copyToClipboard(generatedKeyPair.public_key);
+    if (success) {
       setHasCopiedPublicKey(true);
       setTimeout(() => setHasCopiedPublicKey(false), 2500);
     }

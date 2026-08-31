@@ -309,7 +309,12 @@
   - Synchronized `inject_and_prepare_workflow` across TypeScript and Python to dynamically patch both Visual Canvas (`nodes` array) and API graph formats.
   - Added support for auto-detecting and overriding generation parameters (`steps`, `megapixels`, `frames`) without requiring hardcoded node IDs.
   - Automatically targets `SaveVideo` nodes to inject formatted scene/shot filename prefixes.
-- **`backend/routes/api.py` & `server/services/executionService.ts`**
-  - Updated workflow staging pipelines (`/api/workflow/stage` and multi-shot staging) to persist prepared workflow files directly into the active scene's directory: `assets/{scene_name}/workflows/{scene_name}_Shot_{shot_number}.json`.
-  - Staged workflows are properly synced via SSH to remote RunPod ComfyUI user directories (`{remote_root}/user/default/workflows/{scene_name}/`) and reported cleanly in transfer summaries.
+## Universal Cross-Browser Clipboard Utility & Live Injected Workflow Copy
+- **`src/utils/clipboard.ts`**
+  - Created universal `copyToClipboard(text: string): Promise<boolean>` utility supporting both modern secure contexts (`navigator.clipboard.writeText`) and automatic fallback for insecure HTTP / local LAN addresses (e.g. `http://192.168.x.x:8302`), iframes, or non-focused browser windows via hidden `<textarea>` + `document.execCommand('copy')` element lifecycle management.
+- **`src/components/WorkflowSection.tsx`**
+  - Integrated `copyToClipboard` into `handleCopyJson` to reliably copy the active live-injected workflow JSON across all network environments.
+  - Ensured visual feedback (`Copied!` text and emerald checkmark badge) triggers reliably upon successful copy operation.
+- **`src/components/LLMSection.tsx`, `src/components/ScenePlanningHeader.tsx`, `src/components/CodeViewerModal.tsx`, `src/components/ConfigSection.tsx`, `src/components/RemoteSSHPrimerCard.tsx`**
+  - Standardized all clipboard operations across the UI to use `copyToClipboard` for uniform resilience and error recovery.
 
