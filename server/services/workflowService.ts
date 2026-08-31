@@ -99,15 +99,31 @@ export function parseWorkflowData(workflow: any): ParsedWorkflowData {
         detectedNodes.megapixels = nodeId;
         if (widgetsValues.length > 0) detectedValues.megapixels = widgetsValues[0];
       }
-      if (
-        detectedNodes.frames === null &&
-        (classType.toLowerCase().includes("frame") ||
-          classType.toLowerCase().includes("length") ||
-          classType.toLowerCase().includes("duration"))
-      ) {
+
+      // Broad duration/frame pattern matching
+      const durationKeywords = ["frame", "length", "duration", "videolength", "emptylatent", "latentvideo", "vhs", "minimax"];
+      const isDurationCandidate = durationKeywords.some(
+        (kw) => classType.toLowerCase().includes(kw) || metaTitle.toLowerCase().includes(kw)
+      );
+
+      if (detectedNodes.frames === null && isDurationCandidate) {
         detectedNodes.frames = nodeId;
-        if (widgetsValues.length > 1) detectedValues.frames = widgetsValues[1];
-        else if (widgetsValues.length > 0) detectedValues.frames = widgetsValues[0];
+        let foundVal: any = null;
+        if (node.widgets_values_named && typeof node.widgets_values_named === "object") {
+          for (const k of ["frames", "length", "num_frames", "duration", "frame_count", "video_length", "videolength", "latentvideo", "emptylatent", "vhs", "minimax", "value", "int", "count", "amount"]) {
+            if (k in node.widgets_values_named && typeof node.widgets_values_named[k] === "number") {
+              foundVal = node.widgets_values_named[k];
+              break;
+            }
+          }
+        }
+        if (foundVal === null) {
+          if (widgetsValues.length > 1 && typeof widgetsValues[1] === "number") foundVal = widgetsValues[1];
+          else if (widgetsValues.length > 0 && typeof widgetsValues[0] === "number") foundVal = widgetsValues[0];
+        }
+        if (foundVal !== null) {
+          detectedValues.frames = foundVal;
+        }
       }
     }
 
@@ -152,12 +168,30 @@ export function parseWorkflowData(workflow: any): ParsedWorkflowData {
       detectedNodes.megapixels = String(nodeId);
       detectedValues.megapixels = inputs.megapixels;
     }
+    const durationKeywords = ["frame", "length", "duration", "videolength", "emptylatent", "latentvideo", "vhs", "minimax"];
+    const isDurationCandidate = durationKeywords.some(
+      (kw) => classType.toLowerCase().includes(kw) || title.toLowerCase().includes(kw)
+    );
+
     if (detectedNodes.frames === null && inputs && typeof inputs === "object") {
-      for (const frameKey of ["frames", "length", "num_frames", "duration", "frame_count"]) {
+      let matchedKey: string | null = null;
+      for (const frameKey of ["frames", "length", "num_frames", "duration", "frame_count", "video_length", "videolength", "latentvideo", "emptylatent", "vhs", "minimax", "value", "int"]) {
         if (frameKey in inputs) {
-          detectedNodes.frames = String(nodeId);
-          detectedValues.frames = inputs[frameKey];
+          matchedKey = frameKey;
           break;
+        }
+      }
+      if (matchedKey || isDurationCandidate) {
+        detectedNodes.frames = String(nodeId);
+        if (matchedKey && typeof inputs[matchedKey] === "number") {
+          detectedValues.frames = inputs[matchedKey];
+        } else {
+          for (const [k, v] of Object.entries(inputs)) {
+            if (typeof v === "number") {
+              detectedValues.frames = v;
+              break;
+            }
+          }
         }
       }
     }
@@ -434,7 +468,7 @@ export function injectAndPrepareWorkflowData(
       const fNode = modifiedWf[parameterNodeMappings.frames];
       fNode.inputs = fNode.inputs || {};
       let matchedKey = "frames";
-      for (const k of ["frames", "length", "num_frames", "duration", "frame_count"]) {
+      for (const k of ["frames", "length", "num_frames", "duration", "frame_count", "video_length", "videolength", "latentvideo", "emptylatent", "vhs", "minimax", "value", "int"]) {
         if (k in fNode.inputs) {
           matchedKey = k;
           break;

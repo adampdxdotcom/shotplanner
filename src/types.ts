@@ -49,6 +49,8 @@ export interface SceneProjectFile {
   local_llm_url?: string;
   config?: Partial<AppConfig>;
   llm_provider?: LLMProvider;
+  generation_params?: GenerationParameters;
+  parameter_node_mappings?: ParameterNodeMappings;
 }
 
 export interface ShotItem {

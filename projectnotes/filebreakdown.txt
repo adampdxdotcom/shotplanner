@@ -318,3 +318,28 @@
 - **`src/components/LLMSection.tsx`, `src/components/ScenePlanningHeader.tsx`, `src/components/CodeViewerModal.tsx`, `src/components/ConfigSection.tsx`, `src/components/RemoteSSHPrimerCard.tsx`**
   - Standardized all clipboard operations across the UI to use `copyToClipboard` for uniform resilience and error recovery.
 
+## Interactive JSON Inspector Search & Broadened Parameter Detection
+- **`src/components/JsonViewerWithSearch.tsx`**
+  - Modularized interactive search toolbar and highlighted JSON viewer with match count indicators (e.g. "1 of 3 matches" / "0 matches"), active match highlight with amber focus rings, and previous/next match navigation buttons (`ChevronUp`/`ChevronDown` with Enter / Shift+Enter shortcuts).
+  - Implemented smooth auto-scrolling to the active matched element inside the scrollable viewer.
+- **`src/components/WorkflowSection.tsx`**
+  - Integrated `JsonViewerWithSearch` into the Live Injected Workflow JSON Inspector collapsible panel.
+  - Expanded parameter key mappings for duration and frame count nodes in `generateLiveInjectedWorkflow` to support `frames`, `length`, `num_frames`, `duration`, `frame_count`, `video_length`, `videolength`, `latentvideo`, `emptylatent`, `vhs`, `minimax`, `value`, and `int`.
+- **`server/services/workflowService.ts` & `backend/services/workflow_service.py`**
+  - Broadened Duration and Frame count node auto-detection logic across TypeScript and Python backends. Pattern matching scans class types, titles, and input keys containing `"frame"`, `"length"`, `"duration"`, `"videolength"`, `"emptylatent"`, `"latentvideo"`, `"vhs"`, `"minimax"`, as well as primitive integer inputs linked to frame count.
+- **`src/App.tsx`, `src/types.ts` & `src/components/GenerationParametersSection.tsx`**
+  - Ensured that manually edited parameter node IDs (via the "Change" buttons in `GenerationParametersSection`) update `parameterNodeMappings` state and are saved into project files (`parameter_node_mappings` in `SceneProjectFile`).
+  - Preserved manual parameter node overrides across project loads, auto-saves, and workflow re-parses in `parseSelectedWorkflow`.
+
+## Complete Multi-Workflow Production Bundle ZIP Export & Shot Workflow Synchronization
+- **`server/services/projectService.ts` & `backend/routes/api.py`**
+  - Refactored `GET /api/projects/{filename}/export` across TypeScript Express and Python FastAPI backends to package a complete, ready-to-run multi-workflow production bundle:
+    - **Root:** Contains master project JSON (`{project_name}.json`) and isolated `assets_db.json`.
+    - **`uploads/`:** Packages all referenced media assets across scene assets, shot assigned slots, shared assets, node mappings, and database entries, alongside `empty.png` for unmapped slot bypass.
+    - **`workflows/`:** Packages all unique original master ComfyUI workflow templates referenced by the scene or individual shots (`workflow_file` / `selectedWorkflowFile`).
+    - **`staged_workflows/`:** Dynamically synthesizes and packages a fully injected, ready-to-execute workflow JSON for *every* shot in `project.shots` (named `Shot_{shot_number}_{clean_shot_name}.json` or `{scene_name}_Shot_{shot_number}.json`).
+    - Incorporates each shot's specific workflow template (or scene default), expanded prompt, assigned slot media filenames (with `empty.png` bypass placeholders for unmapped slots), sampling steps, megapixels, and frame duration overrides.
+- **`src/components/WorkflowSection.tsx` & `src/App.tsx`**
+  - Enhanced the Shot Context dropdown to display each shot's number, title, and assigned workflow (`[Custom Workflow]` vs `[Scene Default]`), with active badge indicators.
+  - Seamlessly updates and persists that specific shot's `workflow_file`, prompt node ID, node mappings, generation parameters, and parameter node mappings in project state across saves and project switches.
+

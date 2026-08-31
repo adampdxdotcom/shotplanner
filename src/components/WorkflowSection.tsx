@@ -4,6 +4,7 @@ import { getAssetMediaUrl } from "../utils/assetUrl";
 import { formatShotNumber, generateSaveVideoPrefix } from "../utils/formatters";
 import { copyToClipboard } from "../utils/clipboard";
 import { GenerationParametersSection } from "./GenerationParametersSection";
+import { JsonViewerWithSearch } from "./JsonViewerWithSearch";
 import { 
   Workflow, 
   Upload, 
@@ -216,7 +217,7 @@ function generateLiveInjectedWorkflow(
               else node.widgets_values = [val];
             }
             if (node.widgets_values_named && typeof node.widgets_values_named === "object") {
-              for (const k of ["frames", "length", "num_frames", "duration", "frame_count"]) {
+              for (const k of ["frames", "length", "num_frames", "duration", "frame_count", "video_length", "videolength", "latentvideo", "emptylatent", "vhs", "minimax", "value", "int"]) {
                 if (k in node.widgets_values_named) {
                   node.widgets_values_named[k] = val;
                   break;
@@ -306,7 +307,7 @@ function generateLiveInjectedWorkflow(
       const fNode = cloned[effectiveParamNodes.frames];
       fNode.inputs = fNode.inputs || {};
       let matchedKey = "frames";
-      for (const k of ["frames", "length", "num_frames", "duration", "frame_count"]) {
+      for (const k of ["frames", "length", "num_frames", "duration", "frame_count", "video_length", "videolength", "latentvideo", "emptylatent", "vhs", "minimax", "value", "int"]) {
         if (k in fNode.inputs) {
           matchedKey = k;
           break;
@@ -461,20 +462,39 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
     <div id="workflow-section" className="space-y-5 flex flex-col min-h-0">
       {/* Workflow Screen Header Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-zinc-900/60 p-4 rounded-xl border border-zinc-800 shadow-sm">
-        <div className="flex items-center gap-3">
-          <label className="text-sm font-medium text-zinc-300">Shot Context:</label>
+        <div className="flex items-center gap-3 flex-wrap">
+          <label className="text-sm font-medium text-zinc-300 flex items-center gap-1.5">
+            <Layers className="w-4 h-4 text-indigo-400" />
+            Shot Context:
+          </label>
           <select 
             value={activeShotId || ""}
             onChange={(e) => onSelectShot(e.target.value || null)}
-            className="bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none min-w-[250px]"
+            className="bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none min-w-[280px]"
           >
             <option key="empty" value="">-- Select a Shot to Map Workflow --</option>
             {sceneProject.shots.map(s => (
               <option key={s.id} value={s.id}>
-                Shot {s.shot_number.toString().padStart(2, '0')} - {s.shot_type}
+                Shot {s.shot_number.toString().padStart(2, '0')}: {s.shot_name || s.shot_type || "Shot"} {s.workflow_file ? `[${s.workflow_file}]` : `[Scene Default]`}
               </option>
             ))}
           </select>
+          {activeShot && (
+            <div className="flex items-center gap-2 text-xs flex-wrap">
+              <span className="px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 font-medium">
+                Shot {activeShot.shot_number.toString().padStart(2, '0')}
+              </span>
+              {activeShot.workflow_file ? (
+                <span className="px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                  Custom WF: {activeShot.workflow_file}
+                </span>
+              ) : (
+                <span className="px-2.5 py-1 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700">
+                  Using Scene Default WF
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -589,52 +609,18 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
         </div>
       </div>
 
-      {/* Raw JSON inspection collapsible */}
+      {/* Raw JSON inspection collapsible with search */}
       {showRawJson && parsedWorkflow && (
-        <div className="p-3 rounded-lg bg-zinc-950 border-2 border-zinc-700 text-xs space-y-2">
-          <div className="flex flex-wrap items-center justify-between gap-2 text-zinc-300 border-b border-zinc-800/80 pb-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <FileJson className="w-4 h-4 text-amber-400 shrink-0" />
-              <span className="font-mono font-medium text-xs text-zinc-200">
-                {Array.isArray(liveInjectedWorkflow?.nodes)
-                  ? `Live Injected Workflow Canvas (${liveInjectedWorkflow.nodes.length} nodes)`
-                  : `Live Injected Workflow Graph (${Object.keys(liveInjectedWorkflow || {}).length} nodes)`}
-              </span>
-              <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-mono">
-                Active Shot #{activeShot ? String(activeShot.shot_number).padStart(2, '0') : '01'} Live Data
-              </span>
-              <span className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono">
-                {Array.isArray(liveInjectedWorkflow?.nodes)
-                  ? "Visual UI Workflow JSON"
-                  : "API Prompt Format JSON"}
-              </span>
-            </div>
-
-            <button
-              onClick={handleCopyJson}
-              className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 text-zinc-200 border border-zinc-600 transition-colors"
-              title="Copy live injected workflow JSON to clipboard"
-            >
-              {copiedJson ? (
-                <>
-                  <Check className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="text-emerald-400 font-semibold">Copied!</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3.5 h-3.5 text-zinc-400" />
-                  <span>Copy JSON</span>
-                </>
-              )}
-            </button>
-          </div>
-          <p className="text-[11px] text-zinc-400">
-            Live in-memory preview of the workflow JSON populated with the active shot's assigned assets, expanded prompt, and generation parameters.
-          </p>
-          <pre className="max-h-64 overflow-auto font-mono text-[11px] text-zinc-300 bg-zinc-900/80 p-3 rounded-lg border border-zinc-800">
-            {JSON.stringify(liveInjectedWorkflow || parsedWorkflow.raw_json, null, 2)}
-          </pre>
-        </div>
+        <JsonViewerWithSearch
+          data={liveInjectedWorkflow || parsedWorkflow.raw_json}
+          activeShotNumber={activeShot ? activeShot.shot_number : "01"}
+          isVisualWorkflow={Array.isArray(liveInjectedWorkflow?.nodes)}
+          nodeCount={
+            Array.isArray(liveInjectedWorkflow?.nodes)
+              ? liveInjectedWorkflow.nodes.length
+              : Object.keys(liveInjectedWorkflow || parsedWorkflow.raw_json || {}).length
+          }
+        />
       )}
 
       {/* Dynamic Node Mapping UI */}

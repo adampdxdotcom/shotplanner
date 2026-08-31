@@ -189,7 +189,9 @@ export default function App() {
               ...config,
               lm_studio_url: config.lm_studio_url
             },
-            llm_provider: llmProvider
+            llm_provider: llmProvider,
+            parameter_node_mappings: parameterNodeMappings,
+            generation_params: generationParams
           }
         };
         await fetch("/api/projects", {
@@ -205,7 +207,7 @@ export default function App() {
     
     const timer = setTimeout(saveSceneProject, 1000);
     return () => clearTimeout(timer);
-  }, [sceneProject, isInitialLoad, hasLoadedProject, isDirty]);
+  }, [sceneProject, isInitialLoad, hasLoadedProject, isDirty, parameterNodeMappings, generationParams]);
 
   const handleUpdateParam = (key: keyof GenerationParameters, value: number) => {
     setGenerationParams(prev => ({ ...prev, [key]: value }));
@@ -402,6 +404,8 @@ export default function App() {
         lm_studio_url: config.lm_studio_url
       },
       llm_provider: llmProvider,
+      parameter_node_mappings: parameterNodeMappings,
+      generation_params: generationParams,
       assets,
       subjects: consolidatedSubjects
     };
@@ -447,7 +451,20 @@ export default function App() {
 
     if (data.schema_version === "1.0") {
       setNodeMappings({});
-      setParameterNodeMappings({});
+      if (data.parameter_node_mappings || data.parameterNodeMappings) {
+        setParameterNodeMappings(data.parameter_node_mappings || data.parameterNodeMappings);
+      } else if (data.shots && data.shots.length > 0 && data.shots[0].parameter_node_mappings) {
+        setParameterNodeMappings(data.shots[0].parameter_node_mappings);
+      } else {
+        setParameterNodeMappings({ steps: "", megapixels: "", frames: "" });
+      }
+
+      if (data.generation_params || data.generationParams) {
+        setGenerationParams(data.generation_params || data.generationParams);
+      } else if (data.shots && data.shots.length > 0 && data.shots[0].generation_params) {
+        setGenerationParams(data.shots[0].generation_params);
+      }
+
       setBasicStub("");
       setExpandedPrompt("");
       
@@ -713,13 +730,13 @@ export default function App() {
         if (res.ok && data.nodes_info) {
           setParsedWorkflow(data);
 
-          // Auto-sync detected parameter nodes
+          // Auto-sync detected parameter nodes while preserving user manual overrides
           const detected = data.detected_nodes || data.nodes_info.detected_nodes;
           if (detected) {
             setParameterNodeMappings(prev => ({
-              steps: detected.steps || prev.steps || "",
-              megapixels: detected.megapixels || prev.megapixels || "",
-              frames: detected.frames || prev.frames || ""
+              steps: prev.steps || detected.steps || "",
+              megapixels: prev.megapixels || detected.megapixels || "",
+              frames: prev.frames || detected.frames || ""
             }));
           }
 

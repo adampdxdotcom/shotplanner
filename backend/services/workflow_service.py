@@ -86,12 +86,25 @@ def inspect_workflow_nodes(workflow: Dict[str, Any]) -> Dict[str, Any]:
                 if isinstance(widgets_values, list) and len(widgets_values) > 0:
                     detected_values["megapixels"] = widgets_values[0]
 
-            if detected_nodes["frames"] is None and ("frame" in class_type.lower() or "length" in class_type.lower() or "duration" in class_type.lower()):
+            # Broad duration/frame pattern matching
+            duration_keywords = ["frame", "length", "duration", "videolength", "emptylatent", "latentvideo", "vhs", "minimax"]
+            is_duration_candidate = any(kw in class_type.lower() or kw in title.lower() for kw in duration_keywords)
+
+            if detected_nodes["frames"] is None and is_duration_candidate:
                 detected_nodes["frames"] = node_id
-                if isinstance(widgets_values, list) and len(widgets_values) > 1:
-                    detected_values["frames"] = widgets_values[1]
-                elif isinstance(widgets_values, list) and len(widgets_values) > 0:
-                    detected_values["frames"] = widgets_values[0]
+                found_val = None
+                if "widgets_values_named" in node and isinstance(node["widgets_values_named"], dict):
+                    for k in ["frames", "length", "num_frames", "duration", "frame_count", "video_length", "videolength", "latentvideo", "emptylatent", "vhs", "minimax", "value", "int", "count", "amount"]:
+                        if k in node["widgets_values_named"] and isinstance(node["widgets_values_named"][k], (int, float)):
+                            found_val = node["widgets_values_named"][k]
+                            break
+                if found_val is None and isinstance(widgets_values, list):
+                    if len(widgets_values) > 1 and isinstance(widgets_values[1], (int, float)):
+                        found_val = widgets_values[1]
+                    elif len(widgets_values) > 0 and isinstance(widgets_values[0], (int, float)):
+                        found_val = widgets_values[0]
+                if found_val is not None:
+                    detected_values["frames"] = found_val
 
         return {
             "prompt_nodes": prompt_nodes,
@@ -150,13 +163,25 @@ def inspect_workflow_nodes(workflow: Dict[str, Any]) -> Dict[str, Any]:
             detected_nodes["megapixels"] = str(node_id)
             detected_values["megapixels"] = inputs.get("megapixels")
 
-        # 3. Check for Duration / Frames ("frames", "length", "num_frames", "duration")
+        # 3. Check for Duration / Frames (Broad pattern matching)
+        duration_keywords = ["frame", "length", "duration", "videolength", "emptylatent", "latentvideo", "vhs", "minimax"]
+        is_duration_candidate = any(kw in class_type.lower() or kw in title.lower() for kw in duration_keywords)
+
         if detected_nodes["frames"] is None and isinstance(inputs, dict):
-            for frame_key in ["frames", "length", "num_frames", "duration", "frame_count"]:
+            matched_key = None
+            for frame_key in ["frames", "length", "num_frames", "duration", "frame_count", "video_length", "videolength", "latentvideo", "emptylatent", "vhs", "minimax", "value", "int"]:
                 if frame_key in inputs:
-                    detected_nodes["frames"] = str(node_id)
-                    detected_values["frames"] = inputs.get(frame_key)
+                    matched_key = frame_key
                     break
+            if matched_key or is_duration_candidate:
+                detected_nodes["frames"] = str(node_id)
+                if matched_key and isinstance(inputs.get(matched_key), (int, float)):
+                    detected_values["frames"] = inputs.get(matched_key)
+                else:
+                    for k, v in inputs.items():
+                        if isinstance(v, (int, float)):
+                            detected_values["frames"] = v
+                            break
 
     return {
         "prompt_nodes": prompt_nodes,
@@ -324,7 +349,7 @@ def inject_and_prepare_workflow(
                             else:
                                 node["widgets_values"] = [val]
                         if "widgets_values_named" in node and isinstance(node["widgets_values_named"], dict):
-                            for k in ["frames", "length", "num_frames", "duration", "frame_count"]:
+                            for k in ["frames", "length", "num_frames", "duration", "frame_count", "video_length", "videolength", "latentvideo", "emptylatent", "vhs", "minimax", "value", "int"]:
                                 if k in node["widgets_values_named"]:
                                     node["widgets_values_named"][k] = val
                                     break
@@ -421,7 +446,7 @@ def inject_and_prepare_workflow(
         if frames_node and str(frames_node) in modified_wf and frames_val is not None:
             n_inputs = modified_wf[str(frames_node)].setdefault("inputs", {})
             matched_key = "frames"
-            for k in ["frames", "length", "num_frames", "duration", "frame_count"]:
+            for k in ["frames", "length", "num_frames", "duration", "frame_count", "video_length", "videolength", "latentvideo", "emptylatent", "vhs", "minimax", "value", "int"]:
                 if k in n_inputs:
                     matched_key = k
                     break

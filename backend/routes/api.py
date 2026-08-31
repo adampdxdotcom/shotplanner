@@ -1,11 +1,15 @@
 import shutil
 import mimetypes
 import os
+import io
+import zipfile
+import json
+import re
 import httpx
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Union
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from backend.utils.file_handlers import (
@@ -939,84 +943,267 @@ async def export_project_zip(filename: str):
     file_path = find_project_file(filename)
     if not file_path or not file_path.exists():
         raise HTTPException(status_code=404, detail="Project not found")
-    
 
-    
     with open(file_path, "r", encoding="utf-8") as f:
         project_data = json.load(f)
-        
+
     clean_name = file_path.stem
-    
+    scene_name = project_data.get("scene_name") or clean_name or "Scene"
+    clean_scene_name = re.sub(r'[^a-zA-Z0-9_-]', '_', str(scene_name)).strip('_') or "Scene"
+
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-        # 1. Add project json
+        # 1. Master project JSON at root
         zip_file.writestr(f"{clean_name}.json", json.dumps(project_data, indent=2))
-        
-        # 2. Add workflow if selected
-        wf_name = project_data.get("selectedWorkflowFile") or project_data.get("workflow_file")
-        if wf_name:
-            wf_path = WORKFLOWS_DIR / os.path.basename(wf_name)
-            if wf_path.exists():
-                zip_file.write(wf_path, arcname=f"workflows/{os.path.basename(wf_name)}")
-                
-        # 3. Add all project media assets
+
+        # Helper to find workflow file
+        def find_wf_file(wf_fn: str) -> Optional[Path]:
+            if not wf_fn:
+                return None
+            clean_wf = os.path.basename(wf_fn.strip())
+            if not clean_wf:
+                return None
+            cand = WORKFLOWS_DIR / clean_wf
+            if cand.exists():
+                return cand
+            if ASSETS_DIR.exists():
+                for sub in ASSETS_DIR.iterdir():
+                    if sub.is_dir():
+                        sub_wf = sub / "workflows" / clean_wf
+                        if sub_wf.exists():
+                            return sub_wf
+            return None
+
+        # 2. Collect and package unique original master workflow templates into workflows/
+        cached_templates: Dict[str, Any] = {}
+        referenced_wfs = set()
+
+        if project_data.get("workflow_file") and isinstance(project_data["workflow_file"], str):
+            referenced_wfs.add(os.path.basename(project_data["workflow_file"]))
+        if project_data.get("selectedWorkflowFile") and isinstance(project_data["selectedWorkflowFile"], str):
+            referenced_wfs.add(os.path.basename(project_data["selectedWorkflowFile"]))
+
+        shots = project_data.get("shots", [])
+        if isinstance(shots, list):
+            for s in shots:
+                if isinstance(s, dict) and s.get("workflow_file") and isinstance(s["workflow_file"], str):
+                    referenced_wfs.add(os.path.basename(s["workflow_file"]))
+
+        for wf_fn in referenced_wfs:
+            found_path = find_wf_file(wf_fn)
+            if found_path and found_path.exists():
+                zip_file.write(found_path, arcname=f"workflows/{wf_fn}")
+                try:
+                    with open(found_path, "r", encoding="utf-8") as wf_f:
+                        cached_templates[wf_fn] = json.load(wf_f)
+                except Exception:
+                    pass
+
+        # 3. Add all project media assets into uploads/
         added_files = set()
+
+        def collect_asset(fn_val: Optional[str]):
+            if not fn_val or not isinstance(fn_val, str):
+                return
+            clean_fn = os.path.basename(fn_val.strip())
+            if not clean_fn or clean_fn in added_files:
+                return
+            asset_path = find_asset_file_path(clean_fn)
+            if asset_path and asset_path.exists():
+                zip_file.write(asset_path, arcname=f"uploads/{clean_fn}")
+                added_files.add(clean_fn)
+
         assets_list = project_data.get("assets", [])
         if isinstance(assets_list, list):
             for asset in assets_list:
                 if isinstance(asset, dict) and asset.get("filename"):
-                    fn = asset["filename"].strip()
-                    if fn and fn not in added_files:
-                        asset_path = find_asset_file_path(fn)
-                        if asset_path:
-                            zip_file.write(asset_path, arcname=f"uploads/{fn}")
-                            added_files.add(fn)
-                            
-        # Check shots assigned_slots for Scene Projects
-        shots = project_data.get("shots", [])
+                    collect_asset(asset["filename"])
+
         if isinstance(shots, list):
             for shot in shots:
-                if isinstance(shot, dict) and isinstance(shot.get("assigned_slots"), dict):
-                    for slot_fn in shot["assigned_slots"].values():
-                        if slot_fn and isinstance(slot_fn, str):
-                            fn = slot_fn.strip()
-                            if fn and fn not in added_files:
-                                asset_path = find_asset_file_path(fn)
-                                if asset_path:
-                                    zip_file.write(asset_path, arcname=f"uploads/{fn}")
-                                    added_files.add(fn)
-                                    
-        # Check shared_assets for Scene Projects
+                if isinstance(shot, dict):
+                    if isinstance(shot.get("assigned_slots"), dict):
+                        for slot_fn in shot["assigned_slots"].values():
+                            collect_asset(slot_fn)
+                    if isinstance(shot.get("node_mappings"), dict):
+                        for map_fn in shot["node_mappings"].values():
+                            collect_asset(map_fn)
+
         shared_assets = project_data.get("shared_assets", [])
         if isinstance(shared_assets, list):
             for sa in shared_assets:
                 if isinstance(sa, dict) and sa.get("filename"):
-                    fn = sa["filename"].strip()
-                    if fn and fn not in added_files:
-                        asset_path = find_asset_file_path(fn)
-                        if asset_path:
-                            zip_file.write(asset_path, arcname=f"uploads/{fn}")
-                            added_files.add(fn)
-                            
-        # Check nodeMappings
+                    collect_asset(sa["filename"])
+
         node_mappings = project_data.get("nodeMappings", {})
         if isinstance(node_mappings, dict):
             for fn_val in node_mappings.values():
-                if fn_val and isinstance(fn_val, str):
-                    fn = fn_val.strip()
-                    if fn and fn not in added_files:
-                        asset_path = find_asset_file_path(fn)
-                        if asset_path:
-                            zip_file.write(asset_path, arcname=f"uploads/{fn}")
-                            added_files.add(fn)
-                            
-        # Write assets_db.json purely from the isolated project JSON
-        relevant_meta = [a for a in assets_list if a.get("filename") in added_files]
+                collect_asset(fn_val)
+
+        node_mappings_snake = project_data.get("node_mappings", {})
+        if isinstance(node_mappings_snake, dict):
+            for fn_val in node_mappings_snake.values():
+                collect_asset(fn_val)
+
+        # Ensure empty.png is included in uploads/
+        empty_png_path = find_asset_file_path("empty.png")
+        if empty_png_path and empty_png_path.exists():
+            zip_file.write(empty_png_path, arcname="uploads/empty.png")
+        else:
+            empty_bytes = bytes.fromhex("89504e470d0a1a0a0000000d49484452000000010000000108060000001f1563340000000d49444154789c636000000002000148afa4710000000049454e44ae426082")
+            zip_file.writestr("uploads/empty.png", empty_bytes)
+        added_files.add("empty.png")
+
+        # 4. Master assets_db.json at root
+        relevant_meta = [a for a in assets_list if isinstance(a, dict) and a.get("filename") in added_files]
         final_meta = relevant_meta if relevant_meta else assets_list
         zip_file.writestr("assets_db.json", json.dumps(final_meta, indent=2))
-        
+
+        # 5. Dynamically synthesize and include fully injected workflow JSON for EVERY shot in staged_workflows/
+        for shot in shots:
+            if not isinstance(shot, dict):
+                continue
+            shot_num = shot.get("shot_number", 1)
+            try:
+                shot_num_int = int(shot_num)
+                shot_num_str = f"{shot_num_int:02d}"
+            except Exception:
+                shot_num_str = str(shot_num)
+
+            shot_name = shot.get("shot_name", "")
+            clean_shot_name = re.sub(r'[^a-zA-Z0-9_-]', '_', str(shot_name).strip()).strip('_') if shot_name else ""
+            staged_filename = f"Shot_{shot_num_str}_{clean_shot_name}.json" if clean_shot_name else f"{clean_scene_name}_Shot_{shot_num_str}.json"
+
+            # Determine workflow template
+            target_wf_name = shot.get("workflow_file") or project_data.get("workflow_file") or project_data.get("selectedWorkflowFile") or ""
+            clean_wf_name = os.path.basename(target_wf_name.strip()) if target_wf_name else ""
+            template_json = cached_templates.get(clean_wf_name)
+
+            if not template_json and clean_wf_name:
+                found_path = find_wf_file(clean_wf_name)
+                if found_path and found_path.exists():
+                    try:
+                        with open(found_path, "r", encoding="utf-8") as wf_f:
+                            template_json = json.load(wf_f)
+                            cached_templates[clean_wf_name] = template_json
+                    except Exception:
+                        pass
+
+            if not template_json:
+                if cached_templates:
+                    template_json = next(iter(cached_templates.values()))
+                else:
+                    cand_default = find_wf_file("default.json") or find_wf_file("workflow.json")
+                    if cand_default and cand_default.exists():
+                        try:
+                            with open(cand_default, "r", encoding="utf-8") as wf_f:
+                                template_json = json.load(wf_f)
+                        except Exception:
+                            pass
+
+            if not template_json:
+                template_json = {"nodes": [], "links": []}
+
+            # Inspect workflow nodes
+            inspected = inspect_workflow_nodes(template_json)
+            img_loaders = inspected.get("image_loader_nodes", [])
+            vid_loaders = inspected.get("video_loader_nodes", [])
+            aud_loaders = inspected.get("audio_loader_nodes", [])
+            all_loaders = img_loaders + vid_loaders + aud_loaders
+            prompt_nodes = inspected.get("prompt_nodes", [])
+            detected_nodes = inspected.get("detected_nodes", {})
+
+            # Build effective node mappings
+            effective_mappings = {}
+            if isinstance(project_data.get("nodeMappings"), dict):
+                effective_mappings.update(project_data["nodeMappings"])
+            if isinstance(project_data.get("node_mappings"), dict):
+                effective_mappings.update(project_data["node_mappings"])
+            if isinstance(shot.get("node_mappings"), dict):
+                effective_mappings.update(shot["node_mappings"])
+
+            # Assign shot slots
+            if isinstance(shot.get("assigned_slots"), dict):
+                for slot_idx_str, fn in shot["assigned_slots"].items():
+                    try:
+                        slot_idx = int(slot_idx_str)
+                        if fn and isinstance(fn, str):
+                            if slot_idx < len(img_loaders):
+                                effective_mappings[str(img_loaders[slot_idx]["id"])] = fn.strip()
+                            elif slot_idx < len(all_loaders):
+                                effective_mappings[str(all_loaders[slot_idx]["id"])] = fn.strip()
+                    except Exception:
+                        pass
+
+            # Shared assets fallback
+            if isinstance(shared_assets, list):
+                for sa in shared_assets:
+                    if isinstance(sa, dict) and isinstance(sa.get("slot_index"), int) and sa.get("filename"):
+                        s_idx = sa["slot_index"]
+                        is_in_shot = isinstance(shot.get("assigned_slots"), dict) and str(s_idx) in shot["assigned_slots"]
+                        if not is_in_shot:
+                            if s_idx < len(img_loaders) and str(img_loaders[s_idx]["id"]) not in effective_mappings:
+                                effective_mappings[str(img_loaders[s_idx]["id"])] = sa["filename"]
+                            elif s_idx < len(all_loaders) and str(all_loaders[s_idx]["id"]) not in effective_mappings:
+                                effective_mappings[str(all_loaders[s_idx]["id"])] = sa["filename"]
+
+            # Prompt node ID
+            effective_prompt_node_id = (
+                shot.get("prompt_node_id")
+                or project_data.get("selectedPromptNodeId")
+                or project_data.get("prompt_node_id")
+                or (str(prompt_nodes[0]["id"]) if prompt_nodes else "")
+            )
+
+            # Expanded prompt
+            effective_prompt = shot.get("expanded_prompt") or shot.get("basic_stub") or ""
+
+            # Generation parameters
+            effective_params = (
+                shot.get("generation_params")
+                or project_data.get("generation_params")
+                or project_data.get("generationParams")
+                or {"steps": 30, "megapixels": 0.5, "frames": 81}
+            )
+
+            # Parameter node mappings
+            effective_param_nodes = (
+                shot.get("parameter_node_mappings")
+                or project_data.get("parameter_node_mappings")
+                or project_data.get("parameterNodeMappings")
+                or {
+                    "steps": detected_nodes.get("steps") or "",
+                    "megapixels": detected_nodes.get("megapixels") or "",
+                    "frames": detected_nodes.get("frames") or ""
+                }
+            )
+
+            # Prefixes
+            shot_type = shot.get("shot_type") or ""
+            camera_movement = shot.get("camera_movement") or ""
+            prompt_prefix = f"{shot_name} - " if shot_name else ""
+            prompt_prefix += f"Shot {shot_num_str} - {shot_type} - {camera_movement}".strip(" -")
+            save_video_prefix = f"{clean_scene_name}_shot_{shot_num_str}"
+
+            bypass_missing = project_data.get("bypassMissing", True)
+
+            injected_workflow = inject_and_prepare_workflow(
+                workflow_data=template_json,
+                prompt_node_id=effective_prompt_node_id,
+                expanded_prompt=effective_prompt,
+                node_mappings=effective_mappings,
+                bypass_missing=bool(bypass_missing),
+                placeholder="empty.png",
+                parameter_overrides=effective_params,
+                parameter_node_mappings=effective_param_nodes,
+                prompt_prefix=prompt_prefix,
+                save_video_prefix=save_video_prefix
+            )
+
+            zip_file.writestr(f"staged_workflows/{staged_filename}", json.dumps(injected_workflow, indent=2))
+
     zip_buffer.seek(0)
-    
+
     headers = {
         "Content-Disposition": f'attachment; filename="{clean_name}.zip"',
         "Content-Type": "application/zip"
