@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { SceneProjectFile, ShotItem, MediaAsset, AppConfig, ToastMessage } from "../types";
 import { generateSaveVideoPrefix } from "../types";
 import { getAssetMediaUrl } from "../utils/assetUrl";
-import { X, Copy, Trash2, Plus, ChevronLeft, ChevronRight, UploadCloud } from "lucide-react";
+import { X, Copy, Trash2, Plus, ChevronLeft, ChevronRight, UploadCloud, Film, Camera, Move, Hash, Layers } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 interface Props {
@@ -324,59 +324,92 @@ export default function SceneProjectHub({
 
       {/* Bottom Bay: Active Shot Inspector */}
       {activeShot ? (
-        <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-0">
+        <div className="flex-1 flex flex-col gap-6 min-h-0">
           
-          {/* Left Pane: Shot Context & References */}
-          <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-5 flex flex-col gap-5 overflow-y-auto">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-white">Shot Context & References</h2>
-              <span className="text-sm text-zinc-500 font-mono">
-                {generateSaveVideoPrefix(activeShot.shot_name || "", activeShot.shot_number)}
-              </span>
-            </div>
+          {/* Top Full-Width Area: Shot Context & References (Read-Only Display) */}
+          <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-5 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-3.5 mb-3.5 border-b border-zinc-800/80">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-indigo-950/60 border border-indigo-800/60 text-indigo-400 rounded-lg">
+                  <Film className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-semibold text-white tracking-wide">Shot Context & References</h2>
+                  <p className="text-xs text-zinc-400">Read-only shot metadata and camera framing specification</p>
+                </div>
+              </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-400">Shot Name</label>
-                <input 
-                  type="text" 
-                  value={activeShot.shot_name || ""} 
-                  onChange={e => updateActiveShot(p => ({ ...p, shot_name: e.target.value }))}
-                  placeholder="e.g. Hero Close-up"
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-400">Shot Number</label>
-                <input 
-                  type="number" 
-                  value={activeShot.shot_number} 
-                  readOnly
-                  className="w-full bg-zinc-950/50 border border-zinc-800 rounded-md px-3 py-2 text-sm text-zinc-500 outline-none cursor-not-allowed"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-400">Shot Type</label>
-                <input 
-                  type="text" 
-                  value={activeShot.shot_type} 
-                  onChange={e => updateActiveShot(prev => ({ ...prev, shot_type: e.target.value }))}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-400">Camera Movement</label>
-                <input 
-                  type="text" 
-                  value={activeShot.camera_movement} 
-                  onChange={e => updateActiveShot(prev => ({ ...prev, camera_movement: e.target.value }))}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none"
-                />
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-1 bg-zinc-950/80 border border-zinc-800 text-xs text-zinc-400 font-mono rounded-md shadow-inner">
+                  {generateSaveVideoPrefix(activeShot.shot_name || "", activeShot.shot_number)}
+                </span>
+                <span className={`px-2.5 py-1 text-xs font-semibold rounded-md shadow uppercase tracking-wider ${
+                  activeShot.staged ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-orange-500/20 text-orange-400 border border-orange-500/30"
+                }`}>
+                  {activeShot.staged ? "✓ Staged" : "Unstaged"}
+                </span>
               </div>
             </div>
 
-            <div className="mt-4">
-              <label className="text-xs font-medium text-zinc-400 mb-3 block">Asset Matrix (Slots 1-9)</label>
+            {/* Read-only Shot Metadata Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="bg-zinc-950/70 border border-zinc-800/80 rounded-lg p-3">
+                <div className="flex items-center gap-1.5 text-zinc-400 text-xs font-medium mb-1">
+                  <Film className="w-3.5 h-3.5 text-zinc-500" />
+                  <span>Shot Name</span>
+                </div>
+                <div className="text-sm font-semibold text-white truncate" title={activeShot.shot_name || "Untitled Shot"}>
+                  {activeShot.shot_name || "Untitled Shot"}
+                </div>
+              </div>
+
+              <div className="bg-zinc-950/70 border border-zinc-800/80 rounded-lg p-3">
+                <div className="flex items-center gap-1.5 text-zinc-400 text-xs font-medium mb-1">
+                  <Hash className="w-3.5 h-3.5 text-zinc-500" />
+                  <span>Shot Number</span>
+                </div>
+                <div className="text-sm font-semibold text-white font-mono">
+                  Shot {activeShot.shot_number.toString().padStart(2, "0")}
+                </div>
+              </div>
+
+              <div className="bg-zinc-950/70 border border-zinc-800/80 rounded-lg p-3">
+                <div className="flex items-center gap-1.5 text-zinc-400 text-xs font-medium mb-1">
+                  <Camera className="w-3.5 h-3.5 text-zinc-500" />
+                  <span>Shot Type</span>
+                </div>
+                <div className="text-sm font-medium text-zinc-200 truncate" title={activeShot.shot_type || "Medium Shot"}>
+                  {activeShot.shot_type || "Medium Shot"}
+                </div>
+              </div>
+
+              <div className="bg-zinc-950/70 border border-zinc-800/80 rounded-lg p-3">
+                <div className="flex items-center gap-1.5 text-zinc-400 text-xs font-medium mb-1">
+                  <Move className="w-3.5 h-3.5 text-zinc-500" />
+                  <span>Camera Movement</span>
+                </div>
+                <div className="text-sm font-medium text-zinc-200 truncate" title={activeShot.camera_movement || "Locked Off"}>
+                  {activeShot.camera_movement || "Locked Off"}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 2-Column Split: Asset Matrix (Left) & Prompt Engineering (Right) */}
+          <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-0">
+            
+            {/* Left Pane: Asset Matrix */}
+            <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-5 flex flex-col gap-4 overflow-y-auto">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-base font-semibold text-white">Asset Matrix (Slots 1-9)</h2>
+                  <p className="text-xs text-zinc-400">Assigned character & scene references</p>
+                </div>
+                <span className="text-xs text-zinc-500 font-mono">
+                  {Object.keys(activeShot.assigned_slots || {}).length} Assigned
+                </span>
+              </div>
+
               <div className="grid grid-cols-3 gap-3">
                 {Array.from({ length: 9 }).map((_, i) => {
                   const asset = getAssetForSlot(i);
@@ -409,60 +442,61 @@ export default function SceneProjectHub({
                 })}
               </div>
             </div>
-          </div>
 
-          {/* Right Pane: Prompt Engineering & Staging */}
-          <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-5 flex flex-col gap-4 overflow-y-auto">
-            <h2 className="text-lg font-semibold text-white">Prompt Engineering & Staging</h2>
-            
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-zinc-400">Concept Stub</label>
-              <textarea 
-                value={activeShot.basic_stub}
-                onChange={e => updateActiveShot(prev => ({ ...prev, basic_stub: e.target.value }))}
-                placeholder="Describe the action and setting..."
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-3 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none resize-none h-24"
-              />
+            {/* Right Pane: Prompt Engineering & Staging */}
+            <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-5 flex flex-col gap-4 overflow-y-auto">
+              <h2 className="text-base font-semibold text-white">Prompt Engineering & Staging</h2>
+              
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-zinc-400">Concept Stub</label>
+                <textarea 
+                  value={activeShot.basic_stub}
+                  onChange={e => updateActiveShot(prev => ({ ...prev, basic_stub: e.target.value }))}
+                  placeholder="Describe the action and setting..."
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-3 text-sm text-white focus:ring-1 focus:ring-indigo-500 outline-none resize-none h-24"
+                />
+              </div>
+
+              <div className="flex justify-end">
+                <button 
+                  onClick={handleExpandPrompt}
+                  disabled={isExpanding || !activeShot.basic_stub.trim()}
+                  className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                >
+                  {isExpanding ? "Expanding..." : "Expand Prompt"}
+                </button>
+              </div>
+
+              <div className="flex-1 space-y-2 min-h-0 flex flex-col">
+                <label className="text-xs font-medium text-zinc-400">Final Expanded Prompt</label>
+                <textarea 
+                  value={activeShot.expanded_prompt}
+                  onChange={e => updateActiveShot(prev => ({ ...prev, expanded_prompt: e.target.value }))}
+                  placeholder="Expanded MiniMax-H3 prompt will appear here..."
+                  className="w-full flex-1 bg-zinc-950 border border-zinc-800 rounded-md px-3 py-3 text-sm text-zinc-300 focus:ring-1 focus:ring-indigo-500 outline-none resize-none font-mono"
+                />
+              </div>
+
+              <div className="pt-2 border-t border-zinc-800/80 flex flex-col gap-2">
+                <button
+                  onClick={handleTransfer}
+                  disabled={isTransferring || !activeShot.expanded_prompt}
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-3 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 shadow"
+                >
+                  <UploadCloud className="w-5 h-5" />
+                  {isTransferring ? "Sending Shot..." : "Send Shot"}
+                </button>
+                <button
+                  onClick={handleTransferScene}
+                  disabled={isTransferringScene || project.shots.length === 0}
+                  className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-3 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 shadow"
+                >
+                  <UploadCloud className="w-5 h-5" />
+                  {isTransferringScene ? "Sending Scene..." : "Send Scene"}
+                </button>
+              </div>
             </div>
 
-            <div className="flex justify-end">
-              <button 
-                onClick={handleExpandPrompt}
-                disabled={isExpanding || !activeShot.basic_stub.trim()}
-                className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
-              >
-                {isExpanding ? "Expanding..." : "Expand Prompt"}
-              </button>
-            </div>
-
-            <div className="flex-1 space-y-2 min-h-0 flex flex-col">
-              <label className="text-xs font-medium text-zinc-400">Final Expanded Prompt</label>
-              <textarea 
-                value={activeShot.expanded_prompt}
-                onChange={e => updateActiveShot(prev => ({ ...prev, expanded_prompt: e.target.value }))}
-                placeholder="Expanded MiniMax-H3 prompt will appear here..."
-                className="w-full flex-1 bg-zinc-950 border border-zinc-800 rounded-md px-3 py-3 text-sm text-zinc-300 focus:ring-1 focus:ring-indigo-500 outline-none resize-none font-mono"
-              />
-            </div>
-
-            <div className="pt-2 border-t border-zinc-800/80 flex flex-col gap-2">
-              <button
-                onClick={handleTransfer}
-                disabled={isTransferring || !activeShot.expanded_prompt}
-                className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-3 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 shadow"
-              >
-                <UploadCloud className="w-5 h-5" />
-                {isTransferring ? "Sending Shot..." : "Send Shot"}
-              </button>
-              <button
-                onClick={handleTransferScene}
-                disabled={isTransferringScene || project.shots.length === 0}
-                className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-3 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 shadow"
-              >
-                <UploadCloud className="w-5 h-5" />
-                {isTransferringScene ? "Sending Scene..." : "Send Scene"}
-              </button>
-            </div>
           </div>
 
         </div>

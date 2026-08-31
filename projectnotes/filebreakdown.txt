@@ -380,7 +380,12 @@
 - **`backend/routes/__init__.py` & `backend/routes/api.py`**
   - Assembles all domain sub-routers under the consolidated `APIRouter(prefix="/api")` while maintaining 100% backwards compatibility for legacy imports.
 
-## Centralized Workflow Builder & Remote Execution Staging Pipeline Synchronization
+## Shot Inspector & Context Layout Redesign
+- **`src/components/SceneProjectHub.tsx`**
+  - Extracted Shot Context & References into a dedicated full-width header panel that spans across both the Asset Matrix and Prompt Engineering columns.
+  - Converted shot details (Shot Name, Shot Number, Shot Type, Camera Movement, Video Output Prefix, Staging Status) into sleek, read-only metadata cards and badges, removing inline form inputs while preserving all framing information.
+  - Divided the lower bay into two balanced columns: Asset Matrix (Slots 1–9) on the left and Prompt Engineering & Staging on the right.
+
 - **`backend/services/workflow_service.py` & `server/services/workflowService.ts`**
   - Standardized `build_shot_workflow(project_data, shot, scene_name)` / `buildShotWorkflow` as the single source of truth for synthesizing ready-to-run ComfyUI workflow JSONs across Python and TypeScript backends.
   - Ingests designated shot workflow templates (or scene default), expanded prompts into target prompt nodes, dynamic sampler steps, megapixels resolution, frame duration overrides, SaveVideo prefixing (`video/{scene_name}_Shot_{shot_number}_`), and mapped image/video/audio loader nodes (with `empty.png` bypass placeholders).
