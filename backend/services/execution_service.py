@@ -13,7 +13,7 @@ from backend.utils.file_handlers import (
     BASE_DIR
 )
 from backend.services.ssh_service import RunPodSSHService
-from backend.services.workflow_service import inject_and_prepare_workflow
+from backend.services.workflow_service import inject_and_prepare_workflow, build_shot_workflow
 
 def generate_ed25519_keypair() -> Dict[str, str]:
     """Generate modern Ed25519 SSH private and public keypair."""
@@ -135,10 +135,17 @@ def stage_scene_pipeline(
     workflow_filename: Optional[str] = None,
     shots: Optional[List[Any]] = None,
     bypass_missing: bool = True,
-    safe_placeholder: str = "empty.png"
+    safe_placeholder: str = "empty.png",
+    project_data: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
-    """Inject workflows and stage assets for all shots in a scene."""
-    clean_root = remote_root.rstrip('/')
+    """
+    Stage scene pipeline:
+    1. Iterates over all shots in the scene and calls build_shot_workflow for each shot.
+    2. Saves synthesized shot workflow JSONs locally in assets/{scene_name}/workflows/{scene_name}_Shot_{shot_number}.json.
+    3. Gathers all unique assigned asset files across the shots and transfers them via SFTP to {remote_root}/input.
+    4. Transfers the synthesized workflow JSON files via SFTP directly into {remote_root}/user/default/workflows/{scene_name}/.
+    """
+    clean_root = remote_root.rstrip('/') if remote_root else "/workspace/runpod-slim/ComfyUI"
     clean_input = remote_input_dir or f"{clean_root}/input"
     shot_items = shots or []
 
@@ -149,22 +156,35 @@ def stage_scene_pipeline(
     scene_wf_dir = scene_dirs.get("workflows")
     scene_wf_dir.mkdir(parents=True, exist_ok=True)
 
-    all_mappings = {}
-    for shot in shot_items:
-        mappings = shot.node_mappings if hasattr(shot, "node_mappings") else shot.get("node_mappings", {})
-        if mappings:
-            all_mappings.update(mappings)
+    # Prepare project-level base configuration
+    base_proj_data = dict(project_data or {})
+    if "scene_name" not in base_proj_data:
+        base_proj_data["scene_name"] = scene_name
+    if "workflow_file" not in base_proj_data and workflow_filename:
+        base_proj_data["workflow_file"] = workflow_filename
+    if "bypassMissing" not in base_proj_data:
+        base_proj_data["bypassMissing"] = bypass_missing
+    if "safe_placeholder" not in base_proj_data:
+        base_proj_data["safe_placeholder"] = safe_placeholder
 
-    files_to_transfer: List[Path] = []
     seen_files = set()
-    for filename_val in all_mappings.values():
-        if filename_val:
-            clean_name = str(filename_val).strip()
-            if clean_name and clean_name not in seen_files:
-                seen_files.add(clean_name)
-                found_path = find_asset_file_path(clean_name)
-                if found_path:
-                    files_to_transfer.append(found_path)
+    files_to_transfer: List[Path] = []
+
+    def add_asset_if_exists(fname: Optional[str]):
+        if fname and isinstance(fname, str):
+            clean = fname.strip()
+            if clean and clean != safe_placeholder and clean != "empty.png" and clean not in seen_files:
+                seen_files.add(clean)
+                fpath = find_asset_file_path(clean)
+                if fpath and fpath.exists():
+                    files_to_transfer.append(fpath)
+
+    # Collect assets from project level node mappings and shared assets
+    for fn in (base_proj_data.get("node_mappings") or base_proj_data.get("nodeMappings") or {}).values():
+        add_asset_if_exists(fn)
+    for sa in (base_proj_data.get("shared_assets") or []):
+        if isinstance(sa, dict) and sa.get("filename"):
+            add_asset_if_exists(sa["filename"])
 
     transferred_summary = []
     transferred_count = 0
@@ -173,37 +193,47 @@ def stage_scene_pipeline(
     skipped_files = []
 
     staged_workflow_files: List[Path] = []
-    for shot in shot_items:
-        s_dict = shot.dict() if hasattr(shot, "dict") else shot
-        wf_file = s_dict.get("workflow_filename") or workflow_filename
-        if not wf_file:
-            continue
+    for idx, shot in enumerate(shot_items):
+        s_dict = shot.dict() if hasattr(shot, "dict") else dict(shot)
+        s_num = s_dict.get("shot_number", idx + 1)
         try:
-            wf_data = load_workflow_json(wf_file, scene_name=scene_name)
-            s_num = s_dict.get("shot_number", 1)
-            shot_num_str = f"{int(s_num):02d}" if str(s_num).isdigit() else str(s_num)
-            final_wf_filename = f"{scene_name}_Shot_{shot_num_str}.json"
-            
-            injected_wf = inject_and_prepare_workflow(
-                workflow_data=wf_data,
-                prompt_node_id=s_dict.get("prompt_node_id"),
-                expanded_prompt=s_dict.get("expanded_prompt") or "",
-                node_mappings=s_dict.get("node_mappings") or {},
-                bypass_missing=bypass_missing,
-                safe_placeholder=safe_placeholder,
-                parameter_overrides=s_dict.get("generation_parameters"),
-                parameter_node_mappings=s_dict.get("parameter_node_mappings"),
-                save_video_prefix=f"video/{scene_name}_Shot_{shot_num_str}_"
+            shot_num_str = f"{int(s_num):02d}"
+        except Exception:
+            shot_num_str = str(s_num)
+
+        # Collect shot-level assigned slots & explicit node mappings
+        for fn in (s_dict.get("assigned_slots") or {}).values():
+            add_asset_if_exists(fn)
+        for fn in (s_dict.get("node_mappings") or {}).values():
+            add_asset_if_exists(fn)
+
+        final_wf_filename = f"{scene_name}_Shot_{shot_num_str}.json"
+
+        try:
+            injected_wf = build_shot_workflow(
+                project_data=base_proj_data,
+                shot=s_dict,
+                scene_name=scene_name
             )
-            
+
+            # Inspect injected workflow nodes for any mapped image/video/audio inputs
+            if isinstance(injected_wf, dict):
+                for node_id, node_data in injected_wf.items():
+                    if isinstance(node_data, dict):
+                        inputs = node_data.get("inputs", {})
+                        if isinstance(inputs, dict):
+                            for key in ["image", "video", "audio"]:
+                                if key in inputs and isinstance(inputs[key], str):
+                                    add_asset_if_exists(inputs[key])
+
             target_file_path = scene_wf_dir / final_wf_filename
             with open(target_file_path, "w", encoding="utf-8") as f:
                 json.dump(injected_wf, f, indent=2)
-            
+
             if target_file_path.exists():
                 staged_workflow_files.append(target_file_path)
         except Exception as wf_err:
-            print(f"Notice: Failed to prepare staged workflow: {wf_err}")
+            print(f"Notice: Failed to prepare staged workflow for Shot {shot_num_str}: {wf_err}")
 
     if host:
         try:
@@ -215,7 +245,8 @@ def stage_scene_pipeline(
                 key_path=key_path,
                 private_key=private_key
             )
-            
+
+            # Step A: Transfer unique assigned media assets to remote input directory
             if files_to_transfer:
                 asset_results = ssh_service.transfer_files_to_runpod(
                     local_files=files_to_transfer,
@@ -228,6 +259,7 @@ def stage_scene_pipeline(
                 skipped_files.extend(asset_results.get("skipped_files", []))
                 transferred_summary.extend(asset_results.get("files", []))
 
+            # Step B: Transfer synthesized shot workflows into remote user workflow directory
             if staged_workflow_files:
                 remote_workflow_dir = f"{clean_root}/user/default/workflows/{scene_name}"
                 wf_transfer_res = ssh_service.transfer_files_to_runpod(
@@ -274,46 +306,61 @@ def stage_scene_pipeline(
     }
 
 async def execute_workflow_pipeline(req_dict: Dict[str, Any]) -> Dict[str, Any]:
-    """Execute full 4-step pipeline (Load, Inject, SSH Transfer, ComfyUI /prompt Dispatch)."""
+    """Execute full 4-step pipeline (Load, Inject via build_shot_workflow, SSH Transfer, ComfyUI /prompt Dispatch)."""
     steps_log = []
 
-    # 1. Load workflow
+    scene_name = req_dict.get("scene_name") or "Scene"
+    workflow_filename = req_dict.get("workflow_filename") or req_dict.get("workflow_file") or "default.json"
+
+    shot_dict = {
+        "workflow_file": workflow_filename,
+        "workflow_filename": workflow_filename,
+        "shot_number": req_dict.get("shot_number", 1),
+        "prompt_node_id": req_dict.get("prompt_node_id"),
+        "expanded_prompt": req_dict.get("expanded_prompt", ""),
+        "basic_stub": req_dict.get("basic_stub", ""),
+        "prompt": req_dict.get("prompt", ""),
+        "node_mappings": req_dict.get("node_mappings", {}),
+        "assigned_slots": req_dict.get("assigned_slots", {}),
+        "generation_parameters": req_dict.get("generation_parameters") or req_dict.get("parameter_overrides", {}),
+        "generation_params": req_dict.get("generation_parameters") or req_dict.get("parameter_overrides", {}),
+        "parameter_overrides": req_dict.get("parameter_overrides", {}),
+        "parameter_node_mappings": req_dict.get("parameter_node_mappings", {})
+    }
+
+    project_data = {
+        "scene_name": scene_name,
+        "workflow_file": workflow_filename,
+        "bypassMissing": req_dict.get("bypass_missing", True),
+        "bypass_missing": req_dict.get("bypass_missing", True),
+        "safe_placeholder": req_dict.get("safe_placeholder", "empty.png"),
+        "node_mappings": req_dict.get("node_mappings", {}),
+        "parameter_overrides": req_dict.get("parameter_overrides", {}),
+        "parameter_node_mappings": req_dict.get("parameter_node_mappings", {}),
+        "shared_assets": req_dict.get("shared_assets", [])
+    }
+
+    # 1. Build Synthesized Workflow with 100% parameter and asset mapping fidelity
     try:
-        workflow_data = load_workflow_json(req_dict["workflow_filename"])
+        modified_workflow = build_shot_workflow(
+            project_data=project_data,
+            shot=shot_dict,
+            scene_name=scene_name
+        )
         steps_log.append({
             "step": "B",
-            "title": "Workflow Loaded",
+            "title": "Workflow Synthesized",
             "status": "success",
-            "detail": f"Successfully loaded '{req_dict['workflow_filename']}' with {len(workflow_data)} nodes."
+            "detail": f"Successfully prepared workflow for '{workflow_filename}' with {len(modified_workflow)} nodes."
         })
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed loading workflow: {str(e)}")
-
-    # 2. Inject Prompt and Parameters
-    param_overrides = dict(req_dict.get("parameter_overrides", {}))
-    param_node_maps = dict(req_dict.get("parameter_node_mappings", {}))
-    if req_dict.get("generation_parameters"):
-        for k, v in req_dict["generation_parameters"].items():
-            if isinstance(v, dict) and "value" in v and "node_id" in v:
-                param_overrides[k] = v["value"]
-                param_node_maps[k] = str(v["node_id"])
-
-    modified_workflow = inject_and_prepare_workflow(
-        workflow_data=workflow_data,
-        prompt_node_id=req_dict.get("prompt_node_id"),
-        expanded_prompt=req_dict.get("expanded_prompt", ""),
-        node_mappings=req_dict.get("node_mappings", {}),
-        bypass_missing=req_dict.get("bypass_missing", True),
-        safe_placeholder=req_dict.get("safe_placeholder", "empty.png"),
-        parameter_overrides=param_overrides,
-        parameter_node_mappings=param_node_maps
-    )
+        raise HTTPException(status_code=400, detail=f"Failed building workflow: {str(e)}")
 
     steps_log.append({
         "step": "C",
         "title": "Payload Injected",
         "status": "success",
-        "detail": f"Injected prompt into node '{req_dict.get('prompt_node_id')}', mapped {len(req_dict.get('node_mappings', {}))} asset nodes."
+        "detail": f"Injected prompt into target prompt node, mapped asset loader slots, and applied sampler overrides."
     })
 
     if req_dict.get("dry_run_only"):
@@ -324,20 +371,39 @@ async def execute_workflow_pipeline(req_dict: Dict[str, Any]) -> Dict[str, Any]:
             "modified_workflow": modified_workflow
         }
 
-    # 3. SSH Transfer
+    # 2. Gather unique assigned asset files across the shot
     files_to_transfer = []
     seen_files = set()
-    for node_id, filename in req_dict.get("node_mappings", {}).items():
-        if filename and filename.strip() and filename.strip() not in seen_files:
-            seen_files.add(filename.strip())
-            local_file = find_asset_file_path(filename.strip())
-            if local_file:
-                files_to_transfer.append(local_file)
+    safe_placeholder = req_dict.get("safe_placeholder", "empty.png")
 
-    if files_to_transfer and req_dict.get("runpod_ip"):
+    def add_file_to_transfer(fname: Optional[str]):
+        if fname and isinstance(fname, str):
+            clean = fname.strip()
+            if clean and clean != safe_placeholder and clean != "empty.png" and clean not in seen_files:
+                seen_files.add(clean)
+                fpath = find_asset_file_path(clean)
+                if fpath and fpath.exists():
+                    files_to_transfer.append(fpath)
+
+    for fn in req_dict.get("node_mappings", {}).values():
+        add_file_to_transfer(fn)
+    for fn in req_dict.get("assigned_slots", {}).values():
+        add_file_to_transfer(fn)
+    if isinstance(modified_workflow, dict):
+        for n_id, n_data in modified_workflow.items():
+            if isinstance(n_data, dict):
+                inputs = n_data.get("inputs", {})
+                if isinstance(inputs, dict):
+                    for k in ["image", "video", "audio"]:
+                        if k in inputs and isinstance(inputs[k], str):
+                            add_file_to_transfer(inputs[k])
+
+    # 3. SSH Transfer
+    runpod_host = req_dict.get("runpod_ip") or req_dict.get("remote_host")
+    if files_to_transfer and runpod_host:
         try:
             ssh_service = RunPodSSHService(
-                host=req_dict["runpod_ip"],
+                host=runpod_host,
                 port=req_dict.get("ssh_port", 22),
                 username=req_dict.get("ssh_username", "root"),
                 password=req_dict.get("ssh_password"),

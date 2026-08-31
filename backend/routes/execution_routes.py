@@ -66,12 +66,14 @@ class StageSceneRequest(BaseModel):
     shots: List[StageSceneShot] = Field(default_factory=list)
     bypass_missing: bool = True
     safe_placeholder: str = "empty.png"
+    project_data: Optional[Dict[str, Any]] = None
 
     class Config:
         extra = "allow"
 
 class ExecuteWorkflowRequest(BaseModel):
-    runpod_ip: str
+    runpod_ip: Optional[str] = None
+    remote_host: Optional[str] = None
     ssh_port: int = 22
     ssh_username: str = "root"
     ssh_password: Optional[str] = None
@@ -84,12 +86,19 @@ class ExecuteWorkflowRequest(BaseModel):
     prompt_node_id: Optional[str] = None
     expanded_prompt: str
     node_mappings: Dict[str, str] = Field(default_factory=dict)
+    assigned_slots: Dict[str, str] = Field(default_factory=dict)
     bypass_missing: bool = True
     safe_placeholder: str = "empty.png"
     parameter_overrides: Dict[str, Any] = Field(default_factory=dict)
     parameter_node_mappings: Dict[str, str] = Field(default_factory=dict)
     generation_parameters: Optional[Dict[str, Any]] = None
     dry_run_only: bool = False
+    scene_name: Optional[str] = "Scene"
+    shot_number: Optional[Any] = 1
+    shared_assets: Optional[List[Any]] = None
+
+    class Config:
+        extra = "allow"
 
 @router.post("/ssh/test")
 async def test_ssh_connection(req: SSHTestRequest):
@@ -150,7 +159,8 @@ async def stage_scene_endpoint(req: StageSceneRequest):
         workflow_filename=req.workflow_filename,
         shots=req.shots,
         bypass_missing=req.bypass_missing,
-        safe_placeholder=req.safe_placeholder
+        safe_placeholder=req.safe_placeholder,
+        project_data=req.project_data
     )
 
 @router.post("/execute")

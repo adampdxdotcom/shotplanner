@@ -418,8 +418,14 @@ def inject_and_prepare_workflow(
             elif bypass_missing and ("audio" not in inputs or not inputs["audio"] or "default" in str(inputs["audio"])):
                 inputs["audio"] = placeholder
 
-        # SaveVideo prefix
-        if (class_type == "SaveVideo" or str_id == "92" or "save video" in str(node_data.get("title", "")).lower()) and save_video_prefix:
+        # SaveVideo / Video Output prefix
+        if save_video_prefix and (
+            class_type in ["SaveVideo", "VHS_VideoCombine", "SaveAnimatedWEBP", "SaveAnimatedPNG", "SaveImage"]
+            or str_id == "92"
+            or "save video" in str(node_data.get("title", "")).lower()
+            or "save" in class_type.lower()
+            or "filename_prefix" in inputs
+        ):
             inputs["filename_prefix"] = str(save_video_prefix).strip()
 
     # Inject Dynamic Generation Parameter Overrides (Step C)
@@ -588,26 +594,55 @@ def build_shot_workflow(project_data: Dict[str, Any], shot: Dict[str, Any], scen
         or (str(prompt_nodes[0]["id"]) if prompt_nodes else "")
     )
 
-    effective_prompt = shot.get("expanded_prompt") or shot.get("basic_stub") or ""
+    effective_prompt = shot.get("expanded_prompt") or shot.get("prompt") or shot.get("basic_stub") or project_data.get("expanded_prompt") or ""
 
-    effective_params = (
-        shot.get("generation_params")
-        or shot.get("generation_parameters")
+    # Parse generation parameters from nested or flat dictionaries
+    raw_params = (
+        shot.get("generation_parameters")
+        or shot.get("generation_params")
+        or shot.get("generationParams")
+        or shot.get("parameter_overrides")
+        or project_data.get("generation_parameters")
         or project_data.get("generation_params")
         or project_data.get("generationParams")
+        or project_data.get("parameter_overrides")
         or {"steps": 30, "megapixels": 0.5, "frames": 81}
     )
 
-    effective_param_nodes = (
+    effective_params: Dict[str, Any] = {"steps": 30, "megapixels": 0.5, "frames": 81}
+    effective_param_nodes: Dict[str, str] = {
+        "steps": str(detected_nodes.get("steps") or ""),
+        "megapixels": str(detected_nodes.get("megapixels") or ""),
+        "frames": str(detected_nodes.get("frames") or "")
+    }
+
+    # Ingest parameter node mappings
+    explicit_param_nodes = (
         shot.get("parameter_node_mappings")
+        or shot.get("parameterNodeMappings")
         or project_data.get("parameter_node_mappings")
         or project_data.get("parameterNodeMappings")
-        or {
-            "steps": detected_nodes.get("steps") or "",
-            "megapixels": detected_nodes.get("megapixels") or "",
-            "frames": detected_nodes.get("frames") or ""
-        }
     )
+    if isinstance(explicit_param_nodes, dict):
+        for pk, pn in explicit_param_nodes.items():
+            if pn:
+                effective_param_nodes[pk] = str(pn)
+
+    # Ingest parameter values and nested node IDs
+    if isinstance(raw_params, dict):
+        for pk, pv in raw_params.items():
+            if isinstance(pv, dict):
+                if "value" in pv and pv["value"] is not None:
+                    effective_params[pk] = pv["value"]
+                if "node_id" in pv and pv["node_id"]:
+                    effective_param_nodes[pk] = str(pv["node_id"])
+            elif pv is not None:
+                effective_params[pk] = pv
+
+    # Merge additional direct parameter_overrides if passed
+    direct_overrides = shot.get("parameter_overrides") or project_data.get("parameter_overrides")
+    if isinstance(direct_overrides, dict):
+        effective_params.update(direct_overrides)
 
     # Shot number and save video prefix
     shot_num = shot.get("shot_number", 1)
@@ -617,8 +652,27 @@ def build_shot_workflow(project_data: Dict[str, Any], shot: Dict[str, Any], scen
     except Exception:
         shot_num_str = str(shot_num)
 
-    save_video_prefix = f"{clean_scene_name}_shot_{shot_num_str}"
-    bypass_missing = project_data.get("bypassMissing", True)
+    save_video_prefix = (
+        shot.get("save_video_prefix")
+        or project_data.get("save_video_prefix")
+        or f"{clean_scene_name}_shot_{shot_num_str}"
+    )
+
+    bypass_missing = (
+        shot.get("bypass_missing")
+        if "bypass_missing" in shot
+        else shot.get("bypassMissing")
+        if "bypassMissing" in shot
+        else project_data.get("bypass_missing")
+        if "bypass_missing" in project_data
+        else project_data.get("bypassMissing", True)
+    )
+
+    safe_placeholder = (
+        shot.get("safe_placeholder")
+        or project_data.get("safe_placeholder")
+        or "empty.png"
+    )
 
     # 5. Inject and synthesize ready-to-run ComfyUI workflow
     return inject_and_prepare_workflow(
@@ -627,7 +681,7 @@ def build_shot_workflow(project_data: Dict[str, Any], shot: Dict[str, Any], scen
         expanded_prompt=effective_prompt,
         node_mappings=effective_mappings,
         bypass_missing=bool(bypass_missing),
-        safe_placeholder="empty.png",
+        safe_placeholder=safe_placeholder,
         parameter_overrides=effective_params,
         parameter_node_mappings=effective_param_nodes,
         save_video_prefix=save_video_prefix

@@ -380,4 +380,16 @@
 - **`backend/routes/__init__.py` & `backend/routes/api.py`**
   - Assembles all domain sub-routers under the consolidated `APIRouter(prefix="/api")` while maintaining 100% backwards compatibility for legacy imports.
 
+## Centralized Workflow Builder & Remote Execution Staging Pipeline Synchronization
+- **`backend/services/workflow_service.py` & `server/services/workflowService.ts`**
+  - Standardized `build_shot_workflow(project_data, shot, scene_name)` / `buildShotWorkflow` as the single source of truth for synthesizing ready-to-run ComfyUI workflow JSONs across Python and TypeScript backends.
+  - Ingests designated shot workflow templates (or scene default), expanded prompts into target prompt nodes, dynamic sampler steps, megapixels resolution, frame duration overrides, SaveVideo prefixing (`video/{scene_name}_Shot_{shot_number}_`), and mapped image/video/audio loader nodes (with `empty.png` bypass placeholders).
+- **`backend/services/execution_service.py` & `server/services/executionService.ts`**
+  - Refactored `stage_scene_pipeline` and `execute_workflow_pipeline` to strictly invoke `build_shot_workflow` for every shot in a scene, eliminating redundant parameter mapping code.
+  - Verified remote SFTP staging workflow:
+    - Automatically collects all unique assigned media assets across all shots and transfers them via SFTP to the remote ComfyUI input directory (`{remote_comfyui_root}/input`).
+    - Synthesizes and writes individual shot workflow JSONs locally into `assets/{scene_name}/workflows/{scene_name}_Shot_{shot_number}.json` and transfers them via SFTP directly to the remote user workflows directory (`{remote_comfyui_root}/user/default/workflows/{scene_name}/`).
+- **`backend/routes/execution_routes.py`**
+  - Updated `StageSceneRequest` and `ExecuteWorkflowRequest` to support optional `project_data`, `assigned_slots`, and `shared_assets` payloads for high-fidelity workflow construction.
+
 
