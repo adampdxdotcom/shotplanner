@@ -418,5 +418,15 @@
 - **`src/App.tsx`**
   - Updated `handleCreateNewProject` to instantiate a clean, in-memory blank project state without immediate disk I/O, writing to disk only when saved explicitly via the Save modal or auto-saved under its user-specified scene name.
 
+## 1-to-1 Project Synchronization & Scene Folder Isolation
+- **`backend/services/project_service.py` & `server/services/projectService.ts`**
+  - Enforced the 1-to-1 Project Synchronization Rule across listing, saving, and import handlers:
+    - **Authoritative Descriptor Listing (`list_all_projects` / `listProjects`)**: Strictly identifies the single authoritative descriptor matching the scene directory `assets/{scene_name}/{scene_name}.json`. Ignores all auxiliary json files (`assets_db.json`, `gemini_config.json`, `package.json`, `tsconfig.json`, `metadata.json`) and deduplicates entries so each physical scene directory produces exactly one project item in the UI.
+    - **Synchronized Project Saving (`save_project_data` / `POST /api/projects`)**: Synchronizes project name, scene folder name, and JSON filename (e.g. saving "make_out2" writes to `assets/make_out2/make_out2.json` and updates `scene_name: "make_out2"` in the project data payload).
+    - **Direct Scene Extraction on Import (`extract_project_zip_buffer` / `importProjectZip` / `POST /api/projects/import`)**: Unpacks and streams archive contents directly into `assets/{imported_clean_name}/` (and its subdirectories `images/`, `workflows/`, `videos/`, `audios/`, `shared/`), saving the authoritative descriptor `assets/{imported_clean_name}/{imported_clean_name}.json` and synchronizing the internal `scene_name` so archives never dump into mismatched or legacy directories.
+- **`backend/utils/file_handlers.py` & `server/services/projectService.ts`**
+  - Updated `find_project_file` to prioritize the authoritative `assets/{scene_name}/{scene_name}.json` path and filter out auxiliary/configuration JSON files.
+
+
 
 

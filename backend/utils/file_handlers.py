@@ -45,22 +45,34 @@ def find_project_file(identifier: str) -> Optional[Path]:
 
     sanitized = sanitize_project_name(identifier)
     scene_dir_name = format_scene_folder_name(sanitized)
+    
+    # 1. Authoritative 1-to-1 path: assets/{scene_dir_name}/{scene_dir_name}.json
+    p = ASSETS_DIR / scene_dir_name / f"{scene_dir_name}.json"
+    if p.is_file(): return p
+
+    # 2. Check assets/{scene_dir_name}/{sanitized}.json
     p = ASSETS_DIR / scene_dir_name / f"{sanitized}.json"
     if p.is_file(): return p
     
+    # 3. Legacy flat path
     p = PROJECTS_DIR / f"{sanitized}.json"
     if p.is_file(): return p
     
-    directories_to_scan = [PROJECTS_DIR, ASSETS_DIR]
+    # 4. Search scene subdirectories
+    ignored = {"assets_db.json", "gemini_config.json", "package.json", "tsconfig.json", "metadata.json"}
     if ASSETS_DIR.exists():
-        for item in ASSETS_DIR.iterdir():
-            if item.is_dir():
-                directories_to_scan.append(item)
-                
-    for directory in directories_to_scan:
-        if not directory.exists(): continue
-        for f in directory.glob("*.json"):
-            if f.is_file() and normalize(f.name) == target_norm:
+        for d in ASSETS_DIR.iterdir():
+            if d.is_dir() and d.name not in {"tmp_uploads", "project_jsons"}:
+                cand = d / f"{d.name}.json"
+                if cand.is_file() and normalize(cand.stem) == target_norm:
+                    return cand
+                for f in d.glob("*.json"):
+                    if f.is_file() and f.name.lower() not in ignored and normalize(f.stem) == target_norm:
+                        return f
+                 
+    if PROJECTS_DIR.exists():
+        for f in PROJECTS_DIR.glob("*.json"):
+            if f.is_file() and f.name.lower() not in ignored and normalize(f.stem) == target_norm:
                 return f
                 
     return None

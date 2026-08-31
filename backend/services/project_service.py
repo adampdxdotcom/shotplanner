@@ -23,24 +23,36 @@ from backend.utils.file_handlers import (
 )
 from backend.services.workflow_service import inspect_workflow_nodes, inject_and_prepare_workflow, build_shot_workflow
 
+IGNORED_JSON_FILENAMES = {
+    "assets_db.json",
+    "gemini_config.json",
+    "package.json",
+    "tsconfig.json",
+    "metadata.json"
+}
+
 def save_project_data(req: Dict[str, Any]) -> str:
-    """Save project JSON into dedicated scene directory."""
+    """
+    Save project JSON into dedicated scene directory with strict 1-to-1 synchronization:
+    assets/{scene_name}/{scene_name}.json with synchronized scene_name inside JSON.
+    """
     raw_name = str(
         req.get("filename")
         or req.get("name")
         or (req.get("data", {}).get("scene_name") if isinstance(req.get("data"), dict) else None)
         or "project"
     )
-    sanitized_name = sanitize_project_name(raw_name)
-    final_filename = f"{sanitized_name}.json"
+    clean_name = sanitize_project_name(raw_name)
+    scene_dir_name = format_scene_folder_name(clean_name)
+    final_filename = f"{scene_dir_name}.json"
     
     data_to_save = req.get("data") if ("data" in req and isinstance(req["data"], dict)) else req
     
-    # Determine scene folder name
-    scene_name = None
+    # Enforce synchronized scene_name inside project JSON data
     if isinstance(data_to_save, dict):
-        scene_name = data_to_save.get("scene_name") or data_to_save.get("scene_planning", {}).get("scene_name")
-    scene_dir_name = format_scene_folder_name(scene_name or raw_name)
+        data_to_save["scene_name"] = scene_dir_name
+        if "scene_planning" in data_to_save and isinstance(data_to_save["scene_planning"], dict):
+            data_to_save["scene_planning"]["scene_name"] = scene_dir_name
     
     dirs = ensure_scene_directories(scene_dir_name)
     file_path = dirs["base"] / final_filename
@@ -51,34 +63,63 @@ def save_project_data(req: Dict[str, Any]) -> str:
     return final_filename
 
 def list_all_projects() -> List[Dict[str, Any]]:
-    """Scan scene directories and legacy projects folder for saved projects."""
+    """
+    Scan scene directories and legacy projects folder for saved projects.
+    Enforces 1-to-1 Project Synchronization: strictly checks for assets/{scene_name}/{scene_name}.json
+    and deduplicates so each physical scene directory yields exactly one project item in the UI.
+    """
     projects = []
-    seen = set()
+    seen_scenes = set()
     
-    def process_file(f: Path, scene_name: Optional[str]):
-        if f.is_file() and f.name not in seen:
-            seen.add(f.name)
-            stat = f.stat()
-            mtime = datetime.fromtimestamp(stat.st_mtime).isoformat() + "Z"
-            projects.append({
-                "filename": f.name,
-                "display_name": f.name[:-5] if f.name.endswith(".json") else f.name,
-                "scene_name": scene_name,
-                "mtime": mtime,
-                "size": stat.st_size
-            })
-            
-    # Scan scene directories first
+    # 1. Scan scene directories in ASSETS_DIR
     if ASSETS_DIR.exists():
         for d in ASSETS_DIR.iterdir():
-            if d.is_dir():
-                for f in d.glob("*.json"):
-                    process_file(f, d.name)
+            if d.is_dir() and d.name not in {"tmp_uploads", "project_jsons"}:
+                scene_name = d.name
+                if scene_name in seen_scenes:
+                    continue
+                
+                # Check authoritative descriptor assets/{scene_name}/{scene_name}.json
+                authoritative_file = d / f"{scene_name}.json"
+                target_file = None
+                
+                if authoritative_file.is_file():
+                    target_file = authoritative_file
+                else:
+                    # Fallback: find any primary scene json excluding auxiliary files
+                    for f in d.glob("*.json"):
+                        if f.name.lower() not in IGNORED_JSON_FILENAMES and not f.name.startswith("."):
+                            target_file = f
+                            break
+                            
+                if target_file and target_file.is_file():
+                    seen_scenes.add(scene_name)
+                    stat = target_file.stat()
+                    mtime = datetime.fromtimestamp(stat.st_mtime).isoformat() + "Z"
+                    projects.append({
+                        "filename": target_file.name,
+                        "display_name": scene_name,
+                        "scene_name": scene_name,
+                        "mtime": mtime,
+                        "size": stat.st_size
+                    })
                     
-    # Scan legacy projects dir
+    # 2. Scan legacy projects dir
     if PROJECTS_DIR.exists():
         for f in PROJECTS_DIR.glob("*.json"):
-            process_file(f, None)
+            if f.is_file() and f.name.lower() not in IGNORED_JSON_FILENAMES and not f.name.startswith("."):
+                stem = f.stem
+                if stem not in seen_scenes:
+                    seen_scenes.add(stem)
+                    stat = f.stat()
+                    mtime = datetime.fromtimestamp(stat.st_mtime).isoformat() + "Z"
+                    projects.append({
+                        "filename": f.name,
+                        "display_name": stem,
+                        "scene_name": stem,
+                        "mtime": mtime,
+                        "size": stat.st_size
+                    })
             
     projects.sort(key=lambda x: x["mtime"], reverse=True)
     return projects
@@ -313,12 +354,23 @@ def extract_project_zip_buffer(zip_source: Any) -> str:
                 except Exception:
                     pass
 
-        # Determine scene name and initialize directories
-        scene_name = imported_project
+        # Determine authoritative clean scene name
+        raw_scene_name = (
+            (project_json_data.get("scene_name") if isinstance(project_json_data, dict) else None)
+            or (project_json_data.get("scene_planning", {}).get("scene_name") if isinstance(project_json_data, dict) else None)
+            or imported_project
+            or "imported_scene"
+        )
+        clean_scene_name = sanitize_project_name(raw_scene_name)
+        scene_dir_name = format_scene_folder_name(clean_scene_name)
+        
+        # Enforce synchronized scene_name inside project JSON data
         if isinstance(project_json_data, dict):
-            scene_name = project_json_data.get("scene_name") or project_json_data.get("scene_planning", {}).get("scene_name") or scene_name
+            project_json_data["scene_name"] = scene_dir_name
+            if "scene_planning" in project_json_data and isinstance(project_json_data["scene_planning"], dict):
+                project_json_data["scene_planning"]["scene_name"] = scene_dir_name
             
-        scene_dirs = ensure_scene_directories(scene_name)
+        scene_dirs = ensure_scene_directories(scene_dir_name)
         
         # Build lookup for media_type
         media_type_map = {}
@@ -355,19 +407,18 @@ def extract_project_zip_buffer(zip_source: Any) -> str:
                     shutil.copyfileobj(src_file, dest_file, length=1024 * 1024)
                         
             elif filename.endswith(".json") and "/" not in filename and "\\" not in filename:
-                out_name = os.path.basename(filename)
-                # Store in both scene directory base and legacy projects dir
-                dest_base = scene_dirs["base"] / out_name
-                with zip_file_obj.open(member) as src_file, open(dest_base, "wb") as dest_file:
-                    shutil.copyfileobj(src_file, dest_file, length=1024 * 1024)
-                
-                PROJECTS_DIR.mkdir(parents=True, exist_ok=True)
-                dest_legacy = PROJECTS_DIR / out_name
-                try:
-                    shutil.copyfile(dest_base, dest_legacy)
-                except Exception:
-                    pass
+                if filename.lower() not in IGNORED_JSON_FILENAMES:
+                    # Write authoritative descriptor directly to assets/{scene_dir_name}/{scene_dir_name}.json
+                    dest_base = scene_dirs["base"] / f"{scene_dir_name}.json"
+                    with open(dest_base, "w", encoding="utf-8") as f:
+                        json.dump(project_json_data, f, indent=2)
+
+        # Ensure authoritative project json exists if not written in loop
+        authoritative_json = scene_dirs["base"] / f"{scene_dir_name}.json"
+        if not authoritative_json.exists() and project_json_data:
+            with open(authoritative_json, "w", encoding="utf-8") as f:
+                json.dump(project_json_data, f, indent=2)
     finally:
         zip_file_obj.close()
                                 
-    return imported_project
+    return f"{scene_dir_name}.json"

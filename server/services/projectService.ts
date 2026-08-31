@@ -9,44 +9,80 @@ import { assetService } from "./assetService";
 import { formatShotNumber, sanitizeFilenamePart, generateSaveVideoPrefix } from "../utils/formatters";
 import { parseWorkflowData, injectAndPrepareWorkflowData } from "./workflowService";
 
+const IGNORED_JSON_FILENAMES = new Set([
+  "assets_db.json",
+  "gemini_config.json",
+  "package.json",
+  "tsconfig.json",
+  "metadata.json"
+]);
+
 export function listProjects(): any[] {
   const projects: any[] = [];
-  const seen = new Set<string>();
+  const seenScenes = new Set<string>();
   
-  const processFile = (dir: string, f: string, sceneName: string | null) => {
-    if (seen.has(f)) return;
-    seen.add(f);
-    const fullPath = path.join(dir, f);
-    try {
-      const stats = fs.statSync(fullPath);
-      projects.push({
-        filename: f,
-        display_name: f.replace(/\.json$/i, ""),
-        scene_name: sceneName,
-        mtime: stats.mtime.toISOString(),
-        size: stats.size
-      });
-    } catch(e) {}
-  };
-  
-  
+  // 1. Scan scene directories in ASSETS_DIR
   if (fs.existsSync(ASSETS_DIR)) {
     const dirs = fs.readdirSync(ASSETS_DIR);
     for (const d of dirs) {
+      if (d === "tmp_uploads" || d === "project_jsons") continue;
       const dirPath = path.join(ASSETS_DIR, d);
-      if (fs.statSync(dirPath).isDirectory()) {
-        const files = fs.readdirSync(dirPath).filter((f) => f.endsWith(".json"));
-        for (const f of files) {
-          processFile(dirPath, f, d);
+      try {
+        if (fs.statSync(dirPath).isDirectory()) {
+          if (seenScenes.has(d)) continue;
+          
+          // Check authoritative descriptor assets/{scene_name}/{scene_name}.json
+          const authoritativePath = path.join(dirPath, `${d}.json`);
+          let targetFile: string | null = null;
+          
+          if (fs.existsSync(authoritativePath)) {
+            targetFile = authoritativePath;
+          } else {
+            // Fallback: check for primary non-auxiliary json
+            const files = fs.readdirSync(dirPath).filter((f) => f.endsWith(".json"));
+            for (const f of files) {
+              if (!IGNORED_JSON_FILENAMES.has(f.toLowerCase()) && !f.startsWith(".")) {
+                targetFile = path.join(dirPath, f);
+                break;
+              }
+            }
+          }
+          
+          if (targetFile && fs.existsSync(targetFile)) {
+            seenScenes.add(d);
+            const stats = fs.statSync(targetFile);
+            projects.push({
+              filename: path.basename(targetFile),
+              display_name: d,
+              scene_name: d,
+              mtime: stats.mtime.toISOString(),
+              size: stats.size
+            });
+          }
         }
-      }
+      } catch (e) {}
     }
   }
   
+  // 2. Scan legacy PROJECTS_DIR
   if (fs.existsSync(PROJECTS_DIR)) {
     const files = fs.readdirSync(PROJECTS_DIR).filter((f) => f.endsWith(".json"));
     for (const f of files) {
-      processFile(PROJECTS_DIR, f, null);
+      if (IGNORED_JSON_FILENAMES.has(f.toLowerCase()) || f.startsWith(".")) continue;
+      const stem = f.replace(/\.json$/i, "");
+      if (seenScenes.has(stem)) continue;
+      seenScenes.add(stem);
+      try {
+        const fullPath = path.join(PROJECTS_DIR, f);
+        const stats = fs.statSync(fullPath);
+        projects.push({
+          filename: f,
+          display_name: stem,
+          scene_name: stem,
+          mtime: stats.mtime.toISOString(),
+          size: stats.size
+        });
+      } catch (e) {}
     }
   }
   
@@ -54,17 +90,16 @@ export function listProjects(): any[] {
 }
 
 export function getProjectData(projectName: string): any | null {
-  const cleanName = sanitizeProjectName(projectName);
-  const p = path.join(PROJECTS_DIR, `${cleanName}.json`);
-  if (!fs.existsSync(p)) return null;
+  const filePath = findProjectFile(projectName);
+  if (!filePath || !fs.existsSync(filePath)) return null;
 
-  const projectData = JSON.parse(fs.readFileSync(p, "utf-8"));
+  const projectData = JSON.parse(fs.readFileSync(filePath, "utf-8"));
   
   // Ensure scene folders exist on load
+  const cleanName = sanitizeProjectName(projectName);
   const sceneName = projectData?.scene_name || projectData?.scene_planning?.scene_name || cleanName;
   ensureSceneDirectories(sceneName);
 
-  // Strict isolation: no global asset database sync
   return projectData;
 }
 
@@ -85,32 +120,33 @@ export function findProjectFile(identifier: string): string | null {
   const sanitized = sanitizeProjectName(identifier);
   const sceneDirName = formatSceneFolderName(sanitized);
   
-  // 1. Check direct structured path
-  let p = path.join(ASSETS_DIR, sceneDirName, `${sanitized}.json`);
+  // 1. Check direct authoritative 1-to-1 path
+  let p = path.join(ASSETS_DIR, sceneDirName, `${sceneDirName}.json`);
+  if (fs.existsSync(p)) return p;
+
+  // 2. Check assets/{sceneDirName}/{sanitized}.json
+  p = path.join(ASSETS_DIR, sceneDirName, `${sanitized}.json`);
   if (fs.existsSync(p)) return p;
   
-  // 2. Check legacy flat path
+  // 3. Check legacy flat path
   p = path.join(PROJECTS_DIR, `${sanitized}.json`);
   if (fs.existsSync(p)) return p;
   
-  // 3. Flexible search
-  const dirsToScan = [PROJECTS_DIR, ASSETS_DIR];
+  // 4. Search scene subdirectories
   if (fs.existsSync(ASSETS_DIR)) {
     const items = fs.readdirSync(ASSETS_DIR, { withFileTypes: true });
     for (const item of items) {
-      if (item.isDirectory()) {
-        dirsToScan.push(path.join(ASSETS_DIR, item.name));
-      }
-    }
-  }
-  
-  for (const dir of dirsToScan) {
-    if (!fs.existsSync(dir)) continue;
-    const files = fs.readdirSync(dir, { withFileTypes: true });
-    for (const file of files) {
-      if (file.isFile() && file.name.endsWith(".json")) {
-        if (normalize(file.name) === targetNorm) {
-          return path.join(dir, file.name);
+      if (item.isDirectory() && item.name !== "tmp_uploads" && item.name !== "project_jsons") {
+        const cand = path.join(ASSETS_DIR, item.name, `${item.name}.json`);
+        if (fs.existsSync(cand) && normalize(item.name) === targetNorm) {
+          return cand;
+        }
+        const dirPath = path.join(ASSETS_DIR, item.name);
+        const subFiles = fs.readdirSync(dirPath);
+        for (const sf of subFiles) {
+          if (sf.endsWith(".json") && !IGNORED_JSON_FILENAMES.has(sf.toLowerCase()) && normalize(sf) === targetNorm) {
+            return path.join(dirPath, sf);
+          }
         }
       }
     }
@@ -130,23 +166,21 @@ export function sanitizeProjectName(name: string): string {
 
 export function saveProjectData(projectName: string, projectData: any): string {
   const cleanName = sanitizeProjectName(projectName);
+  const sceneDirName = formatSceneFolderName(cleanName);
   
-  const sceneName = projectData?.scene_name || projectData?.scene_planning?.scene_name || cleanName;
-  const sceneDirName = formatSceneFolderName(sceneName);
-  
-  ensureSceneDirectories(sceneName);
-  
-  const targetDir = path.join(ASSETS_DIR, sceneDirName);
-  if (!fs.existsSync(targetDir)) {
-      fs.mkdirSync(targetDir, { recursive: true });
+  if (projectData && typeof projectData === "object") {
+    projectData.scene_name = sceneDirName;
+    if (projectData.scene_planning && typeof projectData.scene_planning === "object") {
+      projectData.scene_planning.scene_name = sceneDirName;
+    }
   }
-  const targetPath = path.join(targetDir, `${cleanName}.json`);
+
+  const dirs = ensureSceneDirectories(sceneDirName);
+  const targetPath = path.join(dirs.base, `${sceneDirName}.json`);
   
   fs.writeFileSync(targetPath, JSON.stringify(projectData, null, 2));
 
-  // Strict isolation: no global asset database sync
-
-  return cleanName;
+  return `${sceneDirName}.json`;
 }
 
 export function deleteProject(projectName: string): boolean {
@@ -511,38 +545,91 @@ export async function importProjectZip(uploadedFilePath: string): Promise<string
   const directory = await unzipper.Open.buffer(zipBuffer);
 
   let importedProject = "";
+  let projectJsonData: any = null;
+  let assetsDbMeta: any[] = [];
 
+  // Pass 1: find master json & assets_db.json
   for (const file of directory.files) {
     if (file.type !== "File") continue;
+    if (file.path === "assets_db.json" || path.basename(file.path) === "assets_db.json") {
+      try {
+        const buf = await file.buffer();
+        const parsed = JSON.parse(buf.toString("utf-8"));
+        if (Array.isArray(parsed)) assetsDbMeta = parsed;
+      } catch (e) {}
+    } else if (file.path.endsWith(".json") && !file.path.includes("/")) {
+      if (!IGNORED_JSON_FILENAMES.has(file.path.toLowerCase())) {
+        importedProject = path.basename(file.path).replace(/\.json$/i, "");
+        try {
+          const buf = await file.buffer();
+          projectJsonData = JSON.parse(buf.toString("utf-8"));
+        } catch (e) {}
+      }
+    }
+  }
+
+  // Determine clean scene name
+  const rawSceneName =
+    projectJsonData?.scene_name ||
+    projectJsonData?.scene_planning?.scene_name ||
+    importedProject ||
+    "imported_scene";
+  const cleanSceneName = sanitizeProjectName(rawSceneName);
+  const sceneDirName = formatSceneFolderName(cleanSceneName);
+
+  if (projectJsonData && typeof projectJsonData === "object") {
+    projectJsonData.scene_name = sceneDirName;
+    if (projectJsonData.scene_planning && typeof projectJsonData.scene_planning === "object") {
+      projectJsonData.scene_planning.scene_name = sceneDirName;
+    }
+  }
+
+  const sceneDirs = ensureSceneDirectories(sceneDirName);
+
+  // Build media type lookup
+  const mediaTypeMap: Record<string, string> = {};
+  for (const a of assetsDbMeta) {
+    if (a?.filename) mediaTypeMap[a.filename] = a.media_type || "image";
+  }
+  if (Array.isArray(projectJsonData?.assets)) {
+    for (const a of projectJsonData.assets) {
+      if (a?.filename) mediaTypeMap[a.filename] = a.media_type || "image";
+    }
+  }
+
+  // Pass 2: extract files into scene hierarchy
+  for (const file of directory.files) {
+    if (file.type !== "File") continue;
+    const fname = path.basename(file.path);
+    if (!fname) continue;
     const buffer = await file.buffer();
 
-    if (file.path.startsWith("workflows/")) {
-      const fname = path.basename(file.path);
-      fs.writeFileSync(path.join(WORKFLOWS_DIR, fname), buffer);
+    if (file.path.startsWith("workflows/") || file.path.startsWith("staged_workflows/")) {
+      fs.writeFileSync(path.join(sceneDirs.workflows, fname), buffer);
     } else if (file.path.startsWith("uploads/")) {
-      const fname = path.basename(file.path);
-      fs.writeFileSync(path.join(UPLOADS_DIR, fname), buffer);
-    } else if (file.path === "assets_db.json") {
-      // Ignored: strictly using project JSON for metadata now
+      const mType = mediaTypeMap[fname] || "image";
+      const targetDir = (sceneDirs as any)[`${mType}s`] || sceneDirs.images;
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+      }
+      fs.writeFileSync(path.join(targetDir, fname), buffer);
     } else if (file.path.endsWith(".json") && !file.path.includes("/")) {
-      const fname = path.basename(file.path);
-      fs.writeFileSync(path.join(PROJECTS_DIR, fname), buffer);
-      importedProject = fname.replace(/\.json$/, "");
-      try {
-        const pData = JSON.parse(buffer.toString("utf-8"));
-        
-        // Ensure scene folders exist on load
-        const sceneName = pData?.scene_name || pData?.scene_planning?.scene_name || importedProject;
-        ensureSceneDirectories(sceneName);
-
-
-      } catch (e) {}
+      if (!IGNORED_JSON_FILENAMES.has(fname.toLowerCase())) {
+        const destBase = path.join(sceneDirs.base, `${sceneDirName}.json`);
+        fs.writeFileSync(destBase, JSON.stringify(projectJsonData || {}, null, 2));
+      }
     }
+  }
+
+  // Ensure authoritative json exists
+  const authoritativeJson = path.join(sceneDirs.base, `${sceneDirName}.json`);
+  if (!fs.existsSync(authoritativeJson) && projectJsonData) {
+    fs.writeFileSync(authoritativeJson, JSON.stringify(projectJsonData, null, 2));
   }
 
   try {
     fs.unlinkSync(uploadedFilePath);
   } catch (e) {}
 
-  return importedProject;
+  return `${sceneDirName}.json`;
 }
