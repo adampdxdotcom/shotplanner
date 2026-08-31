@@ -201,6 +201,17 @@ def stage_scene_pipeline(
         except Exception:
             shot_num_str = str(s_num)
 
+        takes = s_dict.get("takes") or []
+        take_num = s_dict.get("take_number")
+        if take_num is None:
+            take_numbers = [
+                t.get("take_number")
+                for t in takes
+                if isinstance(t, dict) and t.get("take_number") is not None
+            ]
+            take_num = max(take_numbers, default=0) + 1
+        s_dict["take_number"] = take_num
+
         # Collect shot-level assigned slots & explicit node mappings
         for fn in (s_dict.get("assigned_slots") or {}).values():
             add_asset_if_exists(fn)
@@ -312,10 +323,28 @@ async def execute_workflow_pipeline(req_dict: Dict[str, Any]) -> Dict[str, Any]:
     scene_name = req_dict.get("scene_name") or "Scene"
     workflow_filename = req_dict.get("workflow_filename") or req_dict.get("workflow_file") or "default.json"
 
+    s_num = req_dict.get("shot_number", 1)
+    try:
+        shot_num_str = f"{int(s_num):02d}"
+    except Exception:
+        shot_num_str = str(s_num)
+
+    takes = req_dict.get("takes") or []
+    take_num = req_dict.get("take_number")
+    if take_num is None:
+        take_numbers = [
+            t.get("take_number")
+            for t in takes
+            if isinstance(t, dict) and t.get("take_number") is not None
+        ]
+        take_num = max(take_numbers, default=0) + 1
+
     shot_dict = {
         "workflow_file": workflow_filename,
         "workflow_filename": workflow_filename,
-        "shot_number": req_dict.get("shot_number", 1),
+        "shot_number": s_num,
+        "take_number": take_num,
+        "takes": takes,
         "prompt_node_id": req_dict.get("prompt_node_id"),
         "expanded_prompt": req_dict.get("expanded_prompt", ""),
         "basic_stub": req_dict.get("basic_stub", ""),
@@ -363,10 +392,14 @@ async def execute_workflow_pipeline(req_dict: Dict[str, Any]) -> Dict[str, Any]:
         "detail": f"Injected prompt into target prompt node, mapped asset loader slots, and applied sampler overrides."
     })
 
+    expected_video_filename = f"{scene_name}_Shot_{shot_num_str}_Take_{take_num}.mp4"
+
     if req_dict.get("dry_run_only"):
         return {
             "success": True,
             "dry_run": True,
+            "take_number": take_num,
+            "expected_video_filename": expected_video_filename,
             "steps": steps_log,
             "modified_workflow": modified_workflow
         }
@@ -469,6 +502,8 @@ async def execute_workflow_pipeline(req_dict: Dict[str, Any]) -> Dict[str, Any]:
                 return {
                     "success": True,
                     "prompt_id": prompt_id,
+                    "take_number": take_num,
+                    "expected_video_filename": expected_video_filename,
                     "steps": steps_log,
                     "modified_workflow": modified_workflow
                 }
@@ -481,6 +516,8 @@ async def execute_workflow_pipeline(req_dict: Dict[str, Any]) -> Dict[str, Any]:
                 })
                 return {
                     "success": False,
+                    "take_number": take_num,
+                    "expected_video_filename": expected_video_filename,
                     "error": f"ComfyUI returned {response.status_code}",
                     "steps": steps_log,
                     "modified_workflow": modified_workflow
@@ -495,6 +532,8 @@ async def execute_workflow_pipeline(req_dict: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "success": True,
             "simulated": True,
+            "take_number": take_num,
+            "expected_video_filename": expected_video_filename,
             "message": "Workflow processed and ready. Remote call timed out or endpoint is local mock.",
             "steps": steps_log,
             "modified_workflow": modified_workflow

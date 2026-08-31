@@ -11,6 +11,7 @@ import {
 import { injectAndPrepareWorkflowData, parseWorkflowData } from "./workflowService";
 
 export interface AssetTransferOptions {
+  take_number?: string | number;
   remote_host?: string;
   ssh_port?: number;
   ssh_username?: string;
@@ -28,6 +29,8 @@ export interface AssetTransferOptions {
   shot_number?: string | number;
   shot_type?: string;
   camera_movement?: string;
+  lens_focal_length?: string;
+  aspect_ratio?: string;
   scene_planning?: ScenePlanningDTO;
   planning?: ScenePlanningDTO;
   node_mappings?: Record<string, string>;
@@ -53,6 +56,8 @@ export async function processAssetTransfer(options: AssetTransferOptions) {
     shot_number,
     shot_type,
     camera_movement,
+    lens_focal_length,
+    aspect_ratio,
     scene_planning,
     planning,
     node_mappings = {},
@@ -68,12 +73,20 @@ export async function processAssetTransfer(options: AssetTransferOptions) {
     save_video_prefix ||
     generateSaveVideoPrefix(
       scene_name ?? scene_planning?.scene_name ?? planning?.scene_name,
-      shot_number ?? scene_planning?.shot_number ?? planning?.shot_number
+      shot_number ?? scene_planning?.shot_number ?? planning?.shot_number,
+      options.take_number
     );
 
   const resolvedPromptPrefix =
     (prompt_prefix || "").trim() ||
-    generatePromptPrefix(scene_planning || planning || { scene_name, shot_number, shot_type, camera_movement });
+    generatePromptPrefix(scene_planning || planning || { 
+      scene_name, 
+      shot_number, 
+      shot_type, 
+      camera_movement,
+      lens_focal_length,
+      aspect_ratio
+    });
 
   if (!remote_host) {
     throw new Error("Remote GPU Host / IP is required for remote transfer.");
@@ -233,10 +246,13 @@ export interface SceneTransferOptions {
     shot_number: string | number;
     shot_type?: string;
     camera_movement?: string;
+    lens_focal_length?: string;
+    aspect_ratio?: string;
     expanded_prompt?: string;
     prompt_node_id?: string;
     node_mappings?: Record<string, string>;
     workflow_filename?: string;
+    takes?: any[];
   }[];
   scene_name?: string;
   bypass_missing?: boolean;
@@ -316,8 +332,16 @@ export async function processSceneTransfer(options: SceneTransferOptions) {
           const activeShotNumber = formatShotNumber(shot.shot_number ?? "1");
           const finalFilename = `${activeSceneName}_Shot_${activeShotNumber}.json`;
           
-          const resolvedSaveVideoPrefix = generateSaveVideoPrefix(activeSceneName, activeShotNumber);
-          const resolvedPromptPrefix = generatePromptPrefix({ scene_name: activeSceneName, shot_number: activeShotNumber, shot_type: shot.shot_type, camera_movement: shot.camera_movement });
+          const nextTakeNumber = (shot.takes?.length || 0) + 1;
+          const resolvedSaveVideoPrefix = generateSaveVideoPrefix(activeSceneName, activeShotNumber, nextTakeNumber);
+          const resolvedPromptPrefix = generatePromptPrefix({ 
+            scene_name: activeSceneName, 
+            shot_number: activeShotNumber, 
+            shot_type: shot.shot_type, 
+            camera_movement: shot.camera_movement,
+            lens_focal_length: shot.lens_focal_length,
+            aspect_ratio: shot.aspect_ratio
+          });
 
           const updatedWorkflowJson = injectAndPrepareWorkflowData(
             rawWf,
@@ -381,6 +405,7 @@ export async function processSceneTransfer(options: SceneTransferOptions) {
 }
 
 export interface ExecuteWorkflowOptions {
+  take_number?: string | number;
   remote_host?: string;
   ssh_port?: number;
   ssh_username?: string;
@@ -399,6 +424,8 @@ export interface ExecuteWorkflowOptions {
   shot_number?: string | number;
   shot_type?: string;
   camera_movement?: string;
+  lens_focal_length?: string;
+  aspect_ratio?: string;
   scene_planning?: ScenePlanningDTO;
   planning?: ScenePlanningDTO;
   node_mappings?: Record<string, string>;
@@ -427,6 +454,8 @@ export async function executeWorkflow(options: ExecuteWorkflowOptions) {
     shot_number,
     shot_type,
     camera_movement,
+    lens_focal_length,
+    aspect_ratio,
     scene_planning,
     planning,
     node_mappings = {},
@@ -442,16 +471,34 @@ export async function executeWorkflow(options: ExecuteWorkflowOptions) {
     throw new Error("Workflow filename is required");
   }
 
+  const cleanScene = sanitizeFilenamePart(scene_name ?? scene_planning?.scene_name ?? planning?.scene_name ?? "Scene");
+  const rawShotNum = shot_number ?? scene_planning?.shot_number ?? planning?.shot_number ?? "1";
+  const formattedShot = formatShotNumber(rawShotNum);
+
+  const calculatedTake = options.take_number ?? (
+    (options.planning as any)?.takes?.length ? Math.max(...(options.planning as any).takes.map((t: any) => t.take_number || 0)) + 1 : 1
+  );
+
   const resolvedSaveVideoPrefix =
     save_video_prefix ||
     generateSaveVideoPrefix(
-      scene_name ?? scene_planning?.scene_name ?? planning?.scene_name,
-      shot_number ?? scene_planning?.shot_number ?? planning?.shot_number
+      cleanScene,
+      formattedShot,
+      calculatedTake
     );
+
+  const expectedVideoFilename = `${cleanScene}_Shot_${formattedShot}_Take_${calculatedTake}.mp4`;
 
   const resolvedPromptPrefix =
     (prompt_prefix || "").trim() ||
-    generatePromptPrefix(scene_planning || planning || { scene_name, shot_number, shot_type, camera_movement });
+    generatePromptPrefix(scene_planning || planning || { 
+      scene_name: cleanScene, 
+      shot_number: formattedShot, 
+      shot_type, 
+      camera_movement,
+      lens_focal_length,
+      aspect_ratio
+    });
 
   const workflowPath = path.join(WORKFLOWS_DIR, workflow_filename);
   if (!fs.existsSync(workflowPath)) {
@@ -509,6 +556,8 @@ export async function executeWorkflow(options: ExecuteWorkflowOptions) {
     return {
       success: true,
       dry_run: true,
+      take_number: calculatedTake,
+      expected_video_filename: expectedVideoFilename,
       steps: stepsLog,
       modified_workflow: modifiedWf
     };
@@ -575,6 +624,8 @@ export async function executeWorkflow(options: ExecuteWorkflowOptions) {
   return {
     success: true,
     prompt_id: promptId,
+    take_number: calculatedTake,
+    expected_video_filename: expectedVideoFilename,
     steps: stepsLog,
     modified_workflow: modifiedWf
   };

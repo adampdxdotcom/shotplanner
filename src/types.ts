@@ -2,14 +2,18 @@ export const SCENE_REFERENCE_DIRECTIVE = "Do not embellish the setting. Use the 
 
 export { 
   assembleFinalPrompt, 
-  buildMandatoryHeader, 
-  buildMandatoryFooter, 
   generatePromptPrefix, 
   formatShotNumber, 
   sanitizeFilenamePart, 
-  generateSaveVideoPrefix 
+  generateSaveVideoPrefix,
+  buildSubjectDefinitions,
+  computePrePromptContext
 } from "./utils/formatters";
-export type { AssembleFinalPromptParams, MandatoryHeaderOptions, MandatoryFooterOptions } from "./utils/formatters";
+
+export type {
+  SubjectAssetDefinition,
+  PrePromptContextOptions
+} from "./utils/formatters";
 
 export function hasSceneReferencePhoto(assets: Array<{ type?: string; media_type?: string; filename?: string; subject_name?: string }>): boolean {
   if (!assets || !Array.isArray(assets)) return false;
@@ -31,6 +35,14 @@ export function hasSceneReferencePhoto(assets: Array<{ type?: string; media_type
   });
 }
 
+export interface CharacterProfile {
+  id: string;
+  name: string;
+  notes: string;
+  quick_slots: string[];
+  scene_outfit_ref: string;
+}
+
 export interface SceneProjectFile {
   schema_version: "1.0";
   scene_id: string;
@@ -45,12 +57,31 @@ export interface SceneProjectFile {
   shots: ShotItem[];
   assets?: MediaAsset[];
   subjects?: string[];
+  characters?: Record<string, CharacterProfile>;
   lm_studio_url?: string;
   local_llm_url?: string;
   config?: Partial<AppConfig>;
   llm_provider?: LLMProvider;
   generation_params?: GenerationParameters;
   parameter_node_mappings?: ParameterNodeMappings;
+  takes?: ShotTake[];
+  active_take_id?: string;
+  hero_take_id?: string;
+}
+
+export interface ShotTake {
+  id: string;
+  take_number: number;
+  created_at: string;
+  video_url?: string;
+  video_filename?: string;
+  expanded_prompt: string;
+  basic_stub?: string;
+  generation_params?: GenerationParameters;
+  sampling_steps?: number;
+  assigned_slots?: Record<number, string>;
+  review_status?: "unreviewed" | "approved" | "needs_work";
+  is_hero: boolean;
 }
 
 export interface ShotItem {
@@ -59,6 +90,8 @@ export interface ShotItem {
   shot_number: number;
   shot_type: string;
   camera_movement: string;
+  lens_focal_length?: string;
+  aspect_ratio?: string;
   basic_stub: string;
   expanded_prompt: string;
   assigned_slots: Record<number, string>;
@@ -72,6 +105,9 @@ export interface ShotItem {
   node_mappings?: Record<string, string>;
   generation_params?: GenerationParameters;
   parameter_node_mappings?: ParameterNodeMappings;
+  takes?: ShotTake[];
+  active_take_id?: string;
+  hero_take_id?: string;
 }
 
 export interface ToastMessage {
@@ -87,6 +123,8 @@ export interface ScenePlanning {
   shot_number: string | number;
   shot_type: string;
   camera_movement: string;
+  lens_focal_length?: string;
+  aspect_ratio?: string;
   ots_anchor_subject?: string;
   ots_focus_subject?: string;
   ots_side?: "Left" | "Right";

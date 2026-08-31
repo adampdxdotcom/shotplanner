@@ -6,7 +6,8 @@ interface SubjectComboboxProps {
   value: string;
   onChange: (value: string) => void;
   subjects: string[];
-  onRegisterSubject: (name: string) => void;
+  onRegisterSubject?: (name: string) => void;
+  characters?: Record<string, any>;
   assets?: MediaAsset[];
   assetType?: string;
   placeholder?: string;
@@ -16,8 +17,9 @@ interface SubjectComboboxProps {
 export const SubjectCombobox: React.FC<SubjectComboboxProps> = ({
   value,
   onChange,
-  subjects,
-  onRegisterSubject,
+  subjects = [],
+  onRegisterSubject = (_name: string) => {},
+  characters: _characters,
   assets = [],
   assetType = "",
   placeholder = "e.g. Jackie, Cyberpunk_Car, Tavern",

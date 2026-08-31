@@ -10,7 +10,8 @@ import {
   Save,
   FolderOpen,
   Plus,
-  Image
+  Image,
+  Film
 } from "lucide-react";
 
 interface NavbarProps {
@@ -39,13 +40,47 @@ export const Navbar: React.FC<NavbarProps> = ({
   return (
     <header className="sticky top-0 z-40 bg-zinc-900/90 backdrop-blur-md border-b border-zinc-800 px-4 lg:px-8 py-3.5 flex items-center justify-between shadow-sm">
       <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-lg bg-gradient-to-tr from-amber-500 to-indigo-600 flex items-center justify-center shadow-inner">
+        <div className="w-9 h-9 rounded-lg bg-gradient-to-tr from-amber-500 to-indigo-600 flex items-center justify-center shadow-inner shrink-0">
           <Workflow className="w-5 h-5 text-white" />
         </div>
-        <div>
+        <div className="flex flex-col">
           <h1 className="text-base font-bold tracking-tight text-white">
             {projectName || "Untitled Project"}
           </h1>
+          
+          {/* Toast Messages Area Moved Below Project Name */}
+          <div className="flex flex-col gap-1 mt-1 pointer-events-auto">
+            <div className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">Toast Message Area</div>
+            {toasts.length > 0 && (
+              <div className="flex flex-col gap-1 max-w-sm">
+                {toasts.map((toast) => (
+                  <div 
+                    key={toast.id}
+                    className={`flex items-start gap-2 w-full p-1.5 rounded border backdrop-blur-md transition-all animate-in slide-in-from-top-1 duration-200 ${
+                      toast.type === "success" ? "bg-zinc-900/95 border-emerald-500/50 text-emerald-300" :
+                      toast.type === "error" ? "bg-zinc-900/95 border-red-500/50 text-red-300" :
+                      "bg-zinc-900/95 border-indigo-500/50 text-indigo-300"
+                    }`}
+                  >
+                    <div className="mt-0.5 shrink-0">
+                      {toast.type === "success" && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />}
+                      {toast.type === "error" && <AlertCircle className="w-3.5 h-3.5 text-red-400" />}
+                      {toast.type === "info" && <Info className="w-3.5 h-3.5 text-indigo-400" />}
+                    </div>
+                    <p className="text-[10px] font-medium flex-1 leading-relaxed break-words text-zinc-200">{toast.text}</p>
+                    {onDismissToast && (
+                      <button 
+                        onClick={() => onDismissToast(toast.id)}
+                        className="shrink-0 p-0.5 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 rounded transition-colors cursor-pointer"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -70,9 +105,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                 : "text-zinc-400 hover:text-zinc-200"
             }`}
           >
-          <HardDrive className="w-3.5 h-3.5" />
-          Assets
-        </button>
+            <Film className="w-3.5 h-3.5" />
+            Shots
+          </button>
         <button
           onClick={() => onNavigate("workflow")}
           className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
@@ -164,37 +199,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span>Save</span>
           </button>
         </div>
-        
-        {/* Toast Messages Floating Overlay */}
-        {toasts.length > 0 && (
-          <div className="fixed top-16 right-4 z-50 flex flex-col items-end gap-2 max-w-sm w-full pointer-events-auto">
-            {toasts.map((toast) => (
-              <div 
-                key={toast.id}
-                className={`flex items-start gap-2.5 w-full p-3 rounded-xl border shadow-xl backdrop-blur-md transition-all animate-in slide-in-from-top-2 duration-200 ${
-                  toast.type === "success" ? "bg-zinc-900/95 border-emerald-500/50 text-emerald-300 shadow-emerald-950/40" :
-                  toast.type === "error" ? "bg-zinc-900/95 border-red-500/50 text-red-300 shadow-red-950/40" :
-                  "bg-zinc-900/95 border-indigo-500/50 text-indigo-300 shadow-indigo-950/40"
-                }`}
-              >
-                <div className="mt-0.5 shrink-0">
-                  {toast.type === "success" && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
-                  {toast.type === "error" && <AlertCircle className="w-4 h-4 text-red-400" />}
-                  {toast.type === "info" && <Info className="w-4 h-4 text-indigo-400" />}
-                </div>
-                <p className="text-xs font-medium flex-1 leading-relaxed break-words text-zinc-100">{toast.text}</p>
-                {onDismissToast && (
-                  <button 
-                    onClick={() => onDismissToast(toast.id)}
-                    className="shrink-0 p-1 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 rounded-lg transition-colors cursor-pointer"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
       </div>
       </div>
     </header>

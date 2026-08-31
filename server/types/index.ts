@@ -1,3 +1,23 @@
+
+export interface GenerationParameters {
+  steps: number;
+  megapixels: number;
+  frames: number;
+}
+
+export interface ShotTake {
+  id: string;
+  take_number: number;
+  created_at: string;
+  video_url?: string;
+  video_filename?: string;
+  expanded_prompt: string;
+  basic_stub?: string;
+  generation_params?: GenerationParameters;
+  assigned_slots?: Record<number, string>;
+  review_status?: "unreviewed" | "approved" | "needs_work";
+  is_hero: boolean;
+}
 export interface SceneProjectFile {
   schema_version: "1.0";
   scene_id: string;
@@ -15,16 +35,27 @@ export interface SceneProjectFile {
 export interface ShotItem {
   id: string;
   shot_number: number;
-  shot_type: string;
-  camera_movement: string;
-  basic_stub: string;
-  expanded_prompt: string;
-  assigned_slots: Record<number, string>;
-  staged: boolean;
-  updated_at: string;
+  shot_name?: string;
+  shot_type?: string;
+  camera_movement?: string;
+  lens_focal_length?: string;
+  aspect_ratio?: string;
+  basic_stub?: string;
+  expanded_prompt?: string;
+  assigned_slots?: Record<number, string>;
+  staged?: boolean;
+  updated_at?: string;
   ots_anchor_subject?: string;
   ots_focus_subject?: string;
   ots_side?: "Left" | "Right";
+  workflow_file?: string;
+  prompt_node_id?: string;
+  node_mappings?: Record<string, string>;
+  generation_params?: GenerationParameters;
+  parameter_node_mappings?: Record<string, string>;
+  takes?: ShotTake[];
+  active_take_id?: string;
+  hero_take_id?: string;
 }
 
 export interface AssetRecord {
@@ -73,6 +104,8 @@ export interface ScenePlanningDTO {
   shot_number?: string | number;
   shot_type?: string;
   camera_movement?: string;
+  lens_focal_length?: string;
+  aspect_ratio?: string;
   ots_anchor_subject?: string;
   ots_focus_subject?: string;
   ots_side?: "Left" | "Right";
@@ -98,3 +131,5 @@ export interface ExecutionStepLog {
   status: "success" | "info" | "error";
   detail: string;
 }
+
+export const SCENE_REFERENCE_DIRECTIVE = "A scene reference image is provided. Please match the location, lighting, and general environment of the provided reference image.";

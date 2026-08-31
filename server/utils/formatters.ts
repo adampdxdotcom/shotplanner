@@ -1,5 +1,4 @@
-import { SCENE_REFERENCE_DIRECTIVE } from "../config/constants";
-import { ScenePlanningDTO } from "../types";
+import { SCENE_REFERENCE_DIRECTIVE } from "../types";
 
 export function formatShotNumber(raw: string | number): string {
   const str = String(raw !== undefined && raw !== null ? raw : "").trim().replace(/^shot\s*/i, "");
@@ -20,28 +19,32 @@ export function sanitizeFilenamePart(str: string): string {
     .replace(/^_+|_+$/g, "");
 }
 
-export function sanitizeSlug(str: string): string {
-  return str.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_").replace(/_+/g, "_");
-}
-
-export function generateSaveVideoPrefix(sceneName?: string, shotNumber?: string | number): string {
+export function generateSaveVideoPrefix(sceneName?: string, shotNumber?: string | number, takeNumber?: string | number): string {
   const sanitizedScene = sanitizeFilenamePart(sceneName || "");
   const rawShot = shotNumber !== undefined && shotNumber !== null ? String(shotNumber).trim() : "";
   const paddedShot = rawShot ? formatShotNumber(rawShot) : "";
+  const takeStr = takeNumber !== undefined && takeNumber !== null ? `_Take_${takeNumber}` : "";
 
   if (sanitizedScene && paddedShot) {
-    return `video/${sanitizedScene}_Shot_${paddedShot}_`;
+    return `video/${sanitizedScene}_Shot_${paddedShot}${takeStr}_`;
   }
   if (sanitizedScene) {
-    return `video/${sanitizedScene}_`;
+    return `video/${sanitizedScene}${takeStr}_`;
   }
   if (paddedShot) {
-    return `video/Shot_${paddedShot}_`;
+    return `video/Shot_${paddedShot}${takeStr}_`;
   }
   return "";
 }
 
-export function generatePromptPrefix(plan?: ScenePlanningDTO | null): string {
+export function generatePromptPrefix(plan?: { 
+  scene_name?: string; 
+  shot_number?: string | number; 
+  shot_type?: string; 
+  camera_movement?: string;
+  lens_focal_length?: string;
+  aspect_ratio?: string;
+} | null): string {
   if (!plan) return "";
   const parts: string[] = [];
   
@@ -53,12 +56,20 @@ export function generatePromptPrefix(plan?: ScenePlanningDTO | null): string {
   const shotNum = formatShotNumber(rawShot || "01");
   parts.push(`Shot ${shotNum}`);
   
-  if (plan.shot_type && String(plan.shot_type).trim()) {
+  if (plan.shot_type && String(plan.shot_type).trim() && plan.shot_type !== "None") {
     parts.push(String(plan.shot_type).trim());
   }
   
-  if (plan.camera_movement && String(plan.camera_movement).trim()) {
+  if (plan.lens_focal_length && String(plan.lens_focal_length).trim() && plan.lens_focal_length !== "None") {
+    parts.push(String(plan.lens_focal_length).trim());
+  }
+  
+  if (plan.camera_movement && String(plan.camera_movement).trim() && plan.camera_movement !== "None") {
     parts.push(String(plan.camera_movement).trim());
+  }
+  
+  if (plan.aspect_ratio && String(plan.aspect_ratio).trim() && plan.aspect_ratio !== "None") {
+    parts.push(String(plan.aspect_ratio).trim());
   }
   
   return parts.join(" - ");
@@ -128,8 +139,7 @@ export interface AssembleFinalPromptParams {
 }
 
 /**
- * Programmatic Assembly Line Prompt Builder.
- * Concatenates Header + LLM Description + Footer without regex manipulation.
+ * Clean assembly line prompt builder (no regex parsing).
  */
 export function assembleFinalPrompt(
   descriptionOrParams: string | AssembleFinalPromptParams,
@@ -171,7 +181,7 @@ export function assembleFinalPrompt(
 
   let cleanDesc = description.trim();
 
-  // Strip duplicated headers/footers if the raw input was already pre-assembled
+  // Strip duplicate headers/footers if raw input was pre-assembled
   if (header && cleanDesc.startsWith(header)) {
     cleanDesc = cleanDesc.substring(header.length).trim();
   }
@@ -192,23 +202,16 @@ export function assembleFinalPrompt(
   return sections.join("\n\n");
 }
 
-export function hasSceneReferencePhoto(assets: any[]): boolean {
-  if (!assets || !Array.isArray(assets)) return false;
-  return assets.some((a) => {
-    if (!a) return false;
-    const isImage = !a.media_type || a.media_type === "image";
-    const typeStr = (a.type || "").toLowerCase();
-    const sname = (a.subject_name || "").toLowerCase();
-    const fname = (a.filename || "").toLowerCase();
-    return (
-      isImage &&
-      (typeStr === "scene reference" ||
-        typeStr.includes("scene") ||
-        typeStr.includes("location") ||
-        typeStr.includes("environment") ||
-        sname.includes("location") ||
-        fname.startsWith("scene_") ||
-        fname.includes("scene_reference"))
-    );
-  });
+export function sanitizeSlug(str: string): string {
+  if (!str) return "";
+  return str
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+export function hasSceneReferencePhoto(project: any): boolean {
+  if (!project || !project.shared_assets) return false;
+  return project.shared_assets.some((a: any) => a.is_location);
 }

@@ -11,7 +11,9 @@ import {
   Check, 
   Sparkles,
   Layers,
-  Video
+  Video,
+  Aperture,
+  RectangleHorizontal
 } from "lucide-react";
 
 export { formatShotNumber, generateSaveVideoPrefix, sanitizeFilenamePart, generatePromptPrefix, assembleFinalPrompt };
@@ -45,6 +47,23 @@ export const CAMERA_MOVEMENTS = [
   { label: "Zoom Out", value: "Zoom Out" }
 ];
 
+export const LENS_PRESETS = [
+  { label: "24mm Wide-Angle", value: "24mm Wide-Angle" },
+  { label: "35mm Natural", value: "35mm Natural" },
+  { label: "50mm Standard Prime", value: "50mm Standard Prime" },
+  { label: "85mm Portrait Telephoto", value: "85mm Portrait Telephoto" },
+  { label: "135mm Cinematic Compression", value: "135mm Cinematic Compression" },
+  { label: "Macro / Close-Up", value: "Macro / Close-Up" }
+];
+
+export const ASPECT_RATIO_PRESETS = [
+  { label: "16:9 Widescreen", value: "16:9 Widescreen" },
+  { label: "2.39:1 Anamorphic Scope", value: "2.39:1 Anamorphic Scope" },
+  { label: "9:16 Vertical (Reels)", value: "9:16 Vertical (Reels)" },
+  { label: "1:1 Square", value: "1:1 Square" },
+  { label: "4:3 Classic", value: "4:3 Classic" }
+];
+
 interface ScenePlanningHeaderProps {
   planning: ScenePlanning;
   onChangePlanning: (newPlanning: ScenePlanning) => void;
@@ -74,6 +93,14 @@ export const ScenePlanningHeader: React.FC<ScenePlanningHeaderProps> = ({
 
   const handleCameraMovementChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     onChangePlanning({ ...planning, camera_movement: e.target.value });
+  };
+
+  const handleLensChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    onChangePlanning({ ...planning, lens_focal_length: e.target.value });
+  };
+
+  const handleAspectRatioChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    onChangePlanning({ ...planning, aspect_ratio: e.target.value });
   };
 
   const handleCopy = async () => {
@@ -115,8 +142,8 @@ export const ScenePlanningHeader: React.FC<ScenePlanningHeaderProps> = ({
         </div>
       </div>
 
-      {/* 4-Column Controls Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* 6-Column Controls Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         {/* 1. Shot Name */}
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
@@ -159,7 +186,7 @@ export const ScenePlanningHeader: React.FC<ScenePlanningHeaderProps> = ({
             <span>Shot Type</span>
           </label>
           <select
-            value={planning.shot_type === "Over-the-Shoulder" ? "Over-the-shoulder (OTS)" : planning.shot_type}
+            value={planning.shot_type === "Over-the-Shoulder" ? "Over-the-shoulder (OTS)" : planning.shot_type || "Medium Shot"}
             onChange={handleShotTypeChange}
             className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-indigo-500 focus:outline-hidden text-zinc-100 text-xs px-3 py-2 rounded-lg transition-colors cursor-pointer"
           >
@@ -178,13 +205,51 @@ export const ScenePlanningHeader: React.FC<ScenePlanningHeaderProps> = ({
             <span>Camera Movement</span>
           </label>
           <select
-            value={planning.camera_movement}
+            value={planning.camera_movement || "Locked Off"}
             onChange={handleCameraMovementChange}
             className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-indigo-500 focus:outline-hidden text-zinc-100 text-xs px-3 py-2 rounded-lg transition-colors cursor-pointer"
           >
             {CAMERA_MOVEMENTS.map((cm) => (
               <option key={cm.value} value={cm.value}>
                 {cm.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* 5. Lens / Focal Length */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
+            <Aperture className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Lens / Focal Length</span>
+          </label>
+          <select
+            value={planning.lens_focal_length || "50mm Standard Prime"}
+            onChange={handleLensChange}
+            className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-indigo-500 focus:outline-hidden text-zinc-100 text-xs px-3 py-2 rounded-lg transition-colors cursor-pointer"
+          >
+            {LENS_PRESETS.map((lp) => (
+              <option key={lp.value} value={lp.value}>
+                {lp.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* 6. Aspect Ratio */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
+            <RectangleHorizontal className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Aspect Ratio</span>
+          </label>
+          <select
+            value={planning.aspect_ratio || "16:9 Widescreen"}
+            onChange={handleAspectRatioChange}
+            className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-indigo-500 focus:outline-hidden text-zinc-100 text-xs px-3 py-2 rounded-lg transition-colors cursor-pointer"
+          >
+            {ASPECT_RATIO_PRESETS.map((ar) => (
+              <option key={ar.value} value={ar.value}>
+                {ar.label}
               </option>
             ))}
           </select>

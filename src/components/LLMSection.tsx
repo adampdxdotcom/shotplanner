@@ -1,6 +1,17 @@
-import React, { useState } from "react";
-import { MediaAsset, LLMProvider, ScenePlanning, hasSceneReferencePhoto, SCENE_REFERENCE_DIRECTIVE, assembleFinalPrompt } from "../types";
+import React, { useState, useMemo, useRef, useEffect } from "react";
+import { 
+  MediaAsset, 
+  LLMProvider, 
+  ScenePlanning, 
+  hasSceneReferencePhoto, 
+  SCENE_REFERENCE_DIRECTIVE, 
+  assembleFinalPrompt, 
+  generatePromptPrefix,
+  computePrePromptContext
+} from "../types";
 import { formatShotNumber } from "./ScenePlanningHeader";
+import { TakeSelector } from "./TakeSelector";
+import { TakeReviewModal } from "./TakeReviewModal";
 import { copyToClipboard } from "../utils/clipboard";
 import { 
   Sparkles, 
@@ -15,7 +26,9 @@ import {
   Film,
   Camera,
   Layers,
-  MapPin
+  MapPin,
+  RotateCcw,
+  Eye
 } from "lucide-react";
 
 interface LLMSectionProps {
@@ -64,6 +77,7 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
   };
 
   const [generating, setGenerating] = useState(false);
+  const [reviewTakeId, setReviewTakeId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [providerUsed, setProviderUsed] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -73,9 +87,74 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
   const activeShot = activeShotId ? sceneProject.shots.find(s => s.id === activeShotId) : null;
   const activeShotAssets = activeShot ? Object.values(activeShot.assigned_slots).filter(Boolean) : [];
   
+  const relevantAssets = useMemo(() => {
+    if (!activeShot) return assets;
+    const slotEntries = Object.entries(activeShot.assigned_slots || {});
+    if (slotEntries.length > 0) {
+      const mapped: Array<MediaAsset & { slot_index?: number }> = [];
+      slotEntries.forEach(([slotKey, filename]) => {
+        if (!filename) return;
+        const asset = assets.find(a => a.filename === filename);
+        if (asset) {
+          const match = slotKey.match(/slot_(\d+)/);
+          const slotIdx = match ? parseInt(match[1], 10) : asset.slot_index;
+          mapped.push({ ...asset, slot_index: slotIdx });
+        }
+      });
+      (sceneProject.shared_assets || []).forEach(sa => {
+        if (!mapped.some(m => m.filename === sa.filename)) {
+          const asset = assets.find(a => a.filename === sa.filename);
+          if (asset) mapped.push({ ...asset, slot_index: sa.slot_index });
+        }
+      });
+      if (mapped.length > 0) return mapped;
+    }
+    return assets.filter(a => activeShotAssets.includes(a.filename) || sceneProject.shared_assets?.some(sa => sa.filename === a.filename));
+  }, [activeShot, assets, activeShotAssets, sceneProject.shared_assets]);
+
   const activeShotPrefix = activeShot 
-    ? `${sceneProject.scene_name ? sceneProject.scene_name + " - " : ""}Shot ${activeShot.shot_number.toString().padStart(2, "0")} - ${activeShot.shot_type} - ${activeShot.camera_movement}`
+    ? generatePromptPrefix({
+        scene_name: sceneProject.scene_name || activeShot.shot_name,
+        shot_number: activeShot.shot_number,
+        shot_type: activeShot.shot_type,
+        lens_focal_length: activeShot.lens_focal_length,
+        camera_movement: activeShot.camera_movement,
+        aspect_ratio: activeShot.aspect_ratio
+      })
     : promptPrefix;
+
+  const livePrePromptContext = useMemo(() => {
+    return computePrePromptContext({
+      sceneName: sceneProject.scene_name || activeShot?.shot_name || planning?.scene_name,
+      shotNumber: activeShot?.shot_number ?? planning?.shot_number ?? 1,
+      shotType: activeShot?.shot_type || planning?.shot_type,
+      lensFocalLength: activeShot?.lens_focal_length || planning?.lens_focal_length,
+      cameraMovement: activeShot?.camera_movement || planning?.camera_movement,
+      aspectRatio: activeShot?.aspect_ratio || planning?.aspect_ratio,
+      otsAnchorSubject: activeShot?.ots_anchor_subject || planning?.ots_anchor_subject,
+      otsFocusSubject: activeShot?.ots_focus_subject || planning?.ots_focus_subject,
+      otsSide: activeShot?.ots_side || planning?.ots_side,
+      basicStub: basicStub,
+      assets: relevantAssets
+    });
+  }, [
+    sceneProject.scene_name,
+    activeShot?.shot_name,
+    activeShot?.shot_number,
+    activeShot?.shot_type,
+    activeShot?.lens_focal_length,
+    activeShot?.camera_movement,
+    activeShot?.aspect_ratio,
+    activeShot?.ots_anchor_subject,
+    activeShot?.ots_focus_subject,
+    activeShot?.ots_side,
+    planning,
+    basicStub,
+    relevantAssets
+  ]);
+
+  const isLivePreview = !expandedPrompt || !expandedPrompt.trim();
+  const displayedPrompt = isLivePreview ? livePrePromptContext : expandedPrompt;
 
   const handleGeneratePrompt = async () => {
     if (!basicStub.trim()) {
@@ -93,7 +172,7 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           basic_stub: basicStub,
-          assets: activeShot ? assets.filter(a => activeShotAssets.includes(a.filename) || sceneProject.shared_assets?.some(sa => sa.filename === a.filename)) : assets,
+          assets: relevantAssets,
           lm_studio_url: lmStudioUrl,
           provider: providerChoice,
           prompt_prefix: activeShotPrefix,
@@ -102,11 +181,14 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
           active_shot: activeShot || undefined,
           shot_type: activeShot ? activeShot.shot_type : planning?.shot_type,
           camera_movement: activeShot ? activeShot.camera_movement : planning?.camera_movement,
+          lens_focal_length: activeShot ? activeShot.lens_focal_length : planning?.lens_focal_length,
+          aspect_ratio: activeShot ? activeShot.aspect_ratio : planning?.aspect_ratio,
           ots_anchor_subject: activeShot?.ots_anchor_subject || planning?.ots_anchor_subject,
           ots_focus_subject: activeShot?.ots_focus_subject || planning?.ots_focus_subject,
           ots_side: activeShot?.ots_side || planning?.ots_side,
           shot_number: activeShot ? activeShot.shot_number : planning?.shot_number,
           scene_name: sceneProject?.scene_name || planning?.scene_name,
+          characters: sceneProject?.characters,
           gemini_api_key: geminiApiKey
         })
       });
@@ -126,10 +208,10 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
     }
   };
 
-  // Auto-inject header and photo statement once when shot changes
-  const lastLoadedShotIdRef = React.useRef<string | null>(null);
+  // Auto-inject header and photo statement once when shot changes if already has an expanded prompt
+  const lastLoadedShotIdRef = useRef<string | null>(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (activeShotId && expandedPrompt && expandedPrompt.trim()) {
       if (lastLoadedShotIdRef.current !== activeShotId) {
         const assembled = assembleFinalPrompt(expandedPrompt, activeShotPrefix, isSceneRefPresent);
@@ -138,13 +220,18 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
         }
         lastLoadedShotIdRef.current = activeShotId;
       }
-    } else if (!expandedPrompt) {
+    } else if (!expandedPrompt || !expandedPrompt.trim()) {
       lastLoadedShotIdRef.current = null;
     }
   }, [activeShotId, expandedPrompt, activeShotPrefix, isSceneRefPresent, onChangeExpandedPrompt]);
 
+  const handleResetToLivePreview = () => {
+    onChangeExpandedPrompt("");
+    onShowToast?.("Prompt cleared — live context preview re-engaged.", "info");
+  };
+
   const handleCopy = async () => {
-    const textToCopy = expandedPrompt;
+    const textToCopy = displayedPrompt;
     if (!textToCopy || !textToCopy.trim()) {
       onShowToast?.("No prompt text to copy.", "info");
       return;
@@ -155,7 +242,12 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
     if (success) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
-      onShowToast?.("Final prompt (with Scene & Shot header at top) copied to clipboard!", "success");
+      onShowToast?.(
+        isLivePreview 
+          ? "Pre-generation context preview copied to clipboard!" 
+          : "Final prompt copied to clipboard!", 
+        "success"
+      );
     } else {
       onShowToast?.("Failed to copy prompt to clipboard.", "error");
     }
@@ -181,6 +273,22 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
           </select>
         </div>
       </div>
+      
+      {activeShot && activeShot.takes && activeShot.takes.length > 0 && (
+        <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-3 shadow-sm -mt-2">
+          <TakeSelector 
+            shot={activeShot} 
+            onSetHeroTake={(tid) => onUpdateShot(prev => {
+              const updatedTakes = (prev.takes || []).map(t => ({
+                ...t,
+                is_hero: t.id === tid
+              }));
+              return { ...prev, hero_take_id: tid, takes: updatedTakes };
+            })}
+            onReviewTake={setReviewTakeId}
+          />
+        </div>
+      )}
 
       {!activeShotId ? (
         <div className="flex flex-col items-center justify-center p-12 bg-zinc-900/40 border-2 border-dashed border-zinc-800 rounded-xl">
@@ -323,13 +431,38 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
         {/* Right: Preview & Editable Prompt */}
         <div className="bg-zinc-950/50 p-4 rounded-xl border-2 border-zinc-700/80 space-y-3 flex flex-col justify-between">
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-semibold text-zinc-200 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                Preview / Edit Expanded Prompt (Injected into Node)
-              </label>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-semibold text-zinc-200 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  Preview / Edit Expanded Prompt
+                </label>
+                {isLivePreview ? (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                    Live Pre-Prompt Context
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                    <Check className="w-3 h-3 text-emerald-400" />
+                    Compiled / Custom Prompt
+                  </span>
+                )}
+              </div>
               
               <div className="flex items-center gap-2">
+                {!isLivePreview && (
+                  <button
+                    type="button"
+                    onClick={handleResetToLivePreview}
+                    className="px-2.5 py-1 text-xs font-medium rounded-lg border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                    title="Clear custom prompt and return to real-time synthesized live context preview"
+                  >
+                    <RotateCcw className="w-3 h-3 text-zinc-400" />
+                    <span>Reset to Live Preview</span>
+                  </button>
+                )}
+
                 {copied && (
                   <span className="text-[11px] text-emerald-400 font-medium bg-emerald-950/90 border border-emerald-800/80 px-2 py-0.5 rounded-md flex items-center gap-1">
                     <Check className="w-3 h-3" />
@@ -339,38 +472,65 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
                 <button
                   type="button"
                   onClick={handleCopy}
-                  disabled={!expandedPrompt || !expandedPrompt.trim()}
+                  disabled={!displayedPrompt || !displayedPrompt.trim()}
                   className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition-all flex items-center gap-1.5 shadow-xs ${
                     copied
                       ? "bg-emerald-600 border-emerald-500 text-white shadow-emerald-900/30 cursor-default"
-                      : expandedPrompt && expandedPrompt.trim()
+                      : displayedPrompt && displayedPrompt.trim()
                       ? "bg-zinc-800 hover:bg-zinc-700 text-amber-300 hover:text-amber-200 border-zinc-700 hover:border-amber-500/50 cursor-pointer"
                       : "bg-zinc-900 text-zinc-600 border-zinc-800 cursor-not-allowed"
                   }`}
-                  title={expandedPrompt && expandedPrompt.trim() ? "Copy LLM generated prompt" : "Generate a prompt first"}
+                  title={isLivePreview ? "Copy synthesized live context preview" : "Copy compiled/edited prompt"}
                 >
                   {copied ? <Check className="w-3.5 h-3.5 text-white" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{copied ? "Copied to Clipboard" : "Copy Prompt"}</span>
+                  <span>{copied ? "Copied to Clipboard" : isLivePreview ? "Copy Preview Context" : "Copy Prompt"}</span>
                 </button>
               </div>
             </div>
 
             <textarea
               rows={18}
-              placeholder="The expanded, tagged prompt will appear here ready for editing before execution..."
-              value={expandedPrompt}
+              placeholder="The dynamic pre-prompt context or expanded prompt will appear here ready for editing before execution..."
+              value={displayedPrompt}
               onChange={(e) => onChangeExpandedPrompt(e.target.value)}
-              className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-amber-500 rounded-lg p-3 text-xs text-zinc-100 placeholder-zinc-600 outline-none resize-none leading-relaxed font-mono"
+              className={`w-full bg-zinc-900 border-2 rounded-lg p-3 text-xs text-zinc-100 placeholder-zinc-600 outline-none resize-none leading-relaxed font-mono ${
+                isLivePreview 
+                  ? "border-amber-500/40 focus:border-amber-500" 
+                  : "border-zinc-700 focus:border-amber-500"
+              }`}
             />
           </div>
 
           <div className="text-[11px] text-zinc-400 bg-zinc-900/60 p-2 rounded-lg border-2 border-zinc-700/60 flex items-center justify-between">
-            <span>Character Count: {expandedPrompt.length}</span>
+            <span>
+              Character Count: {displayedPrompt.length}{" "}
+              <span className="text-zinc-500 font-normal">
+                ({isLivePreview ? "Synthesized Live Context" : "Compiled Prompt"})
+              </span>
+            </span>
             <span className="text-zinc-500">Target Node: Configured in Step 2</span>
           </div>
         </div>
       </div>
       </div>
+      )}
+      {reviewTakeId && activeShot && (
+        <TakeReviewModal
+          take={activeShot.takes?.find(t => t.id === reviewTakeId)!}
+          sceneName={sceneProject.scene_name || "Untitled_Scene"}
+          shotNumber={activeShot.shot_number}
+          onClose={() => setReviewTakeId(null)}
+          onSetHero={() => {
+            onUpdateShot(prev => {
+              const updatedTakes = (prev.takes || []).map(t => ({
+                ...t,
+                is_hero: t.id === reviewTakeId
+              }));
+              return { ...prev, hero_take_id: reviewTakeId, takes: updatedTakes };
+            });
+            setReviewTakeId(null);
+          }}
+        />
       )}
     </div>
   );

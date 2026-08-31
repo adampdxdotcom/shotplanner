@@ -37,16 +37,44 @@ class SSHTransferRequest(BaseModel):
     class Config:
         extra = "allow"
 
+class ShotTake(BaseModel):
+    id: str
+    take_number: int
+    created_at: str
+    video_url: Optional[str] = None
+    video_filename: Optional[str] = None
+    expanded_prompt: str = ""
+    basic_stub: Optional[str] = None
+    generation_params: Optional[Dict[str, Any]] = None
+    assigned_slots: Optional[Dict[str, str]] = None
+    review_status: Optional[str] = "unreviewed"
+    is_hero: bool = False
+
+    class Config:
+        extra = "allow"
+
 class StageSceneShot(BaseModel):
+    id: Optional[str] = None
     shot_number: Any = 1
+    shot_name: Optional[str] = None
     shot_type: Optional[str] = None
     camera_movement: Optional[str] = None
+    lens_focal_length: Optional[str] = "50mm Standard Prime"
+    aspect_ratio: Optional[str] = "16:9 Widescreen"
     expanded_prompt: Optional[str] = None
+    basic_stub: Optional[str] = None
     prompt_node_id: Optional[str] = None
     node_mappings: Dict[str, str] = Field(default_factory=dict)
+    assigned_slots: Dict[str, str] = Field(default_factory=dict)
     workflow_filename: Optional[str] = None
+    workflow_file: Optional[str] = None
     generation_parameters: Optional[Dict[str, Any]] = None
+    generation_params: Optional[Dict[str, Any]] = None
     parameter_node_mappings: Optional[Dict[str, str]] = None
+    takes: List[ShotTake] = Field(default_factory=list)
+    hero_take_id: Optional[str] = None
+    active_take_id: Optional[str] = None
+    take_number: Optional[int] = None
 
     class Config:
         extra = "allow"
@@ -84,7 +112,8 @@ class ExecuteWorkflowRequest(BaseModel):
     runpod_api_token: Optional[str] = None
     workflow_filename: str
     prompt_node_id: Optional[str] = None
-    expanded_prompt: str
+    expanded_prompt: str = ""
+    basic_stub: Optional[str] = None
     node_mappings: Dict[str, str] = Field(default_factory=dict)
     assigned_slots: Dict[str, str] = Field(default_factory=dict)
     bypass_missing: bool = True
@@ -92,9 +121,14 @@ class ExecuteWorkflowRequest(BaseModel):
     parameter_overrides: Dict[str, Any] = Field(default_factory=dict)
     parameter_node_mappings: Dict[str, str] = Field(default_factory=dict)
     generation_parameters: Optional[Dict[str, Any]] = None
+    generation_params: Optional[Dict[str, Any]] = None
     dry_run_only: bool = False
     scene_name: Optional[str] = "Scene"
     shot_number: Optional[Any] = 1
+    take_number: Optional[int] = None
+    takes: List[ShotTake] = Field(default_factory=list)
+    hero_take_id: Optional[str] = None
+    active_take_id: Optional[str] = None
     shared_assets: Optional[List[Any]] = None
 
     class Config:

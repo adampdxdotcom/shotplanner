@@ -491,15 +491,23 @@ export async function exportProjectZip(projectName: string, res: Response): Prom
       projectData.prompt_node_id ||
       (parsedWf.promptNodes.length > 0 ? parsedWf.promptNodes[0].id : undefined);
 
+    // 5. Hero Take Selection & Parameter Resolution
+    const takes = Array.isArray(shot.takes) ? shot.takes : [];
+    const heroTake = takes.find((t: any) => t.id === shot.hero_take_id || t.is_hero) 
+      || (takes.length > 0 ? takes[takes.length - 1] : null);
+
     // Expanded prompt
-    const effectivePrompt = shot.expanded_prompt || shot.basic_stub || "";
+    const effectivePrompt = (heroTake && heroTake.expanded_prompt) 
+      ? heroTake.expanded_prompt 
+      : (shot.expanded_prompt || shot.basic_stub || "");
 
     // Sampling steps, megapixels, frame duration
     const effectiveParams =
-      shot.generation_params ||
+      (heroTake && heroTake.generation_params) ? heroTake.generation_params :
+      (shot.generation_params ||
       projectData.generation_params ||
       projectData.generationParams ||
-      { steps: 30, megapixels: 0.5, frames: 81 };
+      { steps: 30, megapixels: 0.5, frames: 81 });
 
     // Parameter node mappings
     const effectiveParamNodes =
@@ -513,8 +521,9 @@ export async function exportProjectZip(projectName: string, res: Response): Prom
       };
 
     // Prefixes
+    const takeNum = heroTake ? heroTake.take_number : (takes.length + 1);
     const promptPrefix = `${shot.shot_name ? shot.shot_name + " - " : ""}Shot ${shotNumStr} - ${shot.shot_type || ""} - ${shot.camera_movement || ""}`;
-    const saveVideoPrefix = generateSaveVideoPrefix(cleanSceneName, shotNumStr);
+    const saveVideoPrefix = generateSaveVideoPrefix(cleanSceneName, shotNumStr, takeNum);
 
     const bypassMissing = projectData.bypassMissing !== undefined ? Boolean(projectData.bypassMissing) : true;
 
@@ -535,6 +544,23 @@ export async function exportProjectZip(projectName: string, res: Response): Prom
     archive.append(JSON.stringify(injectedWorkflow, null, 2), {
       name: `staged_workflows/${stagedFilename}`
     });
+
+    // Package output video for hero take if it exists on disk
+    if (heroTake) {
+      const vidFilename = heroTake.video_filename || `${cleanSceneName}_Shot_${shotNumStr}_Take_${heroTake.take_number}.mp4`;
+      const sceneFolder = formatSceneFolderName(cleanSceneName);
+      const possibleOutputs = [
+        path.join(ASSETS_DIR, cleanSceneName, "outputs", vidFilename),
+        path.join(ASSETS_DIR, sceneFolder, "outputs", vidFilename),
+        path.join(ASSETS_DIR, "outputs", vidFilename)
+      ];
+      for (const outPath of possibleOutputs) {
+        if (fs.existsSync(outPath)) {
+          archive.file(outPath, { name: `outputs/${vidFilename}` });
+          break;
+        }
+      }
+    }
   }
 
   await archive.finalize();

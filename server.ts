@@ -10,6 +10,8 @@ import settingsRoutes from "./server/routes/settingsRoutes";
 import sshRoutes, { handleAssetTransfer, handleSceneTransferController } from "./server/routes/sshRoutes";
 import workflowRoutes from "./server/routes/workflowRoutes";
 
+import outputRoutes from "./server/routes/outputRoutes";
+
 // Re-export utility functions for external consumers
 export {
   assembleFinalPrompt,
@@ -39,6 +41,7 @@ app.use("/api/projects", projectRoutes);
 app.use("/api/ssh", sshRoutes);
 app.use("/api", promptRoutes);
 app.use("/api", executionRoutes);
+app.use("/api", outputRoutes);
 
 // Compatibility aliases for remote sync and staging
 app.post("/api/assets/sync_remote", handleAssetTransfer);

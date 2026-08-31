@@ -427,6 +427,103 @@
 - **`backend/utils/file_handlers.py` & `server/services/projectService.ts`**
   - Updated `find_project_file` to prioritize the authoritative `assets/{scene_name}/{scene_name}.json` path and filter out auxiliary/configuration JSON files.
 
+## Character Bible & "Quick 4" Asset Planning
+- **`src/types.ts` & `src/App.tsx`**
+  - Expanded project state schemas to include a `CharacterProfile` interface inside `SceneProjectFile`, providing a rich data model for cast members containing `name`, `notes` (physical traits/bio), `quick_slots` (up to 4 assigned reference assets), and a `scene_outfit_ref`.
+- **`src/components/GallerySection.tsx`**
+  - Implemented a new "Subject / Cast" view mode alongside the List and Grid toggles.
+  - Generates rich Character Profile Cards that group all media associated with a specific subject.
+  - Features inline editing forms to persist character bios/notes and wardrobe configuration.
+  - Built an interactive toggle on reference images to assign up to 4 core assets into that character's "⚡ Quick 4" slots, adorned with visual badges.
+- **`src/components/AssetManagerSection.tsx`**
+  - Implemented a "⚡ Quick 4" auto-populate dropdown in the shot planning panel (Image Assignments Header).
+  - Triggers an instant one-click macro to map a selected character's 4 designated reference assets directly into Image Slots 1–4 of the currently active shot, saving manual drag-and-drop actions.
+- **`backend/services/llm_service.py` & `backend/routes/prompt_routes.py`**
+  - Enhanced the LLM prompt expansion service to accept a `characters` payload.
+  - Dynamically injects a "CHARACTER BIBLE (FEATURED IN THIS SHOT)" context block into the LLM prompt when a character's assets are assigned to the shot or their name appears in the basic stub.
+  - Ensures the LLM strictly adheres to persistent physical likeness descriptions and scene wardrobe configurations, providing shot-to-shot character consistency natively.
 
 
 
+
+
+
+## Execution Monitor & Live Status Integration
+- **`src/hooks/useComfyMonitor.ts`**
+  - Created a robust hook integrating with ComfyUI's WebSocket endpoint to track live queues, execution times, sampling steps, and active processing node states.
+- **`src/components/ExecutionSection.tsx`**
+  - Implemented an `Active Progress Monitor` UI overlay that dynamically replaces the static 'Send' panels during execution, rendering detailed real-time step progressions, elapsed timing, and active node titles.
+- **`src/App.tsx` & `src/components/Navbar.tsx`**
+  - Piped the WebSocket status events back to the globally managed Toast Message System, surfacing non-blocking, auto-dismissing runtime status notifications (queue positions, start events, sampling ticks, success checks) directly inside the top Navigation Bar's newly relocated Toast message area.
+
+
+## Output Management & QA Review System
+- **`server/routes/outputRoutes.ts`**
+  - Created a robust backend service to handle rendered output synchronization from ComfyUI.
+  - Implemented `POST /api/outputs/pull` to intercept `executed` events, parse the generated filenames, and download the actual media binaries (.mp4/.webp) directly into `assets/{scene_name}/outputs/`.
+  - Built an HTTP 206 Byte-Range streaming endpoint (`GET /api/outputs/stream/...`) to enable smooth scrubbing and playback of rendered video files directly in the browser.
+  - Added QA review persistence endpoints (`/api/outputs/review` and `/api/outputs/reviews`) mapped against a localized `qa_status.json` file inside the output directory.
+- **`src/hooks/useComfyMonitor.ts`**
+  - Expanded the WebSocket message parser to detect node `executed` completion events. Extracts output node artifacts and triggers the backend `/api/outputs/pull` endpoint asynchronously.
+- **`src/components/GallerySection.tsx`**
+  - Developed the **Renders / Dailies** view mode, a dedicated QA and review tab.
+  - Constructed Playable Video Cards using HTML5 `<video>` tags cross-referencing shot identifiers in filenames back to their SceneProject shot metadata.
+  - Displayed a comprehensive Shot Slate overlay mapping resolution, duration, framing, camera motion, and visual cast chips.
+  - Integrated interactive QA Review buttons (🟢 Approved / 🟡 Needs Work) that write review states back to the API and dynamically badge the UI.
+  - Crafted a helpful empty state when no renders exist, prompting the user to stage shots from the Execution tab.
+
+## Multi-Take Version History Architecture
+- **`src/types.ts` & `server/types/index.ts`**
+  - Defined the unified `ShotTake` interface holding: `id` (string), `take_number` (number), `created_at` (ISO timestamp), `video_url` (optional string), `video_filename` (optional string), `expanded_prompt` (string), `generation_params` (steps, megapixels, frames), `is_hero` (boolean), and optional QA review metadata.
+  - Updated `ShotItem` to support `takes: ShotTake[]`, `hero_take_id?: string`, and `active_take_id?: string` with safe default empty arrays.
+- **`backend/routes/execution_routes.py` & `backend/services/workflow/builder.py` & `backend/services/execution_service.py`**
+  - Pydantic models and execution builders calculate the sequential take number (`take_number = len(shot.takes) + 1`) for any executed or re-rendered shot.
+  - Systematically formatted output video prefix and expected filenames using `{scene_name}_Shot_{shot_number}_Take_{take_number}.mp4`.
+  - Returned `expected_video_filename` and `take_number` in staging and execution responses.
+- **`server/services/executionService.ts` & `src/utils/formatters.ts` & `server/utils/formatters.ts`**
+  - Updated Node.js execution pipeline and `generateSaveVideoPrefix` to format filenames with take numbers.
+- **`src/components/TakeSelector.tsx` & `src/components/TakeReviewModal.tsx` & `src/components/RendersView.tsx`**
+  - Integrated take selector pill components allowing instant switching between versions, marking hero takes (⭐), and reviewing QA metadata.
+  - Implemented the full Take Review Modal with streaming video playback, parameter comparisons, and hero take promotion.
+- **`server/services/projectService.ts` & `backend/services/project_service.py`**
+  - Verified and confirmed that project persistence (saving, loading, exporting ZIP archives) completely preserves the `takes` array, `hero_take_id`, and `active_take_id` without data loss.
+
+## Cinematic Lens & Aspect Ratio Metadata Architecture
+- **`src/types.ts` & `server/types/index.ts`**
+  - Extended `ShotItem`, `ScenePlanning`, and `ScenePlanningDTO` interfaces with `lens_focal_length` (optional string, defaulting to "50mm Standard Prime") and `aspect_ratio` (optional string, defaulting to "16:9 Widescreen").
+  - Ensured all planning and shot type definitions serialize and persist across project saves, loads, and auto-saves.
+- **`src/components/ScenePlanningHeader.tsx`**
+  - Added "Lens / Focal Length" dropdown selector with cinematic presets: "24mm Wide-Angle", "35mm Natural", "50mm Standard Prime", "85mm Portrait Telephoto", "135mm Cinematic Compression", and "Macro / Close-Up".
+  - Added "Aspect Ratio" dropdown selector with framing presets: "16:9 Widescreen", "2.39:1 Anamorphic Scope", "9:16 Vertical (Reels)", "1:1 Square", and "4:3 Classic".
+  - Expanded grid layout and wired change events to update active shot planning state and trigger dirty state tracking.
+  - Ensured real-time reactivity in the "ASSEMBLED PREFIX" box reflecting `"Shot {shot_number} - {shot_type} - {lens_focal_length} - {camera_movement} - {aspect_ratio}"`.
+- **`src/components/hub/ShotMetadataPanel.tsx`**
+  - Added dedicated read-only display cards and badges for the active shot's Lens / Focal Length and Aspect Ratio with cinematic icon accents.
+- **`src/utils/formatters.ts` & `server/utils/formatters.ts` & `server/services/llm_service.ts` & `backend/services/llm_service.py`**
+  - Standardized unified prompt prefix generation in `generatePromptPrefix`: `"Shot {shot_number} - {shot_type} - {lens_focal_length} - {camera_movement} - {aspect_ratio}"`.
+  - Added comprehensive optics & cinematography directives mapping lenses (24mm, 35mm, 50mm, 85mm, 135mm, Macro) and aspect ratios (16:9, 2.39:1, 9:16, 1:1, 4:3) into detailed depth-of-field, perspective compression, field of view, and framing canvas constraints for the LLM.
+- **`backend/routes/execution_routes.py` & `backend/routes/prompt_routes.py` & `backend/services/llm_service.py`**
+  - Added `lens_focal_length` and `aspect_ratio` fields to backend Pydantic models (`StageSceneShot`, `LLMGenerateRequest`).
+  - Integrated lens and aspect ratio metadata directly into LLM prompt expansion prompts to influence cinematic camera direction during prompt generation.
+- **`src/hooks/useAppLogic.ts`, `src/components/LLMSection.tsx`, `src/components/AssetManagerSection.tsx` & `src/components/SceneProjectHub.tsx`**
+  - Wired lens and aspect ratio parameters into project creation, duplication, transfer payloads, and prompt generation request pipelines.
+
+## Dynamic Live Pre-Generation Context Preview Architecture
+- **`src/utils/formatters.ts` & `src/types.ts`**
+  - Created `buildSubjectDefinitions` to systematically synthesize structured multimodal subject tags and media labels (`<Picture N>`, `<Video N>`, `<Audio N>`) for character bibles and location reference slots.
+  - Implemented `computePrePromptContext` to calculate a real-time pre-prompt context string fusing:
+    1. Scene and Shot Planning Header with optics and framing (`Shot {num} - {type} - {lens} - {movement} - {aspect}`).
+    2. Global Subject Definitions formatted for reference asset mapping.
+    3. Framing Directives (OTS angle, anchor/focus subjects, side positioning).
+    4. Scene Reference and Single Subject identity preservation constraints.
+    5. Active Concept / Stub description with default placeholder guidance.
+    6. Overall soundscape and non-diegetic music footer specifications.
+- **`src/components/LLMSection.tsx`**
+  - Implemented dynamic live pre-prompt context display inside the Prompt expansion tab's "Preview / Edit Expanded Prompt" textarea whenever `expandedPrompt` is blank or ungenerated.
+  - Wired reactive recalculation of the live preview context whenever camera dropdowns, lens, aspect ratio, OTS framing parameters, mapped asset slots, or concept stubs are tweaked.
+  - Added visual status badges differentiating "Live Pre-Prompt Context" (with subtle active pulse) from "Compiled / Custom Prompt".
+  - Added a "Reset to Live Preview" action allowing users to clear custom manual edits and re-engage real-time synthesized context preview.
+  - Updated clipboard copying to dynamically copy the active live pre-prompt context when in preview mode or the compiled prompt when generated/edited.
+  - Ensured "Generate Prompt with LM Studio / Gemini" completely overwrites the preview textarea with the finalized assembled prompt (Header + LLM Description + Footer), marks the project dirty, and auto-saves to shot state.
+- **`src/components/hub/PromptEngineeringPanel.tsx`**
+  - Integrated `computePrePromptContext` into the Scene Project Hub's Prompt Engineering panel to display the real-time synthesized pre-prompt context and provide "Reset to Preview" controls.

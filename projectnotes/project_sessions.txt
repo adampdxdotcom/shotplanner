@@ -1,0 +1,107 @@
+session 1
+
+Troubleshooting & Network Resolution
+
+    Initial Startup: Verified that both containers (comfyui_bridge_backend on port 8000 and comfyui_bridge_frontend on port 8302) booted cleanly without internal crashes.
+
+    Network Mismatch: Identified that the Connection refused error on 192.168.1.10:8302 occurred because the request was targeting the wrong host IP on the LAN (the host was actually located at 192.168.1.11).
+
+    Asset Route Collision: Diagnosed a blank page issue where JavaScript assets were failing with a MIME type mismatch (application/json). The Nginx frontend was forwarding /assets/ requests directly to the Python backend (which mounts ./assets:/app/assets) instead of serving compiled frontend static files from /usr/share/nginx/html.
+
+Workflow & Architecture Prompts
+
+    Developer Bug Prompt: Formatted a concise bug ticket instructing the code writer to resolve the Nginx /assets/ path collision by scoping proxy_pass to an explicit API prefix (like /api/) or renaming the backend assets volume.
+
+    Git Update Workflow: Outlined the deployment cycle to pull repo changes and rebuild containers:
+    Bash
+
+    git pull
+    docker compose up -d --build
+    docker image prune -f
+
+    Gemini API Integration: Formatted a developer task prompt to integrate the Google GenAI SDK (google-genai), persist API credentials on the backend, and add a masked password field with a save action on the frontend Settings view.
+
+Pending Request: Shot Data Persistence
+Before the session hiccuped, you asked about saving and loading shot details as JSON files. Here is the developer-ready specification for that request:
+
+Feature Request: Shot JSON Storage & Page-Leave Guard
+
+    Storage Location: Save project/shot JSON files server-side under /assets/project_jsons/ (backed by the existing assets volume).
+
+    Backend Endpoints:
+
+        POST /api/shots/save: Accepts shot payload and writes filename.json to /assets/project_jsons/.
+
+        GET /api/shots/list: Returns available JSON files in /assets/project_jsons/.
+
+        GET /api/shots/load/{filename}: Retrieves the selected JSON data.
+
+    Frontend State & Navigation Guard:
+
+        Keep shot working data purely in frontend state/memory; do not preserve unsaved session state across refreshes.
+
+        Implement an onbeforeunload listener to prompt users with a browser confirmation dialog if they try to leave or reload the page with unsaved changes.
+
+        Add "Save Project" and "Load Project" UI dialogs pointing to the backend endpoints.
+
+
+  session 2
+   Please summarize this session
+
+Here is a summary of the topics, architectural updates, and debugging discussions covered in this session:
+
+    README.md Overhaul: Updated the documentation from an automated RunPod API executor to a pre-production visual canvas staging tool. Documented the Scene Hub, Storyboard Carousel, MiniMax-H3 multimodal prompt conventions, camera planning, and targeted SCP file staging.
+
+    Upload Progress & Persistent Summary Feature: Specified a multi-state console under the execution cards on Tab 4, detailing live transfer progress indicators, actionable failure alerts, and a persistent post-upload manifest.
+
+    Cloud GPU Portability & Decoupling: Evaluated the feasibility of running the dispatch pipeline on other GPU cloud providers. Outlined the feature specification to generalize UI naming and make the remote ComfyUI root installation path fully configurable.
+
+    Asset URL Resolution: Diagnosed why media previews failed to render across components. Traced network traffic showing that /api/assets/file/... returned 404 while /api/uploads/... returned 200, identifying the need for a single, centralized URL helper.
+
+    Subject-Organized Asset Library: Designed a feature specification for the upload modal to allow users to either upload new files or select from existing project media grouped by subject name.
+
+    State Scoping & Blank Shot Duplication Bugs: Explored the root causes behind new blank shots unintentionally mirroring Shot 1 and the asset gallery failing to surface all scene media. Established targeted diagnostic logging steps and questions for the developer to isolate state inheritance in the parent component and data models.
+
+
+  # Session 3 Summary: Core Architecture, Scene-First Storage, Production Workflows & Multi-Take Versioning
+
+## 1. Scene-First Storage & Directory Hierarchy
+- **Transitioned to Scene-First Directory Layout:** Established a clean, self-contained structure: `assets/{scene_name}/{images, videos, audios, workflows, thumbnails}/` with project descriptors saved at `assets/{scene_name}/{scene_name}.json`.
+- **Eliminated Ghost & Flat Folders:** Removed hardcoded boot-time directory provisioning loops for `scene01` and legacy flat directories. Enforced Just-In-Time directory creation upon user save/creation.
+- **Docker Mount Anchoring:** Anchored all backend path resolvers directly to the container root mount (`/app/assets`), guaranteeing 100% persistence between container restarts.
+
+## 2. Dynamic Workflow Synthesis & Surgical Node Patching
+- **Centralized `build_shot_workflow()` Engine:** Unified all ComfyUI workflow generation into a single source of truth inside `backend/services/workflow_service.py`.
+- **Dual Format AST Graph Support:** Enabled surgical in-place parameter patching for both **Visual UI Workflow Graphs** (`nodes` array) and **ComfyUI API Dictionaries** (`{ "node_id": {...} }`).
+- **Dynamic Parameter & Loader Injections:**
+  - Injected expanded prompts into detected multiline/CLIP prompt nodes.
+  - Injected assigned media asset filenames into image/video/audio loader nodes with `empty.png` bypass for unassigned slots.
+  - Injected sampling steps, megapixels resolution (fixed missing visual canvas handler), and frame duration overrides without mutating graph coordinates, links, or custom nodes.
+- **Live Injected Preview & Universal Clipboard:** Updated the web JSON inspector to display live in-memory injected shot JSON and implemented a universal clipboard fallback for HTTP/LAN access.
+
+## 3. Production ZIP Exports & Remote RunPod SFTP Staging
+- **Multi-Workflow Production ZIP Bundling:** Refactored the project export handler to package master project JSONs, media assets in `uploads/`, clean master templates in `workflows/`, and **ready-to-run, pre-injected workflows for every single shot** in `staged_workflows/`.
+- **Large Archive Ingestion (Fixed HTTP 413):** Updated NGINX configuration with `client_max_body_size 500M;` to support multi-megabyte project ZIPs and 4K source assets.
+- **Remote RunPod / ComfyUI Staging:** Automated SFTP staging of all unique shot assets to `/workspace/runpod-slim/ComfyUI/input/` and shot workflows to `/workspace/runpod-slim/ComfyUI/user/default/workflows/{scene_name}/`.
+
+## 4. Assembly Line Prompt Expansion & Over-The-Shoulder (OTS) Framing
+- **Assembly Line Architecture:** Separated prompt generation into deterministic Header (Scene Planning + Global Subject Definitions + Directives), LLM-generated Multimodal Description, and deterministic Audio/Music Footer.
+- **OTS Spatial Controls:** Added dedicated UI controls for Over-The-Shoulder shots (**Anchor Subject**, **Focus Subject**, and **Framing Side: Left / Right**), hard-injecting precise spatial framing directives into the prompt header.
+- **Strict Camera Motion Constraints:** Enforced camera movement rules (e.g. `Locked Off (Static)`) preventing LLM hallucinations like unwanted push-ins.
+
+## 5. On-Demand Lightweight Thumbnail Pipeline
+- **Pillow (PIL) Thumbnail Generation:** Automated background creation of lightweight (384px) thumbnails upon image upload.
+- **On-Demand Caching Endpoint (`/api/uploads/thumb/{filename}`):** Generates and caches missing thumbnails on the fly for legacy or newly imported files, reducing UI network payloads from 20MB+ down to ~15KB per card.
+- **ZIP Exclusion:** Excluded cached thumbnails from export archives to keep bundles lean and pristine.
+
+## 6. Codebase Modularization & Code Hygiene
+- **Monolithic Component Decomposition:**
+  - Modularized `AssetManagerSection.tsx` (1,600+ lines down to ~200 lines) by extracting `AssetUploadModal`, `AssetEditModal`, `AssetLightbox`, and `AssetSlotGrid`.
+  - Refactored `App.tsx` (1,100+ lines) using custom hooks (`useProjectState`, `useWorkflowState`, `useAssetState`).
+  - Modularized `GallerySection.tsx` and `WorkflowSection.tsx` into focused sub-components.
+- **Backend Service Decoupling:** Began modularizing the 1,400+ line `api.py` into dedicated routers (`project_routes`, `workflow_routes`, `asset_routes`, `execution_routes`) and domain services.
+
+## 7. Multi-Take Versioning System
+- **Shot Takes History:** Enhanced `ShotItem` to support a `takes` snapshot array (`Take 1`, `Take 2`, etc.) capturing prompts, parameters, and video outputs per run.
+- **Systematic Output Naming:** Saved rendered video outputs with systematic identifiers: `{scene_name}_Shot_{shot_number}_Take_{take_number}.mp4`.
+- **Take Management:** Added UI Take Selector pills and "⭐ Hero Take" designation for export prioritization.

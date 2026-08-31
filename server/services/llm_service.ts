@@ -23,6 +23,8 @@ export interface ExpandPromptOptions {
   shot_number?: string | number;
   shot_type?: string;
   camera_movement?: string;
+  lens_focal_length?: string;
+  aspect_ratio?: string;
   ots_anchor_subject?: string;
   ots_focus_subject?: string;
   ots_side?: "Left" | "Right";
@@ -91,6 +93,8 @@ export async function expandPrompt(
     shot_number,
     shot_type,
     camera_movement,
+    lens_focal_length,
+    aspect_ratio,
     ots_anchor_subject,
     ots_focus_subject,
     ots_side,
@@ -104,17 +108,49 @@ export async function expandPrompt(
     throw new Error("At least one uploaded asset is required to generate a prompt.");
   }
 
-  // 1. Programmatic Header Construction
-  const resolvedPromptPrefix =
-    (prompt_prefix || "").trim() ||
-    generatePromptPrefix(scene_planning || planning || { scene_name, shot_number, shot_type, camera_movement });
-
+  // 1. Resolve cinematography context
   const effectiveShotType =
     active_shot?.shot_type ||
     scene_planning?.shot_type ||
     planning?.shot_type ||
     shot_type ||
     "";
+
+  const effectiveCameraMovement = (
+    active_shot?.camera_movement ||
+    camera_movement ||
+    scene_planning?.camera_movement ||
+    planning?.camera_movement ||
+    ""
+  ).trim();
+
+  const effectiveLens = (
+    active_shot?.lens_focal_length ||
+    scene_planning?.lens_focal_length ||
+    planning?.lens_focal_length ||
+    lens_focal_length ||
+    ""
+  ).trim();
+
+  const effectiveAspectRatio = (
+    active_shot?.aspect_ratio ||
+    scene_planning?.aspect_ratio ||
+    planning?.aspect_ratio ||
+    aspect_ratio ||
+    ""
+  ).trim();
+
+  // 2. Programmatic Header Construction
+  const resolvedPromptPrefix =
+    (prompt_prefix || "").trim() ||
+    generatePromptPrefix(scene_planning || planning || { 
+      scene_name, 
+      shot_number, 
+      shot_type: effectiveShotType, 
+      camera_movement: effectiveCameraMovement,
+      lens_focal_length: effectiveLens,
+      aspect_ratio: effectiveAspectRatio
+    });
 
   const anchorSubject = (
     active_shot?.ots_anchor_subject ||
@@ -188,15 +224,7 @@ export async function expandPrompt(
     isSingleSubject
   });
 
-  // 2. Camera Motion & Framing Hard Constraints
-  const effectiveCameraMovement = (
-    active_shot?.camera_movement ||
-    camera_movement ||
-    scene_planning?.camera_movement ||
-    planning?.camera_movement ||
-    ""
-  ).trim();
-
+  // 3. Camera Motion & Optics Hard Constraints
   const isStatic =
     effectiveCameraMovement.toLowerCase().includes("locked") ||
     effectiveCameraMovement.toLowerCase().includes("static");
@@ -207,10 +235,51 @@ export async function expandPrompt(
       : `The camera movement is strictly "${effectiveCameraMovement}". Describe camera motion naturally matching ONLY this specified movement (Motion Type + Amplitude + Speed). Contradictory camera movements (such as push-ins or zooms when panning, or moving when static) are STRICTLY FORBIDDEN.`
     : `Describe camera motion naturally (Motion Type + Amplitude + Speed, e.g., "The camera pushes in with small amplitude at slow speed...").`;
 
-  // 3. Programmatic Footer Construction
+  // Optics / Lens & Framing Directives
+  let lensInstruction = "";
+  if (effectiveLens && effectiveLens !== "None") {
+    const lLow = effectiveLens.toLowerCase();
+    if (lLow.includes("24mm") || lLow.includes("wide")) {
+      lensInstruction = `Optics / Lens: ${effectiveLens}. Capture an expansive environmental field of view, deep focus, and sharp contextual background detail with subtle wide-angle perspective depth.`;
+    } else if (lLow.includes("35mm") || lLow.includes("natural")) {
+      lensInstruction = `Optics / Lens: ${effectiveLens}. Render natural human-eye perspective with balanced depth, grounded composition, and realistic environmental scale.`;
+    } else if (lLow.includes("50mm") || lLow.includes("standard")) {
+      lensInstruction = `Optics / Lens: ${effectiveLens}. Deliver classic standard prime optics with crisp subject sharpness and natural, smooth depth-of-field falloff.`;
+    } else if (lLow.includes("85mm") || lLow.includes("portrait")) {
+      lensInstruction = `Optics / Lens: ${effectiveLens}. Emphasize portrait telephoto compression with shallow depth-of-field, prominent subject isolation, and creamy background bokeh.`;
+    } else if (lLow.includes("135mm") || lLow.includes("compression")) {
+      lensInstruction = `Optics / Lens: ${effectiveLens}. Deliver dramatic telephoto perspective compression, pulling background geometry closer with cinematic optical softness behind the subject.`;
+    } else if (lLow.includes("macro") || lLow.includes("close-up")) {
+      lensInstruction = `Optics / Lens: ${effectiveLens}. Deliver ultra-shallow focus plane with magnified micro-textures, intricate surface details, and extreme background softness.`;
+    } else {
+      lensInstruction = `Optics / Lens: ${effectiveLens}. Render authentic depth-of-field and optical perspective consistent with this lens choice.`;
+    }
+  }
+
+  let aspectInstruction = "";
+  if (effectiveAspectRatio && effectiveAspectRatio !== "None") {
+    const arLow = effectiveAspectRatio.toLowerCase();
+    if (arLow.includes("2.39:1") || arLow.includes("anamorphic") || arLow.includes("scope")) {
+      aspectInstruction = `Framing Canvas: ${effectiveAspectRatio}. Compose for cinematic anamorphic ultra-widescreen scope with expansive horizontal blocking.`;
+    } else if (arLow.includes("9:16") || arLow.includes("vertical")) {
+      aspectInstruction = `Framing Canvas: ${effectiveAspectRatio}. Compose for vertical mobile orientation, framing the subject with deliberate vertical balance and headroom.`;
+    } else if (arLow.includes("1:1") || arLow.includes("square")) {
+      aspectInstruction = `Framing Canvas: ${effectiveAspectRatio}. Compose with centered geometric balance tailored to a 1:1 square canvas.`;
+    } else if (arLow.includes("4:3")) {
+      aspectInstruction = `Framing Canvas: ${effectiveAspectRatio}. Compose for classic 4:3 academy framing with tight, focused subject staging.`;
+    } else {
+      aspectInstruction = `Framing Canvas: ${effectiveAspectRatio}. Maintain clean widescreen framing.`;
+    }
+  }
+
+  const opticsContextBlock = (lensInstruction || aspectInstruction)
+    ? `\nCINEMATOGRAPHY & OPTICS DIRECTIVE:\n${[lensInstruction, aspectInstruction].filter(Boolean).join(" ")}\n`
+    : "";
+
+  // 4. Programmatic Footer Construction
   const mandatoryFooter = buildMandatoryFooter();
 
-  // 4. Structured Request to LLM for Integrated Multimodal Description ONLY
+  // 5. Structured Request to LLM for Integrated Multimodal Description ONLY
   const systemPrompt = `You are an expert AI Screenwriter and Prompt Engineer specializing in advanced multimodal video generation frameworks (MiniMax-H3 / Ref2VA pipelines).
 
 Your task is to generate ONLY the integrated_multimodal_description content. Do not generate headers, footers, or subject definitions. Use exact asset tags (<Picture N>, <Video N>) provided in the context.
@@ -218,6 +287,7 @@ Your task is to generate ONLY the integrated_multimodal_description content. Do 
 ### Strict Output Constraints:
 - Spatial Initialization: Always define the subject's exact spatial position and initial posture at the very beginning (e.g., "[Shot 1] Live-action, cinematic... At the start of the shot, [Subject] is positioned at...").
 - Exact Tags: Differentiate between facial likeness and styling using the exact tags provided (e.g., "<Picture 1>"). Do NOT invent new tags or reference off-screen characters.
+- Cinematography & Optical Rendering: Reflect the visual characteristics of the selected lens (${effectiveLens || "standard"}) and framing (${effectiveAspectRatio || "16:9 widescreen"}) in depth-of-field, perspective compression, and environmental sharpness, while strictly adhering to camera motion constraints.
 - Framing Directives: When a Framing Directive is provided in context, utilize the specific anchor and focus subject likenesses provided in the Global Subject Definitions to execute this framing.
 - Camera Motion Hard Constraint: ${cameraConstraintInstruction}
 - Dialogue: If dialogue is present, format as <d>[Language] Dialogue text</d> with speaker tags like (S1).
@@ -236,11 +306,11 @@ Your task is to generate ONLY the integrated_multimodal_description content. Do 
 
 SHOT PLANNING CONTEXT:
 ${resolvedPromptPrefix || "Shot 01"}
-${cameraContextBlock}${framingContextBlock}
+${cameraContextBlock}${opticsContextBlock}${framingContextBlock}
 AVAILABLE MULTIMODAL REFERENCE ASSETS:
 ${subjectDefinitions || "No reference definitions"}
 
-Generate ONLY the integrated_multimodal_description paragraph incorporating the reference tags naturally while strictly adhering to all camera and framing constraints.`;
+Generate ONLY the integrated_multimodal_description paragraph incorporating the reference tags naturally while strictly adhering to all camera, optics, and framing constraints.`;
 
   let rawLlmDescription = "";
   let providerUsed = "Local LM Studio";
