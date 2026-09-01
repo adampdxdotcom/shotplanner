@@ -14,19 +14,30 @@ interface GalleryBulkUploadModalProps {
   isOpen: boolean;
   onClose: () => void;
   subjects: string[];
+  defaultSubject?: string;
+  sceneName?: string;
   onAssetUploaded: (asset: MediaAsset) => void;
   onRegisterSubject: (name: string) => void;
 }
 
 export const GalleryBulkUploadModal: React.FC<GalleryBulkUploadModalProps> = ({
-  isOpen, onClose, subjects, onAssetUploaded, onRegisterSubject
+  isOpen, onClose, subjects, defaultSubject, sceneName, onAssetUploaded, onRegisterSubject
 }) => {
   const [bulkQueue, setBulkQueue] = useState<BulkQueueItem[]>([]);
-  const [bulkSubject, setBulkSubject] = useState("");
+  const [bulkSubject, setBulkSubject] = useState(defaultSubject || "");
   const [bulkDescription, setBulkDescription] = useState("");
-  const [bulkAssetType, setBulkAssetType] = useState("Scene Reference");
+  const [bulkAssetType, setBulkAssetType] = useState(defaultSubject ? "Body Reference" : "Scene Reference");
   const [isBulkUploading, setIsBulkUploading] = useState(false);
   const [bulkDragActive, setBulkDragActive] = useState(false);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      if (defaultSubject) {
+        setBulkSubject(defaultSubject);
+        setBulkAssetType("Body Reference");
+      }
+    }
+  }, [isOpen, defaultSubject]);
 
   if (!isOpen) return null;
 
@@ -74,6 +85,9 @@ export const GalleryBulkUploadModal: React.FC<GalleryBulkUploadModalProps> = ({
       
       const formData = new FormData();
       formData.append("file", bulkQueue[i].file);
+      if (sceneName) {
+        formData.append("scene_name", sceneName);
+      }
       formData.append("subject_name", bulkSubject);
       formData.append("type", bulkAssetType);
       formData.append("description", bulkDescription);

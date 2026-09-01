@@ -11,6 +11,7 @@ interface AssetUploadModalProps {
   libraryAssets: MediaAsset[];
   subjects: string[];
   characters: Record<string, any>;
+  sceneName?: string;
   onRegisterSubject?: (name: string) => void;
   onClose: () => void;
   onAssetUploaded: (asset: MediaAsset, slotIndex: number, type: string) => void;
@@ -23,6 +24,7 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
   libraryAssets,
   subjects,
   characters,
+  sceneName,
   onRegisterSubject,
   onClose,
   onAssetUploaded
@@ -86,6 +88,10 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
     formData.append("slot_index", targetSlotIndex.toString());
     formData.append("media_type", targetMediaType);
     
+    if (sceneName) {
+      formData.append("scene_name", sceneName);
+    }
+
     if (targetMediaType === "image") {
       formData.append("subject_name", subjectName.trim() || "subject");
       formData.append("type", assetType);

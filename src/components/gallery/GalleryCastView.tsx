@@ -9,6 +9,7 @@ interface GalleryCastViewProps {
   characters: Record<string, CharacterProfile>;
   onUpdateCharacter?: (profile: CharacterProfile) => void;
   onDeleteCharacter?: (name: string) => void;
+  onAddRef?: (subject: string) => void;
   setLightboxAsset: (asset: MediaAsset) => void;
 }
 
@@ -18,6 +19,7 @@ export const GalleryCastView: React.FC<GalleryCastViewProps> = ({
   characters,
   onUpdateCharacter,
   onDeleteCharacter,
+  onAddRef,
   setLightboxAsset
 }) => {
   const [characterToDelete, setCharacterToDelete] = useState<string | null>(null);
@@ -127,7 +129,10 @@ export const GalleryCastView: React.FC<GalleryCastViewProps> = ({
                   </div>
                 ))}
                 
-                <div className="w-32 h-40 border-2 border-dashed border-zinc-800 rounded-xl flex flex-col items-center justify-center text-zinc-600 hover:text-zinc-400 hover:border-zinc-600 hover:bg-zinc-900/50 transition-colors cursor-pointer shrink-0">
+                <div 
+                  onClick={() => onAddRef?.(subject)}
+                  className="w-32 h-40 border-2 border-dashed border-zinc-800 rounded-xl flex flex-col items-center justify-center text-zinc-600 hover:text-amber-400 hover:border-amber-500/50 hover:bg-zinc-900/50 transition-colors cursor-pointer shrink-0"
+                >
                   <ChevronRight className="w-6 h-6 mb-1" />
                   <span className="text-[10px] font-bold">Add Ref</span>
                 </div>

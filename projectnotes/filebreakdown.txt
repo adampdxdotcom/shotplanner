@@ -563,4 +563,18 @@
   - Introduced character deletion action button on each character card header with hover styling and accessible labels.
   - Built an interactive confirmation modal detailing that deleting the profile will remove character metadata and de-assign shot input slots while keeping all original media files safe and accessible in the gallery.
 
+## Scene-Specific Asset Upload & Character Ref Routing Architecture
+- **`src/components/AssetUploadModal.tsx`**
+  - Updated `AssetUploadModalProps` to accept the optional `sceneName?: string` prop.
+  - Augmented single-asset upload submission handler to explicitly append `scene_name` to the `FormData` multipart payload when present, ensuring files are written to the active scene directory `assets/{scene_name}/{media_type}/`.
+- **`src/components/gallery/GalleryBulkUploadModal.tsx`**
+  - Updated `GalleryBulkUploadModalProps` to accept `sceneName?: string` and `defaultSubject?: string`.
+  - In the bulk upload worker loop (`runBulkUpload`), dynamically attached `scene_name` to each queued file's `FormData` payload under the exact key `scene_name`.
+  - Initialized `bulkSubject` and default reference type from `defaultSubject` whenever opened with a preselected character.
+- **`src/components/AssetManagerSection.tsx` & `src/components/GallerySection.tsx`**
+  - Passed the active scene identifier (`activeSceneName` in `AssetManagerSection` and `sceneName` in `GallerySection`) into `AssetUploadModal` and `GalleryBulkUploadModal` instances.
+- **`src/components/gallery/GalleryCastView.tsx`**
+  - Wired the "Add Ref" card click handler (`onAddRef`) to trigger the asset upload workflow, pre-populating the target character's name as the subject and scoping the upload directly to the active scene directory.
+
+
 

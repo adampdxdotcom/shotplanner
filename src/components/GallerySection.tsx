@@ -48,6 +48,7 @@ export const GallerySection: React.FC<GallerySectionProps> = ({
 
   // Modals & Active Controls
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [bulkModalSubject, setBulkModalSubject] = useState<string | undefined>(undefined);
   const [editingAsset, setEditingAsset] = useState<MediaAsset | null>(null);
   const [lightboxAsset, setLightboxAsset] = useState<MediaAsset | null>(null);
 
@@ -212,7 +213,10 @@ export const GallerySection: React.FC<GallerySectionProps> = ({
 
             {/* Bulk Upload Button */}
             <button
-              onClick={() => setIsBulkModalOpen(true)}
+              onClick={() => {
+                setBulkModalSubject(undefined);
+                setIsBulkModalOpen(true);
+              }}
               className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md shadow-indigo-900/20 transition-all flex items-center gap-2"
             >
               <Plus className="w-4 h-4" />
@@ -272,6 +276,10 @@ export const GallerySection: React.FC<GallerySectionProps> = ({
               characters={characters}
               onUpdateCharacter={onUpdateCharacter}
               onDeleteCharacter={onDeleteCharacter}
+              onAddRef={(subj) => {
+                setBulkModalSubject(subj);
+                setIsBulkModalOpen(true);
+              }}
               setLightboxAsset={setLightboxAsset}
             />
           ) : null}
@@ -280,8 +288,13 @@ export const GallerySection: React.FC<GallerySectionProps> = ({
 
       <GalleryBulkUploadModal
         isOpen={isBulkModalOpen}
-        onClose={() => setIsBulkModalOpen(false)}
+        onClose={() => {
+          setIsBulkModalOpen(false);
+          setBulkModalSubject(undefined);
+        }}
         subjects={subjects}
+        defaultSubject={bulkModalSubject}
+        sceneName={sceneName}
         onAssetUploaded={onAssetUploaded}
         onRegisterSubject={onRegisterSubject}
       />

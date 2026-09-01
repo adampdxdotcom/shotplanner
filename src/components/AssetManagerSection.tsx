@@ -338,6 +338,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
         libraryAssets={assets}
         subjects={projectSubjects}
         characters={characters}
+        sceneName={activeSceneName}
         onRegisterSubject={onRegisterSubject}
         onClose={() => setUploadModalSlot(null)}
         onAssetUploaded={handleAssetUploaded}
