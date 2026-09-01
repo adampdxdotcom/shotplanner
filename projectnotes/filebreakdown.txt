@@ -576,5 +576,15 @@
 - **`src/components/gallery/GalleryCastView.tsx`**
   - Wired the "Add Ref" card click handler (`onAddRef`) to trigger the asset upload workflow, pre-populating the target character's name as the subject and scoping the upload directly to the active scene directory.
 
+## Asset Reference Modifier & Prompt Tagging Architecture
+- **`src/utils/assetModifiers.ts`**
+  - Established modular, extensible `ASSET_REFERENCE_MODIFIERS` configuration map for asset reference types and modifier presets.
+  - Configured Headshot presets: "Facing" (`headshot facing`), "3/4 Profile" (`headshot 3/4 profile`), and "Full Profile" (`headshot full profile`).
+  - Implemented `updateDescriptionWithModifier` reactive tag replacement and insertion utility with duplicate prevention and clean punctuation formatting.
+- **`src/components/AssetUploadModal.tsx`**
+  - Rendered a companion modifier dropdown selector whenever the selected reference type has available modifiers in the configuration map.
+  - Integrated reactive modifier tag injection/replacement into the visual description input while keeping the textarea fully editable and dropzone validation responsive.
+
+
 
 

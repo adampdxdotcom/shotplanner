@@ -3,6 +3,10 @@ import { MediaAsset } from "../types";
 import { UploadCloud, HardDrive, Search, Music, CheckCircle, X, AlertCircle } from "lucide-react";
 import { SubjectCombobox } from "./SubjectCombobox";
 import { getAssetMediaUrl } from "../utils/assetUrl";
+import { 
+  ASSET_REFERENCE_MODIFIERS, 
+  updateDescriptionWithModifier 
+} from "../utils/assetModifiers";
 
 interface AssetUploadModalProps {
   isOpen: boolean;
@@ -30,11 +34,19 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
   onAssetUploaded
 }) => {
   const [assetType, setAssetType] = useState<string>("Headshot");
+  const [selectedModifier, setSelectedModifier] = useState<string>("");
   const [subjectName, setSubjectName] = useState<string>("");
   const [description, setDescription] = useState<string>("");
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const modifierConfig = useMemo(() => ASSET_REFERENCE_MODIFIERS[assetType], [assetType]);
+
+  const handleModifierChange = (modValue: string) => {
+    setSelectedModifier(modValue);
+    setDescription(prev => updateDescriptionWithModifier(prev, assetType, modValue));
+  };
   
   const [uploadModalTab, setUploadModalTab] = useState<"upload" | "library">("upload");
   const [librarySearch, setLibrarySearch] = useState("");
@@ -208,11 +220,15 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
                 <>
                   <div>
                     <label className="block text-xs font-medium text-zinc-400 mb-1">Type of Reference</label>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap sm:flex-nowrap">
                       <select 
                         value={assetType}
-                        onChange={(e) => setAssetType(e.target.value)}
-                        className="bg-zinc-950 border-2 border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 transition-colors outline-none"
+                        onChange={(e) => {
+                          const nextType = e.target.value;
+                          setAssetType(nextType);
+                          setSelectedModifier("");
+                        }}
+                        className="bg-zinc-950 border-2 border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 transition-colors outline-none flex-1 min-w-[140px]"
                       >
                         <option value="Headshot">Headshot (Face)</option>
                         <option value="Body Reference">Body / Outfit</option>
@@ -221,6 +237,22 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
                         <option value="Style / Mood">Style / Mood</option>
                         <option value="Other">Other</option>
                       </select>
+
+                      {modifierConfig && (
+                        <select
+                          value={selectedModifier}
+                          onChange={(e) => handleModifierChange(e.target.value)}
+                          className="bg-zinc-950 border-2 border-amber-600/40 rounded-lg px-3 py-2 text-sm text-amber-300 focus:border-amber-500 transition-colors outline-none shrink-0"
+                        >
+                          <option value="">Modifier (Optional)...</option>
+                          {modifierConfig.modifiers.map(preset => (
+                            <option key={preset.id} value={preset.modifier}>
+                              {preset.label}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+
                       {assetType === "Other" && (
                         <input
                           type="text"
