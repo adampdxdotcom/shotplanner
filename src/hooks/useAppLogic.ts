@@ -1,7 +1,7 @@
 import { getAssetMediaUrl } from "../utils/assetUrl";
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { AppConfig, MediaAsset, WorkflowItem, ParsedWorkflow, ToastMessage, GenerationParameters, ParameterNodeMappings, LLMProvider, ScenePlanning, SceneProjectFile, ShotItem } from '../types';
+import { AppConfig, MediaAsset, WorkflowItem, ParsedWorkflow, ToastMessage, GenerationParameters, ParameterNodeMappings, LLMProvider, ScenePlanning, SceneProjectFile, ShotItem, CharacterProfile } from '../types';
 import { useComfyMonitor } from './useComfyMonitor';
 import { generatePromptPrefix } from '../components/ScenePlanningHeader';
 import { generateUUID } from '../utils/formatters';
@@ -160,6 +160,110 @@ export function useAppLogic() {
       setToasts(prev => prev.filter(t => t.id !== id));
     }, 4000);
   }, []);
+
+  const handleDeleteCharacter = useCallback((characterName: string) => {
+    const trimmed = characterName.trim();
+    if (!trimmed) return;
+    const targetLower = trimmed.toLowerCase();
+
+    setSceneProject(prevProject => {
+      // 1. Identify all asset filenames associated with the deleted character
+      const characterFilenames = new Set<string>();
+
+      // Check quick slots & outfit ref from character profile
+      const charEntries = Object.entries(prevProject.characters || {}) as [string, CharacterProfile][];
+      const charProfile = charEntries.find(([name]) => name.toLowerCase() === targetLower)?.[1];
+      if (charProfile) {
+        (charProfile.quick_slots || []).forEach(fn => { if (fn) characterFilenames.add(fn); });
+        if (charProfile.scene_outfit_ref && /\.(png|jpe?g|webp|gif|bmp|mp4|mov)$/i.test(charProfile.scene_outfit_ref)) {
+          characterFilenames.add(charProfile.scene_outfit_ref);
+        }
+      }
+
+      // Check assets matching character tag
+      (prevProject.assets || []).forEach(a => {
+        if ((a.subject_name || "").trim().toLowerCase() === targetLower) {
+          if (a.filename) characterFilenames.add(a.filename);
+        }
+      });
+
+      // 2. Remove character record from characters registry
+      const nextCharacters: Record<string, CharacterProfile> = {};
+      charEntries.forEach(([key, val]) => {
+        if (key.toLowerCase() !== targetLower && val.name.toLowerCase() !== targetLower) {
+          nextCharacters[key] = val;
+        }
+      });
+
+      // 3. Remove character name from global subjects registry
+      const nextSubjects = (prevProject.subjects || []).filter(
+        s => s.toLowerCase() !== targetLower
+      );
+
+      // 4. Preserve media files while removing the character tag (reset subject_name to empty)
+      const nextAssets = (prevProject.assets || []).map(a => {
+        if ((a.subject_name || "").trim().toLowerCase() === targetLower) {
+          return { ...a, subject_name: "" };
+        }
+        return a;
+      });
+
+      // 5. Surgical shot-level de-assignment across every shot in the project
+      const nextShots = (prevProject.shots || []).map(shot => {
+        // De-assign slot keys containing filenames belonging to the deleted character
+        const nextAssignedSlots: Record<number, string> = {};
+        for (const [slotKey, fn] of Object.entries(shot.assigned_slots || {})) {
+          if (fn && !characterFilenames.has(fn as string)) {
+            nextAssignedSlots[Number(slotKey)] = fn as string;
+          }
+        }
+
+        // Clean OTS anchor/focus subjects if they match the deleted character
+        let otsAnchor = shot.ots_anchor_subject;
+        let otsFocus = shot.ots_focus_subject;
+        if (otsAnchor && otsAnchor.trim().toLowerCase() === targetLower) {
+          otsAnchor = "";
+        }
+        if (otsFocus && otsFocus.trim().toLowerCase() === targetLower) {
+          otsFocus = "";
+        }
+
+        return {
+          ...shot,
+          assigned_slots: nextAssignedSlots,
+          ots_anchor_subject: otsAnchor,
+          ots_focus_subject: otsFocus
+        };
+      });
+
+      return {
+        ...prevProject,
+        characters: nextCharacters,
+        subjects: nextSubjects,
+        assets: nextAssets,
+        shots: nextShots
+      };
+    });
+
+    // Clean OTS in scene planning if configured for this character
+    setScenePlanning(prev => {
+      let changed = false;
+      let otsAnchor = prev.ots_anchor_subject;
+      let otsFocus = prev.ots_focus_subject;
+      if (otsAnchor && otsAnchor.trim().toLowerCase() === targetLower) {
+        otsAnchor = "";
+        changed = true;
+      }
+      if (otsFocus && otsFocus.trim().toLowerCase() === targetLower) {
+        otsFocus = "";
+        changed = true;
+      }
+      return changed ? { ...prev, ots_anchor_subject: otsAnchor, ots_focus_subject: otsFocus } : prev;
+    });
+
+    setIsDirty(true);
+    addToast(`Character "${trimmed}" deleted. Media assets preserved in gallery.`, "info");
+  }, [addToast]);
 
   const monitorState = useComfyMonitor(config.comfyui_api_url, addToast, sceneProject.scene_name);
 
@@ -964,6 +1068,7 @@ export function useAppLogic() {
     promptPrefix,
     handleRegisterSubject,
     handleUpdateCharacter,
+    handleDeleteCharacter,
     fetchWorkflows,
     handleUpdateParam,
     handleUpdateParameterMapping,

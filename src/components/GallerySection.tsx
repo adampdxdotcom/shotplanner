@@ -19,6 +19,7 @@ interface GallerySectionProps {
   sceneProject?: any; // or SceneProjectFile
   onUpdateProject?: React.Dispatch<React.SetStateAction<any>>;
   onUpdateCharacter?: (profile: CharacterProfile) => void;
+  onDeleteCharacter?: (name: string) => void;
   onRegisterSubject: (name: string) => void;
   onAssetUploaded: (asset: MediaAsset) => void;
   onAssetDeleted: (filename: string) => void;
@@ -33,6 +34,7 @@ export const GallerySection: React.FC<GallerySectionProps> = ({
   sceneProject,
   onUpdateProject,
   onUpdateCharacter,
+  onDeleteCharacter,
   onRegisterSubject,
   onAssetUploaded,
   onAssetDeleted,
@@ -269,6 +271,7 @@ export const GallerySection: React.FC<GallerySectionProps> = ({
               sortedAssets={sortedAssets}
               characters={characters}
               onUpdateCharacter={onUpdateCharacter}
+              onDeleteCharacter={onDeleteCharacter}
               setLightboxAsset={setLightboxAsset}
             />
           ) : null}

@@ -45,6 +45,7 @@ export default function App() {
     promptPrefix,
     handleRegisterSubject,
     handleUpdateCharacter,
+    handleDeleteCharacter,
     fetchWorkflows,
     handleUpdateParam,
     handleUpdateParameterMapping,
@@ -191,6 +192,7 @@ export default function App() {
             characters={sceneProject.characters || {}}
             sceneProject={sceneProject}
             onUpdateCharacter={handleUpdateCharacter}
+            onDeleteCharacter={handleDeleteCharacter}
             sceneName={sceneProject.scene_name || currentProjectName || "Untitled_Scene"}
             onRegisterSubject={handleRegisterSubject}
             onAssetUploaded={handleAssetUploaded}

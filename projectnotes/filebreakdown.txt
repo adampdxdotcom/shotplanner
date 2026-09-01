@@ -550,3 +550,17 @@
   - Replaced the temporary "TOAST MESSAGE AREA" placeholder under the project title with "SHOT PLANNER".
   - Configured conditional display so the "SHOT PLANNER" label automatically hides when active toast notifications appear and seamlessly returns when all toast notifications are dismissed or expire.
 
+## Character Deletion Orchestration Architecture
+- **`src/hooks/useAppLogic.ts`**
+  - Implemented `handleDeleteCharacter` orchestrator performing atomic state synchronization across the active project, global subjects registry, character profiles, assets, and shot records.
+  - Removes the target character entry from `sceneProject.characters` and `sceneProject.subjects`.
+  - Preserves all media files and paths while untagging deleted character subject names (`subject_name` reset to `""`).
+  - Executes surgical shot-level de-assignment across all shots in `sceneProject.shots`, removing assigned slot entries mapped to the deleted character's files (`quick_slots` and character-tagged media) and clearing OTS framing anchor/focus subject references matching the deleted character.
+  - Automatically clears OTS references from active `scenePlanning` and sets project dirty flag (`isDirty = true`) to trigger auto-saves and manual save persistence.
+- **`src/App.tsx` & `src/components/GallerySection.tsx`**
+  - Piped `handleDeleteCharacter` handler as `onDeleteCharacter` from the central application logic down to the gallery cast view component.
+- **`src/components/gallery/GalleryCastView.tsx`**
+  - Introduced character deletion action button on each character card header with hover styling and accessible labels.
+  - Built an interactive confirmation modal detailing that deleting the profile will remove character metadata and de-assign shot input slots while keeping all original media files safe and accessible in the gallery.
+
+

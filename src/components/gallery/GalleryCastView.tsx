@@ -1,6 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import { MediaAsset, CharacterProfile } from "../../types";
-import { ChevronRight, Settings } from "lucide-react";
+import { ChevronRight, Settings, Trash2, AlertTriangle, X } from "lucide-react";
 import { getAssetMediaUrl } from "../../utils/assetUrl";
 
 interface GalleryCastViewProps {
@@ -8,12 +8,20 @@ interface GalleryCastViewProps {
   sortedAssets: MediaAsset[];
   characters: Record<string, CharacterProfile>;
   onUpdateCharacter?: (profile: CharacterProfile) => void;
+  onDeleteCharacter?: (name: string) => void;
   setLightboxAsset: (asset: MediaAsset) => void;
 }
 
 export const GalleryCastView: React.FC<GalleryCastViewProps> = ({
-  subjects, sortedAssets, characters, onUpdateCharacter, setLightboxAsset
+  subjects,
+  sortedAssets,
+  characters,
+  onUpdateCharacter,
+  onDeleteCharacter,
+  setLightboxAsset
 }) => {
+  const [characterToDelete, setCharacterToDelete] = useState<string | null>(null);
+
   return (
     <div className="space-y-8">
       {subjects.map(subject => {
@@ -31,18 +39,32 @@ export const GalleryCastView: React.FC<GalleryCastViewProps> = ({
           <div key={subject} className="bg-zinc-900/50 border border-zinc-800/80 rounded-2xl overflow-hidden flex flex-col md:flex-row">
             {/* Character Header / Sidebar */}
             <div className="md:w-64 bg-zinc-900 p-6 border-b md:border-b-0 md:border-r border-zinc-800 flex flex-col shrink-0">
-              <div className="flex items-center gap-4 mb-4">
-                <div className="w-16 h-16 rounded-full bg-zinc-950 border-2 border-zinc-800 overflow-hidden shrink-0 flex items-center justify-center">
-                  {profilePic ? (
-                    <img src={getAssetMediaUrl(profilePic.filename, true)} className="w-full h-full object-cover" alt={subject} referrerPolicy="no-referrer" />
-                  ) : (
-                    <span className="text-xl font-bold text-zinc-600">{subject.charAt(0).toUpperCase()}</span>
-                  )}
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-14 h-14 rounded-full bg-zinc-950 border-2 border-zinc-800 overflow-hidden shrink-0 flex items-center justify-center">
+                    {profilePic ? (
+                      <img src={getAssetMediaUrl(profilePic.filename, true)} className="w-full h-full object-cover" alt={subject} referrerPolicy="no-referrer" />
+                    ) : (
+                      <span className="text-lg font-bold text-zinc-600">{subject.charAt(0).toUpperCase()}</span>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-base font-bold text-zinc-100 line-clamp-1" title={subject}>{subject}</h3>
+                    <p className="text-xs text-amber-500 font-medium">{charAssets.length} reference{charAssets.length === 1 ? "" : "s"}</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-lg font-bold text-zinc-100 line-clamp-1" title={subject}>{subject}</h3>
-                  <p className="text-xs text-amber-500 font-medium">{charAssets.length} references</p>
-                </div>
+
+                {onDeleteCharacter && (
+                  <button
+                    type="button"
+                    onClick={() => setCharacterToDelete(subject)}
+                    className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-950/40 rounded-lg transition-colors shrink-0"
+                    title={`Delete ${subject} profile`}
+                    aria-label={`Delete ${subject} profile`}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
               </div>
               
               <div className="flex-1 space-y-4">
@@ -114,6 +136,70 @@ export const GalleryCastView: React.FC<GalleryCastViewProps> = ({
           </div>
         );
       })}
+
+      {/* Delete Character Confirmation Modal */}
+      {characterToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-6">
+              <div className="flex items-start justify-between gap-4 mb-4">
+                <div className="w-12 h-12 rounded-xl bg-red-950/60 border border-red-900/60 flex items-center justify-center text-red-400 shrink-0">
+                  <AlertTriangle className="w-6 h-6" />
+                </div>
+                <button 
+                  onClick={() => setCharacterToDelete(null)}
+                  className="text-zinc-400 hover:text-zinc-200 transition-colors p-1"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <h3 className="text-lg font-bold text-zinc-100 mb-2">
+                Delete Character Profile
+              </h3>
+
+              <p className="text-sm text-zinc-300 mb-3">
+                Are you sure you want to delete <span className="font-semibold text-amber-400">{characterToDelete}</span>?
+              </p>
+
+              <div className="bg-zinc-950/70 border border-zinc-800/80 rounded-xl p-3.5 text-xs text-zinc-400 space-y-2 mb-6">
+                <p>
+                  • Deletes the character profile and removes them from project subjects.
+                </p>
+                <p>
+                  • De-assigns this character&apos;s images from all shot input slots and OTS framing.
+                </p>
+                <p className="text-emerald-400 font-medium">
+                  ✓ All original media files remain safe and accessible in your gallery.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setCharacterToDelete(null)}
+                  className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (characterToDelete) {
+                      onDeleteCharacter?.(characterToDelete);
+                      setCharacterToDelete(null);
+                    }
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg transition-colors shadow-lg shadow-red-950/50"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete Character
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
