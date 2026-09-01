@@ -7,19 +7,20 @@ interface AssetCardProps {
   asset: MediaAsset;
   idx: number;
   type: string;
+  className?: string;
   onEdit: () => void;
   onDelete: () => void;
   onLightbox: () => void;
 }
 
-export const AssetCard: React.FC<AssetCardProps> = ({ asset, idx, type, onEdit, onDelete, onLightbox }) => {
+export const AssetCard: React.FC<AssetCardProps> = ({ asset, idx, type, className = "", onEdit, onDelete, onLightbox }) => {
   const isImage = asset.media_type === "image" || (!asset.media_type && !/\.(mp3|wav|ogg|m4a|mp4|mov|webm)$/i.test(asset.filename)) || /\.(png|jpe?g|webp|gif|svg|avif|bmp)$/i.test(asset.filename);
   const isAudio = asset.media_type === "audio" || /\.(mp3|wav|ogg|m4a|flac)$/i.test(asset.filename);
   const isVideo = asset.media_type === "video" || /\.(mp4|mov|webm|mkv)$/i.test(asset.filename);
   const imageSrc = getAssetMediaUrl(asset, true);
 
   return (
-    <div className="bg-zinc-950 p-3 rounded-xl border-2 border-zinc-700 hover:border-zinc-600 transition-all space-y-2 relative group flex flex-col">
+    <div className={`bg-zinc-950 p-3 rounded-xl border-2 border-zinc-700 hover:border-zinc-600 transition-all space-y-2 relative group flex flex-col ${className}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="w-5 h-5 rounded-full bg-zinc-800 text-zinc-300 text-[10px] font-mono font-bold flex items-center justify-center">
@@ -100,10 +101,10 @@ export const AssetCard: React.FC<AssetCardProps> = ({ asset, idx, type, onEdit, 
   );
 };
 
-export const EmptySlotCard: React.FC<{ idx: number, type: string, onClick: () => void }> = ({ idx, type, onClick }) => (
+export const EmptySlotCard: React.FC<{ idx: number, type: string, className?: string, onClick: () => void }> = ({ idx, type, className = "", onClick }) => (
   <div 
     onClick={onClick}
-    className="bg-zinc-950/30 p-3 rounded-xl border-2 border-dashed border-zinc-800/80 flex flex-col items-center justify-center min-h-[160px] text-zinc-600 transition-colors cursor-pointer hover:border-zinc-600 hover:bg-zinc-900/50 hover:text-zinc-400 group"
+    className={`bg-zinc-950/30 p-3 rounded-xl border-2 border-dashed border-zinc-800/80 flex flex-col items-center justify-center min-h-[160px] text-zinc-600 transition-colors cursor-pointer hover:border-zinc-600 hover:bg-zinc-900/50 hover:text-zinc-400 group ${className}`}
   >
     <div className="w-8 h-8 rounded-full bg-zinc-900 flex items-center justify-center mb-2 group-hover:bg-zinc-800 group-hover:text-amber-400 transition-colors">
       <UploadCloud className="w-4 h-4" />

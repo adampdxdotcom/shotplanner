@@ -527,3 +527,24 @@
   - Ensured "Generate Prompt with LM Studio / Gemini" completely overwrites the preview textarea with the finalized assembled prompt (Header + LLM Description + Footer), marks the project dirty, and auto-saves to shot state.
 - **`src/components/hub/PromptEngineeringPanel.tsx`**
   - Integrated `computePrePromptContext` into the Scene Project Hub's Prompt Engineering panel to display the real-time synthesized pre-prompt context and provide "Reset to Preview" controls.
+
+## 9 Image Slots Layout Architecture
+- **`src/components/AssetManagerSection.tsx` & `src/components/AssetSlotGrid.tsx`**
+  - Updated `MAX_IMAGES` constant from 6 to 9 so that all 9 `<Picture 1>` through `<Picture 9>` slots are always accessible to the user on the Image Slots tab.
+  - Configured a 10-column responsive grid layout (`lg:grid-cols-10`) where:
+    - Top row renders 5 cards (Slots 1–5), each spanning 2 columns (`lg:col-span-2`), fully occupying columns 1–10.
+    - Second row renders 4 cards (Slots 6–9), each spanning 2 columns with Slot 6 starting at column 2 (`lg:col-start-2`), perfectly centering the 4 cards with symmetric 1-column negative margins on both sides.
+  - Added `className` prop support to `AssetCard` and `EmptySlotCard` for modular grid alignment.
+- **`src/hooks/useAppLogic.ts`**
+  - Updated stage transfer mapping loops to support all 15 loader slots (9 images, 3 videos, 3 audios).
+
+## Non-Secure HTTP Context Compatibility Fix
+- **`src/utils/formatters.ts` & `src/hooks/useAppLogic.ts`**
+  - Resolved `Uncaught TypeError: crypto.randomUUID is not a function` error when running in HTTP LAN / non-secure contexts.
+  - Implemented `generateUUID` with fallback RFC4122 v4 generation for browsers where `window.crypto.randomUUID` is not exposed.
+
+## Navbar Status & Toast Label Architecture
+- **`src/components/Navbar.tsx`**
+  - Replaced the temporary "TOAST MESSAGE AREA" placeholder under the project title with "SHOT PLANNER".
+  - Configured conditional display so the "SHOT PLANNER" label automatically hides when active toast notifications appear and seamlessly returns when all toast notifications are dismissed or expire.
+

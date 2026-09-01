@@ -15,7 +15,7 @@ import { AssetEditModal } from "./AssetEditModal";
 import { AssetLightbox } from "./AssetLightbox";
 import { AssetCard, EmptySlotCard } from "./AssetSlotGrid";
 
-const MAX_IMAGES = 6;
+const MAX_IMAGES = 9;
 const MAX_VIDEOS = 3;
 const MAX_AUDIOS = 3;
 
@@ -292,10 +292,17 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
               </button>
             </div>
             
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+            <div className={
+              activeTab === "image"
+                ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-10 gap-4"
+                : "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4"
+            }>
               {Array.from({ length: currentMax }).map((_, idx) => {
                 const globalSlot = getGlobalSlotIndex(activeTab, idx);
                 const asset = getAssetForGlobalSlot(globalSlot.toString());
+                const slotClassName = activeTab === "image" 
+                  ? `col-span-1 lg:col-span-2 ${idx === 5 ? "lg:col-start-2" : ""}` 
+                  : "";
                 
                 return asset ? (
                   <AssetCard 
@@ -303,6 +310,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
                     asset={asset}
                     idx={idx}
                     type={activeTab}
+                    className={slotClassName}
                     onEdit={() => setEditingAsset(asset)}
                     onDelete={() => handleClearSlot(activeTab, idx)}
                     onLightbox={() => setLightboxAsset(asset)}
@@ -312,6 +320,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
                     key={`empty-${activeTab}-${idx}`}
                     idx={idx}
                     type={activeTab}
+                    className={slotClassName}
                     onClick={() => setUploadModalSlot({ type: activeTab, index: idx })}
                   />
                 );

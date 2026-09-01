@@ -48,10 +48,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             {projectName || "Untitled Project"}
           </h1>
           
-          {/* Toast Messages Area Moved Below Project Name */}
-          <div className="flex flex-col gap-1 mt-1 pointer-events-auto">
-            <div className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">Toast Message Area</div>
-            {toasts.length > 0 && (
+          {/* Toast / Status Area Below Project Name */}
+          <div className="flex flex-col gap-1 mt-1 pointer-events-auto min-h-[16px]">
+            {toasts.length === 0 ? (
+              <div className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">SHOT PLANNER</div>
+            ) : (
               <div className="flex flex-col gap-1 max-w-sm">
                 {toasts.map((toast) => (
                   <div 

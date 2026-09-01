@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { AppConfig, MediaAsset, WorkflowItem, ParsedWorkflow, ToastMessage, GenerationParameters, ParameterNodeMappings, LLMProvider, ScenePlanning, SceneProjectFile, ShotItem } from '../types';
 import { useComfyMonitor } from './useComfyMonitor';
 import { generatePromptPrefix } from '../components/ScenePlanningHeader';
+import { generateUUID } from '../utils/formatters';
 
 export function useAppLogic() {
 
@@ -77,7 +78,7 @@ export function useAppLogic() {
         const nextCharacters = { ...(prev.characters || {}) };
         if (!nextCharacters[trimmed]) {
           nextCharacters[trimmed] = {
-            id: crypto.randomUUID(),
+            id: generateUUID(),
             name: trimmed,
             notes: "",
             quick_slots: [],
@@ -334,7 +335,7 @@ export function useAppLogic() {
       const allLoaders = [...imgLoaders, ...vidLoaders, ...audLoaders];
       
       // Assign based on slot index
-      for (let i = 0; i < 9; i++) {
+      for (let i = 0; i < Math.max(allLoaders.length, 15); i++) {
         const filename = shot.assigned_slots[i] || sceneProject.shared_assets.find(a => a.slot_index === i)?.filename;
         if (filename && allLoaders[i]) {
           shotMappings[allLoaders[i].id] = filename;
@@ -380,7 +381,7 @@ export function useAppLogic() {
         const audLoaders = parsedWorkflow.nodes_info.audio_loader_nodes || [];
         
         const allLoaders = [...imgLoaders, ...vidLoaders, ...audLoaders];
-        for (let i = 0; i < 9; i++) {
+        for (let i = 0; i < Math.max(allLoaders.length, 15); i++) {
           const filename = shot.assigned_slots[i] || sceneProject.shared_assets.find(a => a.slot_index === i)?.filename;
           if (filename && allLoaders[i]) {
             shotMappings[allLoaders[i].id] = filename;
