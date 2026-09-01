@@ -34,7 +34,7 @@ export const GalleryCastView: React.FC<GalleryCastViewProps> = ({
               <div className="flex items-center gap-4 mb-4">
                 <div className="w-16 h-16 rounded-full bg-zinc-950 border-2 border-zinc-800 overflow-hidden shrink-0 flex items-center justify-center">
                   {profilePic ? (
-                    <img src={getAssetMediaUrl(profilePic.filename)} className="w-full h-full object-cover" alt={subject} referrerPolicy="no-referrer" />
+                    <img src={getAssetMediaUrl(profilePic.filename, true)} className="w-full h-full object-cover" alt={subject} referrerPolicy="no-referrer" />
                   ) : (
                     <span className="text-xl font-bold text-zinc-600">{subject.charAt(0).toUpperCase()}</span>
                   )}
@@ -83,7 +83,7 @@ export const GalleryCastView: React.FC<GalleryCastViewProps> = ({
                     <div className="w-32 h-40 bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden mb-2 relative hover:border-amber-500/50 transition-colors">
                       {asset.media_type === "image" || !asset.media_type || !/\.(mp4|mov|webm|mp3|wav)$/i.test(asset.filename) ? (
                         <img 
-                          src={getAssetMediaUrl(asset.filename)} 
+                          src={getAssetMediaUrl(asset.filename, true)} 
                           className="w-full h-full object-cover group-hover:opacity-75 transition-opacity" 
                           alt={asset.filename} 
                           referrerPolicy="no-referrer"

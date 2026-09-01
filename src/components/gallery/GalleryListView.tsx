@@ -2,6 +2,7 @@ import React from "react";
 import { MediaAsset } from "../../types";
 import { Image as ImageIcon, Video as VideoIcon, Music, Edit3, Trash2, Play, Pause, Eye } from "lucide-react";
 import { formatSize } from "../../utils/formatters";
+import { getAssetMediaUrl } from "../../utils/assetUrl";
 
 interface GalleryListViewProps {
   assets: MediaAsset[];
@@ -32,7 +33,7 @@ export const GalleryListView: React.FC<GalleryListViewProps> = ({
             const isVideoOrAudio = /\.(mp3|wav|ogg|m4a|flac|mp4|mov|webm|mkv)$/i.test(asset.filename);
             const isAudio = /\.(mp3|wav|ogg|m4a|flac)$/i.test(asset.filename);
             const isVideo = /\.(mp4|mov|webm|mkv)$/i.test(asset.filename);
-            const mediaUrl = `/api/assets/stream/${asset.filename}`;
+            const mediaUrl = getAssetMediaUrl(asset.filename, false);
 
             return (
               <tr key={idx} className="hover:bg-zinc-800/30 transition-colors group">
@@ -41,7 +42,7 @@ export const GalleryListView: React.FC<GalleryListViewProps> = ({
                        onClick={() => setLightboxAsset(asset)}>
                     {asset.media_type === "image" || (!isVideo && !isAudio) ? (
                       <img
-                        src={`/api/assets/stream/${asset.filename}`}
+                        src={getAssetMediaUrl(asset, true)}
                         alt={asset.subject_name || "Asset"}
                         className="w-full h-full object-cover group-hover:opacity-75 transition-opacity"
                         referrerPolicy="no-referrer"

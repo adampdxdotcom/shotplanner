@@ -2,6 +2,7 @@ import React from "react";
 import { MediaAsset } from "../../types";
 import { Image as ImageIcon, Video as VideoIcon, Music, Edit3, Trash2, Play, Pause, FileText, ChevronRight } from "lucide-react";
 import { formatSize } from "../../utils/formatters";
+import { getAssetMediaUrl } from "../../utils/assetUrl";
 
 interface GalleryGridViewProps {
   assets: MediaAsset[];
@@ -20,7 +21,7 @@ export const GalleryGridView: React.FC<GalleryGridViewProps> = ({
       {assets.map((asset, idx) => {
         const isVideoOrAudio = /\.(mp3|wav|ogg|m4a|flac|mp4|mov|webm|mkv)$/i.test(asset.filename);
         const isAudio = /\.(mp3|wav|ogg|m4a|flac)$/i.test(asset.filename);
-        const mediaUrl = `/api/assets/stream/${asset.filename}`;
+        const mediaUrl = getAssetMediaUrl(asset.filename, false);
 
         return (
           <div key={idx} className="group relative bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden hover:border-zinc-700 transition-all shadow-sm flex flex-col h-full cursor-pointer"
@@ -29,7 +30,7 @@ export const GalleryGridView: React.FC<GalleryGridViewProps> = ({
             <div className="aspect-[4/3] bg-zinc-950 flex items-center justify-center relative overflow-hidden">
               {asset.media_type === "image" || (!asset.media_type && !isVideoOrAudio) ? (
                 <img
-                  src={`/api/assets/stream/${asset.filename}`}
+                  src={getAssetMediaUrl(asset, true)}
                   alt={asset.subject_name || asset.filename}
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"
