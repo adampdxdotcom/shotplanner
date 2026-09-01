@@ -539,9 +539,11 @@
   - Updated stage transfer mapping loops to support all 15 loader slots (9 images, 3 videos, 3 audios).
 
 ## Non-Secure HTTP Context Compatibility Fix
-- **`src/utils/formatters.ts` & `src/hooks/useAppLogic.ts`**
-  - Resolved `Uncaught TypeError: crypto.randomUUID is not a function` error when running in HTTP LAN / non-secure contexts.
-  - Implemented `generateUUID` with fallback RFC4122 v4 generation for browsers where `window.crypto.randomUUID` is not exposed.
+- **`index.html`, `src/main.tsx`, `src/utils/formatters.ts` & `src/hooks/useAppLogic.ts`**
+  - Resolved `Uncaught TypeError: crypto.randomUUID is not a function` error when running in HTTP LAN / non-secure contexts (e.g., `http://192.168.x.x:8302`).
+  - Added an inline polyfill script in `<head>` of `index.html` executing before any module scripts or third-party bundles load, guaranteeing `window.crypto.randomUUID()` and `window.crypto.getRandomValues()` are available globally.
+  - Added top-of-file safeguard polyfill in `src/main.tsx` and custom `generateUUID` helper in `src/utils/formatters.ts`.
+
 
 ## Navbar Status & Toast Label Architecture
 - **`src/components/Navbar.tsx`**
