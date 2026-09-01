@@ -142,6 +142,8 @@ export interface AppConfig {
   remote_api_token: string;
   lm_studio_url: string;
   gemini_api_key?: string;
+  llm_provider?: LLMProvider;
+  default_llm_provider?: LLMProvider;
 }
 
 export type AssetType = 

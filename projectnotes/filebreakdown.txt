@@ -585,6 +585,60 @@
   - Rendered a companion modifier dropdown selector whenever the selected reference type has available modifiers in the configuration map.
   - Integrated reactive modifier tag injection/replacement into the visual description input while keeping the textarea fully editable and dropzone validation responsive.
 
+## Settings & Configuration Panel Restructuring
+- **`src/components/ConfigSection.tsx`**
+  - Restructured configuration interface into two distinct, dedicated panel sections: "LLM Connection" and "Remote Server Connection".
+  - Implemented a provider selector pill-bar ("LM Studio" & "Gemini") at the top of the LLM Connection panel with active status pulse indicators, distinct accent highlight borders, and hover states.
+  - Contextually rendered LLM configuration body based on active pill: Local LM Studio API URL input when "LM Studio" is active, and Gemini API key configuration controls when "Gemini" is active.
+  - Added dedicated "Test Connection" button for LM Studio view with spinning loading state (`RefreshCw`), in-panel status badge (emerald "Connected" / red "Connection Failed"), and global toast notification dispatch.
+  - Implemented dual-layer connection verification for LM Studio: probes backend endpoint (`/api/settings/test-lm-studio`) with short timeout and falls back to direct browser fetch if container network cannot reach user's local endpoint.
+  - Reactive provider selection updates global application and project state (`llm_provider`), marks project state as unsaved/dirty, and triggers a toast notification ("{Provider Name} selected").
+  - Created the **Remote Server Connection** panel section containing SSH credentials (Remote GPU Host, SSH Port, Username, SSH Private Key card with status badge and generator), Remote ComfyUI paths & endpoints (Root Path, Input Directory, API URL, Remote API Token), header action triggers ("Test Remote SSH" and "Backend & Docker Code"), and execution info callout.
+  - Nested the expandable `RemoteSSHPrimerCard` guide accordion directly at the bottom inside the Remote Server Connection section.
+- **`src/components/config/GeminiConfig.tsx`**
+  - Added dedicated "Test Connection" button to the Gemini configuration view with active loading state and disabled state when unconfigured.
+  - Integrated Gemini API verification check (`POST /api/settings/test-gemini`) performing lightweight model verification query with Google GenAI SDK (`gemini-2.5-flash`).
+  - Added in-panel status badge (emerald success / red error) and dispatched global toast notifications ("✓ Gemini API verified successfully" / "⚠ Gemini API connection failed: ...").
+- **`server/routes/settingsRoutes.ts`**
+  - Added `POST /api/settings/test-lm-studio` endpoint: probes local LM Studio `/models` or `/v1/models` endpoint with a 5-second AbortController timeout, returning model count and status.
+  - Added `POST /api/settings/test-gemini` endpoint: validates configured or provided Gemini API key by performing a test generation call using `@google/genai` (`gemini-2.5-flash`).
+
+## Single-Message Global Toast Notification Management
+- **`src/hooks/useAppLogic.ts`**
+  - Refactored global toast notification state management (`addToast` & `dismissToast`) to enforce a single-message rule: replacing existing toasts with a single-element array (`[{ id, text, type }]`) rather than appending to a stack.
+  - Maintained at most one active toast notification in state at all times.
+  - Integrated a `toastTimerRef` to cleanly cancel and reset active auto-dismiss countdown timers (`clearTimeout`) whenever a new toast is dispatched, guaranteeing full display duration (4000ms).
+- **`src/components/Navbar.tsx`**
+  - Updated navigation bar header status area to present only the single active toast notification using `AnimatePresence` and `motion.div` smooth slide/fade transitions from `motion/react`.
+  - Configured layout to cleanly revert back to the default `SHOT PLANNER` title label upon toast dismissal or auto-expiration.
+- **`src/App.tsx`**
+  - Bound `dismissToast` from `useAppLogic` directly to the `Navbar` `onDismissToast` prop.
+
+## Persistent Default LLM Provider Preference & Project Hydration
+- **`src/types.ts`**
+  - Added `default_llm_provider?: LLMProvider;` field to the `AppConfig` interface.
+- **`src/hooks/useAppLogic.ts`**
+  - Implemented `getDefaultLlmProvider()` helper to establish `"lm_studio"` as the authoritative factory default fallback while reading user preferences from `localStorage` (`default_llm_provider`).
+  - Added `defaultLlmProvider` state and `setDefaultLlmProvider` callback that updates local storage, app config, scene project state, and dispatches single-message toast notifications (e.g., `"LM Studio set as default LLM"` or `"Gemini set as default LLM"`).
+  - Updated `handleCreateNewProject` to hydrate newly created projects with the user's saved default LLM preference.
+  - Updated `handleLoadProject` to automatically assign the active LLM provider to the saved default preference if no explicit provider override exists in the project JSON.
+- **`src/components/ConfigSection.tsx`**
+  - Removed all inner badges, tags, and label chips from the provider selector pills so each pill cleanly renders only its icon and name ("LM Studio", "Gemini").
+  - Dynamically bound the color theme of each provider pill to its active connection verification status (vibrant emerald theme for connected, warm amber/purple for active unverified, muted neutral for inactive unverified).
+  - Implemented `probeLMStudioConnection` and `handleSetDefaultLMStudio` with a mandatory connection verification gate that triggers an inline connection probe and rejects default designation on failure with an error toast ("Failed to set default: Could not connect to LM Studio").
+  - Implemented silent periodic health-check polling every 25 seconds for the active default LLM, automatically updating connection state, restoring green pill status upon success, emitting a single "Connection lost to [Provider]" toast on status drop, and cleaning up interval timers on unmount or configuration changes.
+  - Disabled the `RemoteSSHPrimerCard` ("Remote GPU SSH Key Setup Guide") from rendering at the bottom of the section without deleting its code or component imports.
+- **`src/components/config/GeminiConfig.tsx`**
+  - Added `probeGeminiConnection` and `handleSetDefaultGemini` with a mandatory connection verification gate, ensuring Gemini is only set as default after successful API verification.
+  - Added `onConnectionStatusChange` callback prop to propagate connection verification status back to parent state on initial check, key save, connection test, and default setting.
+- **`src/components/config/RemoteGPUConfig.tsx`**
+  - Moved the SSH Private Key Generation block to its own dedicated full-width row directly below the Remote GPU Host / Port / Username inputs.
+  - Added a dedicated Public Key display field and blue Copy button on a new line inside the SSH Private Key block.
+  - Duplicated the Web Terminal one-liner command block directly under the private key generator block (removing step labels and crucial badge), complete with web terminal command, instant copy button, and auto-prefilling public key string upon key pair generation.
+- **`src/App.tsx`**
+  - Destructured `defaultLlmProvider` and `setDefaultLlmProvider` from `useAppLogic` and passed them down to `ConfigSection`.
+
+
 
 
 

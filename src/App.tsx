@@ -27,6 +27,7 @@ export default function App() {
     basicStub, setBasicStub,
     expandedPrompt, setExpandedPrompt,
     llmProvider, setLlmProvider,
+    defaultLlmProvider, setDefaultLlmProvider,
     activeSection, setActiveSection,
     activeShotId, setActiveShotId,
     isCodeModalOpen, setIsCodeModalOpen,
@@ -41,6 +42,7 @@ export default function App() {
     monitorState,
     availableScenes, setAvailableScenes,
     addToast,
+    dismissToast,
     subjects,
     promptPrefix,
     handleRegisterSubject,
@@ -75,7 +77,7 @@ export default function App() {
         onLoadProject={() => setIsLoadModalOpen(true)}
         onNewProject={() => setIsNewModalOpen(true)}
         toasts={toasts}
-        onDismissToast={(id) => setToasts(prev => prev.filter(t => t.id !== id))}
+        onDismissToast={dismissToast}
       />
 
       {/* Main Workspace Layout */}
@@ -206,9 +208,13 @@ export default function App() {
              config={config}
              onChange={(newConfig) => {
               setConfig(newConfig);
+              if (newConfig.llm_provider) {
+                setLlmProvider(newConfig.llm_provider);
+              }
               setSceneProject(prev => ({
                 ...prev,
                 lm_studio_url: newConfig.lm_studio_url,
+                llm_provider: newConfig.llm_provider || llmProvider,
                 config: {
                   ...(prev.config || {}),
                   ...newConfig
@@ -216,7 +222,24 @@ export default function App() {
               }));
               setIsDirty(true);
             }}
-             onOpenCodeViewer={() => setIsCodeModalOpen(true)}
+            llmProvider={llmProvider}
+            defaultLlmProvider={defaultLlmProvider}
+            onSetDefaultProvider={setDefaultLlmProvider}
+            onChangeProvider={(provider) => {
+              setLlmProvider(provider);
+              setConfig(prev => ({ ...prev, llm_provider: provider }));
+              setSceneProject(prev => ({
+                ...prev,
+                llm_provider: provider,
+                config: {
+                  ...(prev.config || {}),
+                  llm_provider: provider
+                }
+              }));
+              setIsDirty(true);
+            }}
+            onShowToast={addToast}
+            onOpenCodeViewer={() => setIsCodeModalOpen(true)}
           />
         )}
 

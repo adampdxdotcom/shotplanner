@@ -1,6 +1,7 @@
 import React from "react";
 import { ToastMessage } from "../types";
 import { CheckCircle2, AlertCircle, Info, X } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import { 
   Server, 
   Workflow, 
@@ -37,6 +38,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   toasts = [], 
   onDismissToast 
 }) => {
+  const activeToast = toasts && toasts.length > 0 ? toasts[0] : null;
+
   return (
     <header className="sticky top-0 z-40 bg-zinc-900/90 backdrop-blur-md border-b border-zinc-800 px-4 lg:px-8 py-3.5 flex items-center justify-between shadow-sm">
       <div className="flex items-center gap-3">
@@ -44,43 +47,58 @@ export const Navbar: React.FC<NavbarProps> = ({
           <Workflow className="w-5 h-5 text-white" />
         </div>
         <div className="flex flex-col">
-          <h1 className="text-base font-bold tracking-tight text-white">
+          <h1 className="text-base font-bold tracking-tight text-white flex items-center gap-2">
             {projectName || "Untitled Project"}
+            {isDirty && <span className="text-xs text-amber-400 font-normal opacity-75">(Unsaved)</span>}
           </h1>
           
-          {/* Toast / Status Area Below Project Name */}
-          <div className="flex flex-col gap-1 mt-1 pointer-events-auto min-h-[16px]">
-            {toasts.length === 0 ? (
-              <div className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">SHOT PLANNER</div>
-            ) : (
-              <div className="flex flex-col gap-1 max-w-sm">
-                {toasts.map((toast) => (
-                  <div 
-                    key={toast.id}
-                    className={`flex items-start gap-2 w-full p-1.5 rounded border backdrop-blur-md transition-all animate-in slide-in-from-top-1 duration-200 ${
-                      toast.type === "success" ? "bg-zinc-900/95 border-emerald-500/50 text-emerald-300" :
-                      toast.type === "error" ? "bg-zinc-900/95 border-red-500/50 text-red-300" :
-                      "bg-zinc-900/95 border-indigo-500/50 text-indigo-300"
-                    }`}
-                  >
-                    <div className="mt-0.5 shrink-0">
-                      {toast.type === "success" && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />}
-                      {toast.type === "error" && <AlertCircle className="w-3.5 h-3.5 text-red-400" />}
-                      {toast.type === "info" && <Info className="w-3.5 h-3.5 text-indigo-400" />}
-                    </div>
-                    <p className="text-[10px] font-medium flex-1 leading-relaxed break-words text-zinc-200">{toast.text}</p>
-                    {onDismissToast && (
-                      <button 
-                        onClick={() => onDismissToast(toast.id)}
-                        className="shrink-0 p-0.5 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 rounded transition-colors cursor-pointer"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    )}
+          {/* Toast / Status Area Below Project Name - Single active toast with smooth transition */}
+          <div className="relative min-h-[20px] flex items-center mt-0.5 pointer-events-auto max-w-sm sm:max-w-md">
+            <AnimatePresence mode="wait">
+              {!activeToast ? (
+                <motion.div 
+                  key="default-title"
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.18, ease: "easeOut" }}
+                  className="text-[10px] font-bold text-amber-500 uppercase tracking-wider"
+                >
+                  SHOT PLANNER
+                </motion.div>
+              ) : (
+                <motion.div 
+                  key={activeToast.id}
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -5 }}
+                  transition={{ duration: 0.18, ease: "easeOut" }}
+                  className={`flex items-center gap-2 px-2 py-0.5 rounded border backdrop-blur-md shadow-xs ${
+                    activeToast.type === "success" ? "bg-zinc-900/95 border-emerald-500/50 text-emerald-300" :
+                    activeToast.type === "error" ? "bg-zinc-900/95 border-red-500/50 text-red-300" :
+                    "bg-zinc-900/95 border-indigo-500/50 text-indigo-300"
+                  }`}
+                >
+                  <div className="shrink-0">
+                    {activeToast.type === "success" && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />}
+                    {activeToast.type === "error" && <AlertCircle className="w-3.5 h-3.5 text-red-400" />}
+                    {activeToast.type === "info" && <Info className="w-3.5 h-3.5 text-indigo-400" />}
                   </div>
-                ))}
-              </div>
-            )}
+                  <p className="text-[10px] font-medium leading-normal text-zinc-200 truncate max-w-[220px] sm:max-w-[300px]">
+                    {activeToast.text}
+                  </p>
+                  {onDismissToast && (
+                    <button 
+                      onClick={() => onDismissToast(activeToast.id)}
+                      className="shrink-0 p-0.5 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 rounded transition-colors cursor-pointer ml-1"
+                      title="Dismiss notification"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </div>

@@ -1,12 +1,23 @@
 import { getAssetMediaUrl } from "../utils/assetUrl";
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { AppConfig, MediaAsset, WorkflowItem, ParsedWorkflow, ToastMessage, GenerationParameters, ParameterNodeMappings, LLMProvider, ScenePlanning, SceneProjectFile, ShotItem, CharacterProfile } from '../types';
 import { useComfyMonitor } from './useComfyMonitor';
 import { generatePromptPrefix } from '../components/ScenePlanningHeader';
 import { generateUUID } from '../utils/formatters';
 
+const getDefaultLlmProvider = (): LLMProvider => {
+  try {
+    const saved = localStorage.getItem("default_llm_provider");
+    if (saved === "gemini" || saved === "lm_studio") {
+      return saved;
+    }
+  } catch (e) {}
+  return "lm_studio";
+};
+
 export function useAppLogic() {
+  const [defaultLlmProvider, setDefaultLlmProviderState] = useState<LLMProvider>(getDefaultLlmProvider);
 
   // 1. Config State
   const [config, setConfig] = useState<AppConfig>({
@@ -19,7 +30,8 @@ export function useAppLogic() {
     remote_comfyui_root: "/workspace/runpod-slim/ComfyUI",
     comfyui_api_url: "http://127.0.0.1:8188",
     remote_api_token: "",
-    lm_studio_url: "http://localhost:1234/v1"
+    lm_studio_url: "http://localhost:1234/v1",
+    default_llm_provider: getDefaultLlmProvider()
   });
 
   // 2. Workflow & Node Mapping State
@@ -135,7 +147,7 @@ export function useAppLogic() {
 
   const [basicStub, setBasicStub] = useState<string>("");
   const [expandedPrompt, setExpandedPrompt] = useState<string>("");
-  const [llmProvider, setLlmProvider] = useState<LLMProvider>("lm_studio");
+  const [llmProvider, setLlmProvider] = useState<LLMProvider>(getDefaultLlmProvider);
 
   // UI Navigation & Code Modal
   const [activeSection, setActiveSection] = useState<string>("scene");
@@ -152,14 +164,54 @@ export function useAppLogic() {
   const [currentProjectName, setCurrentProjectName] = useState<string>("");
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const toastTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const dismissToast = useCallback((_id?: string) => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = null;
+    }
+    setToasts([]);
+  }, []);
 
   const addToast = useCallback((text: string, type: "success" | "error" | "info" = "info") => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = null;
+    }
     const id = Date.now().toString(36) + Math.random().toString(36).substr(2);
-    setToasts(prev => [...prev, { id, text, type }]);
-    setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id));
+    setToasts([{ id, text, type }]);
+    toastTimerRef.current = setTimeout(() => {
+      setToasts([]);
+      toastTimerRef.current = null;
     }, 4000);
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
+
+  const setDefaultLlmProvider = useCallback((provider: LLMProvider) => {
+    try {
+      localStorage.setItem("default_llm_provider", provider);
+    } catch (e) {}
+    setDefaultLlmProviderState(provider);
+    setConfig(prev => ({ ...prev, default_llm_provider: provider }));
+    setSceneProject(prev => ({
+      ...prev,
+      config: {
+        ...(prev.config || {}),
+        default_llm_provider: provider
+      }
+    }));
+
+    const providerName = provider === "lm_studio" ? "LM Studio" : "Gemini";
+    addToast(`${providerName} set as default LLM`, "info");
+  }, [addToast]);
 
   const handleDeleteCharacter = useCallback((characterName: string) => {
     const trimmed = characterName.trim();
@@ -584,8 +636,11 @@ export function useAppLogic() {
         lm_studio_url: restoredLlmUrl
       }));
     }
-    const loadedLlmProvider = data.llmProvider || data.llm_provider || data.llmChoice || data.providerChoice || "lm_studio";
-    setLlmProvider(loadedLlmProvider === "gemini" ? "gemini" : "lm_studio");
+    const explicitLlmProvider = data.llmProvider || data.llm_provider || data.llmChoice || data.providerChoice || data.config?.llm_provider || data.config?.llmProvider;
+    const resolvedLlmProvider: LLMProvider = (explicitLlmProvider === "gemini" || explicitLlmProvider === "lm_studio")
+      ? explicitLlmProvider
+      : defaultLlmProvider;
+    setLlmProvider(resolvedLlmProvider);
 
     if (data.schema_version === "1.0") {
       setNodeMappings({});
@@ -731,9 +786,10 @@ export function useAppLogic() {
       subjects: [],
       lm_studio_url: config.lm_studio_url,
       config: {
-        ...config
+        ...config,
+        default_llm_provider: defaultLlmProvider
       },
-      llm_provider: llmProvider,
+      llm_provider: defaultLlmProvider,
       shots: [{
         id: "shot_" + Date.now(),
         shot_number: 1,
@@ -756,6 +812,7 @@ export function useAppLogic() {
     setParameterNodeMappings({});
     setBasicStub("");
     setExpandedPrompt("");
+    setLlmProvider(defaultLlmProvider);
     
     setSceneProject(newScene);
     setCurrentProjectName(cleanFilename);
@@ -1050,6 +1107,7 @@ export function useAppLogic() {
     basicStub, setBasicStub,
     expandedPrompt, setExpandedPrompt,
     llmProvider, setLlmProvider,
+    defaultLlmProvider, setDefaultLlmProvider,
     activeSection, setActiveSection,
     activeShotId, setActiveShotId,
     isCodeModalOpen, setIsCodeModalOpen,
@@ -1064,6 +1122,7 @@ export function useAppLogic() {
     monitorState,
     availableScenes, setAvailableScenes,
     addToast,
+    dismissToast,
     subjects,
     promptPrefix,
     handleRegisterSubject,
