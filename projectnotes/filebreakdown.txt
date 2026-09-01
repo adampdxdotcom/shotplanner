@@ -642,3 +642,65 @@
 
 
 
+
+## Shot Status Lifecycle & ComfyUI Execution Monitoring
+- **`src/types.ts`**
+  - Updated `ShotItem` to use a 4-state lifecycle model: `status: "unstaged" | "staged" | "rendering" | "rendered"`.
+  - Added `latest_prompt_id?: string;` to track the remote ComfyUI execution prompt associated with each shot.
+- **`src/hooks/useAppLogic.ts`**
+  - Updated `updateActiveShot` to automatically revert a shot's status to `"unstaged"` whenever its `expanded_prompt`, `camera_movement`, `lens_focal_length`, `aspect_ratio`, `assigned_slots`, or `generation_params` are modified.
+  - Implemented `handleExecutionStarted` and `handleOutputPulled` callbacks.
+  - Linked callbacks to `useComfyMonitor` to reactively transition shot states (`"staged"` -> `"rendering"` -> `"rendered"`) and auto-record new takes upon completion based on filename parsing.
+- **`src/hooks/useComfyMonitor.ts`**
+  - Added `onExecutionStarted` callback prop, triggered upon receiving an `execution_start` WebSocket event containing a `prompt_id`.
+- **`src/components/ExecutionSection.tsx` & `src/components/execution/ExecutionConsole.tsx`**
+  - Updated execution dispatch to store the returned `prompt_id` on the shot as `latest_prompt_id` and transition status to `"rendering"`.
+  - Added comprehensive status badge rendering for the new four-state lifecycle across the Execution Console.
+- **`src/components/hub/ShotCarousel.tsx` & `src/components/hub/ShotMetadataPanel.tsx`**
+  - Enhanced badge rendering to visually reflect `"Unstaged"`, `"✓ Staged"`, `"⟳ Rendering"` (with pulse animation), and `"✓ Rendered"` lifecycle states.
+
+## Cast & Characters Dashboard & Navigation Tab
+- **`src/types.ts`**
+  - Updated workspace sections implicitly by adopting the new "cast" active section routing model.
+- **`src/App.tsx`**
+  - Registered the "cast" workspace section alongside scene hub, shots, workflow, prompt, upload, gallery, and config.
+  - Wired `CastSection` into the main application layout connecting it to the top-level project character dictionary, update/delete callbacks, subjects registry, and asset synchronization callbacks.
+- **`src/components/Navbar.tsx`**
+  - Added a dedicated top-level "Cast" navigation tab positioned directly beside the "Scene Hub" tab.
+  - Imported the `Users` icon from `lucide-react` for the new tab.
+- **`src/components/CastSection.tsx`**
+  - Created a dedicated Cast & Characters Dashboard section component using the rich Character Profile Card layout previously found in the gallery.
+  - Rendered interactive Character Profile Cards for each subject in the project, displaying profile avatars, reference counts, inline editable notes/lore textareas, and scene outfit inputs.
+  - Rendered a horizontal reference asset strip for each character containing thumbnail previews, semantic type tags, descriptions, and a click-to-view lightbox inspection.
+  - Included a top-level action header with a primary "Register Character" button that opens an inline character creation modal.
+  - Implemented character deletion with a confirmation modal that removes the profile, untags assets without deleting physical media, and cleans up shot slot references.
+  - Wired the "Add Ref" card on each character profile to launch the `GalleryBulkUploadModal` (upload or library asset selector) pre-populated with the selected character's name and the active scene name.
+- **`src/components/GallerySection.tsx`**
+  - Removed the embedded Cast View ("cast" toggle and `<GalleryCastView>`) from the Gallery section, delegating character management entirely to the dedicated Cast tab.
+- **`src/components/gallery/GalleryCastView.tsx`**
+  - Deleted the obsolete component file as its functionality has been absorbed and enhanced within `CastSection`.
+
+## AI-Powered Character Headshot Variations (Gemini Image Generation)
+- **`server.ts`**
+  - Mounted the new `headshotRoutes` at `/api/headshots` to expose the variation generation and ingestion endpoints.
+- **`server/routes/headshotRoutes.ts`**
+  - Created a new Express router handling AI headshot variations.
+  - Implemented `GET /api/headshots/templates` to expose the prompt templates directly to clients.
+  - Implemented `POST /api/headshots/generate` using `multer` for memory buffering. It accepts seed images via binary upload, base64 payloads, or existing asset filenames, extracts parameters (character name, aspect ratio, keys), and executes the generation pipeline.
+  - Implemented `POST /api/headshots/save-selected` to finalize user-approved variations, saving image files and thumbnails directly into the active scene's filesystem and returning serialized asset records.
+- **`server/services/headshotService.ts`**
+  - Implemented `HEADSHOT_TEMPLATES` constant block explicitly defining visual directives for presets ("Facing", "3/4 Profile", "Full Profile", "Cinematic / Mood") demanding maximum quality and likeness preservation.
+  - Implemented `generateVariations()` function utilizing the `@google/genai` client (with `gemini-3.1-flash-lite-image`) to dispatch parallel, asynchronous image-to-image requests via image and text multipart payloads.
+  - Implemented `saveSelectedVariations()` to persist images securely, auto-generate responsive thumbnails via the `sharp` library, and orchestrate synchronous database registration using `assetService.upsertAsset`.
+
+- **`src/components/cast/HeadshotGeneratorModal.tsx`**
+  - Created a dedicated modal component for driving AI character headshot variations.
+  - Implemented seed image selection supporting existing reference asset selection or local file uploads.
+  - Added format toggles for output aspect ratios ("1:1", "3:4", "2:3", "16:9").
+  - Bound visual toggles to explicit backend generation templates ("Facing", "3/4 Profile", "Full Profile", "Cinematic / Mood").
+  - Developed a Candidate Review Grid allowing high-resolution inspection and multi-select retention of generated assets.
+  - Wired frontend inputs to `POST /api/headshots/generate` and selections to `POST /api/headshots/save-selected`.
+- **`src/components/CastSection.tsx`**
+  - Integrated the `HeadshotGeneratorModal` inside the Cast dashboard.
+  - Injected a "⚡ AI Headshots" action button into each character profile card header to launch the generator.
+  - Wired the modal's save callbacks through `onAssetUploaded` to automatically register new headshots and transition project state to dirty, triggering auto-save and issuing a success toast notification.

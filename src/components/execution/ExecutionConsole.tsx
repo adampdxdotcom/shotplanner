@@ -9,7 +9,7 @@ export interface ExecutionConsoleProps {
   progressPercent: number;
   transferResult: TransferResult | null;
   error: string | null;
-  lastAction: "shot" | "scene" | null;
+  lastAction: "shot" | "scene" | "execute_shot" | null;
   lastStagedTime: string | null;
   activeShot: ShotItem | null | undefined;
   sceneProject: SceneProjectFile;
@@ -44,7 +44,7 @@ export const ExecutionConsole: React.FC<ExecutionConsoleProps> = ({
           <div className="p-5 flex flex-col gap-4">
             <div className="flex items-center gap-3">
               <Terminal className="w-5 h-5 text-indigo-400 animate-pulse" />
-              <h3 className="text-sm font-bold text-zinc-200">Staging in Progress...</h3>
+              <h3 className="text-sm font-bold text-zinc-200">{lastAction === "execute_shot" ? "Executing on Remote GPU..." : "Staging in Progress..."}</h3>
             </div>
             
             <div className="space-y-2">
@@ -73,13 +73,13 @@ export const ExecutionConsole: React.FC<ExecutionConsoleProps> = ({
               <AlertCircle className="w-6 h-6 text-red-500" />
             </div>
             <div className="flex-1 space-y-2">
-              <h3 className="text-base font-bold text-red-400">Staging Failed</h3>
+              <h3 className="text-base font-bold text-red-400">{lastAction === "execute_shot" ? "Execution Failed" : "Staging Failed"}</h3>
               <div className="bg-red-950/40 border border-red-900/30 p-3 rounded-lg">
                 <p className="text-sm text-red-300 font-mono break-words">{error}</p>
               </div>
               <div className="flex gap-3 pt-2">
                 <button 
-                  onClick={lastAction === "shot" ? handleSendShot : handleSendScene}
+                  onClick={lastAction === "shot" || lastAction === "execute_shot" ? handleSendShot : handleSendScene}
                   className="px-4 py-2 bg-red-900/40 hover:bg-red-900/60 text-red-200 text-sm font-medium rounded-lg transition-colors"
                 >
                   Retry
@@ -102,12 +102,27 @@ export const ExecutionConsole: React.FC<ExecutionConsoleProps> = ({
           <div className="p-4 border-b border-emerald-900/30 flex items-center justify-between bg-emerald-900/10">
             <div className="flex items-center gap-3">
               <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-              <h3 className="text-sm font-bold text-emerald-300">Successfully Staged to Remote GPU</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-emerald-300">{lastAction === "execute_shot" ? "Executed on Remote GPU" : "Successfully Staged to Remote GPU"}</h3>
+                {activeShot && lastAction === "execute_shot" && (
+                  <span className={`px-2 py-0.5 text-[10px] font-bold rounded shadow uppercase tracking-wider ${
+                    activeShot.status === "rendered" ? "bg-purple-500/20 text-purple-400 border border-purple-500/30" :
+                    activeShot.status === "rendering" ? "bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 animate-pulse" :
+                    activeShot.status === "staged" ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" :
+                    "bg-orange-500/20 text-orange-400 border border-orange-500/30"
+                  }`}>
+                    {activeShot.status === "rendered" ? "✓ Rendered" :
+                     activeShot.status === "rendering" ? "⟳ Rendering" :
+                     activeShot.status === "staged" ? "✓ Staged" :
+                     "Unstaged"}
+                  </span>
+                )}
+              </div>
             </div>
             {lastStagedTime && (
               <span className="text-xs text-emerald-500/70 font-medium flex items-center gap-1.5">
                 <Check className="w-3.5 h-3.5" />
-                Staged at {lastStagedTime}
+                {lastAction === "execute_shot" ? `Executed at ${lastStagedTime}` : `Staged at ${lastStagedTime}`}
               </span>
             )}
           </div>
@@ -119,7 +134,7 @@ export const ExecutionConsole: React.FC<ExecutionConsoleProps> = ({
                 <div>
                   <h4 className="text-xs font-semibold text-emerald-500/80 uppercase tracking-wider mb-1">Scope</h4>
                   <p className="text-sm text-emerald-100 font-medium">
-                    {lastAction === "shot" ? `Single Shot (Shot ${activeShot ? formatShotNumber(activeShot.shot_number) : ''})` : `Full Scene (${sceneProject.shots.length} Shots)`}
+                    {lastAction === "shot" || lastAction === "execute_shot" ? `Single Shot (Shot ${activeShot ? formatShotNumber(activeShot.shot_number) : ''})` : `Full Scene (${sceneProject.shots.length} Shots)`}
                   </p>
                 </div>
               </div>
@@ -170,9 +185,15 @@ export const ExecutionConsole: React.FC<ExecutionConsoleProps> = ({
           <div className="bg-emerald-900/20 p-4 border-t border-emerald-900/30 flex items-start gap-3">
             <ArrowRight className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
             <div>
-              <h4 className="text-sm font-bold text-emerald-300">Ready to Render</h4>
+              <h4 className="text-sm font-bold text-emerald-300">
+                {lastAction === "execute_shot" ? "Execution Started" : "Ready to Render"}
+              </h4>
               <p className="text-xs text-emerald-200/70 mt-1">
-                Open ComfyUI on your Remote GPU, navigate to <code className="bg-emerald-950 px-1.5 py-0.5 rounded border border-emerald-900/50 text-emerald-300 font-mono">Workflows -&gt; {sanitizedSceneName}</code>, load your shot workflow, and click <strong>Queue Prompt</strong>.
+                {lastAction === "execute_shot" ? (
+                  <>Prompt has been queued on the Remote GPU. Prompt ID: <code className="bg-emerald-950 px-1.5 py-0.5 rounded border border-emerald-900/50 text-emerald-300 font-mono">{(transferResult as any).prompt_id || "Unknown"}</code></>
+                ) : (
+                  <>Open ComfyUI on your Remote GPU, navigate to <code className="bg-emerald-950 px-1.5 py-0.5 rounded border border-emerald-900/50 text-emerald-300 font-mono">Workflows -&gt; {sanitizedSceneName}</code>, load your shot workflow, and click <strong>Queue Prompt</strong>.</>
+                )}
               </p>
             </div>
           </div>

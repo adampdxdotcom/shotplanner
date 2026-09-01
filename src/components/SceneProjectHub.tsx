@@ -48,7 +48,7 @@ export default function SceneProjectHub({
       if (idx !== -1) {
         shots[idx] = { ...updater(shots[idx]), updated_at: new Date().toISOString() };
         if (JSON.stringify(shots[idx]) !== JSON.stringify(prev.shots[idx])) {
-            shots[idx].staged = false;
+            shots[idx].status = "unstaged";
         }
       }
       return { ...prev, shots };
@@ -65,7 +65,7 @@ export default function SceneProjectHub({
         shot_number: shot.shot_number + 1,
         lens_focal_length: shot.lens_focal_length || "50mm Standard Prime",
         aspect_ratio: shot.aspect_ratio || "16:9 Widescreen",
-        staged: false,
+        status: "unstaged",
         updated_at: new Date().toISOString()
       };
       const shots = [...prev.shots];
@@ -99,7 +99,7 @@ export default function SceneProjectHub({
       basic_stub: "",
       expanded_prompt: "",
       assigned_slots: {},
-      staged: false,
+      status: "unstaged",
       updated_at: new Date().toISOString()
     };
     onUpdateProject(prev => ({ ...prev, shots: [...prev.shots, newShot] }));
@@ -133,7 +133,7 @@ export default function SceneProjectHub({
       const success = await onTransferScene();
       if (success) {
         onUpdateProject(prev => {
-          const updatedShots = prev.shots.map(s => ({ ...s, staged: true }));
+          const updatedShots = prev.shots.map(s => ({ ...s, status: "staged" as const }));
           return { ...prev, shots: updatedShots };
         });
         onShowToast("Scene staged successfully!", "success");
@@ -151,7 +151,7 @@ export default function SceneProjectHub({
     try {
       const success = await onTransfer(activeShot);
       if (success) {
-        updateActiveShot(prev => ({ ...prev, staged: true }));
+        updateActiveShot(prev => ({ ...prev, status: "staged" as const }));
         onShowToast("Shot staged successfully!", "success");
       }
     } catch (e: any) {

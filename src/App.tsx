@@ -3,6 +3,7 @@ import { Navbar } from "./components/Navbar";
 import { ConfigSection } from "./components/ConfigSection";
 import { WorkflowSection } from "./components/WorkflowSection";
 import { AssetManagerSection } from "./components/AssetManagerSection";
+import { CastSection } from "./components/CastSection";
 import { GallerySection } from "./components/GallerySection";
 import { LLMSection } from "./components/LLMSection";
 import { ExecutionSection } from "./components/ExecutionSection";
@@ -151,12 +152,12 @@ export default function App() {
             basicStub={basicStub}
             onChangeBasicStub={(val) => {
               setBasicStub(val);
-              if (activeShotId) updateActiveShot(prev => ({ ...prev, basic_stub: val, staged: false }));
+              if (activeShotId) updateActiveShot(prev => ({ ...prev, basic_stub: val, status: "unstaged" }));
             }}
             expandedPrompt={expandedPrompt}
             onChangeExpandedPrompt={(val) => {
               setExpandedPrompt(val);
-              if (activeShotId) updateActiveShot(prev => ({ ...prev, expanded_prompt: val, staged: false }));
+              if (activeShotId) updateActiveShot(prev => ({ ...prev, expanded_prompt: val, status: "unstaged" }));
             }}
             providerChoice={llmProvider}
             onChangeProviderChoice={setLlmProvider}
@@ -200,6 +201,24 @@ export default function App() {
             onAssetUploaded={handleAssetUploaded}
             onAssetDeleted={handleAssetDeleted}
             onAssetUpdated={handleAssetUpdated}
+          />
+        )}
+
+        {activeSection === "cast" && (
+          <CastSection
+            assets={assets}
+            subjects={subjects}
+            characters={sceneProject.characters || {}}
+            sceneProject={sceneProject}
+            activeSceneName={sceneProject.scene_name || currentProjectName || "Untitled_Scene"}
+            onUpdateCharacter={handleUpdateCharacter}
+            onDeleteCharacter={handleDeleteCharacter}
+            onRegisterSubject={handleRegisterSubject}
+            onAssetUploaded={handleAssetUploaded}
+            onAssetDeleted={handleAssetDeleted}
+            onAssetUpdated={handleAssetUpdated}
+            onUpdateProject={setSceneProject}
+            addToast={addToast}
           />
         )}
 

@@ -95,7 +95,8 @@ export interface ShotItem {
   basic_stub: string;
   expanded_prompt: string;
   assigned_slots: Record<number, string>;
-  staged: boolean;
+  status: "unstaged" | "staged" | "rendering" | "rendered";
+  latest_prompt_id?: string;
   updated_at: string;
   ots_anchor_subject?: string;
   ots_focus_subject?: string;

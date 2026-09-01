@@ -157,10 +157,15 @@ export const GeminiConfig: React.FC<GeminiConfigProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          {isGeminiConfigured && (
+          {isGeminiConfigured ? (
             <span className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 px-2.5 py-1 rounded-full shrink-0">
               <CheckCircle2 className="w-3 h-3 text-emerald-400" />
               Active ({maskedGeminiKey})
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5 text-[11px] font-medium text-red-400 bg-red-950/40 border border-red-800/40 px-2.5 py-1 rounded-full shrink-0">
+              <AlertCircle className="w-3 h-3 text-red-400" />
+              Unconfigured
             </span>
           )}
 
@@ -174,9 +179,9 @@ export const GeminiConfig: React.FC<GeminiConfigProps> = ({
               <button
                 type="button"
                 onClick={handleSetDefaultGemini}
-                disabled={testingGemini}
+                disabled={testingGemini || !isGeminiConfigured}
                 title="Set Gemini as default LLM provider"
-                className="px-2.5 py-1 text-xs font-medium bg-zinc-800 hover:bg-emerald-950/40 text-zinc-300 hover:text-emerald-300 border border-zinc-700 hover:border-emerald-600/50 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shrink-0 disabled:opacity-50"
+                className="px-2.5 py-1 text-xs font-medium bg-zinc-800 hover:bg-emerald-950/40 text-zinc-300 hover:text-emerald-300 border border-zinc-700 hover:border-emerald-600/50 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shrink-0 disabled:opacity-50 disabled:hover:bg-zinc-800 disabled:hover:border-zinc-700 disabled:hover:text-zinc-300"
               >
                 <RefreshCw className={`w-3 h-3 ${testingGemini ? "animate-spin text-emerald-400" : "hidden"}`} />
                 <Star className={`w-3.5 h-3.5 text-zinc-400 hover:text-emerald-400 ${testingGemini ? "hidden" : ""}`} />
@@ -202,7 +207,7 @@ export const GeminiConfig: React.FC<GeminiConfigProps> = ({
           <button
             type="button"
             onClick={handleTestGemini}
-            disabled={testingGemini || (!geminiKeyInput.trim() && !isGeminiConfigured && !config.gemini_api_key)}
+            disabled={testingGemini || (!geminiKeyInput.trim() && !isGeminiConfigured)}
             className="px-3.5 py-2 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-zinc-200 border border-zinc-700 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${testingGemini ? "animate-spin text-purple-400" : ""}`} />

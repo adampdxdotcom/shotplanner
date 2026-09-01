@@ -31,7 +31,8 @@ export function useAppLogic() {
     comfyui_api_url: "http://127.0.0.1:8188",
     remote_api_token: "",
     lm_studio_url: "http://localhost:1234/v1",
-    default_llm_provider: getDefaultLlmProvider()
+    default_llm_provider: getDefaultLlmProvider(),
+    gemini_api_key: ""
   });
 
   // 2. Workflow & Node Mapping State
@@ -75,7 +76,7 @@ export function useAppLogic() {
       basic_stub: "",
       expanded_prompt: "",
       assigned_slots: {},
-      staged: false,
+      status: "unstaged",
       updated_at: new Date().toISOString()
     }]
   });
@@ -317,7 +318,65 @@ export function useAppLogic() {
     addToast(`Character "${trimmed}" deleted. Media assets preserved in gallery.`, "info");
   }, [addToast]);
 
-  const monitorState = useComfyMonitor(config.comfyui_api_url, addToast, sceneProject.scene_name);
+  const handleOutputPulled = useCallback((filename: string) => {
+    setSceneProject(prev => {
+      const match = filename.match(/_Shot_(\d+)/i);
+      if (!match) return prev;
+      
+      const shotNumber = parseInt(match[1], 10);
+      const shots = [...prev.shots];
+      const shotIdx = shots.findIndex(s => s.shot_number === shotNumber);
+      
+      if (shotIdx !== -1) {
+        const shot = shots[shotIdx];
+        const newTakeId = Math.random().toString(36).substring(2, 9);
+        const takeNumMatch = filename.match(/_Take_(\d+)/i);
+        const takeNum = takeNumMatch ? parseInt(takeNumMatch[1], 10) : (shot.takes?.length || 0) + 1;
+        
+        const newTake = {
+          id: newTakeId,
+          take_number: takeNum,
+          created_at: new Date().toISOString(),
+          video_filename: filename,
+          expanded_prompt: shot.expanded_prompt,
+          basic_stub: shot.basic_stub,
+          generation_params: shot.generation_params,
+          assigned_slots: shot.assigned_slots
+        };
+        
+        const updatedTakes = [...(shot.takes || []), newTake];
+        
+        shots[shotIdx] = {
+          ...shot,
+          status: "rendered",
+          takes: updatedTakes,
+          active_take_id: newTakeId,
+          hero_take_id: shot.hero_take_id || newTakeId
+        };
+      }
+      return { ...prev, shots };
+    });
+    addToast(`Render output pulled: ${filename}`, "success");
+  }, [addToast]);
+
+  const handleExecutionStarted = useCallback((promptId: string) => {
+    setSceneProject(prev => {
+      const shots = [...prev.shots];
+      const shotIdx = shots.findIndex(s => s.latest_prompt_id === promptId);
+      if (shotIdx !== -1 && shots[shotIdx].status !== "rendering") {
+         shots[shotIdx] = { ...shots[shotIdx], status: "rendering" };
+      }
+      return { ...prev, shots };
+    });
+  }, []);
+
+  const monitorState = useComfyMonitor(
+    config.comfyui_api_url, 
+    addToast, 
+    sceneProject.scene_name,
+    handleOutputPulled,
+    handleExecutionStarted
+  );
 
   const [availableScenes, setAvailableScenes] = useState<string[]>([]);
   
@@ -591,7 +650,8 @@ export function useAppLogic() {
       config: {
         ...(sceneProject.config || {}),
         ...config,
-        lm_studio_url: config.lm_studio_url
+        lm_studio_url: config.lm_studio_url,
+        gemini_api_key: ""
       },
       llm_provider: llmProvider,
       parameter_node_mappings: parameterNodeMappings,
@@ -666,7 +726,8 @@ export function useAppLogic() {
         setConfig(prev => ({
           ...prev,
           ...data.config,
-          lm_studio_url: restoredLlmUrl || data.config.lm_studio_url || prev.lm_studio_url
+          lm_studio_url: restoredLlmUrl || data.config.lm_studio_url || prev.lm_studio_url,
+          gemini_api_key: ""
         }));
       }
 
@@ -737,6 +798,7 @@ export function useAppLogic() {
       setConfig(prev => ({
         ...prev,
         ...data.config,
+        gemini_api_key: "",
         remote_host: data.config.remote_host || data.config.runpod_ip || prev.remote_host,
         remote_api_token: data.config.remote_api_token || data.config.runpod_api_token || prev.remote_api_token,
         remote_comfyui_root: data.config.remote_comfyui_root || (data.config.remote_input_dir ? data.config.remote_input_dir.replace(/\/input\/?$/, "") : null) || prev.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI"
@@ -800,7 +862,7 @@ export function useAppLogic() {
         basic_stub: "",
         expanded_prompt: "",
         assigned_slots: {},
-        staged: false,
+        status: "unstaged",
         updated_at: new Date().toISOString()
       }]
     };
@@ -1069,7 +1131,24 @@ export function useAppLogic() {
       const shots = [...prev.shots];
       const idx = shots.findIndex(s => s.id === activeShotId);
       if (idx !== -1) {
-        shots[idx] = updater(shots[idx]);
+        const previousShot = shots[idx];
+        let nextShot = updater(previousShot);
+        
+        // Auto-revert to "unstaged" if specific fields changed
+        const fieldsToCheck: (keyof ShotItem)[] = [
+          "basic_stub", "expanded_prompt", "camera_movement", 
+          "lens_focal_length", "aspect_ratio", "assigned_slots", "generation_params"
+        ];
+        
+        const hasChanged = fieldsToCheck.some(field => 
+          JSON.stringify(previousShot[field]) !== JSON.stringify(nextShot[field])
+        );
+
+        if (hasChanged && nextShot.status !== "unstaged") {
+          nextShot = { ...nextShot, status: "unstaged" };
+        }
+        
+        shots[idx] = nextShot;
       }
       return { ...prev, shots };
     });

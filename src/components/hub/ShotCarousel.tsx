@@ -111,8 +111,16 @@ export const ShotCarousel: React.FC<ShotCarouselProps> = ({
                 >
                   Shot {shotNumberDisplay} - {currentSceneName}
                 </span>
-                <span className={`px-2 py-0.5 text-[10px] font-bold rounded shadow uppercase tracking-wider ${shot.staged ? "bg-emerald-500/90 text-white" : "bg-orange-500/90 text-white"}`}>
-                  {shot.staged ? "✓ Staged" : "Unstaged"}
+                <span className={`px-2 py-0.5 text-[10px] font-bold rounded shadow uppercase tracking-wider ${
+                  shot.status === "rendered" ? "bg-purple-500/90 text-white" :
+                  shot.status === "rendering" ? "bg-indigo-500/90 text-white animate-pulse" :
+                  shot.status === "staged" ? "bg-emerald-500/90 text-white" :
+                  "bg-orange-500/90 text-white"
+                }`}>
+                  {shot.status === "rendered" ? "✓ Rendered" :
+                   shot.status === "rendering" ? "⟳ Rendering" :
+                   shot.status === "staged" ? "✓ Staged" :
+                   "Unstaged"}
                 </span>
               </div>
               

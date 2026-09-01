@@ -9,7 +9,6 @@ import { AssetLightbox } from "./AssetLightbox";
 import { GalleryBulkUploadModal } from "./gallery/GalleryBulkUploadModal";
 import { GalleryGridView } from "./gallery/GalleryGridView";
 import { GalleryListView } from "./gallery/GalleryListView";
-import { GalleryCastView } from "./gallery/GalleryCastView";
 
 interface GallerySectionProps {
   assets: MediaAsset[];
@@ -196,13 +195,6 @@ export const GallerySection: React.FC<GallerySectionProps> = ({
                 <List className="w-4 h-4" />
               </button>
               <button 
-                onClick={() => setViewMode("cast")}
-                title="Cast / Characters"
-                className={`p-1.5 rounded-md transition-all ${viewMode === "cast" ? "bg-zinc-800 text-amber-400" : "text-zinc-500 hover:text-zinc-300"}`}
-              >
-                <Users className="w-4 h-4" />
-              </button>
-              <button 
                 onClick={() => setViewMode("renders")}
                 title="Dailies / Renders"
                 className={`p-1.5 rounded-md transition-all flex items-center gap-1 ${viewMode === "renders" ? "bg-indigo-600 text-white" : "text-zinc-500 hover:text-zinc-300"}`}
@@ -269,19 +261,6 @@ export const GallerySection: React.FC<GallerySectionProps> = ({
             />
           ) : viewMode === "renders" ? (
             <RendersView sceneProject={sceneProject} sceneName={sceneName} onUpdateProject={onUpdateProject as any} />
-          ) : viewMode === "cast" ? (
-            <GalleryCastView
-              subjects={subjects}
-              sortedAssets={sortedAssets}
-              characters={characters}
-              onUpdateCharacter={onUpdateCharacter}
-              onDeleteCharacter={onDeleteCharacter}
-              onAddRef={(subj) => {
-                setBulkModalSubject(subj);
-                setIsBulkModalOpen(true);
-              }}
-              setLightboxAsset={setLightboxAsset}
-            />
           ) : null}
         </div>
       </div>

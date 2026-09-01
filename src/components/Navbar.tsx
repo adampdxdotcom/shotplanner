@@ -12,7 +12,8 @@ import {
   FolderOpen,
   Plus,
   Image,
-  Film
+  Film,
+  Users
 } from "lucide-react";
 
 interface NavbarProps {
@@ -170,6 +171,17 @@ export const Navbar: React.FC<NavbarProps> = ({
         >
           <Image className="w-3.5 h-3.5 text-amber-400" />
           Gallery
+        </button>
+        <button
+          onClick={() => onNavigate("cast")}
+          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
+            activeSection === "cast" 
+              ? "bg-zinc-800 text-zinc-100 shadow-xs" 
+              : "text-zinc-400 hover:text-zinc-200"
+          }`}
+        >
+          <Users className="w-3.5 h-3.5 text-indigo-400" />
+          Cast
         </button>
       </nav>
 

@@ -11,6 +11,7 @@ import sshRoutes, { handleAssetTransfer, handleSceneTransferController } from ".
 import workflowRoutes from "./server/routes/workflowRoutes";
 
 import outputRoutes from "./server/routes/outputRoutes";
+import headshotRoutes from "./server/routes/headshotRoutes";
 
 // Re-export utility functions for external consumers
 export {
@@ -42,6 +43,7 @@ app.use("/api/ssh", sshRoutes);
 app.use("/api", promptRoutes);
 app.use("/api", executionRoutes);
 app.use("/api", outputRoutes);
+app.use("/api/headshots", headshotRoutes);
 
 // Compatibility aliases for remote sync and staging
 app.post("/api/assets/sync_remote", handleAssetTransfer);

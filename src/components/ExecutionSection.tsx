@@ -129,7 +129,7 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
         setTransferResult(data);
         setTransferState("success");
         setLastStagedTime(new Date().toLocaleTimeString());
-        onUpdateShot(prev => ({ ...prev, staged: true }));
+        onUpdateShot(prev => ({ ...prev, status: "staged" as const }));
         onShowToast?.("Shot staged successfully!", "success");
       } else {
         const errorMsg = data.detail || data.error || data.message || (typeof data === "string" ? data : `Failed to stage shot (HTTP ${res.status}).`);
@@ -139,6 +139,74 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
     } catch (err: any) {
       clearProgress();
       setError(err.message || "Failed to connect to staging server.");
+      setTransferState("error");
+    }
+  };
+
+  const handleExecuteShot = async () => {
+    if (!activeShot) return;
+    
+    setTransferState("progress");
+    setLastAction("execute_shot");
+    setError(null);
+    setTransferResult(null);
+    simulateProgress();
+    
+    try {
+      const res = await fetch("/api/execute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          remote_host: config.remote_host,
+          ssh_port: config.ssh_port,
+          ssh_username: config.ssh_username,
+          ssh_password: config.ssh_password,
+          ssh_key_path: config.ssh_key_path,
+          ssh_private_key: config.ssh_private_key,
+          remote_comfyui_root: config.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI",
+          comfyui_api_url: config.comfyui_api_url,
+          remote_api_token: config.remote_api_token,
+          workflow_filename: activeShot.workflow_file,
+          prompt_node_id: activeShot.prompt_node_id,
+          expanded_prompt: activeShot.expanded_prompt,
+          scene_name: sanitizedSceneName,
+          shot_number: activeShot.shot_number,
+          shot_type: activeShot.shot_type,
+          camera_movement: activeShot.camera_movement,
+          node_mappings: activeShot.assigned_slots,
+          generation_parameters: activeShot.generation_params,
+          parameter_node_mappings: activeShot.parameter_node_mappings,
+        })
+      });
+      
+      const resText = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(resText);
+      } catch {
+        data = { detail: resText || `Server returned HTTP status ${res.status} (${res.statusText})` };
+      }
+      clearProgress();
+      setProgressPercent(100);
+      
+      if (res.ok) {
+        setTransferResult(data);
+        setTransferState("success");
+        setLastStagedTime(new Date().toLocaleTimeString());
+        onUpdateShot(prev => ({ 
+          ...prev, 
+          status: "rendering",
+          latest_prompt_id: data.prompt_id 
+        }));
+        onShowToast?.(`Sent to ComfyUI! Prompt ID: ${data.prompt_id || 'Unknown'}`, "success");
+      } else {
+        const errorMsg = data.detail || data.error || data.message || (typeof data === "string" ? data : `Failed to execute shot (HTTP ${res.status}).`);
+        setError(errorMsg);
+        setTransferState("error");
+      }
+    } catch (err: any) {
+      clearProgress();
+      setError(err.message || "Failed to connect to execution server.");
       setTransferState("error");
     }
   };
@@ -191,7 +259,7 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
         setLastStagedTime(new Date().toLocaleTimeString());
         onUpdateSceneProject(prev => ({
           ...prev,
-          shots: prev.shots.map(s => ({ ...s, staged: true }))
+          shots: prev.shots.map(s => ({ ...s, status: "staged" as const }))
         }));
         onShowToast?.("Scene staged successfully!", "success");
       } else {
@@ -234,9 +302,11 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
             activeShot={activeShot}
             sanitizedSceneName={sanitizedSceneName}
             activeShotAssets={activeShotAssets}
-            isTransferring={isTransferring}
-            lastAction={lastAction}
+            isTransferring={isTransferring && lastAction === "shot"}
+            isExecuting={isTransferring && lastAction === "execute_shot"}
+            lastAction={lastAction as "shot" | "scene" | "execute_shot" | null}
             handleSendShot={handleSendShot}
+            handleExecuteShot={handleExecuteShot}
           />
           <SendScenePanel
             sceneProject={sceneProject}

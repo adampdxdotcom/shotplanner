@@ -563,16 +563,28 @@ export async function executeWorkflow(options: ExecuteWorkflowOptions) {
     };
   }
 
-  // Step A: SFTP transfer
-  const mappedFiles = Array.from(new Set(Object.values(node_mappings).filter(Boolean) as string[]));
-  stepsLog.push({
-    step: "A",
-    title: "SSH Asset Sync (Step A)",
-    status: "success",
-    detail: remote_host
-      ? `Connected to ${ssh_username}@${remote_host}:${ssh_port} via SFTP. Verified & staged ${mappedFiles.length} assigned asset file(s) across all active input slots into ${remote_comfyui_root}.`
-      : `Staged ${mappedFiles.length} assigned asset file(s) across all active input slots into ${remote_comfyui_root}.`
-  });
+  // Step A: SFTP transfer (Auto-Staging)
+  let transferResult: any = null;
+  try {
+    transferResult = await processAssetTransfer(options);
+    const mappedFiles = Array.from(new Set(Object.values(node_mappings).filter(Boolean) as string[]));
+    stepsLog.push({
+      step: "A",
+      title: "SSH Asset Sync (Auto-Staged)",
+      status: "success",
+      detail: remote_host
+        ? `Connected to ${ssh_username}@${remote_host}:${ssh_port} via SFTP. Verified & auto-staged ${mappedFiles.length} assigned asset file(s) across all active input slots into ${remote_comfyui_root}.`
+        : `Auto-staged ${mappedFiles.length} assigned asset file(s) across all active input slots into ${remote_comfyui_root}.`
+    });
+  } catch (err: any) {
+    stepsLog.push({
+      step: "A",
+      title: "SSH Asset Sync (Auto-Staged)",
+      status: "error",
+      detail: `Auto-staging failed: ${err.message}`
+    });
+    throw err;
+  }
 
   // Step D: ComfyUI /prompt HTTP endpoint
   const promptEndpoint = comfyui_api_url.endsWith("/prompt")
@@ -627,6 +639,8 @@ export async function executeWorkflow(options: ExecuteWorkflowOptions) {
     take_number: calculatedTake,
     expected_video_filename: expectedVideoFilename,
     steps: stepsLog,
-    modified_workflow: modifiedWf
+    modified_workflow: modifiedWf,
+    remote_workflow_paths: transferResult?.remote_workflow_path ? [transferResult.remote_workflow_path] : [],
+    uploaded_files: transferResult?.uploaded_files || []
   };
 }

@@ -72,7 +72,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
         basic_stub: "",
         expanded_prompt: "",
         assigned_slots: {},
-        staged: false,
+        status: "unstaged",
         takes: [],
         updated_at: new Date().toISOString()
       };
@@ -109,7 +109,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
           const nextSlots = { ...shots[shotIdx].assigned_slots };
           delete nextSlots[globalSlot];
           delete nextSlots[String(globalSlot)];
-          shots[shotIdx] = { ...shots[shotIdx], assigned_slots: nextSlots , staged: false };
+          shots[shotIdx] = { ...shots[shotIdx], assigned_slots: nextSlots , status: "unstaged" };
         }
         return { ...prev, shots };
       });
@@ -141,7 +141,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
         const shotIdx = shots.findIndex(s => s.id === activeShotId);
         if (shotIdx !== -1) {
           const nextSlots = { ...shots[shotIdx].assigned_slots, [globalSlot]: asset.filename };
-          shots[shotIdx] = { ...shots[shotIdx], assigned_slots: nextSlots, staged: false };
+          shots[shotIdx] = { ...shots[shotIdx], assigned_slots: nextSlots, status: "unstaged" };
         }
         return { ...prev, shots };
       });

@@ -117,5 +117,73 @@ router.post("/test-gemini", async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * Test ComfyUI endpoint connection
+ */
+router.post("/test-comfyui", async (req: Request, res: Response) => {
+  const { url, token } = req.body;
+  const targetUrl = (url || "http://127.0.0.1:8188").trim().replace(/\/$/, "");
+
+  let probeUrl = `${targetUrl}/system_stats`;
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+
+    const headers: Record<string, string> = { "Accept": "application/json" };
+    if (token && token.trim()) {
+      headers["Authorization"] = `Bearer ${token.trim()}`;
+    }
+
+    const lmRes = await fetch(probeUrl, {
+      method: "GET",
+      headers,
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+
+    if (lmRes.ok) {
+      const data = await lmRes.json().catch(() => ({}));
+      
+      let systemInfo = "";
+      if (data && data.system && data.system.os) {
+        systemInfo = `OS: ${data.system.os}`;
+      }
+      if (data && data.devices && data.devices.length > 0) {
+        const device = data.devices[0];
+        if (device.name) {
+          systemInfo += systemInfo ? ` | GPU: ${device.name}` : `GPU: ${device.name}`;
+        }
+        if (device.vram_total) {
+          const vramGB = (device.vram_total / (1024 * 1024 * 1024)).toFixed(1);
+          systemInfo += ` (${vramGB}GB VRAM)`;
+        }
+      }
+
+      return res.json({
+        success: true,
+        message: `ComfyUI server responsive at ${targetUrl}`,
+        systemInfo,
+        probeUrl
+      });
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: `Server responded with HTTP ${lmRes.status} ${lmRes.statusText}`
+      });
+    }
+  } catch (err: any) {
+    const isAbort = err.name === "AbortError";
+    const errorMessage = isAbort 
+      ? "Connection timed out (5s limit reached)" 
+      : (err.message || "Connection refused or endpoint unreachable");
+
+    return res.status(400).json({
+      success: false,
+      error: errorMessage
+    });
+  }
+});
+
 export default router;
 

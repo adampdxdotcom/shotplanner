@@ -32,9 +32,15 @@ export const ShotMetadataPanel: React.FC<ShotMetadataPanelProps> = ({
             {generateSaveVideoPrefix(activeShot.shot_name || "", activeShot.shot_number)}
           </span>
           <span className={`px-2.5 py-1 text-xs font-semibold rounded-md shadow uppercase tracking-wider ${
-            activeShot.staged ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-orange-500/20 text-orange-400 border border-orange-500/30"
+            activeShot.status === "rendered" ? "bg-purple-500/20 text-purple-400 border border-purple-500/30" :
+            activeShot.status === "rendering" ? "bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 animate-pulse" :
+            activeShot.status === "staged" ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" :
+            "bg-orange-500/20 text-orange-400 border border-orange-500/30"
           }`}>
-            {activeShot.staged ? "✓ Staged" : "Unstaged"}
+            {activeShot.status === "rendered" ? "✓ Rendered" :
+             activeShot.status === "rendering" ? "⟳ Rendering" :
+             activeShot.status === "staged" ? "✓ Staged" :
+             "Unstaged"}
           </span>
         </div>
       </div>

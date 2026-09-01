@@ -6,10 +6,10 @@ export function getStoredGeminiKey(): string | undefined {
   if (fs.existsSync(GEMINI_CONFIG_FILE)) {
     try {
       const data = JSON.parse(fs.readFileSync(GEMINI_CONFIG_FILE, "utf-8"));
-      return data.api_key;
+      return data.api_key || "";
     } catch (e) {}
   }
-  return process.env.GEMINI_API_KEY;
+  return "";
 }
 
 export function saveGeminiKey(apiKey: string): void {

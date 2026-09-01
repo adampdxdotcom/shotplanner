@@ -524,6 +524,7 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({
         <ComfyUIConfig 
           config={config}
           handleInputChange={handleInputChange}
+          onShowToast={onShowToast}
         />
 
         {/* Informational Callout */}

@@ -15,7 +15,8 @@ export function useComfyMonitor(
   comfyApiUrl: string, 
   onShowToast?: (msg: string, type: "success" | "error" | "info") => void,
   activeSceneName?: string,
-  onOutputPulled?: (filename: string) => void
+  onOutputPulled?: (filename: string) => void,
+  onExecutionStarted?: (promptId: string) => void
 ) {
   const [state, setState] = useState<ComfyMonitorState>({
     isConnected: false,
@@ -111,6 +112,7 @@ export function useComfyMonitor(
               startTimeRef.current = Date.now();
               startTimer();
               onShowToast?.('🎬 Execution Started', 'info');
+              onExecutionStarted?.(msg.data.prompt_id);
             } else if (msg.type === 'executing') {
               const node = msg.data.node;
               if (node) {
