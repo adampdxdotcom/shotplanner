@@ -19,8 +19,9 @@ router.post("/gemini", (req: Request, res: Response) => {
  * Test LM Studio local API endpoint connection
  */
 router.post("/test-lm-studio", async (req: Request, res: Response) => {
-  const { url } = req.body;
-  const targetUrl = (url || "http://localhost:1234/v1").trim().replace(/\/$/, "");
+  const { url, endpoint, targetUrl: rawTargetUrl } = req.body || {};
+  const inputUrl = url || endpoint || rawTargetUrl || "http://localhost:1234/v1";
+  const targetUrl = inputUrl.trim().replace(/\/$/, "");
 
   let probeUrl = targetUrl;
   if (!probeUrl.endsWith("/models")) {
@@ -44,16 +45,16 @@ router.post("/test-lm-studio", async (req: Request, res: Response) => {
 
     if (lmRes.ok) {
       const data = await lmRes.json().catch(() => ({}));
-      const modelsCount = Array.isArray(data.data) ? data.data.length : undefined;
-      const modelNames = Array.isArray(data.data) && data.data.length > 0 
-        ? data.data.map((m: any) => m.id || m.name).slice(0, 2).join(", ")
-        : null;
+      const modelsList = Array.isArray(data.data) ? data.data : [];
+      const modelsCount = modelsList.length;
+      const modelNames = modelsList.map((m: any) => m.id || m.name || m);
 
       return res.json({
         success: true,
         message: `LM Studio server responsive at ${targetUrl}`,
         modelsCount,
-        modelNames,
+        models: modelNames,
+        modelNames: modelNames.slice(0, 3).join(", "),
         probeUrl
       });
     } else {
@@ -79,35 +80,38 @@ router.post("/test-lm-studio", async (req: Request, res: Response) => {
  * Test Google Gemini API connection with lightweight verification query
  */
 router.post("/test-gemini", async (req: Request, res: Response) => {
-  let { api_key } = req.body;
-  if (!api_key || !api_key.trim()) {
-    api_key = getStoredGeminiKey();
+  let { api_key, apiKey } = req.body || {};
+  let keyToUse = (api_key || apiKey || "").trim();
+
+  if (!keyToUse) {
+    keyToUse = getStoredGeminiKey() || "";
   }
 
-  if (!api_key || !api_key.trim()) {
+  if (!keyToUse) {
     return res.status(400).json({
       success: false,
-      error: "No Gemini API key provided or configured"
+      error: "No Gemini API key is configured"
     });
   }
 
   try {
-    const result = await generateWithGeminiAPI(api_key.trim(), "Ping test connection verification");
+    const result = await generateWithGeminiAPI(keyToUse, "Ping test connection verification");
     if (result && result.text) {
       return res.json({
         success: true,
         message: `Gemini API key verified successfully using ${result.modelUsed}`,
+        activeModel: result.modelUsed,
         modelUsed: result.modelUsed
       });
     } else {
       return res.status(400).json({
         success: false,
-        error: "Gemini API returned empty response"
+        error: "Gemini API returned an empty response"
       });
     }
   } catch (err: any) {
     let errMsg = err.message || "Invalid API key or network request failed";
-    if (errMsg.toLowerCase().includes("api_key_invalid") || errMsg.toLowerCase().includes("api key not valid") || errMsg.toLowerCase().includes("unauthorized")) {
+    if (errMsg.toLowerCase().includes("api_key_invalid") || errMsg.toLowerCase().includes("api key not valid") || errMsg.toLowerCase().includes("unauthorized") || errMsg.toLowerCase().includes("403") || errMsg.toLowerCase().includes("401")) {
       errMsg = "Invalid API key provided";
     }
     return res.status(400).json({

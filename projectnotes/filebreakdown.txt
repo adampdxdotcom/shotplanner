@@ -704,3 +704,9 @@
   - Integrated the `HeadshotGeneratorModal` inside the Cast dashboard.
   - Injected a "⚡ AI Headshots" action button into each character profile card header to launch the generator.
   - Wired the modal's save callbacks through `onAssetUploaded` to automatically register new headshots and transition project state to dirty, triggering auto-save and issuing a success toast notification.
+
+## Settings & Model Connection Verification Endpoints
+- **`server/routes/settingsRoutes.ts`**
+  - **`POST /api/settings/test-gemini`**: Validates Google Gemini API key configuration by accepting an optional `api_key` payload or falling back to the saved server configuration key via `getStoredGeminiKey()`. Returns an explicit 400 error stating no Gemini API key is configured if neither is present. Dispatches a lightweight verification query using the `@google/genai` client (`gemini-2.5-flash`) and returns status confirmation alongside active model metadata on success or caught authentication/network error details on failure.
+  - **`POST /api/settings/test-lm-studio`**: Tests connectivity to local LM Studio server endpoints (`GET /v1/models`) using an asynchronous HTTP client with a 5-second `AbortController` timeout. On success, returns confirmation payloads containing loaded model counts and model names. On failure (connection refused, unreachable host, timeout), catches network exceptions and returns a clear failure description.
+

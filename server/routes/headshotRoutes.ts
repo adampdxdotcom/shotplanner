@@ -19,10 +19,14 @@ router.post("/generate", upload.single("image"), async (req: Request, res: Respo
     const aspectRatio = req.body.aspectRatio || "1:1";
     let variationKeys: string[] = [];
     
-    try {
-      variationKeys = JSON.parse(req.body.variationKeys || "[]");
-    } catch(e) {
-      return res.status(400).json({ error: "Invalid variationKeys format. Must be a JSON array of strings." });
+    if (Array.isArray(req.body.variationKeys)) {
+      variationKeys = req.body.variationKeys;
+    } else if (typeof req.body.variationKeys === "string") {
+      try {
+        variationKeys = JSON.parse(req.body.variationKeys || "[]");
+      } catch(e) {
+        return res.status(400).json({ error: "Invalid variationKeys format. Must be a JSON array of strings." });
+      }
     }
 
     if (!characterName) {
@@ -72,7 +76,8 @@ router.post("/generate", upload.single("image"), async (req: Request, res: Respo
 
 router.post("/save-selected", async (req: Request, res: Response) => {
   try {
-    const { selections, characterName, sceneName, tags } = req.body;
+    const { selections, characterName, sceneName, activeSceneName, tags } = req.body;
+    const targetScene = sceneName || activeSceneName;
 
     if (!selections || !Array.isArray(selections) || selections.length === 0) {
       return res.status(400).json({ error: "selections array is required" });
@@ -80,11 +85,11 @@ router.post("/save-selected", async (req: Request, res: Response) => {
     if (!characterName) {
       return res.status(400).json({ error: "characterName is required" });
     }
-    if (!sceneName) {
+    if (!targetScene) {
       return res.status(400).json({ error: "sceneName is required" });
     }
 
-    const savedRecords = await saveSelectedVariations(selections, characterName, sceneName, tags);
+    const savedRecords = await saveSelectedVariations(selections, characterName, targetScene, tags);
 
     res.json({ success: true, savedAssets: savedRecords });
   } catch (error: any) {
