@@ -166,12 +166,13 @@ export const HeadshotGeneratorModal: React.FC<HeadshotGeneratorModalProps> = ({
       }
 
       const data = await res.json();
+      const savedList: MediaAsset[] = data.savedAssets || data.savedRecords || data.assets || [];
       
-      // Pass saved records back to parent
-      data.savedAssets.forEach((asset: MediaAsset) => onAssetSaved(asset));
+      // Pass all saved records back to parent
+      savedList.forEach((asset: MediaAsset) => onAssetSaved(asset));
       
       if (addToast) {
-        addToast(`Successfully saved ${data.savedAssets.length} headshot variations to ${subjectName}.`, "success");
+        addToast(`Successfully saved ${savedList.length} headshot variation${savedList.length === 1 ? '' : 's'} to ${subjectName}.`, "success");
       }
       
       onClose(); // Close modal on success

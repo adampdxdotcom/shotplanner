@@ -85,7 +85,7 @@ export async function generateVariations(
 }
 
 export async function saveSelectedVariations(
-  selections: { base64: string; key: string }[],
+  selections: { base64: string; key?: string; variationKey?: string }[],
   characterName: string,
   sceneName: string,
   tags: string[] = []
@@ -100,16 +100,22 @@ export async function saveSelectedVariations(
 
   const savedRecords: AssetRecord[] = [];
 
-  for (const sel of selections) {
-    const timestamp = Date.now() + Math.floor(Math.random() * 1000);
-    const safeTag = sel.key.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
-    const safeChar = characterName.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+  for (let idx = 0; idx < selections.length; idx++) {
+    const sel = selections[idx];
+    const timestamp = Date.now();
+    const rawKey = sel.variationKey || sel.key || `variation_${idx}`;
+    const safeTag = rawKey.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase().replace(/_+/g, "_");
+    const safeChar = characterName.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase().replace(/_+/g, "_");
     
-    const filename = `headshot_${safeChar}_${safeTag}_${timestamp}.png`;
+    const filename = `headshot_${safeChar}_${safeTag}_${timestamp}_${idx}.png`;
     const fullPath = path.join(dirs.images, filename);
     const thumbPath = path.join(thumbDir, filename);
 
-    const buffer = Buffer.from(sel.base64, 'base64');
+    let base64Data = sel.base64 || "";
+    if (base64Data.includes(",")) {
+      base64Data = base64Data.split(",")[1];
+    }
+    const buffer = Buffer.from(base64Data, 'base64');
     fs.writeFileSync(fullPath, buffer);
 
     try {
@@ -123,13 +129,13 @@ export async function saveSelectedVariations(
 
     // register in asset service
     const record: AssetRecord = {
-      id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      id: `${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 9)}`,
       original_name: filename,
       filename,
       type: "Headshot",
       media_type: "image",
       subject_name: characterName,
-      description: `Generated headshot variation: ${sel.key}${tags.length ? ' - ' + tags.join(', ') : ''}`,
+      description: `Generated headshot variation: ${rawKey}${tags.length ? ' - ' + tags.join(', ') : ''}`,
       size_bytes: buffer.length,
       created_at: Date.now()
     };

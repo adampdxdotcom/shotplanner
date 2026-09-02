@@ -694,7 +694,7 @@
   - Implemented `HEADSHOT_TEMPLATES` constant block explicitly defining visual directives for presets ("Facing", "3/4 Profile", "Full Profile", "Cinematic / Mood") demanding maximum quality and likeness preservation.
   - Implemented `generateVariations()` utilizing the `@google/genai` client configured with `gemini-3.1-flash-image` (Nano Banana 2) and automatic fallback to `gemini-2.5-flash-image` to dispatch parallel image-to-image requests via multimodal payloads (`inlineData` + text directive) with custom `aspectRatio` settings.
   - Removed silent fallbacks on error: logs exact Google API errors to terminal and raises explicit errors to the client to surface billing, quota, or parameter issues.
-  - Implemented `saveSelectedVariations()` to persist images securely into the active scene's image directory, auto-generate responsive thumbnails via the `sharp` library, and orchestrate synchronous database registration using `assetService.upsertAsset`.
+  - Implemented `saveSelectedVariations()` to persist images securely into the active scene's image directory with collision-free filenames (`headshot_{character}_{variation_key}_{timestamp}_{index}.png`), generate separate physical files with companion thumbnails via the `sharp` library, and orchestrate synchronous database registration using `assetService.upsertAsset`.
 
 - **`src/components/cast/HeadshotGeneratorModal.tsx`**
   - Created a dedicated modal component for driving AI character headshot variations.
@@ -704,10 +704,12 @@
   - Developed a Candidate Review Grid allowing high-resolution inspection and multi-select retention of generated assets.
   - Explicitly passes `activeSceneName` and `sceneName` in generation and save payloads to ensure all assets are saved into the active project's scene directory instead of defaulting to `scene01`.
   - Wired frontend inputs to `POST /api/headshots/generate` and selections to `POST /api/headshots/save-selected` with informative error extraction (`detail`/`error`).
+  - Iterates over all returned saved asset records in `handleSave()`, sequentially passing each to `onAssetSaved` to synchronize the runtime state and notify users with an exact saved count toast.
 - **`src/components/CastSection.tsx`**
   - Integrated the `HeadshotGeneratorModal` inside the Cast dashboard with explicit `activeSceneName` routing.
   - Injected a "⚡ AI Headshots" action button into each character profile card header to launch the generator.
   - Wired the modal's save callbacks through `onAssetUploaded` to automatically register new headshots and transition project state to dirty, triggering auto-save and issuing a success toast notification.
+  - Refactored the character profile card reference media strip to filter by normalized character names and render all associated media assets in a horizontally scrollable container with unconstrained `shrink-0` card layouts, ensuring all generated headshots and uploaded references remain visible.
 
 ## Settings & Model Connection Verification Endpoints
 - **`server/routes/settingsRoutes.ts`**
@@ -727,7 +729,7 @@
   - Defines `HEADSHOT_TEMPLATES` for character visual presets ("Facing", "3/4 Profile", "Full Profile", "Cinematic / Mood").
   - Implements `generate_headshots()` to dispatch variation requests using `gemini-3.1-flash-image` (Nano Banana 2) with fallback to `gemini-2.5-flash-image` and custom `aspectRatio` image configuration.
   - Removed silent fallback: logs `[Headshot Generation] Google API Error {status}: {error_body}` to terminal and raises explicit `HTTPException` on failure.
-  - Implements `save_selected_headshots()` to save image files to `assets/{scene_name}/images/`, generate companion thumbnails via Pillow, and assemble structured asset objects.
+  - Implements `save_selected_headshots()` to save image files to `assets/{scene_name}/images/` with unique collision-free filenames (`headshot_{character}_{variation_key}_{timestamp}_{index}.png`), generate companion thumbnails via Pillow, and assemble structured asset objects.
 - **`backend/routes/__init__.py`**
   - Included `headshot_router` into the primary `/api` FastAPI router.
 

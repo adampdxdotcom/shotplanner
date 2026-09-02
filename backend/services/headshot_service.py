@@ -196,7 +196,7 @@ async def save_selected_headshots(
     scene_name: str = "scene01",
     tags: Optional[List[str]] = None
 ) -> List[Dict[str, Any]]:
-    """Save user-approved headshot variations to scene image assets directory."""
+    """Save user-approved headshot variations to scene image assets directory with unique filenames."""
     print(f"[Headshot Save] Saving {len(selections)} selected variations for {character_name} in scene '{scene_name}'", flush=True)
 
     saved_assets: List[Dict[str, Any]] = []
@@ -215,9 +215,11 @@ async def save_selected_headshots(
             print(f"[Headshot Save] Base64 decode failed for selection {idx}: {e}", flush=True)
             continue
 
-        var_key = item.get("variationKey") or item.get("label") or f"variation_{idx}"
-        orig_name = f"{var_key}.png"
-        target_filename = generate_target_filename("headshot", character_name, orig_name)
+        var_key = item.get("variationKey") or item.get("key") or item.get("label") or f"variation_{idx}"
+        safe_char = sanitize_filename(character_name)
+        safe_var = sanitize_filename(str(var_key))
+        micro_ts = int(time.time() * 1000000)
+        target_filename = f"headshot_{safe_char}_{safe_var}_{micro_ts}_{idx}.png"
 
         saved_path = await save_uploaded_file(
             file_bytes=img_bytes,
@@ -231,7 +233,7 @@ async def save_selected_headshots(
         asset_record = {
             "id": target_filename,
             "filename": target_filename,
-            "original_name": orig_name,
+            "original_name": target_filename,
             "media_type": "image",
             "type": "Headshot",
             "subject_name": character_name,
@@ -239,7 +241,7 @@ async def save_selected_headshots(
             "size_bytes": len(img_bytes),
             "path": str(saved_path),
             "preview_url": f"/api/uploads/{target_filename}",
-            "tags": tags or []
+            "tags": tags or ["AI Generated"]
         }
         saved_assets.append(asset_record)
 

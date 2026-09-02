@@ -106,7 +106,7 @@ export const CastSection: React.FC<CastSectionProps> = ({
             </div>
           ) : (
             subjects.map(subject => {
-              const charAssets = assets.filter(a => (a.subject_name || "").toLowerCase() === subject.toLowerCase());
+              const charAssets = assets.filter(a => (a.subject_name || "").trim().toLowerCase() === subject.trim().toLowerCase());
               
               const profile = characters[subject] || { name: subject, notes: "", quick_slots: [], scene_outfit_ref: "" };
               
@@ -180,7 +180,7 @@ export const CastSection: React.FC<CastSectionProps> = ({
                   </div>
 
                   <div className="p-4 md:p-6 flex-1 bg-zinc-950/20 overflow-x-auto min-w-0">
-                    <div className="flex gap-4 min-w-max pb-2">
+                    <div className="flex items-start gap-4 min-w-max pb-2">
                       {charAssets.length === 0 && (
                         <>
                           {[1, 2, 3].map(i => (
@@ -194,9 +194,9 @@ export const CastSection: React.FC<CastSectionProps> = ({
                       
                       {charAssets.map(asset => (
                         <div 
-                          key={asset.filename}
+                          key={asset.filename || asset.id}
                           onClick={() => setLightboxAsset(asset)}
-                          className="w-32 group cursor-pointer"
+                          className="w-32 shrink-0 group cursor-pointer"
                         >
                           <div className="w-32 h-40 bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden mb-2 relative hover:border-amber-500/50 transition-colors">
                             {asset.media_type === "image" || !asset.media_type || !/\.(mp4|mov|webm|mp3|wav)$/i.test(asset.filename) ? (
