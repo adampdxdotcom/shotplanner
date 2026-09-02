@@ -300,9 +300,7 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
   // Location-first Reference Save Panel state
   const [compositeRefName, setCompositeRefName] = useState<string>("");
   const [hasUserEditedRefName, setHasUserEditedRefName] = useState<boolean>(false);
-  const [semanticRefType, setSemanticRefType] = useState<string>("Scene / Location Reference");
   const [compositeDescription, setCompositeDescription] = useState<string>("");
-  const [hasUserEditedDescription, setHasUserEditedDescription] = useState<boolean>(false);
   const [assignToShotSlot, setAssignToShotSlot] = useState<boolean>(false);
   const [targetSlotIndex, setTargetSlotIndex] = useState<number>(8); // default to Slot 9 (index 8)
   const [isExportingComposite, setIsExportingComposite] = useState<boolean>(false);
@@ -447,7 +445,6 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
       }
     } else {
       setHasUserEditedRefName(false);
-      setHasUserEditedDescription(false);
       setAssignToShotSlot(false);
     }
   }, [isOpen, defaultEnvironmentName, hasUserEditedRefName]);
@@ -629,46 +626,6 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
     setCustomBackgroundUrl(undefined);
   };
 
-  // Synthesize Staging Context String
-  const synthesizedStagingText = useMemo(() => {
-    const locName = customLocationName.trim() || activeLocationAsset?.description || activeLocationAsset?.filename || activeScene || "Cinematic Set";
-    const atmo = LIGHTING_ATMOSPHERES.find(a => a.id === selectedAtmosphere)?.label || "Motivated Cinematic Lighting";
-    
-    const actorDescriptions = stagedActors.map(actor => {
-      const facingStr = 
-        actor.facing === "facing_camera" ? "facing directly toward camera" :
-        actor.facing === "turn_left" ? "turned 3/4 stage-left" :
-        actor.facing === "turn_right" ? "turned 3/4 stage-right" :
-        actor.facing === "profile_left" ? "in full profile facing left" :
-        actor.facing === "profile_right" ? "in full profile facing right" :
-        "with back toward camera";
-      
-      const posStr = 
-        actor.horizontalPercent < 0 ? "partially off-screen stage left" :
-        actor.horizontalPercent <= 30 ? "stage left" :
-        actor.horizontalPercent <= 45 ? "center-left" :
-        actor.horizontalPercent <= 55 ? "center stage" :
-        actor.horizontalPercent <= 70 ? "center-right" :
-        actor.horizontalPercent <= 100 ? "stage right" :
-        "partially off-screen stage right";
-
-      return `${actor.characterName} positioned in ${actor.plane} (${posStr}), ${facingStr}, ${actor.posture.toLowerCase()}`;
-    });
-
-    const actorSection = actorDescriptions.length > 0 
-      ? `Staging & Blocking: ${actorDescriptions.join("; ")}.`
-      : "Staging: Open scene layout.";
-
-    return `[Scene Context: ${activeScene}] [Location: ${locName}] [Atmosphere: ${atmo}] [Framing: ${cameraFraming}, ${viewportRatio}] ${actorSection}`;
-  }, [activeScene, customLocationName, activeLocationAsset, selectedAtmosphere, cameraFraming, viewportRatio, stagedActors]);
-
-  // Auto-sync visual description if user hasn't typed custom notes
-  useEffect(() => {
-    if (!hasUserEditedDescription && synthesizedStagingText) {
-      setCompositeDescription(synthesizedStagingText);
-    }
-  }, [synthesizedStagingText, hasUserEditedDescription]);
-
   // Requirement 2: Composite Export and Asset Ingestion
   const handleSaveCompositeReference = async () => {
     try {
@@ -698,20 +655,19 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
       });
 
       const effectiveRefName = (compositeRefName && compositeRefName.trim()) || defaultEnvironmentName || "Location Reference";
-      const cleanType = sanitizeSlug(semanticRefType) || "scene_location_reference";
       const cleanRefName = sanitizeSlug(effectiveRefName) || "location_ref";
       const timeStamp = Math.floor(Date.now() / 1000);
-      const filename = `${cleanType}_${cleanRefName}_${timeStamp}.png`;
+      const filename = `scene_reference_${cleanRefName}_${timeStamp}.png`;
 
-      const finalDescription = (compositeDescription && compositeDescription.trim()) || synthesizedStagingText;
+      const finalDescription = compositeDescription.trim();
 
       const formData = new FormData();
       formData.append("file", blob, filename);
-      formData.append("type", semanticRefType);
+      formData.append("type", "Scene Reference");
       formData.append("subject_name", effectiveRefName);
       formData.append("scene_name", activeScene);
       formData.append("description", finalDescription);
-      formData.append("tags", JSON.stringify([semanticRefType, "Composite Staging", "Director Staging", viewportRatio]));
+      formData.append("tags", JSON.stringify(["Scene Reference", "Composite Staging", "Director Staging", viewportRatio]));
       if (assignToShotSlot) {
         formData.append("slot_index", String(targetSlotIndex));
       }
@@ -1591,8 +1547,8 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
                   </div>
                 </div>
 
-                {/* Form fields: Location/Reference Name & Semantic Type Selector */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Form fields: Location/Reference Name */}
+                <div className="grid grid-cols-1 gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-zinc-300 mb-1">
                       Location / Reference Name
@@ -1609,24 +1565,6 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
                     />
                     <span className="block mt-1 text-[11px] text-zinc-500">
                       Asset subject identifier for gallery organization (avoids phantom characters)
-                    </span>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-zinc-300 mb-1">
-                      Semantic Type Selector
-                    </label>
-                    <select
-                      value={semanticRefType}
-                      onChange={(e) => setSemanticRefType(e.target.value)}
-                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-amber-400 font-medium focus:outline-none focus:border-amber-500/60 transition-colors cursor-pointer"
-                    >
-                      <option value="Scene / Location Reference">Scene / Location Reference (Default)</option>
-                      <option value="Scene Reference">Scene Reference</option>
-                      <option value="Character Staging Reference">Character Staging Reference</option>
-                    </select>
-                    <span className="block mt-1 text-[11px] text-zinc-500">
-                      Semantic reference category passed to ComfyUI & workflow pipelines
                     </span>
                   </div>
                 </div>

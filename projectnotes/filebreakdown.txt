@@ -1157,6 +1157,7 @@
     - **Removed Stance/Pose Description Field:** Removed the "Actor Stance / Pose Description" text input from the keying panel footer, eliminating manual typing overhead when preparing posed cutouts.
     - **Removed Initial Depth Plane Settings:** Removed the "Initial Depth Plane" (foreground/midground/background) segmented buttons from the keying panel footer. Posed actors now stage cleanly using the stage's contextual defaults without forcing pre-configuration during keying.
     - **Streamlined Actor Blocking Controls:** Removed the "Depth Plane" segmented selector from the actor blocking controls card, streamlined the scale slider label to "Scale", removed the "Gaze & Facing Direction" and "Action / Stance" dropdown controls, and removed the "Visual Description" textarea block from the save panel to keep the staging controls focused, uncluttered, and performant.
+    - **Hardcoded Scene Reference Export:** Enforced strict "Scene Reference" semantics for all composite staging exports. Removed the semantic asset type dropdown, locked payload types to `Scene Reference`, mapped generated filenames to `scene_reference_*`, bound subject names strictly to the location name to organize in the gallery, and stripped out automatic synthesized boilerplate descriptions so assets upload with clean metadata.
 
 
 
