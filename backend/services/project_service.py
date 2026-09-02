@@ -26,6 +26,8 @@ from backend.services.workflow_service import inspect_workflow_nodes, inject_and
 IGNORED_JSON_FILENAMES = {
     "assets_db.json",
     "gemini_config.json",
+    "civitai_config.json",
+    "huggingface_config.json",
     "package.json",
     "tsconfig.json",
     "metadata.json"

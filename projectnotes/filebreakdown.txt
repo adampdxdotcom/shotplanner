@@ -884,6 +884,34 @@
 - **`src/components/ConfigSection.tsx`**
   - Replaced legacy Civitai-only panel with the unified `ModelHubConfig` (Remote Model Ingestion Hub).
 
+## Python FastAPI Backend Model Hub & Settings Endpoints
+- **`backend/services/civitai_service.py`**
+  - Implemented `get_stored_civitai_key()` and `save_civitai_key(api_key)` managing Civitai API tokens in `assets/civitai_config.json` and environment.
+  - Implemented `determine_comfyui_destination(category)` for ComfyUI folder routing (Checkpoints, LoRAs, ControlNet, VAE, Upscalers, Embeddings, Diffusion Models).
+  - Implemented `fetch_civitai_model_info(query, token_override)` querying Civitai API v1 model/version endpoints with Bearer authentication and metadata extraction.
+- **`backend/services/huggingface_service.py`**
+  - Implemented `get_stored_huggingface_token()` and `save_huggingface_token(token)` managing HF tokens in `assets/huggingface_config.json` and environment.
+  - Implemented `normalize_huggingface_url(raw_url)` resolving `/blob/` path segments to direct `/resolve/` streaming endpoints and parsing repository IDs, revisions, and filenames.
+  - Implemented `detect_hf_category()` auto-classifying model types (Diffusion Models, CLIP/Text Encoders, LoRAs, ControlNet, VAE, Upscalers, Embeddings, Checkpoints).
+  - Implemented `fetch_huggingface_model_info(query_url, token_override)` querying Hugging Face API or direct URLs with Bearer token authentication, discovering repository siblings files, inspecting content-length, and auto-routing destination paths.
+- **`backend/services/model_hub_service.py`**
+  - Standardized `COMFYUI_MODEL_CATEGORIES` preset definitions.
+  - Implemented `execute_unified_remote_download(options)` supporting Civitai, Hugging Face, and direct model downloads via Paramiko SSH, executing multi-threaded `aria2c` (8x streams) with Bearer token authentication headers, fallback to `curl -L` resume streaming or `wget`, directory verification (`mkdir -p`), and file existence validation.
+- **`backend/routes/settings_routes.py`**
+  - Implemented `GET /api/settings/civitai` and `POST /api/settings/civitai` for Civitai API key persistence and masked retrieval.
+  - Implemented `GET /api/settings/huggingface` and `POST /api/settings/huggingface` for Hugging Face token persistence and masked retrieval.
+  - Implemented `GET /api/settings/gemini`, `POST /api/settings/gemini`, `POST /api/settings/test-lm-studio`, `POST /api/settings/test-gemini`, and `POST /api/settings/test-comfyui`.
+- **`backend/routes/civitai_routes.py`**
+  - Mounted `GET /api/civitai/model-info` for Civitai metadata inspection and auto-routing.
+  - Mounted `POST /api/civitai/download-remote` for remote GPU model ingestion.
+- **`backend/routes/model_hub_routes.py`**
+  - Mounted `GET /api/model-hub/categories` for ComfyUI folder category presets.
+  - Mounted `GET /api/model-hub/hf-info` for Hugging Face and direct link metadata inspection.
+  - Mounted `GET /api/model-hub/civitai-info` for Civitai metadata inspection.
+  - Mounted `POST /api/model-hub/download-remote` for unified remote SSH model download execution.
+- **`backend/routes/__init__.py`**
+  - Registered `settings_router`, `civitai_router`, and `model_hub_router` onto the main FastAPI `/api` application router.
+
 
 
 

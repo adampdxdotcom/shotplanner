@@ -246,7 +246,7 @@ def update_asset_metadata_service(
         print(f"[Asset Service] Failed to write assets_db.json: {e}")
 
     # 4. Synchronize across all active scene project files
-    ignored_files = {"assets_db.json", "gemini_config.json", "package.json", "tsconfig.json", "metadata.json"}
+    ignored_files = {"assets_db.json", "gemini_config.json", "civitai_config.json", "huggingface_config.json", "package.json", "tsconfig.json", "metadata.json"}
     project_files_to_check = []
 
     if ASSETS_DIR.exists():
