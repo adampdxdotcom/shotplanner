@@ -25,6 +25,7 @@ export interface CivitaiModelMetadata {
   download_url: string;
   default_destination_folder: string;
   suggested_remote_path: string;
+  files?: any[];
   description?: string;
   tags?: string[];
   allow_commercial_use?: boolean | string;
@@ -132,58 +133,78 @@ export function formatBytes(bytes: number): string {
   return `${mb.toFixed(1)} MB`;
 }
 
+export interface ParsedCivitaiQuery {
+  modelId?: number;
+  versionId?: number;
+  isRawNumeric?: boolean;
+  isAir?: boolean;
+}
+
 /**
- * Parse input string or URL to extract version ID and/or model ID
+ * Parse input string or URL to extract version ID and/or model ID.
+ * Strictly prioritizes Model Version ID across all input formats.
  */
-export function parseCivitaiQuery(rawQuery: string): { modelId?: number; versionId?: number } {
+export function parseCivitaiQuery(rawQuery: string): ParsedCivitaiQuery {
   const query = (rawQuery || "").trim();
   if (!query) return {};
 
-  // Check if pure integer
+  // 1. Raw numeric ID (e.g., "3193337")
   if (/^\d+$/.test(query)) {
     const num = parseInt(query, 10);
-    return { versionId: num, modelId: num };
+    return { versionId: num, modelId: num, isRawNumeric: true };
   }
 
-  try {
-    const urlObj = new URL(query);
-    const modelVersionParam = urlObj.searchParams.get("modelVersionId");
-    const parsedVersionParam = modelVersionParam ? parseInt(modelVersionParam, 10) : undefined;
+  // 2. Civitai AIR parser:
+  // Extract strictly the numeric digits located between '@' and '+' (or end of string/whitespace).
+  // Example: urn:air:minimaxh3:diffusionmodel:civitai:2830065@3193337+3074134 -> versionId: 3193337
+  if (query.includes("@")) {
+    const airVersionMatch = query.match(/@(\d+)(?:\+|[\s\b]|$)/);
+    const airModelMatch = query.match(/(?:civitai:|\/models\/|:|^)(\d+)@/i);
+    const versionId = airVersionMatch ? parseInt(airVersionMatch[1], 10) : undefined;
+    const modelId = airModelMatch ? parseInt(airModelMatch[1], 10) : undefined;
+    if (versionId) {
+      return { versionId, modelId, isAir: true };
+    }
+  }
 
-    // Check pathname patterns
-    // e.g. /models/12345 or /models/12345/slug-name
-    const modelsMatch = urlObj.pathname.match(/\/models\/(\d+)/i);
-    const modelId = modelsMatch ? parseInt(modelsMatch[1], 10) : undefined;
+  // 3. Civitai URL & standard query parser:
+  // Prioritize modelVersionId query parameter over parent model path
+  const versionParamMatch = query.match(/[?&]modelVersionId=(\d+)/i);
+  const versionParamId = versionParamMatch ? parseInt(versionParamMatch[1], 10) : undefined;
 
-    // e.g. /api/v1/model-versions/12345
-    const apiVersionMatch = urlObj.pathname.match(/\/model-versions\/(\d+)/i);
-    const apiVersionId = apiVersionMatch ? parseInt(apiVersionMatch[1], 10) : undefined;
+  // Check /model-versions/{id} in URL path
+  const versionPathMatch = query.match(/\/model-versions\/(\d+)/i);
+  const versionPathId = versionPathMatch ? parseInt(versionPathMatch[1], 10) : undefined;
 
-    // e.g. /api/v1/models/12345
-    const apiModelMatch = urlObj.pathname.match(/\/api\/v1\/models\/(\d+)/i);
-    const apiModelId = apiModelMatch ? parseInt(apiModelMatch[1], 10) : undefined;
+  // Check /models/{id} in URL path
+  const modelPathMatch = query.match(/\/models\/(\d+)/i);
+  const modelPathId = modelPathMatch ? parseInt(modelPathMatch[1], 10) : undefined;
 
+  // Check /api/v1/models/{id}
+  const apiModelMatch = query.match(/\/api\/v1\/models\/(\d+)/i);
+  const apiModelId = apiModelMatch ? parseInt(apiModelMatch[1], 10) : undefined;
+
+  const resolvedVersionId = versionParamId || versionPathId;
+  const resolvedModelId = modelPathId || apiModelId;
+
+  if (resolvedVersionId) {
     return {
-      modelId: modelId || apiModelId,
-      versionId: parsedVersionParam || apiVersionId
+      versionId: resolvedVersionId,
+      modelId: resolvedModelId
     };
-  } catch (e) {
-    // Regex fallback on non-standard URLs
-    const versionParamMatch = query.match(/modelVersionId=(\d+)/i);
-    if (versionParamMatch) {
-      return { versionId: parseInt(versionParamMatch[1], 10) };
-    }
-    const modelPathMatch = query.match(/\/models\/(\d+)/i);
-    if (modelPathMatch) {
-      return { modelId: parseInt(modelPathMatch[1], 10) };
-    }
+  }
+
+  if (resolvedModelId) {
+    return {
+      modelId: resolvedModelId
+    };
   }
 
   return {};
 }
 
 /**
- * Query Civitai API to fetch detailed model metadata
+ * Query Civitai API to fetch detailed model metadata, strictly prioritizing Model Version ID.
  */
 export async function fetchCivitaiModelInfo(
   query: string,
@@ -193,7 +214,7 @@ export async function fetchCivitaiModelInfo(
   const { modelId, versionId } = parseCivitaiQuery(query);
 
   if (!modelId && !versionId) {
-    throw new Error("Invalid Civitai query. Please enter a valid Civitai Model ID, Version ID, or Civitai URL.");
+    throw new Error("Invalid Civitai query. Please enter a valid Civitai Model Version ID, AIR URN, Model ID, or Civitai URL.");
   }
 
   const headers: Record<string, string> = {
@@ -207,7 +228,7 @@ export async function fetchCivitaiModelInfo(
   let versionData: any = null;
   let modelData: any = null;
 
-  // Case 1: Specific version ID identified
+  // Priority 1: Query Civitai Model Version endpoint for versionId / raw numeric / AIR / modelVersionId param
   if (versionId) {
     const versionUrl = `https://civitai.com/api/v1/model-versions/${versionId}`;
     try {
@@ -218,20 +239,20 @@ export async function fetchCivitaiModelInfo(
     } catch (e) {}
   }
 
-  // Case 2: Model ID identified or version lookup fell back
+  // Priority 2: If version endpoint failed (e.g. raw ID was a Model ID instead of Version ID, or model-only URL)
   if (!versionData && modelId) {
     const modelUrl = `https://civitai.com/api/v1/models/${modelId}`;
     const res = await fetch(modelUrl, { headers });
     if (!res.ok) {
       if (res.status === 404) {
-        throw new Error(`Civitai model not found (ID ${modelId}). Check the ID or ensure your Civitai API Token is configured for private/early-access models.`);
+        throw new Error(`Civitai model / version not found (ID ${versionId || modelId}). Check the ID or ensure your Civitai API Token is configured for private/early-access models.`);
       }
       throw new Error(`Civitai API error (HTTP ${res.status}): ${res.statusText}`);
     }
     modelData = await res.json();
   }
 
-  // If we fetched version data, also optionally fetch parent model data if name/type missing
+  // If we fetched version data, query parent model data to enrich metadata
   if (versionData && !modelData && versionData.modelId) {
     try {
       const modelRes = await fetch(`https://civitai.com/api/v1/models/${versionData.modelId}`, { headers });
@@ -254,6 +275,7 @@ export async function fetchCivitaiModelInfo(
     throw new Error("Could not retrieve model version metadata from Civitai API.");
   }
 
+  // Ensure response contains exact version title, files list, base model architecture, and authenticated download URL for that specific release
   const resolvedModelId = modelData?.id || versionData.modelId || modelId || 0;
   const resolvedModelName = modelData?.name || versionData.model?.name || versionData.name || "Untitled Model";
   const resolvedVersionId = versionData.id;
@@ -272,14 +294,14 @@ export async function fetchCivitaiModelInfo(
   const sizeKB = primaryFile?.sizeKB || 0;
   const fileSizeBytes = Math.round(sizeKB * 1024);
 
-  // Extract preview image
+  // Extract preview image from the exact version
   const images = versionData.images || modelData?.images || [];
   let previewImageUrl = "";
   if (images.length > 0) {
     previewImageUrl = images[0].url || "";
   }
 
-  // Formulate direct download URL
+  // Formulate direct authenticated download URL for that specific release
   let downloadUrl = versionData.downloadUrl || `https://civitai.com/api/download/models/${resolvedVersionId}`;
   if (token && !downloadUrl.includes("token=")) {
     const sep = downloadUrl.includes("?") ? "&" : "?";
@@ -311,7 +333,8 @@ export async function fetchCivitaiModelInfo(
     download_url: downloadUrl,
     default_destination_folder: defaultDestination,
     suggested_remote_path: suggestedRemotePath,
-    description: modelData?.description || versionData.description || "",
+    files,
+    description: versionData.description || modelData?.description || "",
     tags: modelData?.tags || [],
     allow_commercial_use: modelData?.allowCommercialUse,
     nsfw: modelData?.nsfw || versionData.images?.[0]?.nsfwLevel > 1,

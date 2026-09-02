@@ -60,38 +60,68 @@ def format_bytes(bytes_val: int) -> str:
     mb = bytes_val / (1024 * 1024)
     return f"{mb:.1f} MB"
 
-def parse_civitai_query(raw_query: str) -> Dict[str, Optional[int]]:
-    """Parse input string or URL to extract version ID and/or model ID."""
+def parse_civitai_query(raw_query: str) -> Dict[str, Any]:
+    """
+    Parse input string, AIR URN, or URL to extract version ID and/or model ID.
+    Strictly prioritizes Model Version ID across all input formats.
+    """
     query = (raw_query or "").strip()
     if not query:
         return {}
+
+    # 1. Pure integer ID (e.g. "3193337")
     if re.match(r"^\d+$", query):
         num = int(query)
-        return {"version_id": num, "model_id": num}
-    
-    # Check URL parameter modelVersionId=123
-    version_param_match = re.search(r"modelVersionId=(\d+)", query, re.IGNORECASE)
-    version_id = int(version_param_match.group(1)) if version_param_match else None
+        return {"version_id": num, "model_id": num, "is_raw_numeric": True}
 
-    # Check path matches
+    # 2. Civitai AIR parser:
+    # Extract strictly the numeric digits located between '@' and '+' (or end of string/whitespace).
+    # Example: urn:air:minimaxh3:diffusionmodel:civitai:2830065@3193337+3074134 -> version_id: 3193337
+    if "@" in query:
+        air_version_match = re.search(r"@(\d+)(?:\+|[\s\b]|$)", query)
+        air_model_match = re.search(r"(?:civitai:|\/models\/|:|^)(\d+)@", query, re.IGNORECASE)
+        version_id = int(air_version_match.group(1)) if air_version_match else None
+        model_id = int(air_model_match.group(1)) if air_model_match else None
+        if version_id:
+            return {"version_id": version_id, "model_id": model_id, "is_air": True}
+
+    # 3. Civitai URL & query parser:
+    # Prioritize modelVersionId query parameter over parent model path
+    version_param_match = re.search(r"[?&]modelVersionId=(\d+)", query, re.IGNORECASE)
+    version_param_id = int(version_param_match.group(1)) if version_param_match else None
+
+    # Check /model-versions/{id} in URL path
+    version_path_match = re.search(r"/model-versions/(\d+)", query, re.IGNORECASE)
+    version_path_id = int(version_path_match.group(1)) if version_path_match else None
+
+    # Check /models/{id} in URL path
     model_match = re.search(r"/models/(\d+)", query, re.IGNORECASE)
     model_id = int(model_match.group(1)) if model_match else None
 
-    version_path_match = re.search(r"/model-versions/(\d+)", query, re.IGNORECASE)
-    if version_path_match and not version_id:
-        version_id = int(version_path_match.group(1))
+    # Check /api/v1/models/{id}
+    api_model_match = re.search(r"/api/v1/models/(\d+)", query, re.IGNORECASE)
+    if api_model_match and not model_id:
+        model_id = int(api_model_match.group(1))
 
-    return {"model_id": model_id, "version_id": version_id}
+    resolved_version_id = version_param_id or version_path_id
+
+    if resolved_version_id:
+        return {"version_id": resolved_version_id, "model_id": model_id}
+
+    if model_id:
+        return {"model_id": model_id, "version_id": None}
+
+    return {}
 
 async def fetch_civitai_model_info(query: str, token_override: Optional[str] = None) -> Dict[str, Any]:
-    """Query Civitai API to fetch detailed model metadata."""
+    """Query Civitai API to fetch detailed model metadata, strictly prioritizing Model Version ID."""
     token = (token_override or get_stored_civitai_key()).strip()
     parsed = parse_civitai_query(query)
     model_id = parsed.get("model_id")
     version_id = parsed.get("version_id")
 
     if not model_id and not version_id:
-        raise ValueError("Invalid Civitai query. Please enter a valid Civitai Model ID, Version ID, or Civitai URL.")
+        raise ValueError("Invalid Civitai query. Please enter a valid Civitai Model Version ID, AIR URN, Model ID, or Civitai URL.")
 
     headers = {
         "Accept": "application/json",
@@ -104,7 +134,7 @@ async def fetch_civitai_model_info(query: str, token_override: Optional[str] = N
     model_data = None
 
     async with httpx.AsyncClient(timeout=15.0) as client:
-        # Case 1: Specific version ID identified
+        # Priority 1: Query Civitai Model Version endpoint for version_id / raw numeric / AIR / modelVersionId param
         if version_id:
             version_url = f"https://civitai.com/api/v1/model-versions/{version_id}"
             try:
@@ -114,17 +144,17 @@ async def fetch_civitai_model_info(query: str, token_override: Optional[str] = N
             except Exception:
                 pass
 
-        # Case 2: Model ID identified or version lookup fell back
+        # Priority 2: Fallback to Model ID endpoint if version lookup failed or model-only URL
         if not version_data and model_id:
             model_url = f"https://civitai.com/api/v1/models/{model_id}"
             res = await client.get(model_url, headers=headers)
             if res.status_code != 200:
                 if res.status_code == 404:
-                    raise ValueError(f"Civitai model not found (ID {model_id}). Ensure token is configured for early access/private models.")
+                    raise ValueError(f"Civitai model / version not found (ID {version_id or model_id}). Ensure token is configured for early access/private models.")
                 raise ValueError(f"Civitai API error (HTTP {res.status_code}): {res.text[:200]}")
             model_data = res.json()
 
-        # If we fetched version data, optionally fetch parent model data
+        # If we fetched version data, query parent model data to enrich metadata
         if version_data and not model_data and version_data.get("modelId"):
             try:
                 model_res = await client.get(f"https://civitai.com/api/v1/models/{version_data['modelId']}", headers=headers)
@@ -196,7 +226,8 @@ async def fetch_civitai_model_info(query: str, token_override: Optional[str] = N
         "download_url": download_url,
         "default_destination_folder": default_dest,
         "suggested_remote_path": suggested_remote_path,
-        "description": (model_data or {}).get("description") or version_data.get("description") or "",
+        "files": files,
+        "description": version_data.get("description") or (model_data or {}).get("description") or "",
         "tags": (model_data or {}).get("tags") or [],
         "allow_commercial_use": (model_data or {}).get("allowCommercialUse"),
         "nsfw": (model_data or {}).get("nsfw") or False,

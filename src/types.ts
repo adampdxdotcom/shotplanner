@@ -178,6 +178,7 @@ export interface CivitaiModelMetadata {
   download_url: string;
   default_destination_folder: string;
   suggested_remote_path: string;
+  files?: any[];
   description?: string;
   tags?: string[];
   allow_commercial_use?: boolean | string;

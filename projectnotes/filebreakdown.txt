@@ -912,6 +912,20 @@
 - **`backend/routes/__init__.py`**
   - Registered `settings_router`, `civitai_router`, and `model_hub_router` onto the main FastAPI `/api` application router.
 
+## Civitai Metadata Resolver & AIR Parser Version-First Architecture
+- **`server/services/civitaiService.ts` & `backend/services/civitai_service.py`**
+  - Updated `parseCivitaiQuery` (and `parse_civitai_query` in Python) to strictly prioritize Model Version ID across all input formats:
+    1. **Civitai AIR Parser**: Extracts strictly the numeric digits located between `@` and `+` (or end of string/whitespace) (e.g., `urn:air:minimaxh3:diffusionmodel:civitai:2830065@3193337+3074134` -> `version_id: 3193337`, `model_id: 2830065`), discarding trailing `+` suffixes and hash numbers.
+    2. **URL & Query Parser**: If a URL contains a `modelVersionId` query parameter (e.g. `?modelVersionId=3193337`), prioritizes that version ID over the parent model path.
+    3. **Raw Numeric ID**: Flags raw numeric IDs (e.g. `3193337`) so the resolver queries the Civitai Model Version endpoint (`https://civitai.com/api/v1/model-versions/{id}`) first.
+  - Updated `fetchCivitaiModelInfo` (and `fetch_civitai_model_info` in Python):
+    1. Queries `https://civitai.com/api/v1/model-versions/{modelVersionId}` first to ensure the response contains the exact version title, files list, base model architecture, and authenticated download URL for that specific release.
+    2. Enriches version metadata by querying the parent model endpoint (`https://civitai.com/api/v1/models/{modelId}`) for categories, commercial use permissions, tags, and all available version options.
+    3. Seamlessly falls back to the Model endpoint if a raw ID was a Model ID instead of a Version ID.
+- **`src/types.ts`**
+  - Added `files?: any[]` to `CivitaiModelMetadata` interface to carry the version's complete files list to the client.
+
+
 
 
 
