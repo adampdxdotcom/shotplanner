@@ -74,10 +74,12 @@ export interface StagedActorRecipeItem {
   id: string;
   characterName: string;
   cutoutDataUrl?: string;
+  originalCutoutDataUrl?: string;
+  maskDataUrl?: string;
   referenceAssetFilename?: string;
-  xPercent: number; // 0 to 100
-  yPercent: number; // 0 to 100
-  scale: number; // 0.2 to 2.5
+  xPercent: number; // unconstrained (supports negative space & off-canvas framing)
+  yPercent: number; // unconstrained (anchor at feet)
+  scale: number; // 0.20 to 3.50+
   isFlipped: boolean;
   zIndex: number;
   plane?: "foreground" | "midground" | "background";

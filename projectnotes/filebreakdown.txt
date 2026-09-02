@@ -1023,9 +1023,8 @@
 - **`src/components/cast/HeadshotGeneratorModal.tsx`**
   - **Role:** Backward-compatible wrapper delegating to `AiReferenceStagingStudioModal` with `initialTab="headshots"`.
 - **`src/components/CastSection.tsx`**
-  - **Updates:** Updated character card action buttons to directly launch `AiReferenceStagingStudioModal` with dedicated buttons:
-    - **"Headshots"** button (opens Studio in `#studio-tab-headshots`).
-    - **"Stage"** button (opens Studio in `#studio-tab-staging`).
+  - **Updates:** Consolidated separate "Headshots" and "Stage" action buttons into a unified **"Asset Generation"** button on each character card:
+    - Launches `AiReferenceStagingStudioModal` with active character context, enabling immediate access to both AI Headshots synthesis and 2D Scene Staging & Blocking workflows.
   - Passes full character profiles, assets, active scene name, and scene project context to ensure continuous data synchronization.
 - **`src/components/hub/PromptEngineeringPanel.tsx` & `src/components/hub/ShotMetadataPanel.tsx`**
   - **Updates:** Added `onOpenStagingStudio` prop and interactive trigger buttons (`"Staging Studio"` in Prompt Engineering header, `"Stage Shot"` in Shot Metadata header) to launch the studio in Staging mode directly from the Shot Planning workspace.

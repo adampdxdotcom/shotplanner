@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { MediaAsset, CharacterProfile, SceneProjectFile } from "../types";
-import { ChevronRight, Settings, Trash2, AlertTriangle, X, Users, Plus, Zap, Layers } from "lucide-react";
+import { ChevronRight, Settings, Trash2, AlertTriangle, X, Users, Plus, Sparkles } from "lucide-react";
 import { getAssetMediaUrl } from "../utils/assetUrl";
 import { toCanonicalSubjectName } from "../utils/subjectUtils";
 import { GalleryBulkUploadModal } from "./gallery/GalleryBulkUploadModal";
@@ -159,24 +159,11 @@ export const CastSection: React.FC<CastSectionProps> = ({
                             setStudioInitialTab("headshots");
                             setHeadshotModalSubject(subject);
                           }}
-                          className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-2 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer"
-                          title="Generate AI Headshots"
+                          className="bg-indigo-950/60 hover:bg-indigo-900/80 text-indigo-300 border border-indigo-800/60 px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer shadow-sm"
+                          title="Generate AI Assets, Headshots & Scene Staging"
                         >
-                          <Zap className="w-3.5 h-3.5 text-amber-400" />
-                          <span className="hidden sm:inline">Headshots</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setStudioInitialTab("staging");
-                            setHeadshotModalSubject(subject);
-                          }}
-                          className="bg-indigo-950/60 hover:bg-indigo-900/80 text-indigo-300 border border-indigo-800/60 px-2 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer"
-                          title="Scene Staging & Blocking"
-                        >
-                          <Layers className="w-3.5 h-3.5 text-indigo-400" />
-                          <span className="hidden sm:inline">Stage</span>
+                          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Asset Generation</span>
                         </button>
 
                         <button

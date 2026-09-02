@@ -4,10 +4,12 @@ export interface CompositeExportActor {
   id: string;
   characterName: string;
   cutoutDataUrl?: string;
+  originalCutoutDataUrl?: string;
+  maskDataUrl?: string;
   fallbackUrl?: string;
-  xPercent: number; // 0 to 100
-  yPercent: number; // 0 to 100
-  scale: number; // 0.2 to 2.5
+  xPercent: number; // unconstrained (supports negative space & off-canvas framing)
+  yPercent: number; // unconstrained (anchor at feet)
+  scale: number; // 0.20 to 3.50+
   isFlipped: boolean;
   zIndex: number;
 }
@@ -81,6 +83,13 @@ export async function renderCompositeToBlob(options: CompositeExportOptions): Pr
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
 
+  // Enforce strict stage frame clipping mask bounded to the exact stage frame (e.g. 16:9)
+  // so that any off-canvas actor or shadow bleed is cleanly cropped from the final exported reference asset.
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, width, height);
+  ctx.clip();
+
   // 1. Draw Background
   if (options.backgroundUrl) {
     try {
@@ -149,20 +158,43 @@ export async function renderCompositeToBlob(options: CompositeExportOptions): Pr
       ctx.fill();
       ctx.restore();
 
+      // If actor has a separate maskDataUrl and originalCutout was used, apply mask via destination-out
+      let actorDrawable: CanvasImageSource = actorImg;
+      if (actor.maskDataUrl && actor.originalCutoutDataUrl && actorSrc === actor.originalCutoutDataUrl) {
+        try {
+          const maskImg = await loadImage(actor.maskDataUrl);
+          const maskedCanvas = document.createElement("canvas");
+          maskedCanvas.width = actorImg.naturalWidth;
+          maskedCanvas.height = actorImg.naturalHeight;
+          const mCtx = maskedCanvas.getContext("2d");
+          if (mCtx) {
+            mCtx.drawImage(actorImg, 0, 0);
+            mCtx.globalCompositeOperation = "destination-out";
+            mCtx.drawImage(maskImg, 0, 0, actorImg.naturalWidth, actorImg.naturalHeight);
+            actorDrawable = maskedCanvas;
+          }
+        } catch (mErr) {
+          console.warn("Failed to apply maskDataUrl during composite export:", mErr);
+        }
+      }
+
       // Draw Actor Cutout with optional horizontal flip
       ctx.save();
       if (actor.isFlipped) {
         ctx.translate(footX, posY + actorHeight / 2);
         ctx.scale(-1, 1);
-        ctx.drawImage(actorImg, -actorWidth / 2, -actorHeight / 2, actorWidth, actorHeight);
+        ctx.drawImage(actorDrawable, -actorWidth / 2, -actorHeight / 2, actorWidth, actorHeight);
       } else {
-        ctx.drawImage(actorImg, posX, posY, actorWidth, actorHeight);
+        ctx.drawImage(actorDrawable, posX, posY, actorWidth, actorHeight);
       }
       ctx.restore();
     } catch (err) {
       console.warn(`Failed to render actor ${actor.characterName} in composite:`, err);
     }
   }
+
+  // Restore clipping context before converting to Blob
+  ctx.restore();
 
   // 4. Convert Canvas to PNG Blob
   return new Promise((resolve, reject) => {

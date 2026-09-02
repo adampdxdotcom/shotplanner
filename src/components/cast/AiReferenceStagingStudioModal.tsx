@@ -27,7 +27,9 @@ import {
   Loader2,
   FlipHorizontal,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  Compass,
+  Eraser
 } from "lucide-react";
 import { getAssetMediaUrl } from "../../utils/assetUrl";
 import { copyToClipboard } from "../../utils/clipboard";
@@ -304,6 +306,7 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
     }
   ]);
   const [selectedActorId, setSelectedActorId] = useState<string | null>("actor-hero-1");
+  const [activeMaskingActorId, setActiveMaskingActorId] = useState<string | null>(null);
   const [customBackgroundUrl, setCustomBackgroundUrl] = useState<string | undefined>(undefined);
   const [targetSlotIndex, setTargetSlotIndex] = useState<number>(8); // default to Slot 9 (index 8)
   const [isExportingComposite, setIsExportingComposite] = useState<boolean>(false);
@@ -359,7 +362,9 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
           facing: a.facing || "facing_camera",
           posture: a.posture || "Standing Heroic",
           referenceAssetFilename: a.referenceAssetFilename,
-          cutoutDataUrl: a.cutoutDataUrl
+          cutoutDataUrl: a.cutoutDataUrl,
+          originalCutoutDataUrl: a.originalCutoutDataUrl,
+          maskDataUrl: a.maskDataUrl
         }));
         setStagedActors(loaded);
         setSelectedActorId(loaded[0]?.id || null);
@@ -503,7 +508,7 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
   const handleUpdateActor = (id: string, updates: Partial<StagedActor>) => {
     setStagedActors(prev => prev.map(actor => {
       if (actor.id !== id) return actor;
-      const nextX = updates.xPercent !== undefined ? updates.xPercent : actor.xPercent;
+      const nextX = updates.xPercent !== undefined ? updates.xPercent : (updates.horizontalPercent !== undefined ? updates.horizontalPercent : actor.xPercent);
       const nextH = updates.horizontalPercent !== undefined ? updates.horizontalPercent : (updates.xPercent !== undefined ? Math.round(updates.xPercent) : actor.horizontalPercent);
       return {
         ...actor,
@@ -590,11 +595,13 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
         "with back toward camera";
       
       const posStr = 
+        actor.horizontalPercent < 0 ? "partially off-screen stage left" :
         actor.horizontalPercent <= 30 ? "stage left" :
         actor.horizontalPercent <= 45 ? "center-left" :
         actor.horizontalPercent <= 55 ? "center stage" :
         actor.horizontalPercent <= 70 ? "center-right" :
-        "stage right";
+        actor.horizontalPercent <= 100 ? "stage right" :
+        "partially off-screen stage right";
 
       return `${actor.characterName} positioned in ${actor.plane} (${posStr}), ${facingStr}, ${actor.posture.toLowerCase()}`;
     });
@@ -638,6 +645,8 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
         id: actor.id,
         characterName: actor.characterName,
         cutoutDataUrl: actor.cutoutDataUrl,
+        originalCutoutDataUrl: actor.originalCutoutDataUrl,
+        maskDataUrl: actor.maskDataUrl,
         fallbackUrl: actor.referenceAssetFilename ? getAssetMediaUrl(actor.referenceAssetFilename, true) : undefined,
         xPercent: actor.xPercent,
         yPercent: actor.yPercent,
@@ -698,6 +707,8 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
           id: a.id,
           characterName: a.characterName,
           cutoutDataUrl: a.cutoutDataUrl,
+          originalCutoutDataUrl: a.originalCutoutDataUrl,
+          maskDataUrl: a.maskDataUrl,
           referenceAssetFilename: a.referenceAssetFilename,
           xPercent: a.xPercent,
           yPercent: a.yPercent,
@@ -1272,6 +1283,8 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
                     aspectRatio={viewportRatio}
                     showGrid={showGrid}
                     showSafeAreas={showSafeAreas}
+                    activeMaskingActorId={activeMaskingActorId}
+                    onSetMaskingActorId={setActiveMaskingActorId}
                   />
                 </div>
 
@@ -1369,6 +1382,66 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
                         )}
                       </div>
 
+                      {/* Live In-Place Actor Mask / Eraser Brush Action */}
+                      <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-semibold text-zinc-300 flex items-center gap-1.5">
+                            <Eraser className="w-3.5 h-3.5 text-indigo-400" />
+                            Actor Layer Mask / Eraser
+                          </span>
+                          {stagedActors[selectedActorIndex].maskDataUrl && (
+                            <span className="text-[9px] font-semibold text-indigo-300 bg-indigo-950/80 border border-indigo-800/80 px-1.5 py-0.5 rounded">
+                              Masked
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-zinc-400">
+                          Erase pixels live on the canvas to tuck limbs or clothing behind desks, tables, or walls.
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const currActor = stagedActors[selectedActorIndex];
+                              if (activeMaskingActorId === currActor.id) {
+                                setActiveMaskingActorId(null);
+                              } else {
+                                setActiveMaskingActorId(currActor.id);
+                              }
+                            }}
+                            className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-sm ${
+                              activeMaskingActorId === stagedActors[selectedActorIndex].id
+                                ? "bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-400"
+                                : "bg-indigo-950/80 hover:bg-indigo-900 text-indigo-200 border border-indigo-700/60"
+                            }`}
+                          >
+                            <Eraser className="w-3.5 h-3.5" />
+                            <span>
+                              {activeMaskingActorId === stagedActors[selectedActorIndex].id
+                                ? "Done Masking"
+                                : "Erase / Mask on Stage"}
+                            </span>
+                          </button>
+                          {stagedActors[selectedActorIndex].maskDataUrl && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const currActor = stagedActors[selectedActorIndex];
+                                const orig = currActor.originalCutoutDataUrl || currActor.cutoutDataUrl;
+                                updateSelectedActor({
+                                  cutoutDataUrl: orig,
+                                  maskDataUrl: undefined
+                                });
+                              }}
+                              className="py-1.5 px-2.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-white bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 transition-colors cursor-pointer"
+                              title="Reset all mask modifications and restore the complete actor cutout"
+                            >
+                              Reset
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
                       {/* Depth Plane */}
                       <div>
                         <label className="block text-[11px] font-medium text-zinc-400 mb-1">Depth Plane</label>
@@ -1390,26 +1463,136 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
                         </div>
                       </div>
 
-                      {/* Horizontal Placement Slider */}
+                      {/* Depth Scale Factor Slider */}
                       <div>
                         <div className="flex items-center justify-between text-[11px] font-medium text-zinc-400 mb-1">
-                          <span>Stage Position (X-Axis)</span>
-                          <span className="font-mono text-zinc-300">{stagedActors[selectedActorIndex].horizontalPercent}%</span>
+                          <span>Depth Scale Factor (20% – 350%+)</span>
+                          <span className="font-mono text-zinc-200 font-semibold">
+                            {Math.round((stagedActors[selectedActorIndex].scale || 1.0) * 100)}% ({((stagedActors[selectedActorIndex].scale || 1.0)).toFixed(2)}x)
+                          </span>
                         </div>
                         <input
                           type="range"
-                          min="15"
-                          max="85"
-                          value={stagedActors[selectedActorIndex].horizontalPercent}
-                          onChange={(e) => updateSelectedActor({ horizontalPercent: Number(e.target.value) })}
+                          min="0.20"
+                          max="3.50"
+                          step="0.05"
+                          value={stagedActors[selectedActorIndex].scale || 1.0}
+                          onChange={(e) => updateSelectedActor({ scale: Number(e.target.value) })}
                           className="w-full accent-indigo-500 cursor-pointer"
                         />
-                        <div className="flex justify-between text-[9px] text-zinc-500 font-mono mt-0.5">
-                          <span>Stage Left (15%)</span>
-                          <span>Center (50%)</span>
-                          <span>Stage Right (85%)</span>
+                        <div className="flex justify-between gap-1 text-[9px] text-zinc-500 font-mono mt-1">
+                          {[
+                            { label: "50%", scale: 0.5 },
+                            { label: "100%", scale: 1.0 },
+                            { label: "150%", scale: 1.5 },
+                            { label: "225%", scale: 2.25 },
+                            { label: "350%", scale: 3.5 }
+                          ].map((preset) => (
+                            <button
+                              key={preset.label}
+                              type="button"
+                              onClick={() => updateSelectedActor({ scale: preset.scale })}
+                              className="px-1.5 py-0.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800 rounded transition-colors"
+                            >
+                              {preset.label}
+                            </button>
+                          ))}
                         </div>
                       </div>
+
+                      {/* Horizontal Placement Slider (Unconstrained Off-Canvas Framing) */}
+                      <div>
+                        <div className="flex items-center justify-between text-[11px] font-medium text-zinc-400 mb-1">
+                          <span>Stage Position (X-Axis)</span>
+                          <span className="font-mono text-zinc-300">
+                            {Math.round(stagedActors[selectedActorIndex].xPercent)}%
+                            {stagedActors[selectedActorIndex].xPercent < 0 ? (
+                              <span className="text-amber-400 text-[10px] ml-1">(Off-Stage Left)</span>
+                            ) : stagedActors[selectedActorIndex].xPercent > 100 ? (
+                              <span className="text-amber-400 text-[10px] ml-1">(Off-Stage Right)</span>
+                            ) : null}
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min="-40"
+                          max="140"
+                          step="1"
+                          value={Math.round(stagedActors[selectedActorIndex].xPercent)}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            updateSelectedActor({ xPercent: val, horizontalPercent: val });
+                          }}
+                          className="w-full accent-indigo-500 cursor-pointer"
+                        />
+                        <div className="flex justify-between gap-1 text-[9px] text-zinc-500 font-mono mt-1">
+                          {[
+                            { label: "Off-L (-20%)", val: -20 },
+                            { label: "Left (20%)", val: 20 },
+                            { label: "Center (50%)", val: 50 },
+                            { label: "Right (80%)", val: 80 },
+                            { label: "Off-R (120%)", val: 120 }
+                          ].map((preset) => (
+                            <button
+                              key={preset.label}
+                              type="button"
+                              onClick={() => updateSelectedActor({ xPercent: preset.val, horizontalPercent: preset.val })}
+                              className="px-1.5 py-0.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800 rounded transition-colors"
+                            >
+                              {preset.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Vertical Floor Anchor Slider */}
+                      <div>
+                        <div className="flex items-center justify-between text-[11px] font-medium text-zinc-400 mb-1">
+                          <span>Floor Anchor Depth (Y-Axis)</span>
+                          <span className="font-mono text-zinc-300">
+                            {Math.round(stagedActors[selectedActorIndex].yPercent)}%
+                            {stagedActors[selectedActorIndex].yPercent > 100 ? (
+                              <span className="text-amber-400 text-[10px] ml-1">(Bleed Bottom)</span>
+                            ) : null}
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min="-20"
+                          max="130"
+                          step="1"
+                          value={Math.round(stagedActors[selectedActorIndex].yPercent)}
+                          onChange={(e) => updateSelectedActor({ yPercent: Number(e.target.value) })}
+                          className="w-full accent-indigo-500 cursor-pointer"
+                        />
+                        <div className="flex justify-between gap-1 text-[9px] text-zinc-500 font-mono mt-1">
+                          {[
+                            { label: "Deep Bg (42%)", val: 42 },
+                            { label: "Mid (65%)", val: 65 },
+                            { label: "Fg (88%)", val: 88 },
+                            { label: "Bleed (115%)", val: 115 }
+                          ].map((preset) => (
+                            <button
+                              key={preset.label}
+                              type="button"
+                              onClick={() => updateSelectedActor({ yPercent: preset.val })}
+                              className="px-1.5 py-0.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800 rounded transition-colors"
+                            >
+                              {preset.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Quick Center on Stage Button */}
+                      <button
+                        type="button"
+                        onClick={() => updateSelectedActor({ xPercent: 50, horizontalPercent: 50, yPercent: 85, scale: 1.0 })}
+                        className="w-full py-1.5 text-xs text-indigo-300 hover:text-white bg-indigo-950/40 hover:bg-indigo-900/60 border border-indigo-800/50 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Compass className="w-3.5 h-3.5 text-indigo-400" />
+                        <span>Center on Stage (X: 50%, Y: 85%, Scale: 100%)</span>
+                      </button>
 
                       {/* Facing & Gaze Direction */}
                       <div>
