@@ -199,18 +199,25 @@ def generate_civitai_download_command(
     download_url: str,
     destination_folder: str,
     filename: str,
-    token: Optional[str] = None
+    token: Optional[str] = None,
+    remote_comfyui_root: Optional[str] = "/workspace/runpod-slim/ComfyUI"
 ) -> str:
-    """Synthesize pre-formatted remote CLI download command using aria2c with curl fallback."""
-    clean_dest = (destination_folder or "models/checkpoints/").strip().rstrip("/")
+    """Synthesize standardized remote CLI download command using curl exclusively."""
+    root = (remote_comfyui_root or "/workspace/runpod-slim/ComfyUI").rstrip("/")
+    dest = (destination_folder or "models/checkpoints/").strip()
+    if not dest.startswith("/"):
+        dest = f"{root}/{dest.lstrip('/')}"
+    clean_dest = dest.rstrip("/")
     clean_filename = (filename or "model.safetensors").strip()
-    clean_url = (download_url or "").strip()
     clean_token = (token or "").strip()
+    clean_url = (download_url or "").strip()
 
-    auth_aria = f'--header="Authorization: Bearer {clean_token}" ' if clean_token else ""
-    auth_curl = f'-H "Authorization: Bearer {clean_token}" ' if clean_token else ""
+    final_url = clean_url
+    if clean_token and "token=" not in final_url:
+        sep = "&" if "?" in final_url else "?"
+        final_url = f"{final_url}{sep}token={clean_token}"
 
-    return f'mkdir -p "{clean_dest}" && (aria2c -c -x 8 -s 8 -k 1M {auth_aria}-d "{clean_dest}" -o "{clean_filename}" "{clean_url}" || curl -L -C - --fail --retry 3 {auth_curl}-o "{clean_dest}/{clean_filename}" "{clean_url}")'
+    return f'mkdir -p "{clean_dest}" && curl -L -C - --fail --retry 3 --user-agent "Mozilla/5.0" -o "{clean_dest}/{clean_filename}" "{final_url}"'
 
 def parse_civitai_query(raw_query: str) -> Dict[str, Any]:
     """

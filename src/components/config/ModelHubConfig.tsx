@@ -158,6 +158,7 @@ export const ModelHubConfig: React.FC<ModelHubConfigProps> = ({
   const [hfTargetDest, setHfTargetDest] = useState<string>("models/diffusion_models/");
   const [hfTargetFilename, setHfTargetFilename] = useState<string>("");
   const [selectedHfFileUrl, setSelectedHfFileUrl] = useState<string>("");
+  const [copiedHfCmd, setCopiedHfCmd] = useState(false);
 
   // ==========================================
   // 4. DOWNLOAD EXECUTION STATE
@@ -426,15 +427,22 @@ export const ModelHubConfig: React.FC<ModelHubConfigProps> = ({
   const handleCopyCivitaiCommand = async () => {
     if (!civitaiMetadata) return;
 
-    const dest = (civitaiTargetDest || civitaiMetadata.default_destination_folder || "models/checkpoints/").trim().replace(/\/$/, "");
+    const comfyRoot = (config.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI").replace(/\/$/, "");
+    let dest = (civitaiTargetDest || civitaiMetadata.default_destination_folder || "models/checkpoints/").trim();
+    if (!dest.startsWith("/")) {
+      dest = `${comfyRoot}/${dest.replace(/^\//, "")}`;
+    }
+    const cleanDest = dest.replace(/\/$/, "");
     const filename = (civitaiTargetFilename || civitaiMetadata.filename || "model.safetensors").trim();
-    const downloadUrl = (civitaiMetadata.download_url || "").trim();
-    const token = civitaiKeyInput.trim();
+    const token = (config.civitai_api_key || civitaiKeyInput || "").trim();
+    let downloadUrl = (civitaiMetadata.download_url || "").trim();
 
-    const authAria = (token || civitaiConfigured) ? `--header="Authorization: Bearer ${token || '$CIVITAI_API_KEY'}" ` : "";
-    const authCurl = (token || civitaiConfigured) ? `-H "Authorization: Bearer ${token || '$CIVITAI_API_KEY'}" ` : "";
+    if (token && !downloadUrl.includes("token=")) {
+      const sep = downloadUrl.includes("?") ? "&" : "?";
+      downloadUrl = `${downloadUrl}${sep}token=${encodeURIComponent(token)}`;
+    }
 
-    const cmd = `mkdir -p "${dest}" && (aria2c -c -x 8 -s 8 -k 1M ${authAria}-d "${dest}" -o "${filename}" "${downloadUrl}" || curl -L -C - --fail --retry 3 ${authCurl}-o "${dest}/${filename}" "${downloadUrl}")`;
+    const cmd = `mkdir -p "${cleanDest}" && curl -L -C - --fail --retry 3 --user-agent "Mozilla/5.0" -o "${cleanDest}/${filename}" "${downloadUrl}"`;
 
     const success = await copyToClipboard(cmd);
     if (success) {
@@ -626,6 +634,37 @@ export const ModelHubConfig: React.FC<ModelHubConfigProps> = ({
 
     if (newPreset !== hfCategoryPreset) {
       handleHfCategoryChange(newPreset);
+    }
+  };
+
+  // Copy synthesized Hugging Face shell download command to clipboard
+  const handleCopyHfCommand = async () => {
+    if (!hfMetadata) return;
+
+    const comfyRoot = (config.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI").replace(/\/$/, "");
+    let dest = (hfTargetDest || hfMetadata.default_destination_folder || "models/diffusion_models/").trim();
+    if (!dest.startsWith("/")) {
+      dest = `${comfyRoot}/${dest.replace(/^\//, "")}`;
+    }
+    const cleanDest = dest.replace(/\/$/, "");
+    const filename = (hfTargetFilename || hfMetadata.filename || "model.safetensors").trim();
+    const downloadUrl = (selectedHfFileUrl || hfMetadata.download_url || "").trim();
+    const token = (config.huggingface_token || hfTokenInput || "").trim();
+
+    const authPart = (hfMetadata.is_gated && token) ? `-H "Authorization: Bearer ${token}" ` : "";
+    const cmd = `mkdir -p "${cleanDest}" && curl -L -C - --fail --retry 3 --user-agent "Mozilla/5.0" ${authPart}-o "${cleanDest}/${filename}" "${downloadUrl}"`;
+
+    const success = await copyToClipboard(cmd);
+    if (success) {
+      setCopiedHfCmd(true);
+      setTimeout(() => setCopiedHfCmd(false), 2000);
+      if (onShowToast) {
+        onShowToast("Download command copied to clipboard. Ready to paste in any remote terminal!", "success");
+      }
+    } else {
+      if (onShowToast) {
+        onShowToast("Failed to copy command to clipboard.", "error");
+      }
     }
   };
 
@@ -1066,32 +1105,53 @@ export const ModelHubConfig: React.FC<ModelHubConfigProps> = ({
                 </div>
               </div>
 
-              {/* Download CTA */}
+              {/* Download CTA & Actions */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
                 <div className="text-xs text-neutral-400">
                   <span>Method: </span>
-                  <span className="font-mono text-neutral-300">aria2c (multi-stream 8x) / curl fallback</span>
+                  <span className="font-mono text-neutral-300">curl (resumable stream)</span>
                 </div>
 
-                <button
-                  id="btn-download-hf-model"
-                  type="button"
-                  onClick={() => handleExecuteRemoteDownload("huggingface")}
-                  disabled={downloading || !config.remote_host}
-                  className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-xs disabled:opacity-50 transition-all shadow-md shrink-0"
-                >
-                  {downloading ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span>Ingesting Model ({downloadElapsed}s)...</span>
-                    </>
-                  ) : (
-                    <>
-                      <DownloadCloud className="w-4 h-4" />
-                      <span>Ingest to Remote ComfyUI</span>
-                    </>
-                  )}
-                </button>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    id="btn-copy-hf-command"
+                    type="button"
+                    onClick={handleCopyHfCommand}
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-neutral-200 hover:text-white font-semibold text-xs transition-all shadow-sm active:scale-95 cursor-pointer"
+                  >
+                    {copiedHfCmd ? (
+                      <>
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        <span className="text-emerald-300 font-bold">Command Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Terminal className="w-4 h-4 text-amber-400" />
+                        <span>Copy Download Command</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    id="btn-download-hf-model"
+                    type="button"
+                    onClick={() => handleExecuteRemoteDownload("huggingface")}
+                    disabled={downloading || !config.remote_host}
+                    className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-xs disabled:opacity-50 transition-all shadow-md shrink-0 active:scale-95 cursor-pointer"
+                  >
+                    {downloading ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>Ingesting Model ({downloadElapsed}s)...</span>
+                      </>
+                    ) : (
+                      <>
+                        <DownloadCloud className="w-4 h-4" />
+                        <span>Ingest to Remote ComfyUI</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -1468,7 +1528,7 @@ export const ModelHubConfig: React.FC<ModelHubConfigProps> = ({
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
                 <div className="text-xs text-neutral-400">
                   <span>Method: </span>
-                  <span className="font-mono text-neutral-300">aria2c (multi-stream 8x) / curl fallback</span>
+                  <span className="font-mono text-neutral-300">curl (resumable stream)</span>
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap">

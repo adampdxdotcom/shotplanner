@@ -188,9 +188,10 @@ async def execute_unified_remote_download(options: Dict[str, Any]) -> Dict[str, 
     safe_filename = filename.replace("'", "'\\''")
     safe_url = final_download_url.replace("'", "'\\''")
 
-    auth_header_aria = f'--header="Authorization: Bearer {resolved_token}"' if resolved_token else ""
-    auth_header_curl = f'-H "Authorization: Bearer {resolved_token}"' if resolved_token else ""
-    auth_header_wget = f'--header="Authorization: Bearer {resolved_token}"' if resolved_token else ""
+    # Authorization header: ONLY attach for Hugging Face gated downloads when token is present
+    # For Civitai, token is already present in URL query params (avoids Cloudflare/S3 redirect conflicts)
+    is_civitai = auth_type == "civitai" or "civitai.com" in lower_url
+    auth_header_curl = f'-H "Authorization: Bearer {resolved_token}" ' if (not is_civitai and resolved_token) else ""
 
     remote_script = f"""
 set -e
@@ -198,21 +199,9 @@ mkdir -p '{safe_dest_dir}'
 cd '{safe_dest_dir}'
 
 echo "[Model Hub] Target destination: {safe_dest_dir}/{safe_filename}"
-echo "[Model Hub] Downloading from: {safe_url}"
+echo "[Model Hub] Executing curl stream download..."
 
-if command -v aria2c >/dev/null 2>&1; then
-  echo "[Model Hub] Executing aria2c accelerated multi-stream download..."
-  aria2c -c -x 8 -s 8 -k 1M --allow-overwrite=true {auth_header_aria} -d '{safe_dest_dir}' -o '{safe_filename}' '{safe_url}'
-elif command -v curl >/dev/null 2>&1; then
-  echo "[Model Hub] Executing curl stream download with resume..."
-  curl -L -C - --fail --retry 3 {auth_header_curl} -o '{safe_dest_dir}/{safe_filename}' '{safe_url}'
-elif command -v wget >/dev/null 2>&1; then
-  echo "[Model Hub] Executing wget download..."
-  wget -c --tries=3 {auth_header_wget} -O '{safe_dest_dir}/{safe_filename}' '{safe_url}'
-else
-  echo "[Model Hub] Error: Neither aria2c, curl, nor wget is installed on remote instance." >&2
-  exit 1
-fi
+curl -L -C - --fail --retry 3 --user-agent "Mozilla/5.0" {auth_header_curl}-o '{safe_dest_dir}/{safe_filename}' '{safe_url}'
 
 if [ -f '{safe_dest_dir}/{safe_filename}' ]; then
   FILE_SIZE=$(ls -lh '{safe_dest_dir}/{safe_filename}' | awk '{{print $5}}')

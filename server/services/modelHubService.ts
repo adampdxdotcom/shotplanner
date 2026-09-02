@@ -255,32 +255,22 @@ export async function executeUnifiedRemoteDownload(
   const safeDestDir = cleanDestFolder.replace(/'/g, "'\\''");
   const safeFilename = filename.replace(/'/g, "'\\''");
   const safeUrl = finalDownloadUrl.replace(/'/g, "'\\''");
-  const authHeaderAria = resolvedToken ? `--header="Authorization: Bearer ${resolvedToken}"` : "";
-  const authHeaderCurl = resolvedToken ? `-H "Authorization: Bearer ${resolvedToken}"` : "";
-  const authHeaderWget = resolvedToken ? `--header="Authorization: Bearer ${resolvedToken}"` : "";
 
-  // Multi-connection accelerated download script with fallbacks
+  // Authorization header: ONLY attach for Hugging Face gated downloads when token is present
+  // For Civitai, token is already present in URL query params (avoids Cloudflare/S3 redirect conflicts)
+  const isCivitai = auth_type === "civitai" || lowerUrl.includes("civitai.com");
+  const authHeaderCurl = (!isCivitai && resolvedToken) ? `-H "Authorization: Bearer ${resolvedToken}" ` : "";
+
+  // Standardized remote download script using curl exclusively
   const remoteScript = `
 set -e
 mkdir -p '${safeDestDir}'
 cd '${safeDestDir}'
 
 echo "[Model Hub] Target destination: ${safeDestDir}/${safeFilename}"
-echo "[Model Hub] Downloading from: ${safeUrl}"
+echo "[Model Hub] Executing curl stream download..."
 
-if command -v aria2c >/dev/null 2>&1; then
-  echo "[Model Hub] Executing aria2c accelerated multi-stream download..."
-  aria2c -c -x 8 -s 8 -k 1M --allow-overwrite=true ${authHeaderAria} -d '${safeDestDir}' -o '${safeFilename}' '${safeUrl}'
-elif command -v curl >/dev/null 2>&1; then
-  echo "[Model Hub] Executing curl stream download with resume..."
-  curl -L -C - --fail --retry 3 ${authHeaderCurl} -o '${safeDestDir}/${safeFilename}' '${safeUrl}'
-elif command -v wget >/dev/null 2>&1; then
-  echo "[Model Hub] Executing wget download..."
-  wget -c --tries=3 ${authHeaderWget} -O '${safeDestDir}/${safeFilename}' '${safeUrl}'
-else
-  echo "[Model Hub] Error: Neither aria2c, curl, nor wget is installed on remote instance." >&2
-  exit 1
-fi
+curl -L -C - --fail --retry 3 --user-agent "Mozilla/5.0" ${authHeaderCurl}-o '${safeDestDir}/${safeFilename}' '${safeUrl}'
 
 if [ -f '${safeDestDir}/${safeFilename}' ]; then
   FILE_SIZE=$(ls -lh '${safeDestDir}/${safeFilename}' | awk '{print $5}')

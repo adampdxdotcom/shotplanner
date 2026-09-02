@@ -957,6 +957,47 @@
   - Integrated `CivitaiFavoritesTray` in place of the static "Popular" presets bar.
   - Added a prominent **"⭐ Favorite"** / **"★ Favorited"** toggle button directly on the Model Preview Card header with real-time UI synchronization and feedback toasts.
 
+## Configuration Workspace: Dedicated 3-Tab Architecture
+- **`src/components/ConfigSection.tsx`**
+  - Restructured the monolithic vertical configuration section into a clean, dedicated 3-tab workspace with an interactive top tab navigation bar (`#config-tab-bar`):
+    - **Tab 1: LLM Setup (`#config-tab-llm`, `#panel-llm-setup`)**:
+      - Houses provider selection tabs (LM Studio and Google Gemini) with dynamic connection state styling.
+      - LM Studio workspace: Local API endpoint URL input (`config.lm_studio_url`), dedicated connection tester (`handleTestLMStudio`), and "Set as Default LLM" / "★ Default LLM" configuration action and indicator.
+      - Google Gemini workspace: Embedded `GeminiConfig` component with API key configuration, secret masking, connection verification, and default LLM provider assignment.
+      - Resilient periodic background health checks for the active default LLM provider.
+    - **Tab 2: Remote Server (`#config-tab-remote`, `#panel-remote-server`)**:
+      - Grouped remote GPU SSH credentials (`RemoteGPUConfig`) with Host/IP, SSH port, username, and in-app SSH keypair generator card.
+      - Grouped remote ComfyUI root and input paths, remote API URL, and remote API token (`ComfyUIConfig`).
+      - Header actions for "Backend & Docker Code" viewer modal trigger (`onOpenCodeViewer`) and "Test Remote SSH" tester (`handleTestSSH`).
+      - Informational callout regarding SCP asset ingress and `/prompt` execution.
+      - Integrated expandable **Remote GPU SSH Key Setup & Configuration Guide** accordion (`RemoteSSHPrimerCard`) nested at the bottom.
+      - Attached `SSHKeypairModal` for public/private key download and clipboard copying.
+    - **Tab 3: Models (`#config-tab-models`, `#panel-models-hub`)**:
+      - Houses the unified Remote Model Ingestion Hub (`ModelHubConfig`).
+      - Civitai API key manager, Hugging Face optional token configuration.
+      - Civitai search/lookup tool with collapsible **⭐ Saved Favorites** tray.
+      - Hugging Face / Direct URL input with automated `/resolve/` conversion.
+      - Interactive model preview card with Target Model Category dropdown anchored to Remote ComfyUI Root Path.
+      - Remote SSH download triggers, "Copy Download Command" button, and live status progress.
+  - Maintains seamless reactive state bindings, change handlers, credential saves, and project auto-save dirty tracking across all tab transitions.
+  - Enforces a fixed, uniform width layout: uses a symmetric `grid grid-cols-1 sm:grid-cols-3` distribution across the top tab navigation bar (`#config-tab-bar`) and full-width container normalization (`w-full`) across all three tab panels to prevent layout shift or horizontal jumping between tabs.
+
+## Standardized Remote Model Downloads (curl Stream Ingestion)
+- **`server/services/civitaiService.ts` & `backend/services/civitai_service.py`**
+  - **`generateCivitaiDownloadCommand` / `generate_civitai_download_command`**: Standardized exclusively on `curl` for remote CLI download commands. Automatically resolves the destination directory to an absolute remote path by prepending the configured `remote_comfyui_root` (e.g., `/workspace/runpod-slim/ComfyUI/models/checkpoints/`).
+  - Command Structure: `mkdir -p "<absolute_target_dir>" && curl -L -C - --fail --retry 3 --user-agent "Mozilla/5.0" -o "<absolute_target_dir>/<filename>" "<download_url>"`.
+  - For Civitai, tokens are supplied strictly via URL query parameters (`?token=<token>`), preventing Authorization header forwarding issues when redirected to S3/Cloudflare storage buckets.
+  - **`executeRemoteModelDownload`**: Refactored the remote SSH execution script to run `curl` with auto-resume (`-C -`), redirect following (`-L`), retry on failure (`--retry 3`), fail on HTTP error (`--fail`), and browser user-agent (`--user-agent "Mozilla/5.0"`), removing deprecated `aria2c` and `wget` dependencies.
+- **`server/services/modelHubService.ts` & `backend/services/model_hub_service.py`**
+  - **`executeUnifiedRemoteDownload` / `execute_unified_remote_download`**: Updated the unified remote execution pipeline to execute using `curl` exclusively.
+  - For Hugging Face gated models, selectively attaches `-H "Authorization: Bearer <token>"` only when a token is explicitly configured. For Civitai models, excludes Authorization headers in favor of URL query parameters.
+- **`src/components/config/ModelHubConfig.tsx` & `src/components/config/CivitaiConfig.tsx`**
+  - Updated clipboard actions (`handleCopyCivitaiCommand`, `handleCopyCommand`, and added `handleCopyHfCommand`) to generate the standardized `curl` command with absolute remote paths.
+  - Added dedicated **"Copy Download Command"** action button to the Hugging Face ingestion panel matching the Civitai panel.
+  - Updated method labels from legacy aria2c references to `curl (resumable stream)`.
+
+
+
 
 
 

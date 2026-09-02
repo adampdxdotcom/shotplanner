@@ -12,13 +12,17 @@ import {
   Bot,
   Cpu,
   Sparkles,
-  Star
+  Star,
+  DownloadCloud,
+  Layers,
+  Terminal,
+  Key,
+  ShieldCheck
 } from "lucide-react";
 
 import { RemoteGPUConfig } from "./config/RemoteGPUConfig";
 import { ComfyUIConfig } from "./config/ComfyUIConfig";
 import { GeminiConfig, probeGeminiConnection } from "./config/GeminiConfig";
-import { CivitaiConfig } from "./config/CivitaiConfig";
 import { ModelHubConfig } from "./config/ModelHubConfig";
 import { SSHKeypairModal } from "./config/SSHKeypairModal";
 
@@ -73,6 +77,8 @@ export async function probeLMStudioConnection(url?: string): Promise<{ success: 
   }
 }
 
+export type ConfigTab = "llm" | "remote" | "models";
+
 interface ConfigSectionProps {
   config: AppConfig;
   onChange: (newConfig: AppConfig) => void;
@@ -94,6 +100,9 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({
   onShowToast,
   onOpenCodeViewer 
 }) => {
+  // Active Configuration Tab
+  const [activeTab, setActiveTab] = useState<ConfigTab>("llm");
+
   // Remote SSH Testing state
   const [testingSSH, setTestingSSH] = useState(false);
   const [testResult, setTestResult] = useState<{ success?: boolean; message?: string } | null>(null);
@@ -291,7 +300,6 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({
       }
       const data = await res.json();
       if (data.private_key && data.public_key) {
-        // Auto-populate into state/config
         handleInputChange("ssh_private_key", data.private_key);
         setGeneratedKeyPair(data);
         setShowPublicKeyModal(true);
@@ -326,227 +334,347 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({
   };
 
   return (
-    <div id="config-section" className="space-y-6">
-      {/* 1. LLM Connection Panel */}
-      <section className="bg-zinc-900/60 border-2 border-zinc-700 rounded-xl p-5 shadow-sm space-y-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
-          <div className="flex items-center gap-2.5">
-            <div className="p-1.5 rounded-md bg-purple-500/10 text-purple-400 border border-purple-500/20">
+    <div id="config-section" className="w-full space-y-6">
+      {/* Top 3-Tab Navigation Bar with Fixed Equal-Width Distribution */}
+      <div 
+        id="config-tab-bar"
+        className="w-full bg-zinc-900/90 border-2 border-zinc-700/80 rounded-xl p-1.5 shadow-sm backdrop-blur-xs"
+      >
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full">
+          {/* Tab 1: LLM Setup */}
+          <button
+            id="config-tab-llm"
+            type="button"
+            onClick={() => setActiveTab("llm")}
+            className={`w-full flex items-center gap-2.5 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all cursor-pointer justify-start ${
+              activeTab === "llm"
+                ? "bg-zinc-800 text-white border border-zinc-600 shadow-xs"
+                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850 border border-transparent"
+            }`}
+          >
+            <div className={`p-1 rounded-md shrink-0 ${
+              activeTab === "llm" 
+                ? "bg-purple-500/20 text-purple-300" 
+                : "bg-zinc-800/60 text-zinc-400"
+            }`}>
               <Bot className="w-4 h-4" />
             </div>
-            <div>
-              <h2 className="text-sm font-semibold text-zinc-100">LLM Connection</h2>
-              <p className="text-xs text-zinc-400">Select active LLM provider and configure prompt expansion settings.</p>
-            </div>
-          </div>
-
-          {/* Provider Selector Pill-Bar */}
-          <div className="flex items-center bg-zinc-950 p-1 rounded-xl border border-zinc-800 gap-1.5 self-start sm:self-auto">
-            <button
-              type="button"
-              onClick={() => handleProviderSelect("lm_studio")}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center gap-2 cursor-pointer ${
-                isLmStudioConnected
-                  ? activeProvider === "lm_studio"
-                    ? "bg-emerald-500/20 text-emerald-200 border-emerald-500/60 shadow-xs"
-                    : "bg-emerald-950/40 text-emerald-300 hover:text-emerald-100 hover:bg-emerald-900/50 border-emerald-700/60"
-                  : activeProvider === "lm_studio"
-                    ? "bg-amber-500/20 text-amber-200 border-amber-500/50 shadow-xs"
-                    : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 border-transparent"
-              }`}
-            >
-              <Cpu className={`w-3.5 h-3.5 transition-colors ${
-                isLmStudioConnected 
-                  ? "text-emerald-400" 
-                  : activeProvider === "lm_studio" 
-                    ? "text-amber-400" 
-                    : "text-zinc-400"
-              }`} />
-              <span>LM Studio</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleProviderSelect("gemini")}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center gap-2 cursor-pointer ${
-                isGeminiConnected
-                  ? activeProvider === "gemini"
-                    ? "bg-emerald-500/20 text-emerald-200 border-emerald-500/60 shadow-xs"
-                    : "bg-emerald-950/40 text-emerald-300 hover:text-emerald-100 hover:bg-emerald-900/50 border-emerald-700/60"
-                  : activeProvider === "gemini"
-                    ? "bg-purple-500/20 text-purple-200 border-purple-500/50 shadow-xs"
-                    : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 border-transparent"
-              }`}
-            >
-              <Sparkles className={`w-3.5 h-3.5 transition-colors ${
-                isGeminiConnected 
-                  ? "text-emerald-400" 
-                  : activeProvider === "gemini" 
-                    ? "text-purple-400" 
-                    : "text-zinc-400"
-              }`} />
-              <span>Gemini</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Contextual Configuration Body */}
-        {activeProvider === "lm_studio" ? (
-          <div className="space-y-3 max-w-xl">
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between gap-2">
-                <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
-                  <Cpu className="w-3.5 h-3.5 text-amber-400" />
-                  Local LM Studio API URL
-                </label>
-
-                {effectiveDefault === "lm_studio" ? (
-                  <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-300 bg-emerald-950/50 border border-emerald-700/50 px-2.5 py-1 rounded-lg shrink-0 shadow-xs">
-                    <Star className="w-3.5 h-3.5 fill-emerald-400 text-emerald-400" />
-                    ★ Default LLM
-                  </span>
+            <div className="text-left min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <span className="truncate">LLM Setup</span>
+                {effectiveDefault === "gemini" ? (
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${isGeminiConnected ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]" : "bg-purple-400"}`} />
                 ) : (
-                  <button
-                    type="button"
-                    onClick={handleSetDefaultLMStudio}
-                    disabled={testingLM}
-                    title="Set LM Studio as default LLM provider"
-                    className="px-2.5 py-1 text-xs font-medium bg-zinc-800 hover:bg-emerald-950/40 text-zinc-300 hover:text-emerald-300 border border-zinc-700 hover:border-emerald-600/50 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shrink-0 disabled:opacity-50"
-                  >
-                    <RefreshCw className={`w-3 h-3 ${testingLM ? "animate-spin text-emerald-400" : "hidden"}`} />
-                    <Star className={`w-3.5 h-3.5 text-zinc-400 hover:text-emerald-400 ${testingLM ? "hidden" : ""}`} />
-                    <span>{testingLM ? "Testing..." : "Set as Default LLM"}</span>
-                  </button>
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${isLmStudioConnected ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]" : "bg-amber-400"}`} />
                 )}
               </div>
-
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                <input
-                  type="text"
-                  placeholder="http://localhost:1234/v1"
-                  value={config.lm_studio_url || ""}
-                  onChange={(e) => handleInputChange("lm_studio_url", e.target.value)}
-                  className="flex-1 bg-zinc-950 border-2 border-zinc-700 focus:border-amber-500 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
-                />
-                <button
-                  type="button"
-                  onClick={handleTestLMStudio}
-                  disabled={testingLM}
-                  className="px-3.5 py-2 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-zinc-200 border border-zinc-700 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${testingLM ? "animate-spin text-amber-400" : ""}`} />
-                  <span>{testingLM ? "Testing..." : "Test Connection"}</span>
-                </button>
-              </div>
-              <p className="text-[10px] text-zinc-500">Local OpenAI-compatible endpoint hosted by LM Studio for offline LLM expansion.</p>
+              <span className="text-[10px] font-normal text-zinc-400 block -mt-0.5 truncate">
+                {activeProvider === "gemini" ? "Google Gemini" : "LM Studio Local"}
+              </span>
             </div>
+          </button>
 
-            {lmTestResult && (
-              <div className={`p-2.5 rounded-lg border text-xs flex items-center gap-2 ${
-                lmTestResult.success 
-                  ? "bg-emerald-950/30 border-emerald-800/40 text-emerald-300" 
-                  : "bg-red-950/30 border-red-800/40 text-red-300"
-              }`}>
-                {lmTestResult.success ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" /> : <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />}
-                <span className="font-medium">{lmTestResult.message}</span>
-              </div>
-            )}
-          </div>
-        ) : (
-          <GeminiConfig 
-            config={config}
-            onChange={onChange}
-            isDefault={effectiveDefault === "gemini"}
-            onSetDefault={() => onSetDefaultProvider && onSetDefaultProvider("gemini")}
-            onConnectionStatusChange={setIsGeminiConnected}
-            onShowToast={onShowToast}
-          />
-        )}
-      </section>
-
-      {/* 2. Remote Server Connection Panel */}
-      <section className="bg-zinc-900/60 border-2 border-zinc-700 rounded-xl p-5 shadow-sm space-y-6">
-        <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-          <div className="flex items-center gap-2.5">
-            <div className="p-1.5 rounded-md bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+          {/* Tab 2: Remote Server */}
+          <button
+            id="config-tab-remote"
+            type="button"
+            onClick={() => setActiveTab("remote")}
+            className={`w-full flex items-center gap-2.5 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all cursor-pointer justify-start ${
+              activeTab === "remote"
+                ? "bg-zinc-800 text-white border border-zinc-600 shadow-xs"
+                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850 border border-transparent"
+            }`}
+          >
+            <div className={`p-1 rounded-md shrink-0 ${
+              activeTab === "remote" 
+                ? "bg-indigo-500/20 text-indigo-300" 
+                : "bg-zinc-800/60 text-zinc-400"
+            }`}>
               <Server className="w-4 h-4" />
             </div>
-            <div>
-              <h2 className="text-sm font-semibold text-zinc-100">Remote Server Connection</h2>
-              <p className="text-xs text-zinc-400">Configure Remote GPU SSH connection credentials, ComfyUI root and input paths, and API endpoints.</p>
+            <div className="text-left min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <span className="truncate">Remote Server</span>
+                {config.remote_host ? (
+                  <span className="w-2 h-2 rounded-full shrink-0 bg-indigo-400" />
+                ) : null}
+              </div>
+              <span className="text-[10px] font-normal text-zinc-400 block -mt-0.5 truncate">
+                GPU SSH &amp; ComfyUI
+              </span>
             </div>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            {onOpenCodeViewer && (
+          </button>
+
+          {/* Tab 3: Models */}
+          <button
+            id="config-tab-models"
+            type="button"
+            onClick={() => setActiveTab("models")}
+            className={`w-full flex items-center gap-2.5 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all cursor-pointer justify-start ${
+              activeTab === "models"
+                ? "bg-zinc-800 text-white border border-zinc-600 shadow-xs"
+                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850 border border-transparent"
+            }`}
+          >
+            <div className={`p-1 rounded-md shrink-0 ${
+              activeTab === "models" 
+                ? "bg-blue-500/20 text-blue-300" 
+                : "bg-zinc-800/60 text-zinc-400"
+            }`}>
+              <DownloadCloud className="w-4 h-4" />
+            </div>
+            <div className="text-left min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <span className="truncate">Models</span>
+              </div>
+              <span className="text-[10px] font-normal text-zinc-400 block -mt-0.5 truncate">
+                Civitai &amp; Hugging Face
+              </span>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* TAB 1: LLM SETUP WORKSPACE */}
+      {/* ========================================================================= */}
+      {activeTab === "llm" && (
+        <section 
+          id="panel-llm-setup"
+          className="w-full bg-zinc-900/60 border-2 border-zinc-700 rounded-xl p-5 shadow-sm space-y-5"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 rounded-md bg-purple-500/10 text-purple-400 border border-purple-500/20 shrink-0">
+                <Bot className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-zinc-100">LLM Connection &amp; Provider Setup</h2>
+                <p className="text-xs text-zinc-400">Select active LLM provider, manage local endpoints or API credentials, and set defaults.</p>
+              </div>
+            </div>
+
+            {/* Provider Selector Pill-Bar */}
+            <div className="flex items-center bg-zinc-950 p-1 rounded-xl border border-zinc-800 gap-1.5 self-start sm:self-auto shrink-0">
               <button
-                onClick={onOpenCodeViewer}
-                className="px-3 py-1.5 text-xs font-medium text-zinc-300 bg-zinc-800 hover:bg-zinc-700 hover:text-white rounded-lg border border-zinc-700 transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
-                title="View Python FastAPI & Docker files"
+                type="button"
+                onClick={() => handleProviderSelect("lm_studio")}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center gap-2 cursor-pointer ${
+                  isLmStudioConnected
+                    ? activeProvider === "lm_studio"
+                      ? "bg-emerald-500/20 text-emerald-200 border-emerald-500/60 shadow-xs"
+                      : "bg-emerald-950/40 text-emerald-300 hover:text-emerald-100 hover:bg-emerald-900/50 border-emerald-700/60"
+                    : activeProvider === "lm_studio"
+                      ? "bg-amber-500/20 text-amber-200 border-amber-500/50 shadow-xs"
+                      : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 border-transparent"
+                }`}
               >
-                <FileCode2 className="w-3.5 h-3.5 text-indigo-400" />
-                <span>Backend &amp; Docker Code</span>
+                <Cpu className={`w-3.5 h-3.5 transition-colors ${
+                  isLmStudioConnected 
+                    ? "text-emerald-400" 
+                    : activeProvider === "lm_studio" 
+                      ? "text-amber-400" 
+                      : "text-zinc-400"
+                }`} />
+                <span>LM Studio</span>
               </button>
-            )}
-            <button
-              onClick={handleTestSSH}
-              disabled={testingSSH || !config.remote_host}
-              className="px-3 py-1.5 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-zinc-200 border border-zinc-700 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${testingSSH ? "animate-spin text-indigo-400" : ""}`} />
-              {testingSSH ? "Testing SSH..." : "Test Remote SSH"}
-            </button>
-          </div>
-        </div>
 
-        {testResult && (
-          <div className={`p-3 rounded-lg border text-xs flex items-start gap-2.5 ${
-            testResult.success 
-              ? "bg-emerald-950/30 border-emerald-800/40 text-emerald-300" 
-              : "bg-red-950/30 border-red-800/40 text-red-300"
-          }`}>
-            {testResult.success ? <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" /> : <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />}
-            <div>
-              <p className="font-medium">{testResult.success ? "SSH Connection Verified" : "SSH Connection Notice"}</p>
-              <p className="opacity-90 mt-0.5">{testResult.message}</p>
+              <button
+                type="button"
+                onClick={() => handleProviderSelect("gemini")}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center gap-2 cursor-pointer ${
+                  isGeminiConnected
+                    ? activeProvider === "gemini"
+                      ? "bg-emerald-500/20 text-emerald-200 border-emerald-500/60 shadow-xs"
+                      : "bg-emerald-950/40 text-emerald-300 hover:text-emerald-100 hover:bg-emerald-900/50 border-emerald-700/60"
+                    : activeProvider === "gemini"
+                      ? "bg-purple-500/20 text-purple-200 border-purple-500/50 shadow-xs"
+                      : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 border-transparent"
+                }`}
+              >
+                <Sparkles className={`w-3.5 h-3.5 transition-colors ${
+                  isGeminiConnected 
+                    ? "text-emerald-400" 
+                    : activeProvider === "gemini" 
+                      ? "text-purple-400" 
+                      : "text-zinc-400"
+                }`} />
+                <span>Google Gemini</span>
+              </button>
             </div>
           </div>
-        )}
 
-        {/* SSH Connection Credentials */}
-        <RemoteGPUConfig 
-          config={config}
-          handleInputChange={handleInputChange}
-          handleGenerateKeyPair={handleGenerateKeyPair}
-          isGeneratingKeyPair={isGeneratingKeyPair}
-          generatedKeyPair={generatedKeyPair}
-        />
+          {/* Contextual Configuration Body */}
+          {activeProvider === "lm_studio" ? (
+            <div className="space-y-4 w-full">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
+                    <Cpu className="w-3.5 h-3.5 text-amber-400" />
+                    Local LM Studio API URL
+                  </label>
 
-        {/* Remote ComfyUI Paths & Endpoints */}
-        <ComfyUIConfig 
-          config={config}
-          handleInputChange={handleInputChange}
-          onShowToast={onShowToast}
-        />
+                  {effectiveDefault === "lm_studio" ? (
+                    <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-300 bg-emerald-950/50 border border-emerald-700/50 px-2.5 py-1 rounded-lg shrink-0 shadow-xs">
+                      <Star className="w-3.5 h-3.5 fill-emerald-400 text-emerald-400" />
+                      ★ Default LLM
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleSetDefaultLMStudio}
+                      disabled={testingLM}
+                      title="Set LM Studio as default LLM provider"
+                      className="px-2.5 py-1 text-xs font-medium bg-zinc-800 hover:bg-emerald-950/40 text-zinc-300 hover:text-emerald-300 border border-zinc-700 hover:border-emerald-600/50 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shrink-0 disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${testingLM ? "animate-spin text-emerald-400" : "hidden"}`} />
+                      <Star className={`w-3.5 h-3.5 text-zinc-400 hover:text-emerald-400 ${testingLM ? "hidden" : ""}`} />
+                      <span>{testingLM ? "Testing..." : "Set as Default LLM"}</span>
+                    </button>
+                  )}
+                </div>
 
-        {/* Informational Callout */}
-        <div className="text-[11px] text-zinc-400 bg-zinc-950/40 p-3 rounded-lg border-2 border-zinc-700/60 flex items-center gap-2">
-          <Info className="w-4 h-4 text-zinc-400 shrink-0" />
-          <span>During execution, media assets are pushed via Paramiko SCP into <code className="text-zinc-200 bg-zinc-800 px-1 py-0.5 rounded">{config.remote_comfyui_root ? `${config.remote_comfyui_root.replace(/\/$/, '')}/input/` : "/workspace/remote-slim/ComfyUI/input/"}</code>, and modified JSON graphs are submitted to <code className="text-zinc-200 bg-zinc-800 px-1 py-0.5 rounded">/prompt</code>.</span>
-        </div>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="http://localhost:1234/v1"
+                    value={config.lm_studio_url || ""}
+                    onChange={(e) => handleInputChange("lm_studio_url", e.target.value)}
+                    className="flex-1 bg-zinc-950 border-2 border-zinc-700 focus:border-amber-500 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleTestLMStudio}
+                    disabled={testingLM}
+                    className="px-3.5 py-2 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-zinc-200 border border-zinc-700 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${testingLM ? "animate-spin text-amber-400" : ""}`} />
+                    <span>{testingLM ? "Testing..." : "Test Connection"}</span>
+                  </button>
+                </div>
+                <p className="text-[11px] text-zinc-500">Local OpenAI-compatible endpoint hosted by LM Studio for offline LLM expansion and scene planning.</p>
+              </div>
 
-        {/* Expandable Guide Accordion nested at bottom (Disabled) */}
-        {/* <div id="remote-ssh-guide" className="pt-2 border-t border-zinc-800">
-          <RemoteSSHPrimerCard publicKey={generatedKeyPair?.public_key || config.ssh_public_key || undefined} />
-        </div> */}
-      </section>
+              {lmTestResult && (
+                <div className={`p-3 rounded-lg border text-xs flex items-center gap-2.5 ${
+                  lmTestResult.success 
+                    ? "bg-emerald-950/30 border-emerald-800/40 text-emerald-300" 
+                    : "bg-red-950/30 border-red-800/40 text-red-300"
+                }`}>
+                  {lmTestResult.success ? <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" /> : <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />}
+                  <span className="font-medium">{lmTestResult.message}</span>
+                </div>
+              )}
+            </div>
+          ) : (
+            <GeminiConfig 
+              config={config}
+              onChange={onChange}
+              isDefault={effectiveDefault === "gemini"}
+              onSetDefault={() => onSetDefaultProvider && onSetDefaultProvider("gemini")}
+              onConnectionStatusChange={setIsGeminiConnected}
+              onShowToast={onShowToast}
+            />
+          )}
+        </section>
+      )}
 
-      {/* 3. Remote Model Ingestion Hub (Civitai & Hugging Face / Direct URL) */}
-      <ModelHubConfig 
-        config={config} 
-        onChange={onChange} 
-        onShowToast={onShowToast} 
-      />
+      {/* ========================================================================= */}
+      {/* TAB 2: REMOTE SERVER CONNECTION PANEL */}
+      {/* ========================================================================= */}
+      {activeTab === "remote" && (
+        <section 
+          id="panel-remote-server"
+          className="w-full bg-zinc-900/60 border-2 border-zinc-700 rounded-xl p-5 shadow-sm space-y-6"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 rounded-md bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 shrink-0">
+                <Server className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-zinc-100">Remote Server &amp; GPU Orchestration</h2>
+                <p className="text-xs text-zinc-400">Configure Remote GPU SSH credentials, ComfyUI root and input paths, and API endpoints.</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+              {onOpenCodeViewer && (
+                <button
+                  onClick={onOpenCodeViewer}
+                  className="px-3 py-1.5 text-xs font-medium text-zinc-300 bg-zinc-800 hover:bg-zinc-700 hover:text-white rounded-lg border border-zinc-700 transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
+                  title="View Python FastAPI & Docker files"
+                >
+                  <FileCode2 className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Backend &amp; Docker Code</span>
+                </button>
+              )}
+              <button
+                onClick={handleTestSSH}
+                disabled={testingSSH || !config.remote_host}
+                className="px-3 py-1.5 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-zinc-200 border border-zinc-700 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${testingSSH ? "animate-spin text-indigo-400" : ""}`} />
+                {testingSSH ? "Testing SSH..." : "Test Remote SSH"}
+              </button>
+            </div>
+          </div>
+
+          {testResult && (
+            <div className={`p-3 rounded-lg border text-xs flex items-start gap-2.5 ${
+              testResult.success 
+                ? "bg-emerald-950/30 border-emerald-800/40 text-emerald-300" 
+                : "bg-red-950/30 border-red-800/40 text-red-300"
+            }`}>
+              {testResult.success ? <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" /> : <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />}
+              <div>
+                <p className="font-medium">{testResult.success ? "SSH Connection Verified" : "SSH Connection Notice"}</p>
+                <p className="opacity-90 mt-0.5">{testResult.message}</p>
+              </div>
+            </div>
+          )}
+
+          {/* SSH Connection Credentials */}
+          <RemoteGPUConfig 
+            config={config}
+            handleInputChange={handleInputChange}
+            handleGenerateKeyPair={handleGenerateKeyPair}
+            isGeneratingKeyPair={isGeneratingKeyPair}
+            generatedKeyPair={generatedKeyPair}
+          />
+
+          {/* Remote ComfyUI Paths & Endpoints */}
+          <ComfyUIConfig 
+            config={config}
+            handleInputChange={handleInputChange}
+            onShowToast={onShowToast}
+          />
+
+          {/* Informational Callout */}
+          <div className="text-[11px] text-zinc-400 bg-zinc-950/40 p-3.5 rounded-lg border-2 border-zinc-700/60 flex items-center gap-2.5">
+            <Info className="w-4 h-4 text-indigo-400 shrink-0" />
+            <span>During execution, media assets are pushed via Paramiko SCP into <code className="text-zinc-200 bg-zinc-800 px-1.5 py-0.5 rounded font-mono">{config.remote_comfyui_root ? `${config.remote_comfyui_root.replace(/\/$/, '')}/input/` : "/workspace/remote-slim/ComfyUI/input/"}</code>, and modified JSON graphs are submitted to <code className="text-zinc-200 bg-zinc-800 px-1.5 py-0.5 rounded font-mono">/prompt</code>.</span>
+          </div>
+
+          {/* Expandable Guide Accordion nested at bottom */}
+          <div id="remote-ssh-guide" className="pt-3 border-t border-zinc-800">
+            <RemoteSSHPrimerCard publicKey={generatedKeyPair?.public_key || config.ssh_public_key || undefined} />
+          </div>
+        </section>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 3: MODELS INGESTION HUB */}
+      {/* ========================================================================= */}
+      {activeTab === "models" && (
+        <section id="panel-models-hub" className="w-full">
+          <ModelHubConfig 
+            config={config} 
+            onChange={onChange} 
+            onShowToast={onShowToast} 
+          />
+        </section>
+      )}
 
       {/* SSH Keypair Modal */}
       <SSHKeypairModal 
@@ -560,4 +688,5 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({
     </div>
   );
 };
+
 

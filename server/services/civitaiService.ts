@@ -298,23 +298,32 @@ export function cleanHtmlDescription(rawHtml?: string): string {
 }
 
 /**
- * Synthesize pre-formatted remote CLI download command using aria2c with curl fallback
+ * Synthesize pre-formatted remote CLI download command using curl exclusively.
+ * Ensures absolute destination path and query-parameter based token authentication without extra Authorization headers.
  */
 export function generateCivitaiDownloadCommand(
   downloadUrl: string,
   destinationFolder: string,
   filename: string,
-  token?: string
+  token?: string,
+  remoteComfyuiRoot: string = "/workspace/runpod-slim/ComfyUI"
 ): string {
-  const cleanDest = (destinationFolder || "models/checkpoints/").trim().replace(/\/$/, "");
+  const root = (remoteComfyuiRoot || "/workspace/runpod-slim/ComfyUI").replace(/\/$/, "");
+  let dest = (destinationFolder || "models/checkpoints/").trim();
+  if (!dest.startsWith("/")) {
+    dest = `${root}/${dest.replace(/^\//, "")}`;
+  }
+  const cleanDest = dest.replace(/\/$/, "");
   const cleanFilename = (filename || "model.safetensors").trim();
-  const cleanUrl = (downloadUrl || "").trim();
   const cleanToken = (token || "").trim();
+  let cleanUrl = (downloadUrl || "").trim();
 
-  const authAria = cleanToken ? `--header="Authorization: Bearer ${cleanToken}" ` : "";
-  const authCurl = cleanToken ? `-H "Authorization: Bearer ${cleanToken}" ` : "";
+  if (cleanToken && !cleanUrl.includes("token=")) {
+    const sep = cleanUrl.includes("?") ? "&" : "?";
+    cleanUrl = `${cleanUrl}${sep}token=${encodeURIComponent(cleanToken)}`;
+  }
 
-  return `mkdir -p "${cleanDest}" && (aria2c -c -x 8 -s 8 -k 1M ${authAria}-d "${cleanDest}" -o "${cleanFilename}" "${cleanUrl}" || curl -L -C - --fail --retry 3 ${authCurl}-o "${cleanDest}/${cleanFilename}" "${cleanUrl}")`;
+  return `mkdir -p "${cleanDest}" && curl -L -C - --fail --retry 3 --user-agent "Mozilla/5.0" -o "${cleanDest}/${cleanFilename}" "${cleanUrl}"`;
 }
 
 export interface ParsedCivitaiQuery {
@@ -700,31 +709,17 @@ export async function executeRemoteModelDownload(
   const safeDestDir = cleanDestFolder.replace(/'/g, "'\\''");
   const safeFilename = filename.replace(/'/g, "'\\''");
   const safeUrl = finalDownloadUrl.replace(/'/g, "'\\''");
-  const authHeaderParam = token ? `--header="Authorization: Bearer ${token}"` : "";
-  const authHeaderCurl = token ? `-H "Authorization: Bearer ${token}"` : "";
-  const authHeaderWget = token ? `--header="Authorization: Bearer ${token}"` : "";
 
-  // Script with fallback from aria2c -> curl -> wget
+  // Standardized remote download script using curl exclusively
   const remoteScript = `
 set -e
 mkdir -p '${safeDestDir}'
 cd '${safeDestDir}'
 
 echo "[Civitai Remote] Target destination: ${safeDestDir}/${safeFilename}"
+echo "[Civitai Remote] Executing curl stream download..."
 
-if command -v aria2c >/dev/null 2>&1; then
-  echo "[Civitai Remote] Executing aria2c accelerated multi-stream download..."
-  aria2c -c -x 8 -s 8 -k 1M --allow-overwrite=true ${authHeaderParam} -d '${safeDestDir}' -o '${safeFilename}' '${safeUrl}'
-elif command -v curl >/dev/null 2>&1; then
-  echo "[Civitai Remote] Executing curl stream download with resume..."
-  curl -L -C - --fail --retry 3 ${authHeaderCurl} -o '${safeDestDir}/${safeFilename}' '${safeUrl}'
-elif command -v wget >/dev/null 2>&1; then
-  echo "[Civitai Remote] Executing wget download..."
-  wget -c --tries=3 ${authHeaderWget} -O '${safeDestDir}/${safeFilename}' '${safeUrl}'
-else
-  echo "[Civitai Remote] Error: Neither aria2c, curl, nor wget is installed on the remote machine." >&2
-  exit 1
-fi
+curl -L -C - --fail --retry 3 --user-agent "Mozilla/5.0" -o '${safeDestDir}/${safeFilename}' '${safeUrl}'
 
 if [ -f '${safeDestDir}/${safeFilename}' ]; then
   FILE_SIZE=$(ls -lh '${safeDestDir}/${safeFilename}' | awk '{print $5}')

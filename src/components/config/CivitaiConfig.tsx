@@ -293,15 +293,22 @@ export const CivitaiConfig: React.FC<CivitaiConfigProps> = ({
   const handleCopyCommand = async () => {
     if (!modelMetadata) return;
 
-    const dest = (targetDestination || modelMetadata.default_destination_folder || "models/checkpoints/").trim().replace(/\/$/, "");
+    const comfyRoot = (config.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI").replace(/\/$/, "");
+    let dest = (targetDestination || modelMetadata.default_destination_folder || "models/checkpoints/").trim();
+    if (!dest.startsWith("/")) {
+      dest = `${comfyRoot}/${dest.replace(/^\//, "")}`;
+    }
+    const cleanDest = dest.replace(/\/$/, "");
     const filename = (targetFilename || modelMetadata.filename || "model.safetensors").trim();
-    const downloadUrl = (modelMetadata.download_url || "").trim();
     const token = (config.civitai_api_key || apiKeyInput || "").trim();
+    let finalUrl = (modelMetadata.download_url || "").trim();
 
-    const authAria = (token || isConfigured) ? `--header="Authorization: Bearer ${token || '$CIVITAI_API_KEY'}" ` : "";
-    const authCurl = (token || isConfigured) ? `-H "Authorization: Bearer ${token || '$CIVITAI_API_KEY'}" ` : "";
+    if (token && !finalUrl.includes("token=")) {
+      const sep = finalUrl.includes("?") ? "&" : "?";
+      finalUrl = `${finalUrl}${sep}token=${encodeURIComponent(token)}`;
+    }
 
-    const cmd = `mkdir -p "${dest}" && (aria2c -c -x 8 -s 8 -k 1M ${authAria}-d "${dest}" -o "${filename}" "${downloadUrl}" || curl -L -C - --fail --retry 3 ${authCurl}-o "${dest}/${filename}" "${downloadUrl}")`;
+    const cmd = `mkdir -p "${cleanDest}" && curl -L -C - --fail --retry 3 --user-agent "Mozilla/5.0" -o "${cleanDest}/${filename}" "${finalUrl}"`;
 
     const success = await copyToClipboard(cmd);
     if (success) {
@@ -815,7 +822,7 @@ export const CivitaiConfig: React.FC<CivitaiConfigProps> = ({
                   <div className="bg-cyan-400 h-full w-full animate-pulse"></div>
                 </div>
                 <p className="text-[10px] text-cyan-400/80">
-                  Using high-speed multi-connection stream (aria2c / curl resume). The model will be placed directly into your ComfyUI models folder.
+                  Using high-speed curl stream with automatic redirect following and resume. The model will be placed directly into your ComfyUI models folder.
                 </p>
               </div>
             )}
