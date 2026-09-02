@@ -1,19 +1,21 @@
 import React from "react";
 import { ShotItem } from "../../types";
 import { generateSaveVideoPrefix } from "../../types";
-import { Film, Hash, Camera, Move, Aperture, RectangleHorizontal } from "lucide-react";
+import { Film, Hash, Camera, Move, Aperture, RectangleHorizontal, Layers } from "lucide-react";
 import { TakeSelector } from "../TakeSelector";
 
 interface ShotMetadataPanelProps {
   activeShot: ShotItem;
   onSetHeroTake: (takeId: string) => void;
   onReviewTake: (takeId: string | null) => void;
+  onOpenStagingStudio?: () => void;
 }
 
 export const ShotMetadataPanel: React.FC<ShotMetadataPanelProps> = ({
   activeShot,
   onSetHeroTake,
-  onReviewTake
+  onReviewTake,
+  onOpenStagingStudio
 }) => {
   return (
     <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-5 shadow-sm">
@@ -28,6 +30,17 @@ export const ShotMetadataPanel: React.FC<ShotMetadataPanelProps> = ({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {onOpenStagingStudio && (
+            <button
+              type="button"
+              onClick={onOpenStagingStudio}
+              className="px-2.5 py-1 bg-indigo-950/70 hover:bg-indigo-900/90 border border-indigo-800/70 text-indigo-300 hover:text-white text-xs font-semibold rounded-md flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+              title="Open AI Reference & Staging Studio"
+            >
+              <Layers className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Stage Shot</span>
+            </button>
+          )}
           <span className="px-2.5 py-1 bg-zinc-950/80 border border-zinc-800 text-xs text-zinc-400 font-mono rounded-md shadow-inner">
             {generateSaveVideoPrefix(activeShot.shot_name || "", activeShot.shot_number)}
           </span>

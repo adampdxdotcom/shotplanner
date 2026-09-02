@@ -5,6 +5,7 @@ import { SubjectCombobox } from "./SubjectCombobox";
 import { getAssetMediaUrl } from "../utils/assetUrl";
 import { 
   ASSET_REFERENCE_MODIFIERS, 
+  getModifierConfig,
   updateDescriptionWithModifier, 
   detectActiveModifier 
 } from "../utils/assetModifiers";
@@ -95,7 +96,7 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
     return assetType;
   }, [assetType, customType]);
 
-  const modifierConfig = useMemo(() => ASSET_REFERENCE_MODIFIERS[effectiveType] || ASSET_REFERENCE_MODIFIERS[assetType], [effectiveType, assetType]);
+  const modifierConfig = useMemo(() => getModifierConfig(effectiveType) || getModifierConfig(assetType), [effectiveType, assetType]);
 
   const handleModifierChange = (modValue: string) => {
     setSelectedModifier(modValue);

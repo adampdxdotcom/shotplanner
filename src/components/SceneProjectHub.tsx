@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { SceneProjectFile, ShotItem, MediaAsset, AppConfig } from "../types";
 import { TakeReviewModal } from "./TakeReviewModal";
 import { UploadCloud } from "lucide-react";
@@ -7,6 +7,7 @@ import { ShotCarousel } from "./hub/ShotCarousel";
 import { ShotMetadataPanel } from "./hub/ShotMetadataPanel";
 import { AssetMatrixPanel } from "./hub/AssetMatrixPanel";
 import { PromptEngineeringPanel } from "./hub/PromptEngineeringPanel";
+import { AiReferenceStagingStudioModal } from "./cast/AiReferenceStagingStudioModal";
 
 interface Props {
   project: SceneProjectFile;
@@ -19,6 +20,7 @@ interface Props {
   onTransfer: (shot: ShotItem) => Promise<boolean>;
   onTransferScene: () => Promise<boolean>;
   onExpandPrompt: (shot: ShotItem) => Promise<string>;
+  onAssetUploaded?: (asset: MediaAsset, targetSlotIndex?: number) => void;
 }
 
 export default function SceneProjectHub({
@@ -31,15 +33,35 @@ export default function SceneProjectHub({
   onShowToast,
   onTransfer,
   onTransferScene,
-  onExpandPrompt
+  onExpandPrompt,
+  onAssetUploaded
 }: Props) {
   const [isExpanding, setIsExpanding] = useState(false);
   const [isTransferring, setIsTransferring] = useState(false);
   const [reviewTakeId, setReviewTakeId] = useState<string | null>(null);
   const [isTransferringScene, setIsTransferringScene] = useState(false);
+  const [isStagingStudioOpen, setIsStagingStudioOpen] = useState(false);
+  const [stagingStudioTab, setStagingStudioTab] = useState<"headshots" | "staging">("staging");
 
   const activeShotIndex = project.shots.findIndex((s) => s.id === activeShotId);
   const activeShot = project.shots[activeShotIndex];
+
+  // Derive active character context for the active shot
+  const currentShotSubject = useMemo(() => {
+    if (!activeShot) return Object.keys(project.characters || {})[0] || "";
+    if (activeShot.ots_focus_subject) return activeShot.ots_focus_subject;
+    if (activeShot.ots_anchor_subject) return activeShot.ots_anchor_subject;
+    if (activeShot.assigned_slots) {
+      for (const slotKey of Object.keys(activeShot.assigned_slots)) {
+        const val = activeShot.assigned_slots[Number(slotKey)];
+        if (val) {
+          const matched = assets.find(a => a.filename === val);
+          if (matched && matched.subject_name) return matched.subject_name;
+        }
+      }
+    }
+    return Object.keys(project.characters || {})[0] || "";
+  }, [activeShot, project.characters, assets]);
 
   const updateActiveShot = (updater: (prev: ShotItem) => ShotItem) => {
     onUpdateProject((prev) => {
@@ -196,6 +218,10 @@ export default function SceneProjectHub({
               return { ...prev, shots };
             })}
             onReviewTake={setReviewTakeId}
+            onOpenStagingStudio={() => {
+              setStagingStudioTab("staging");
+              setIsStagingStudioOpen(true);
+            }}
           />
 
           <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-0">
@@ -216,6 +242,10 @@ export default function SceneProjectHub({
               onExpandPrompt={handleExpandPrompt}
               onTransferShot={handleTransferShotAction}
               onTransferScene={handleTransferSceneAction}
+              onOpenStagingStudio={() => {
+                setStagingStudioTab("staging");
+                setIsStagingStudioOpen(true);
+              }}
             />
           </div>
         </div>
@@ -260,6 +290,23 @@ export default function SceneProjectHub({
           }}
         />
       )}
+
+      <AiReferenceStagingStudioModal
+        isOpen={isStagingStudioOpen}
+        onClose={() => setIsStagingStudioOpen(false)}
+        initialTab={stagingStudioTab}
+        subjectName={currentShotSubject}
+        activeSceneName={project.scene_name}
+        characters={project.characters || {}}
+        subjects={project.characters ? Object.keys(project.characters) : []}
+        allAssets={assets}
+        sceneProject={project}
+        activeShotId={activeShotId}
+        onUpdateShot={activeShotId ? updateActiveShot : undefined}
+        onUpdateProject={onUpdateProject}
+        onAssetSaved={onAssetUploaded}
+        addToast={onShowToast}
+      />
     </div>
   );
 }

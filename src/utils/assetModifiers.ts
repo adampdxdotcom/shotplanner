@@ -25,7 +25,38 @@ export const ASSET_REFERENCE_MODIFIERS: Record<string, AssetTypeModifierConfig> 
       { id: "full_profile", label: "Full Profile", modifier: "full profile" },
     ],
   },
+  "Body Reference": {
+    assetType: "Body Reference",
+    baseTag: "body reference",
+    modifiers: [
+      { id: "pose", label: "Pose (Staging / Cutout)", modifier: "pose" },
+      { id: "full_body", label: "Full Body", modifier: "full body" },
+      { id: "upper_body", label: "Upper Body / Outfit", modifier: "upper body" },
+    ],
+  },
+  "Body / Outfit": {
+    assetType: "Body Reference",
+    baseTag: "body reference",
+    modifiers: [
+      { id: "pose", label: "Pose (Staging / Cutout)", modifier: "pose" },
+      { id: "full_body", label: "Full Body", modifier: "full body" },
+      { id: "upper_body", label: "Upper Body / Outfit", modifier: "upper body" },
+    ],
+  },
 };
+
+/**
+ * Normalizes and retrieves the modifier config for any matching asset type.
+ */
+export function getModifierConfig(assetType?: string): AssetTypeModifierConfig | undefined {
+  if (!assetType) return undefined;
+  const trimmed = assetType.trim();
+  if (ASSET_REFERENCE_MODIFIERS[trimmed]) return ASSET_REFERENCE_MODIFIERS[trimmed];
+  const lower = trimmed.toLowerCase();
+  if (lower.includes("headshot")) return ASSET_REFERENCE_MODIFIERS.Headshot;
+  if (lower.includes("body") || lower.includes("outfit")) return ASSET_REFERENCE_MODIFIERS["Body Reference"];
+  return undefined;
+}
 
 /**
  * Generates the standardized lowercase combined tag formatted as `{asset_type} {modifier}`.
@@ -40,7 +71,7 @@ export function formatModifierTag(baseTag: string, modifier: string): string {
  * Gets all possible combined tag variants for a given asset type.
  */
 export function getAllTagsForAssetType(assetType: string): string[] {
-  const config = ASSET_REFERENCE_MODIFIERS[assetType];
+  const config = getModifierConfig(assetType);
   if (!config) return [];
   return config.modifiers.map(m => formatModifierTag(config.baseTag, m.modifier));
 }
@@ -49,7 +80,7 @@ export function getAllTagsForAssetType(assetType: string): string[] {
  * Detects which modifier (if any) is currently present in the description string for an asset type.
  */
 export function detectActiveModifier(description: string, assetType: string): string {
-  const config = ASSET_REFERENCE_MODIFIERS[assetType];
+  const config = getModifierConfig(assetType);
   if (!config || !description) return "";
 
   const lowerDesc = description.toLowerCase();
@@ -73,7 +104,7 @@ export function updateDescriptionWithModifier(
   assetType: string,
   selectedModifier: string
 ): string {
-  const config = ASSET_REFERENCE_MODIFIERS[assetType];
+  const config = getModifierConfig(assetType);
   if (!config) return currentDescription;
 
   const allTags = getAllTagsForAssetType(assetType);
@@ -81,7 +112,7 @@ export function updateDescriptionWithModifier(
 
   let desc = currentDescription || "";
 
-  // Check if any existing tag is present in the description
+  // Check if any existing specific modifier tag is present in the description
   let replaced = false;
   for (const tag of allTags) {
     // Regex matching case-insensitively with boundary checks
@@ -98,6 +129,21 @@ export function updateDescriptionWithModifier(
       }
       replaced = true;
       break;
+    }
+  }
+
+  // If no specific modifier tag was found, check if lone baseTag is present (e.g. "body reference" or "headshot")
+  if (!replaced) {
+    const escapedBase = config.baseTag.replace(/[.*+?^${}()|[\]\/\\]/g, '\\$&');
+    const baseRegex = new RegExp(`\\b${escapedBase}\\b`, 'i');
+    if (baseRegex.test(desc)) {
+      if (newTag) {
+        desc = desc.replace(baseRegex, newTag);
+        replaced = true;
+      } else {
+        desc = desc.replace(new RegExp(`\\b${escapedBase}\\b[,;]?\\s*`, 'i'), '');
+        replaced = true;
+      }
     }
   }
 

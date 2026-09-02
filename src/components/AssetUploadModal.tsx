@@ -5,6 +5,8 @@ import { SubjectCombobox } from "./SubjectCombobox";
 import { getAssetMediaUrl } from "../utils/assetUrl";
 import { 
   ASSET_REFERENCE_MODIFIERS, 
+  getModifierConfig,
+  detectActiveModifier,
   updateDescriptionWithModifier 
 } from "../utils/assetModifiers";
 
@@ -41,7 +43,7 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
-  const modifierConfig = useMemo(() => ASSET_REFERENCE_MODIFIERS[assetType], [assetType]);
+  const modifierConfig = useMemo(() => getModifierConfig(assetType), [assetType]);
 
   const handleModifierChange = (modValue: string) => {
     setSelectedModifier(modValue);

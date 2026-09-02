@@ -996,6 +996,127 @@
   - Added dedicated **"Copy Download Command"** action button to the Hugging Face ingestion panel matching the Civitai panel.
   - Updated method labels from legacy aria2c references to `curl (resumable stream)`.
 
+## Asset Reference Modifiers Expansion ("Body Reference")
+- **`src/utils/assetModifiers.ts`**
+  - **Role:** Centralized configuration and mutation utility for asset reference modifiers across upload, editing, and pack ingestion.
+  - **Updates:** Added support for `"Body Reference"` (and `"Body / Outfit"`) alongside Headshot and Style reference modifiers.
+    - Added preset options:
+      - **"Pose (Staging / Cutout)"** (tag: `body reference pose`)
+      - **"Full Body"** (tag: `body reference full body`)
+      - **"Upper Body / Outfit"** (tag: `body reference upper body`)
+    - Implemented `getModifierConfig(assetType)` for normalized category lookup.
+    - Refactored `updateDescriptionWithModifier(description, newModifier, assetType)` to cleanly strip existing modifier tags of the target category without duplicating or polluting user visual descriptions.
+- **`src/components/AssetEditModal.tsx`**
+  - **Updates:** Integrated conditional modifier dropdown powered by `getModifierConfig` that dynamically displays for "Headshot", "Body Reference", and "Style Reference" assets.
+- **`src/components/gallery/GalleryBulkUploadModal.tsx`**
+  - **Updates:** Enabled companion modifier dropdown when setting asset types in bulk file review, automatically syncing the chosen modifier into the item's visual description.
+- **`src/components/gallery/CharacterReferencePackGrid.tsx`**
+  - **Updates:** Expanded initial pack slot templates to include Upper Body and Full Body references, adding inline modifier selectors in the quick description card.
+
+## AI Reference & Staging Studio Modal & Action Triggers
+- **`src/components/cast/AiReferenceStagingStudioModal.tsx`**
+  - **Role:** Unified, 2-tab production studio modal integrating character asset generation and 2D spatial scene blocking.
+  - **Tabs:**
+    - **Tab 1: "AI Headshots" (`#studio-tab-headshots`)**: Houses the AI headshot variation generator, positive/negative prompts, seed selector, aspect ratio controls, candidate grid, and save-to-character asset pipeline.
+    - **Tab 2: "Scene Staging & Blocking" (`#studio-tab-staging`)**: Interactive canvas for shot-level spatial staging with character cutouts/avatars, positioning, scale, orientation, camera angle, focal length, depth layers, and prompt synchronization.
+  - **Context Synchronization:** Preserves active character context, active scene name, and parent state bindings across tab transitions.
+- **`src/components/cast/HeadshotGeneratorModal.tsx`**
+  - **Role:** Backward-compatible wrapper delegating to `AiReferenceStagingStudioModal` with `initialTab="headshots"`.
+- **`src/components/CastSection.tsx`**
+  - **Updates:** Updated character card action buttons to directly launch `AiReferenceStagingStudioModal` with dedicated buttons:
+    - **"Headshots"** button (opens Studio in `#studio-tab-headshots`).
+    - **"Stage"** button (opens Studio in `#studio-tab-staging`).
+  - Passes full character profiles, assets, active scene name, and scene project context to ensure continuous data synchronization.
+- **`src/components/hub/PromptEngineeringPanel.tsx` & `src/components/hub/ShotMetadataPanel.tsx`**
+  - **Updates:** Added `onOpenStagingStudio` prop and interactive trigger buttons (`"Staging Studio"` in Prompt Engineering header, `"Stage Shot"` in Shot Metadata header) to launch the studio in Staging mode directly from the Shot Planning workspace.
+- **`src/components/SceneProjectHub.tsx`**
+  - **Updates:** Wired up `AiReferenceStagingStudioModal` with active shot and character context derivation, binding `onOpenStagingStudio` triggers from both planning panels to open the studio with full scene continuity.
+
+## Chroma-Key Background Removal & Actor Pose Staging Pipeline
+- **`src/utils/chromaKey.ts`**
+  - **Role:** High-performance client-side Chroma-Key and background removal utility for the staging pipeline.
+  - **Core Logic & Performance:**
+    - Uses an in-memory 2D `<canvas>` with `{ willReadFrequently: true }` to optimize raw `Uint8ClampedArray` pixel manipulation.
+    - **`autoDetectKeyColor(imageElement)`**: Intelligently samples corner pixels and center-edge borders, auto-detecting standard chroma green (`#00FF00`) or the dominant solid backdrop color.
+    - **`samplePixelColor(imageElement, x, y)`**: Helper to extract RGB hex values at specific coordinates for color eyedropper sampling.
+    - **`applyChromaKey(imageElement, options)`**: Performs Euclidean distance calculations in RGB color space against the target key color. Includes a configurable tolerance threshold, smooth feathering edge softness band, and an automated despill pass to eliminate color halos and fringing on semi-transparent silhouette edges.
+    - Outputs processed cutouts directly as clean transparent PNG data URLs (`image/png`).
+- **`src/components/cast/ActorPoseKeyingPanel.tsx`**
+  - **Role:** Interactive actor pose selection, reference filtering, dropzone upload, and real-time Chroma-Key inspector.
+  - **Features:**
+    - **Character Selector Dropdown**: Allows choosing any actor from the project cast.
+    - **Filtered Reference Gallery**: Automatically filters character reference images prioritizing `Pose (Staging / Cutout)` or `Body Reference` types, with one-click selection.
+    - **Quick Dropzone Upload**: Supports drag-and-drop or manual file selection to upload a new pose photo on the fly with automatic tag enrichment.
+    - **Keying Inspector & Eyedropper**:
+      - Live transparent cutout preview rendered over a high-contrast dark checkerboard grid (`8px` tiles).
+      - Color Eyedropper tool to click anywhere on the source image to sample and set the key color in real time.
+      - Preset color chips (Chroma Green, Chroma Blue, Studio Magenta, Studio White, Studio Black).
+      - Instantaneous real-time sliders for **Tolerance / Threshold** (sensitivity) and **Edge Softness** (feathering).
+      - Invert Key toggle to handle inverted or subject-isolated masks.
+    - **Confirmation Action ("Add Posed Actor to Stage")**: Processes the keyed cutout and emits the transparent actor data to the staging session.
+- **`src/components/cast/AiReferenceStagingStudioModal.tsx`**
+  - **Role:** Integrated `ActorPoseKeyingPanel` into the "Scene Staging & Blocking" tab.
+  - **Updates:**
+    - Extended `StagedActor` interface with `cutoutDataUrl?: string` and `referenceAssetFilename?: string`.
+    - Added header action button (`"Add Actor Pose"`) in the Director's 2D Stage Viewport and inline blocking controls (`"Chroma-Key Pose from Reference"`, `"Re-Key"`, and `"Pose Inspector"`).
+    - Mounted the `ActorPoseKeyingPanel` within a responsive, high-contrast modal sheet overlay when keying is activated.
+    - Enhanced the Director's 2D Stage Viewport renderer: displays full-body transparent cutouts standing on depth planes (Background, Midground, Foreground) with directional facing flips (`profile_left`, `turn_left`), back-of-camera shading, soft elliptical ground contact shadows, and actor stance labels, seamlessly falling back to circular avatars if no cutout is provided.
+
+## Interactive 2D Staging Canvas & Composite Reference Export Pipeline
+- **`src/types.ts`**
+  - **Updates:**
+    - **`StagedActor` Schema**: Extended with unique `id` (string), coordinate percentages `xPercent` (0-100) and `yPercent` (0-100), `scale` factor (0.25 to 2.5), `isFlipped` boolean for horizontal facing direction, `zIndex` layer order, along with `cutoutDataUrl`, `referenceAssetFilename`, `characterName`, `plane`, `facing`, and `posture`.
+    - **`StagingRecipe` Schema**: Created formal staging recipe representation capturing complete spatial arrangements:
+      - `actors: StagedActor[]`
+      - `environmentAssetFilename?: string`
+      - `customBackgroundUrl?: string`
+      - `aspectRatio: string` ("16:9", "2.39:1", "4:3", "9:16")
+      - `cameraAngle?: string`
+      - `focalLength?: string`
+      - `lightingId?: string`
+      - `timestamp: string`
+    - **`ShotItem` Schema**: Added optional `staging_recipe?: StagingRecipe` property to persist the exact 2D staging setup alongside shot media and prompt metadata.
+- **`src/utils/compositeCanvasExport.ts`**
+  - **Role:** High-performance client-side composite image rendering utility for the staging workspace.
+  - **Core Logic:**
+    - **`renderCompositeToBlob(options)`**: Flattens the background environment plate and all layered actor cutouts into a single high-resolution transparent/opaque PNG image (`Blob`).
+    - Handles active aspect ratio dimensions (e.g. 1920x1080 for 16:9, 1920x803 for 2.39:1, 1440x1080 for 4:3, 1080x1920 for 9:16).
+    - Draws the location asset image or custom background plate with aspect-ratio-preserving cover fit, falling back to a subtle studio grid on dark canvas if no environment plate is chosen.
+    - Accurately renders each staged actor sorted by `zIndex`:
+      - Handles horizontal mirroring (`scale(-1, 1)`) when `isFlipped` is active.
+      - Projects actor positioning based on `xPercent` and `yPercent`.
+      - Adds a natural ground contact elliptical shadow under the feet of cutouts to ground the actors within the environment.
+      - Renders circular avatar portraits with initials or headshots if no transparent cutout is available.
+- **`src/components/cast/StagingInteractiveCanvas.tsx`**
+  - **Role:** Interactive 2D staging canvas providing real-time spatial blocking and manipulation.
+  - **Features:**
+    - **Environment / Background Layer**: Location asset picker to choose existing project location reference images, or drop in a custom environment photo with instant preview and clear controls.
+    - **Actor Cutouts & Drag-and-Drop Blocking**:
+      - Bounding box indicators with custom corner resize handles and rotation/depth scale handles.
+      - Smooth mouse and touch drag-and-drop repositioning across the stage viewport.
+      - Corner handle scaling and mouse wheel scaling (30% to 220%).
+      - Flip Horizontal (⇄) action button to instantly reverse actor orientation.
+      - Layer stacking controls: Bring Forward (▲) and Send Backward (▼) adjusting actor `zIndex`.
+      - Quick delete actor button (✕) and deselect clicking backdrop.
+    - **Guides & Safe Areas**:
+      - Cinematic aspect ratio container (16:9, 2.39:1, 4:3, 9:16).
+      - Rule of thirds compositional grid overlay.
+      - Depth plane zones (Background, Midground, Foreground).
+    - **Quick Actions Toolbar**: Direct access to add actor pose, clear all actors, and reset viewport.
+- **`src/components/cast/AiReferenceStagingStudioModal.tsx`**
+  - **Role:** Studio modal orchestrator linking the interactive canvas, blocking controls, and composite export pipeline.
+  - **Updates:**
+    - Integrated `StagingInteractiveCanvas` into the Director's 2D Stage Viewport (8-column section).
+    - **State Rehydration**: Automatically loads existing `staging_recipe` from the active shot when opening the modal, restoring actors, background location, and aspect ratio seamlessly.
+    - **Actor Blocking Controls Sidebar**: Linked to the active selected actor on canvas with direct scale slider, facing flip toggle, depth plane placement, gaze dropdown, and action stance notes.
+    - **Composite Export & Ingestion Action Bar**:
+      - **"Save Composite Reference"** button: Triggers `renderCompositeToBlob`, packages the flattened canvas into a `File`, and uploads it through `onAssetSaved` / `/api/assets`.
+      - Automatically tags the generated asset with `["staging_composite", "reference", scene_name]`.
+      - Ingests the new composite asset into the active shot's `assigned_slots` (configurable target slot, defaulting to Slot 9 / Location & Staging Ref).
+      - Updates `staging_recipe` on the active `ShotItem` and synchronizes the project file via `onUpdateShot` and `onUpdateProject`.
+
+
+
 
 
 

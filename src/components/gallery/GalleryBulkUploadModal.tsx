@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { X, UploadCloud, FileText, Music, Image as ImageIcon, Loader2, Check, UserPlus, SlidersHorizontal, AlertCircle } from "lucide-react";
 import { formatSize } from "../../utils/formatters";
 import { MediaAsset } from "../../types";
 import { toCanonicalSubjectName } from "../../utils/subjectUtils";
 import {
   ASSET_REFERENCE_MODIFIERS,
+  getModifierConfig,
   detectActiveModifier,
   updateDescriptionWithModifier
 } from "../../utils/assetModifiers";
@@ -85,15 +86,17 @@ export const GalleryBulkUploadModal: React.FC<GalleryBulkUploadModalProps> = ({
     }
   }, [isOpen, defaultSubject]);
 
+  const bulkModifierConfig = useMemo(() => getModifierConfig(bulkAssetType), [bulkAssetType]);
+
   // Keep modifier state aligned if description or asset type changes
   useEffect(() => {
-    if (bulkAssetType === "Headshot") {
-      const detected = detectActiveModifier(bulkDescription, "Headshot");
+    if (bulkModifierConfig) {
+      const detected = detectActiveModifier(bulkDescription, bulkAssetType);
       setBulkModifier(detected);
     } else {
       setBulkModifier("");
     }
-  }, [bulkAssetType]);
+  }, [bulkAssetType, bulkModifierConfig]);
 
   if (!isOpen) return null;
 
@@ -387,7 +390,7 @@ export const GalleryBulkUploadModal: React.FC<GalleryBulkUploadModalProps> = ({
                 </select>
               </div>
 
-              {bulkAssetType === "Headshot" ? (
+              {bulkModifierConfig ? (
                 <div>
                   <label className="block text-[11px] font-medium text-zinc-400 mb-1">
                     Companion Modifier
@@ -399,7 +402,7 @@ export const GalleryBulkUploadModal: React.FC<GalleryBulkUploadModalProps> = ({
                     disabled={isBulkUploading}
                   >
                     <option value="">None (Standard)</option>
-                    {ASSET_REFERENCE_MODIFIERS.Headshot?.modifiers.map((mod) => (
+                    {bulkModifierConfig.modifiers.map((mod) => (
                       <option key={mod.id} value={mod.modifier}>
                         {mod.label} ({mod.modifier})
                       </option>
@@ -412,7 +415,7 @@ export const GalleryBulkUploadModal: React.FC<GalleryBulkUploadModalProps> = ({
                     Companion Modifier
                   </label>
                   <div className="w-full bg-zinc-900/40 border border-zinc-850 rounded-lg px-2.5 py-2 text-xs text-zinc-500 cursor-not-allowed">
-                    Only active for Headshots
+                    Only active for Headshot & Body Reference
                   </div>
                 </div>
               )}

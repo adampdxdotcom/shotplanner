@@ -67,6 +67,34 @@ export interface SceneProjectFile {
   takes?: ShotTake[];
   active_take_id?: string;
   hero_take_id?: string;
+  staging_recipe?: StagingLayerRecipe;
+}
+
+export interface StagedActorRecipeItem {
+  id: string;
+  characterName: string;
+  cutoutDataUrl?: string;
+  referenceAssetFilename?: string;
+  xPercent: number; // 0 to 100
+  yPercent: number; // 0 to 100
+  scale: number; // 0.2 to 2.5
+  isFlipped: boolean;
+  zIndex: number;
+  plane?: "foreground" | "midground" | "background";
+  posture?: string;
+  facing?: "facing_camera" | "turn_left" | "turn_right" | "profile_left" | "profile_right" | "back_camera";
+}
+
+export interface StagingLayerRecipe {
+  backgroundAssetFilename?: string;
+  backgroundUrl?: string;
+  actors: StagedActorRecipeItem[];
+  aspectRatio?: string;
+  cameraFraming?: string;
+  lightingAtmosphere?: string;
+  compositeAssetFilename?: string;
+  targetSlotIndex?: number;
+  updatedAt?: string;
 }
 
 export interface ShotTake {
@@ -109,6 +137,7 @@ export interface ShotItem {
   takes?: ShotTake[];
   active_take_id?: string;
   hero_take_id?: string;
+  staging_recipe?: StagingLayerRecipe;
 }
 
 export interface ToastMessage {

@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { UploadCloud, Sparkles, Check, RotateCcw } from "lucide-react";
+import { UploadCloud, Sparkles, Check, RotateCcw, Layers } from "lucide-react";
 import { ShotItem, computePrePromptContext } from "../../types";
 
 interface PromptEngineeringPanelProps {
@@ -13,6 +13,7 @@ interface PromptEngineeringPanelProps {
   onExpandPrompt: () => void;
   onTransferShot: () => void;
   onTransferScene: () => void;
+  onOpenStagingStudio?: () => void;
 }
 
 export const PromptEngineeringPanel: React.FC<PromptEngineeringPanelProps> = ({
@@ -25,7 +26,8 @@ export const PromptEngineeringPanel: React.FC<PromptEngineeringPanelProps> = ({
   onUpdateExpandedPrompt,
   onExpandPrompt,
   onTransferShot,
-  onTransferScene
+  onTransferScene,
+  onOpenStagingStudio
 }) => {
   const isLivePreview = !activeShot.expanded_prompt || !activeShot.expanded_prompt.trim();
 
@@ -57,7 +59,20 @@ export const PromptEngineeringPanel: React.FC<PromptEngineeringPanelProps> = ({
 
   return (
     <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-5 flex flex-col gap-4 overflow-y-auto">
-      <h2 className="text-base font-semibold text-white">Prompt Engineering & Staging</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-base font-semibold text-white">Prompt Engineering & Staging</h2>
+        {onOpenStagingStudio && (
+          <button
+            type="button"
+            onClick={onOpenStagingStudio}
+            className="text-xs font-semibold text-indigo-300 hover:text-white bg-indigo-950/60 hover:bg-indigo-900 border border-indigo-800/60 px-2.5 py-1 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+            title="Open AI Reference & Staging Studio"
+          >
+            <Layers className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Staging Studio</span>
+          </button>
+        )}
+      </div>
       
       <div className="space-y-2">
         <label className="text-xs font-medium text-zinc-400">Concept Stub</label>

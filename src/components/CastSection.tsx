@@ -1,11 +1,11 @@
 import React, { useState } from "react";
 import { MediaAsset, CharacterProfile, SceneProjectFile } from "../types";
-import { ChevronRight, Settings, Trash2, AlertTriangle, X, Users, Plus, Zap } from "lucide-react";
+import { ChevronRight, Settings, Trash2, AlertTriangle, X, Users, Plus, Zap, Layers } from "lucide-react";
 import { getAssetMediaUrl } from "../utils/assetUrl";
 import { toCanonicalSubjectName } from "../utils/subjectUtils";
 import { GalleryBulkUploadModal } from "./gallery/GalleryBulkUploadModal";
 import { AssetLightbox } from "./AssetLightbox";
-import { HeadshotGeneratorModal } from "./cast/HeadshotGeneratorModal";
+import { AiReferenceStagingStudioModal } from "./cast/AiReferenceStagingStudioModal";
 
 interface CastSectionProps {
   assets: MediaAsset[];
@@ -40,6 +40,7 @@ export const CastSection: React.FC<CastSectionProps> = ({
 }) => {
   const [characterToDelete, setCharacterToDelete] = useState<string | null>(null);
   const [headshotModalSubject, setHeadshotModalSubject] = useState<string | null>(null);
+  const [studioInitialTab, setStudioInitialTab] = useState<"headshots" | "staging">("headshots");
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [bulkModalSubject, setBulkModalSubject] = useState<string | undefined>();
   const [lightboxAsset, setLightboxAsset] = useState<MediaAsset | null>(null);
@@ -151,20 +152,37 @@ export const CastSection: React.FC<CastSectionProps> = ({
                           <p className="text-xs text-amber-500 font-medium">{charAssets.length} reference{charAssets.length === 1 ? "" : "s"}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
                         <button
                           type="button"
-                          onClick={() => setHeadshotModalSubject(subject)}
-                          className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-2.5 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 transition-colors shrink-0"
+                          onClick={() => {
+                            setStudioInitialTab("headshots");
+                            setHeadshotModalSubject(subject);
+                          }}
+                          className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-2 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer"
                           title="Generate AI Headshots"
                         >
                           <Zap className="w-3.5 h-3.5 text-amber-400" />
-                          <span className="hidden sm:inline">AI Headshots</span>
+                          <span className="hidden sm:inline">Headshots</span>
                         </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setStudioInitialTab("staging");
+                            setHeadshotModalSubject(subject);
+                          }}
+                          className="bg-indigo-950/60 hover:bg-indigo-900/80 text-indigo-300 border border-indigo-800/60 px-2 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer"
+                          title="Scene Staging & Blocking"
+                        >
+                          <Layers className="w-3.5 h-3.5 text-indigo-400" />
+                          <span className="hidden sm:inline">Stage</span>
+                        </button>
+
                         <button
                           type="button"
                           onClick={() => setCharacterToDelete(subject)}
-                          className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-950/40 rounded-lg transition-colors shrink-0"
+                          className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-red-950/40 rounded-lg transition-colors shrink-0"
                           title={`Delete ${subject} profile`}
                           aria-label={`Delete ${subject} profile`}
                         >
@@ -403,14 +421,20 @@ export const CastSection: React.FC<CastSectionProps> = ({
         onDelete={onAssetDeleted}
       />
 
-      <HeadshotGeneratorModal
+      <AiReferenceStagingStudioModal
         isOpen={!!headshotModalSubject}
         onClose={() => setHeadshotModalSubject(null)}
+        initialTab={studioInitialTab}
         subjectName={headshotModalSubject || ""}
         characterAssets={headshotModalSubject ? assets.filter(a => (a.subject_name || "").toLowerCase() === headshotModalSubject.toLowerCase()) : []}
         activeSceneName={activeSceneName}
         onAssetSaved={onAssetUploaded}
         addToast={addToast}
+        characters={characters}
+        subjects={subjects}
+        allAssets={assets}
+        sceneProject={sceneProject}
+        onUpdateProject={onUpdateProject}
       />
     </div>
   );

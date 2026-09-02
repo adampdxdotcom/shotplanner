@@ -98,6 +98,7 @@ export default function App() {
               onTransfer={handleSceneTransfer}
               onTransferScene={handleSceneTransferAll}
               onExpandPrompt={handleSceneExpandPrompt}
+              onAssetUploaded={handleAssetUploaded}
             />
           </div>
         )}

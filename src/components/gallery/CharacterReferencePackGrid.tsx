@@ -1,5 +1,10 @@
 import React, { useRef, useState } from "react";
 import { Camera, User, Image as ImageIcon, X, Check, Loader2, AlertCircle, Sparkles, Shirt } from "lucide-react";
+import {
+  getModifierConfig,
+  detectActiveModifier,
+  updateDescriptionWithModifier
+} from "../../utils/assetModifiers";
 
 export type CharacterPackSlotId = "headshot_facing" | "headshot_3_4" | "body_primary" | "body_secondary";
 
@@ -50,29 +55,29 @@ export const INITIAL_PACK_SLOTS: CharacterPackSlot[] = [
   },
   {
     id: "body_primary",
-    title: "Body Reference (Primary)",
-    badge: "Full Body / Main",
+    title: "Body Reference (Full Body)",
+    badge: "Full Body",
     icon: "user",
     assetType: "Body Reference",
     file: null,
     previewUrl: null,
-    description: "body reference, ",
-    defaultDescription: "body reference, ",
-    placeholder: "e.g. body reference, athletic build, standard outfit",
+    description: "body reference full body, ",
+    defaultDescription: "body reference full body, ",
+    placeholder: "e.g. body reference full body, athletic build, standard outfit",
     status: "idle",
     progress: 0
   },
   {
     id: "body_secondary",
-    title: "Body Reference (Secondary / Outfit)",
-    badge: "Outfit / Alt",
+    title: "Body Reference (Upper Body / Outfit)",
+    badge: "Upper Body",
     icon: "shirt",
     assetType: "Body Reference",
     file: null,
     previewUrl: null,
-    description: "body reference, ",
-    defaultDescription: "body reference, ",
-    placeholder: "e.g. body reference, winter tactical jacket, combat boots",
+    description: "body reference upper body, ",
+    defaultDescription: "body reference upper body, ",
+    placeholder: "e.g. body reference upper body, winter tactical jacket, combat boots",
     status: "idle",
     progress: 0
   }
@@ -298,10 +303,34 @@ export const CharacterReferencePackGrid: React.FC<CharacterReferencePackGridProp
 
               {/* Inline Description Editor */}
               <div className="p-2 bg-zinc-950/95 border-t border-zinc-850 flex flex-col gap-1">
-                <label className="text-[9px] font-semibold text-zinc-400 uppercase tracking-wider flex items-center justify-between">
-                  <span>Prompt Description</span>
-                  <span className="text-[8px] text-zinc-500 font-normal">Pre-filled</span>
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-[9px] font-semibold text-zinc-400 uppercase tracking-wider">
+                    Prompt Description
+                  </label>
+                  {(() => {
+                    const modConfig = getModifierConfig(slot.assetType);
+                    if (!modConfig) return null;
+                    const activeMod = detectActiveModifier(slot.description, slot.assetType);
+                    return (
+                      <select
+                        value={activeMod}
+                        onChange={(e) => {
+                          const newDesc = updateDescriptionWithModifier(slot.description, slot.assetType, e.target.value);
+                          onUpdateSlot(slot.id, { description: newDesc });
+                        }}
+                        disabled={disabled || slot.status === "uploading"}
+                        className="bg-zinc-900 border border-zinc-800 text-[9px] text-amber-400 font-medium rounded px-1 py-0.5 outline-none"
+                      >
+                        <option value="">No modifier</option>
+                        {modConfig.modifiers.map(m => (
+                          <option key={m.id} value={m.modifier}>
+                            {m.label}
+                          </option>
+                        ))}
+                      </select>
+                    );
+                  })()}
+                </div>
                 <input
                   type="text"
                   value={slot.description}
