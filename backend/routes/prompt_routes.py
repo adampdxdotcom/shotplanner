@@ -189,7 +189,7 @@ async def test_gemini(req: GeminiTestRequest):
             "error": err_text
         })
 
-    model_name = "gemini-2.5-flash"
+    model_name = "gemini-3.7-flash"
     endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={key_to_use}"
     payload = {
         "contents": [

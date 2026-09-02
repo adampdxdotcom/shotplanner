@@ -37,7 +37,7 @@ export async function generateVariations(
 
     try {
       const response = await ai.models.generateContent({
-        model: 'gemini-3.1-flash-lite-image',
+        model: 'gemini-3-pro-image',
         contents: {
           parts: [
             { text: promptText },

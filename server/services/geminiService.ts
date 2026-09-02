@@ -17,10 +17,17 @@ export function saveGeminiKey(apiKey: string): void {
 }
 
 export async function generateWithGeminiAPI(apiKey: string, promptText: string) {
-  const genAI = new GoogleGenAI({ apiKey });
+  const genAI = new GoogleGenAI({
+    apiKey,
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build',
+      }
+    }
+  });
   const result = await genAI.models.generateContent({
-    model: "gemini-2.5-flash",
+    model: "gemini-3.7-flash",
     contents: promptText
   });
-  return { text: result.text || "", modelUsed: "gemini-2.5-flash" };
+  return { text: result.text || "", modelUsed: "gemini-3.7-flash" };
 }

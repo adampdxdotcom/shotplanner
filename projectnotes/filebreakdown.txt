@@ -688,9 +688,11 @@
   - Implemented `GET /api/headshots/templates` to expose the prompt templates directly to clients.
   - Implemented `POST /api/headshots/generate` using `multer` for memory buffering. It accepts seed images via binary upload, base64 payloads, or existing asset filenames, extracts parameters (character name, aspect ratio, keys), and executes the generation pipeline.
   - Implemented `POST /api/headshots/save-selected` to finalize user-approved variations, saving image files and thumbnails directly into the active scene's filesystem and returning serialized asset records.
+- **`server/services/geminiService.ts`**
+  - Configured `@google/genai` client with default `gemini-3.7-flash` model identifier for prompt expansion and validation routines, including mandatory telemetry headers (`User-Agent: aistudio-build`).
 - **`server/services/headshotService.ts`**
   - Implemented `HEADSHOT_TEMPLATES` constant block explicitly defining visual directives for presets ("Facing", "3/4 Profile", "Full Profile", "Cinematic / Mood") demanding maximum quality and likeness preservation.
-  - Implemented `generateVariations()` function utilizing the `@google/genai` client (with `gemini-3.1-flash-lite-image`) to dispatch parallel, asynchronous image-to-image requests via image and text multipart payloads.
+  - Implemented `generateVariations()` function utilizing the `@google/genai` client configured strictly with the `gemini-3-pro-image` model identifier to dispatch parallel, asynchronous image-to-image requests via image and text multipart payloads.
   - Implemented `saveSelectedVariations()` to persist images securely, auto-generate responsive thumbnails via the `sharp` library, and orchestrate synchronous database registration using `assetService.upsertAsset`.
 
 - **`src/components/cast/HeadshotGeneratorModal.tsx`**
@@ -707,21 +709,28 @@
 
 ## Settings & Model Connection Verification Endpoints
 - **`server/routes/settingsRoutes.ts`**
-  - **`POST /api/settings/test-gemini`**: Validates Google Gemini API key configuration by accepting an optional `api_key` payload or falling back to the saved server configuration key via `getStoredGeminiKey()`. Returns an explicit 400 error stating no Gemini API key is configured if neither is present. Dispatches a lightweight verification query using the `@google/genai` client (`gemini-2.5-flash`) and returns status confirmation alongside active model metadata on success or caught authentication/network error details on failure.
+  - **`POST /api/settings/test-gemini`**: Validates Google Gemini API key configuration by accepting an optional `api_key` payload or falling back to the saved server configuration key via `getStoredGeminiKey()`. Returns an explicit 400 error stating no Gemini API key is configured if neither is present. Dispatches a lightweight verification query using the `@google/genai` client strictly configured with `gemini-3.7-flash` and returns status confirmation alongside active model metadata on success or caught authentication/network error details on failure.
   - **`POST /api/settings/test-lm-studio`**: Tests connectivity to local LM Studio server endpoints (`GET /v1/models`) using an asynchronous HTTP client with a 5-second `AbortController` timeout. On success, returns confirmation payloads containing loaded model counts and model names. On failure (connection refused, unreachable host, timeout), catches network exceptions and returns a clear failure description.
 
 ## Python FastAPI Backend Settings & Headshot Endpoints
 - **`backend/routes/prompt_routes.py`**
   - **`POST /api/settings/test-lm-studio`**: Accepts target URL payloads (`url`, `lm_studio_url`, or `endpoint`). Logs `[LM Studio Test] Testing reachability for URL: {url}` to terminal, queries `{url}/models` asynchronously via `httpx.AsyncClient` with a 5s timeout, logs success `[LM Studio Test] Success (HTTP {status}) - Found {count} models: {model_names}` or failure `[LM Studio Test] Failed to connect to {url}: {error_message}`, and returns the corresponding response.
-  - **`POST /api/settings/test-gemini`**: Accepts an optional API key or falls back to `assets/gemini_config.json`. Logs `[Gemini Test] Validating API key...`. If missing, logs and returns a 400 error. Validates via Gemini REST API `generateContent` using `httpx.AsyncClient`, logs success `[Gemini Test] Verified successfully with model {model}` or failure `[Gemini Test] Validation failed: {error}`, and returns status payload.
+  - **`POST /api/settings/test-gemini`**: Accepts an optional API key or falls back to `assets/gemini_config.json`. Logs `[Gemini Test] Validating API key...`. If missing, logs and returns a 400 error. Validates via Gemini REST API `generateContent` using `httpx.AsyncClient` and strictly targeting `gemini-3.7-flash`, logs success `[Gemini Test] Verified successfully with model gemini-3.7-flash` or failure `[Gemini Test] Validation failed: {error}`, and returns status payload.
+- **`backend/services/llm_service.py`**
+  - Configured prompt expansion routines to default strictly to `gemini-3.7-flash` for all Gemini-backed synthesis operations.
 - **`backend/routes/headshot_routes.py`**
   - **`POST /api/headshots/generate`**: FastAPI route handling character headshot variation requests. Parses JSON or Form Data parameters, calls `generate_headshots()`, and returns candidate image objects.
   - **`POST /api/headshots/save-selected`**: Accepts user-approved variation candidates, decodes base64 payloads, invokes `save_selected_headshots()`, and returns saved asset records.
 - **`backend/services/headshot_service.py`**
   - Defines `HEADSHOT_TEMPLATES` for character visual presets ("Facing", "3/4 Profile", "Full Profile", "Cinematic / Mood").
-  - Implements `generate_headshots()` to dispatch variation requests using Gemini API or fallback image rendering. Logs attempt details to terminal.
+  - Implements `generate_headshots()` to dispatch variation requests using `gemini-3-pro-image` with `imageConfig` parameters or fallback image rendering. Logs attempt details to terminal.
   - Implements `save_selected_headshots()` to save image files to `assets/{scene_name}/images/`, generate companion thumbnails via Pillow, and assemble structured asset objects.
 - **`backend/routes/__init__.py`**
   - Included `headshot_router` into the primary `/api` FastAPI router.
+
+## Model Configuration Architecture
+- **Default LLM Synthesis & Verification**: `gemini-3.7-flash` applied across Node.js/Express (`server/services/geminiService.ts`, `server/routes/settingsRoutes.ts`) and Python/FastAPI (`backend/services/llm_service.py`, `backend/routes/prompt_routes.py`) for all prompt expansion, fallback generation, and connection test routines.
+- **Image Generation & Variations**: `gemini-3-pro-image` applied directly in character headshot generation pipelines across `server/services/headshotService.ts` and `backend/services/headshot_service.py` with aspect ratio configuration.
+- **Service-Layer Enforcement**: Both models operate directly at the service layer for zero-friction execution without requiring dynamic UI model selectors.
 
 

@@ -368,7 +368,7 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
                   }`}
                 >
                   <Sparkles className="w-3 h-3" />
-                  Gemini 3.6 Flash
+                  Gemini 3.7 Flash
                 </button>
               </div>
             </div>
@@ -420,10 +420,10 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
             )}
             <span>
               {generating 
-                ? `Synthesizing with ${providerChoice === "gemini" ? "Gemini 3.6 Flash..." : "LM Studio..."}` 
+                ? `Synthesizing with ${providerChoice === "gemini" ? "Gemini 3.7 Flash..." : "LM Studio..."}` 
                 : expandedPrompt && expandedPrompt.trim()
-                ? `Regenerate Prompt with ${providerChoice === "gemini" ? "Gemini 3.6 Flash" : "LM Studio"}`
-                : `Generate Prompt with ${providerChoice === "gemini" ? "Gemini 3.6 Flash" : "LM Studio"}`}
+                ? `Regenerate Prompt with ${providerChoice === "gemini" ? "Gemini 3.7 Flash" : "LM Studio"}`
+                : `Generate Prompt with ${providerChoice === "gemini" ? "Gemini 3.7 Flash" : "LM Studio"}`}
             </span>
           </button>
         </div>

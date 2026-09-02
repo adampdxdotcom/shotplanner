@@ -79,7 +79,7 @@ async def generate_headshots(
 
         if api_key:
             try:
-                endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+                endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image:generateContent?key={api_key}"
                 parts: List[Dict[str, Any]] = []
 
                 if seed_b64:
@@ -91,12 +91,16 @@ async def generate_headshots(
                     })
 
                 parts.append({
-                    "text": f"Generate a high-quality character headshot variation for '{character_name}'. Directive: {prompt_text}. Aspect ratio: {aspect_ratio}."
+                    "text": f"Generate a high-quality character headshot variation for '{character_name}'. Directive: {prompt_text}."
                 })
 
                 payload = {
                     "contents": [{"parts": parts}],
-                    "generationConfig": {"temperature": 0.7, "maxOutputTokens": 1024}
+                    "generationConfig": {
+                        "imageConfig": {
+                            "aspectRatio": aspect_ratio
+                        }
+                    }
                 }
 
                 async with httpx.AsyncClient(timeout=30.0) as client:

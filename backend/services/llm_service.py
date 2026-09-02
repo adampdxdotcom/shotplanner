@@ -320,9 +320,9 @@ Generate ONLY the integrated_multimodal_description paragraph incorporating the 
             desc = _get_fallback_description(basic_stub, assets, resolved_framing, effective_cam)
             return assemble_final_prompt(header, desc, footer)
 
-        gemini_model = model or "gemini-2.5-flash"
+        gemini_model = model or "gemini-3.7-flash"
         if "/" not in gemini_model and "gemini-" not in gemini_model:
-            gemini_model = "gemini-2.5-flash"
+            gemini_model = "gemini-3.7-flash"
 
         endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_model}:generateContent?key={api_key}"
         payload = {

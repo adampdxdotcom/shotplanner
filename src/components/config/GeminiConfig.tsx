@@ -152,7 +152,7 @@ export const GeminiConfig: React.FC<GeminiConfigProps> = ({
           </div>
           <div>
             <h3 className="text-xs font-semibold text-zinc-200">Gemini API</h3>
-            <p className="text-[11px] text-zinc-400">Configure Google GenAI client (gemini-3.6-flash) for cloud-based prompt expansion.</p>
+            <p className="text-[11px] text-zinc-400">Configure Google GenAI client (gemini-3.7-flash) for cloud-based prompt expansion.</p>
           </div>
         </div>
 
