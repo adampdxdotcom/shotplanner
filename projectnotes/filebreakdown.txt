@@ -1114,6 +1114,30 @@
       - Ingests the new composite asset into the active shot's `assigned_slots` (configurable target slot, defaulting to Slot 9 / Location & Staging Ref).
       - Updates `staging_recipe` on the active `ShotItem` and synchronizes the project file via `onUpdateShot` and `onUpdateProject`.
 
+## Location-First Reference Save & Asset Persistence Infrastructure
+- **`server/services/assetService.ts`**
+  - **Role:** Centralized backend asset management and file ingestion service.
+  - **Updates:**
+    - **Compound Reference Types Expansion:** Expanded `COMPOUND_REFERENCE_TYPES` to include `scene_location_reference` and `character_staging_reference`, preventing regex collision during prefix parsing.
+    - **Metadata Database Persistence (`ASSET_DB_FILE`):** Integrated JSON-backed persistence (`assets/assets_db.json`) across `getAllAssets` and `handleSingleFileUpload`. Preserves explicit metadata fields (`type`, `subject_name`, `slot_index`, `description`, `scene_name`, `tags`) directly on upload and merges them during registry queries, superseding heuristic filename token parsing.
+    - **Display Name Mapping:** Updated `parseAssetFilename` to gracefully decode `scene_location_reference` into `"Scene / Location Reference"` and `character_staging_reference` into `"Character Staging Reference"`.
+- **`src/utils/formatters.ts` & `src/types.ts`**
+  - **Role:** String utilities and global TypeScript definitions.
+  - **Updates:** Added and exported `sanitizeSlug` to normalize strings for filesystem-safe filename prefixes and slugs.
+- **`src/components/cast/AiReferenceStagingStudioModal.tsx`**
+  - **Role:** Studio modal orchestrator for 2D staging, actor blocking, and composite reference export.
+  - **Updates:**
+    - **Location-First Reference Save Panel:** Replaced the legacy forced shot-slot bar with an intuitive, location-first reference creation panel.
+    - **Location / Reference Name Input:** Provides an editable text input pre-filled with the active background environment name (e.g., "Couch 3/4" or "Living Room"), ensuring `subject_name` reflects the specific location rather than the project name and preventing phantom character profile generation.
+    - **Semantic Type Selector:** Dropdown menu allowing selection among `Scene / Location Reference` (default), `Scene Reference`, and `Character Staging Reference`.
+    - **Visual Description & Directions:** Pre-fills with the auto-synthesized cinematic staging directions, offering an instant "Re-sync from Staging Prompt" action.
+    - **Optional Shot Slot Assignment:** Introduced a toggle checkbox ("Also assign to active shot input slot") that conditionally reveals the target slot selector (defaulting to Slot 9), enabling users to save references directly to the project gallery without mandating immediate shot binding.
+    - **Payload Refactoring:** Refactored `handleSaveCompositeReference` to construct `FormData` with clean semantic slugs, user-defined `subject_name`, and conditional `slot_index` assignments.
+    - **Streamlined Layout:** Removed the redundant "Synthesized Cinematic Staging Context" card/bar from the staging studio interface, decluttering the workspace and keeping the visual directions integrated directly into the Location-First Reference Save Panel.
+    - **Clean Initial Stage State:** Removed the hardcoded default empty character card (`Jim • 115%`, `Standing Heroic`) that previously initialized on new shots. The stage now begins cleanly focused on the environment layer, allowing actors to be introduced on-demand via the cast list or Pose Inspector. Also unlocked removal of single staged actors.
+    - **Header Clutter Removal:** Removed the top three cards ("Environment / Location Plate", "Lighting & Atmosphere", and "Framing Specification") from the Scene Staging tab, allowing the Director's 2D Stage Viewport and Actor Blocking Controls to take primary visual focus immediately upon entering the staging tab. Backdrop selection and room photo uploads remain cleanly accessible directly inside the interactive canvas toolbar.
+    - **Full-Width Viewport & Horizontal Actor Blocking Controls:** Expanded the Director's 2D Stage Viewport to 100% full width of the staging studio workspace. Moved the Actor Blocking Controls directly below the stage as a streamlined, responsive 4-column horizontal module with cast roster quick-add buttons, cutout representation status, live stage mask/eraser, depth plane, scale factor, X/Y placement sliders with presets, and posture/facing controls.
+
 
 
 

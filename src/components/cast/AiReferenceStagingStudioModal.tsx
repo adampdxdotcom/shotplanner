@@ -1,5 +1,5 @@
 import React, { useState, useRef, useMemo, useEffect } from "react";
-import { MediaAsset, SceneProjectFile, ShotItem, CharacterProfile, StagingLayerRecipe } from "../../types";
+import { MediaAsset, SceneProjectFile, ShotItem, CharacterProfile, StagingLayerRecipe, sanitizeSlug } from "../../types";
 import { 
   X, 
   UploadCloud, 
@@ -29,7 +29,9 @@ import {
   ArrowUp,
   ArrowDown,
   Compass,
-  Eraser
+  Eraser,
+  MapPin,
+  RefreshCw
 } from "lucide-react";
 import { getAssetMediaUrl } from "../../utils/assetUrl";
 import { copyToClipboard } from "../../utils/clipboard";
@@ -290,27 +292,20 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
   const [showSafeAreas, setShowSafeAreas] = useState<boolean>(true);
 
   // Staged actors list
-  const [stagedActors, setStagedActors] = useState<StagedActor[]>([
-    {
-      id: "actor-hero-1",
-      characterName: activeSubject || "Actor 1",
-      plane: "foreground",
-      horizontalPercent: 50,
-      xPercent: 50,
-      yPercent: 88,
-      scale: 1.15,
-      isFlipped: false,
-      zIndex: 1,
-      facing: "facing_camera",
-      posture: "Standing Heroic"
-    }
-  ]);
-  const [selectedActorId, setSelectedActorId] = useState<string | null>("actor-hero-1");
+  const [stagedActors, setStagedActors] = useState<StagedActor[]>([]);
+  const [selectedActorId, setSelectedActorId] = useState<string | null>(null);
   const [activeMaskingActorId, setActiveMaskingActorId] = useState<string | null>(null);
   const [customBackgroundUrl, setCustomBackgroundUrl] = useState<string | undefined>(undefined);
+
+  // Location-first Reference Save Panel state
+  const [compositeRefName, setCompositeRefName] = useState<string>("");
+  const [hasUserEditedRefName, setHasUserEditedRefName] = useState<boolean>(false);
+  const [semanticRefType, setSemanticRefType] = useState<string>("Scene / Location Reference");
+  const [compositeDescription, setCompositeDescription] = useState<string>("");
+  const [hasUserEditedDescription, setHasUserEditedDescription] = useState<boolean>(false);
+  const [assignToShotSlot, setAssignToShotSlot] = useState<boolean>(false);
   const [targetSlotIndex, setTargetSlotIndex] = useState<number>(8); // default to Slot 9 (index 8)
   const [isExportingComposite, setIsExportingComposite] = useState<boolean>(false);
-  const [copiedStaging, setCopiedStaging] = useState(false);
 
   // Active shot
   const activeShot = useMemo(() => {
@@ -321,7 +316,7 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
   // Selected actor index derived for backward compatibility
   const selectedActorIndex = useMemo(() => {
     const idx = stagedActors.findIndex(a => a.id === selectedActorId);
-    return idx >= 0 ? idx : 0;
+    return idx >= 0 ? idx : -1;
   }, [stagedActors, selectedActorId]);
 
   // Rehydrate staging layout recipe from activeShot or project
@@ -369,7 +364,13 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
         setStagedActors(loaded);
         setSelectedActorId(loaded[0]?.id || null);
         return;
+      } else {
+        setStagedActors([]);
+        setSelectedActorId(null);
       }
+    } else {
+      setStagedActors([]);
+      setSelectedActorId(null);
     }
 
     if (activeShot?.assigned_slots && activeShot.assigned_slots[8]) {
@@ -402,6 +403,54 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
   const activeLocationAsset = useMemo(() => {
     return allAssets.find(a => a.filename === selectedLocationFilename) || locationAssets[0];
   }, [allAssets, selectedLocationFilename, locationAssets]);
+
+  // Derived default environment reference name (e.g. "Couch 3/4" or "Living Room")
+  const defaultEnvironmentName = useMemo(() => {
+    if (customLocationName.trim()) {
+      return customLocationName.trim();
+    }
+    if (activeLocationAsset) {
+      if (activeLocationAsset.subject_name && !["subject", "unknown", "scene", "default"].includes(activeLocationAsset.subject_name.toLowerCase())) {
+        return activeLocationAsset.subject_name;
+      }
+      if (activeLocationAsset.description && activeLocationAsset.description.trim()) {
+        const descWords = activeLocationAsset.description.trim().split(" ");
+        if (descWords.length <= 4) {
+          return activeLocationAsset.description.trim();
+        }
+      }
+      const clean = activeLocationAsset.filename
+        .replace(/\.[^.]+$/, "")
+        .replace(/^(scene_location_reference_|character_staging_reference_|scene_reference_|location_reference_|scene_|env_)/i, "")
+        .replace(/_\d+$/, "")
+        .replace(/[_-]/g, " ")
+        .trim();
+      if (clean) {
+        return clean.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+      }
+    }
+    return "Living Room";
+  }, [customLocationName, activeLocationAsset]);
+
+  // Synchronize composite reference name if user hasn't explicitly edited it
+  useEffect(() => {
+    if (!hasUserEditedRefName && defaultEnvironmentName) {
+      setCompositeRefName(defaultEnvironmentName);
+    }
+  }, [defaultEnvironmentName, hasUserEditedRefName]);
+
+  // Reset or re-init when modal opens/closes
+  useEffect(() => {
+    if (isOpen) {
+      if (!hasUserEditedRefName && defaultEnvironmentName) {
+        setCompositeRefName(defaultEnvironmentName);
+      }
+    } else {
+      setHasUserEditedRefName(false);
+      setHasUserEditedDescription(false);
+      setAssignToShotSlot(false);
+    }
+  }, [isOpen, defaultEnvironmentName, hasUserEditedRefName]);
 
   // All available characters in project
   const availableCharacters = useMemo(() => {
@@ -613,26 +662,12 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
     return `[Scene Context: ${activeScene}] [Location: ${locName}] [Atmosphere: ${atmo}] [Framing: ${cameraFraming}, ${viewportRatio}] ${actorSection}`;
   }, [activeScene, customLocationName, activeLocationAsset, selectedAtmosphere, cameraFraming, viewportRatio, stagedActors]);
 
-  const handleCopyStaging = async () => {
-    await copyToClipboard(synthesizedStagingText);
-    setCopiedStaging(true);
-    if (addToast) addToast("Staging prompt copied to clipboard!", "success");
-    setTimeout(() => setCopiedStaging(false), 2000);
-  };
-
-  const handleApplyToActiveShot = () => {
-    if (onUpdateShot) {
-      onUpdateShot(prev => ({
-        ...prev,
-        basic_stub: prev.basic_stub ? `${prev.basic_stub}\n${synthesizedStagingText}` : synthesizedStagingText,
-        shot_type: cameraFraming,
-        status: "unstaged"
-      }));
-      if (addToast) addToast("Staging directions applied to active shot!", "success");
-    } else if (addToast) {
-      addToast("Staging synthesized successfully.", "info");
+  // Auto-sync visual description if user hasn't typed custom notes
+  useEffect(() => {
+    if (!hasUserEditedDescription && synthesizedStagingText) {
+      setCompositeDescription(synthesizedStagingText);
     }
-  };
+  }, [synthesizedStagingText, hasUserEditedDescription]);
 
   // Requirement 2: Composite Export and Asset Ingestion
   const handleSaveCompositeReference = async () => {
@@ -662,20 +697,24 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
         aspectRatio: viewportRatio
       });
 
-      const shotNum = activeShot ? activeShot.shot_number.toString().padStart(2, "0") : "01";
-      const cleanScene = activeScene.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_") || "scene";
-      const timeStamp = Date.now().toString().slice(-6);
-      const filename = `scene_reference_${cleanScene}_shot_${shotNum}_composite_${timeStamp}.png`;
+      const effectiveRefName = (compositeRefName && compositeRefName.trim()) || defaultEnvironmentName || "Location Reference";
+      const cleanType = sanitizeSlug(semanticRefType) || "scene_location_reference";
+      const cleanRefName = sanitizeSlug(effectiveRefName) || "location_ref";
+      const timeStamp = Math.floor(Date.now() / 1000);
+      const filename = `${cleanType}_${cleanRefName}_${timeStamp}.png`;
+
+      const finalDescription = (compositeDescription && compositeDescription.trim()) || synthesizedStagingText;
 
       const formData = new FormData();
       formData.append("file", blob, filename);
-      formData.append("type", "Scene Reference");
+      formData.append("type", semanticRefType);
+      formData.append("subject_name", effectiveRefName);
       formData.append("scene_name", activeScene);
-      const actorNames = stagedActors.map(a => a.characterName).join(", ") || "Scene";
-      formData.append("description", `Composite scene staging for ${activeScene} (Shot ${shotNum}, ${viewportRatio}) featuring ${actorNames}`);
-      formData.append("tags", JSON.stringify(["Scene Reference", "Composite Staging", "Director Staging", viewportRatio]));
-      formData.append("subject_name", activeScene);
-      formData.append("slot_index", String(targetSlotIndex));
+      formData.append("description", finalDescription);
+      formData.append("tags", JSON.stringify([semanticRefType, "Composite Staging", "Director Staging", viewportRatio]));
+      if (assignToShotSlot) {
+        formData.append("slot_index", String(targetSlotIndex));
+      }
 
       // Upload flattened composite to backend asset endpoint
       const res = await fetch("/api/assets/upload", {
@@ -723,12 +762,12 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
         cameraFraming: cameraFraming,
         lightingAtmosphere: selectedAtmosphere,
         compositeAssetFilename: newAsset.filename,
-        targetSlotIndex: targetSlotIndex,
+        targetSlotIndex: assignToShotSlot ? targetSlotIndex : undefined,
         updatedAt: new Date().toISOString()
       };
 
-      // Assign to target reference slot on the active shot
-      if (onUpdateShot) {
+      // Assign to target reference slot on the active shot ONLY IF assignToShotSlot is true
+      if (assignToShotSlot && onUpdateShot) {
         onUpdateShot(prev => {
           const nextSlots = { ...(prev.assigned_slots || {}) };
           nextSlots[targetSlotIndex] = newAsset.filename;
@@ -745,33 +784,34 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
       // Update project state and flag as dirty
       if (onUpdateProject) {
         onUpdateProject(prev => {
-          const nextAssets = prev.assets ? [...prev.assets] : [];
-          const existingIdx = nextAssets.findIndex(a => a.filename === newAsset.filename);
-          if (existingIdx !== -1) {
-            nextAssets[existingIdx] = newAsset;
-          } else {
-            nextAssets.push(newAsset);
-          }
+          const prevAssets = prev.assets ? [...prev.assets] : [];
+          const existingIdx = prevAssets.findIndex(a => a.filename === newAsset.filename);
+          const nextAssetsUpdated = existingIdx !== -1
+            ? prevAssets.map((a, i) => i === existingIdx ? newAsset : a)
+            : [...prevAssets, newAsset];
 
-          const nextShots = [...prev.shots];
-          if (activeShotId) {
-            const sIdx = nextShots.findIndex(s => s.id === activeShotId);
-            if (sIdx !== -1) {
-              const nextSlots = { ...(nextShots[sIdx].assigned_slots || {}) };
-              nextSlots[targetSlotIndex] = newAsset.filename;
-              nextShots[sIdx] = {
-                ...nextShots[sIdx],
-                assigned_slots: nextSlots,
-                staging_recipe: recipe,
-                status: "unstaged",
-                updated_at: new Date().toISOString()
-              };
+          let nextShots = prev.shots ? [...prev.shots] : [];
+          if (assignToShotSlot) {
+            const shotIdToUpdate = activeShotId || (nextShots.length > 0 ? nextShots[0].id : null);
+            if (shotIdToUpdate) {
+              const sIdx = nextShots.findIndex(s => s.id === shotIdToUpdate);
+              if (sIdx !== -1) {
+                const nextSlots = { ...(nextShots[sIdx].assigned_slots || {}) };
+                nextSlots[targetSlotIndex] = newAsset.filename;
+                nextShots[sIdx] = {
+                  ...nextShots[sIdx],
+                  assigned_slots: nextSlots,
+                  staging_recipe: recipe,
+                  status: "unstaged",
+                  updated_at: new Date().toISOString()
+                };
+              }
             }
           }
 
           return {
             ...prev,
-            assets: nextAssets,
+            assets: nextAssetsUpdated,
             staging_recipe: recipe,
             shots: nextShots
           };
@@ -779,7 +819,11 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
       }
 
       if (addToast) {
-        addToast(`Composite reference "${newAsset.filename}" saved and assigned to Slot ${targetSlotIndex + 1}!`, "success");
+        if (assignToShotSlot) {
+          addToast(`Composite reference "${effectiveRefName}" saved to gallery and assigned to Shot Slot ${targetSlotIndex + 1}!`, "success");
+        } else {
+          addToast(`Composite reference "${effectiveRefName}" saved to reference gallery!`, "success");
+        }
       }
     } catch (err: any) {
       console.error("Failed to save composite reference:", err);
@@ -1117,212 +1161,135 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
           {activeTab === "staging" && (
             <div className="p-5 flex flex-col gap-6">
               
-              {/* TOP STAGING CONTROLS ROW */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                
-                {/* 1. Location / Environment Picker */}
-                <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4 flex flex-col gap-3">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
-                      <ImageIcon className="w-3.5 h-3.5 text-amber-400" />
-                      Environment / Location Plate
-                    </label>
-                    <span className="text-[10px] text-zinc-500">Backdrop</span>
+              {/* DIRECTOR'S CANVAS VIEWPORT (FULL WIDTH) */}
+              <div className="w-full flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
+                      <Clapperboard className="w-3.5 h-3.5 text-indigo-400" />
+                      Director's 2D Stage Viewport ({viewportRatio})
+                    </span>
                   </div>
-
-                  <select
-                    value={selectedLocationFilename}
-                    onChange={(e) => setSelectedLocationFilename(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-2.5 py-2 text-xs text-zinc-200 outline-none focus:border-amber-500"
-                  >
-                    <option value="">Default Studio Depth Grid (No Plate)</option>
-                    {locationAssets.map(loc => (
-                      <option key={loc.filename} value={loc.filename}>
-                        {loc.description ? `${loc.description.slice(0, 30)}...` : loc.filename}
-                      </option>
-                    ))}
-                  </select>
-
-                  <input
-                    type="text"
-                    placeholder="Custom location tag (e.g. Tavern Interior, Neon Rooftop)..."
-                    value={customLocationName}
-                    onChange={(e) => setCustomLocationName(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-zinc-300 placeholder-zinc-600 outline-none focus:border-indigo-500"
-                  />
-                </div>
-
-                {/* 2. Atmosphere & Lighting */}
-                <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4 flex flex-col gap-3">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                      Lighting & Atmosphere
-                    </label>
-                    <span className="text-[10px] text-zinc-500">Mood</span>
-                  </div>
-
-                  <select
-                    value={selectedAtmosphere}
-                    onChange={(e) => setSelectedAtmosphere(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-2.5 py-2 text-xs text-zinc-200 outline-none focus:border-indigo-500"
-                  >
-                    {LIGHTING_ATMOSPHERES.map(atmo => (
-                      <option key={atmo.id} value={atmo.id}>{atmo.label}</option>
-                    ))}
-                  </select>
-
-                  <p className="text-[11px] text-zinc-400 italic">
-                    {LIGHTING_ATMOSPHERES.find(a => a.id === selectedAtmosphere)?.desc}
-                  </p>
-                </div>
-
-                {/* 3. Camera Framing & Viewport Options */}
-                <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4 flex flex-col gap-3">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
-                      <Camera className="w-3.5 h-3.5 text-emerald-400" />
-                      Framing Specification
-                    </label>
-                    <span className="text-[10px] text-zinc-500">Lens / Shot</span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <select
-                      value={cameraFraming}
-                      onChange={(e) => setCameraFraming(e.target.value)}
-                      className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-2 py-1.5 text-xs text-zinc-200 outline-none"
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setKeyingTargetSubject(activeSubject || stagedActors[selectedActorIndex]?.characterName || "");
+                        setIsPoseKeyingOpen(true);
+                      }}
+                      className="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow"
                     >
-                      <option value="Wide Shot">Wide Shot (WS)</option>
-                      <option value="Medium Wide Shot">Medium Wide (MWS)</option>
-                      <option value="Medium Shot">Medium Shot (MS)</option>
-                      <option value="Medium Close-Up">Medium Close-Up</option>
-                      <option value="Close-Up">Close-Up (CU)</option>
-                      <option value="Over-the-shoulder">Over-the-shoulder</option>
-                    </select>
-
-                    <select
-                      value={viewportRatio}
-                      onChange={(e) => setViewportRatio(e.target.value)}
-                      className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-2 py-1.5 text-xs text-zinc-200 outline-none"
-                    >
-                      {ASPECT_RATIOS.map(r => (
-                        <option key={r.id} value={r.id}>{r.label}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="flex items-center gap-3 pt-1">
-                    <label className="flex items-center gap-1.5 text-xs text-zinc-400 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={showGrid}
-                        onChange={(e) => setShowGrid(e.target.checked)}
-                        className="rounded border-zinc-700 text-indigo-600 focus:ring-0"
-                      />
-                      Rule of Thirds
-                    </label>
-                    <label className="flex items-center gap-1.5 text-xs text-zinc-400 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={showSafeAreas}
-                        onChange={(e) => setShowSafeAreas(e.target.checked)}
-                        className="rounded border-zinc-700 text-indigo-600 focus:ring-0"
-                      />
-                      Depth Planes
-                    </label>
+                      <UserPlus className="w-3.5 h-3.5" />
+                      <span>Add Actor Pose</span>
+                    </button>
                   </div>
                 </div>
 
+                {/* Interactive 2D Staging Canvas with Drag, Scale, Flip, and Layer controls */}
+                <StagingInteractiveCanvas
+                  actors={stagedActors}
+                  selectedActorId={selectedActorId}
+                  onSelectActor={(id) => setSelectedActorId(id)}
+                  onUpdateActor={handleUpdateActor}
+                  onRemoveActor={handleRemoveActor}
+                  onReorderActors={handleReorderActors}
+                  activeLocationAsset={activeLocationAsset}
+                  locationAssets={locationAssets}
+                  customBackgroundUrl={customBackgroundUrl}
+                  onSelectLocationAsset={(filename) => {
+                    setSelectedLocationFilename(filename);
+                    setCustomBackgroundUrl(undefined);
+                  }}
+                  onUploadCustomBackground={handleUploadCustomBackground}
+                  onClearBackground={handleClearBackground}
+                  aspectRatio={viewportRatio}
+                  showGrid={showGrid}
+                  showSafeAreas={showSafeAreas}
+                  activeMaskingActorId={activeMaskingActorId}
+                  onSetMaskingActorId={setActiveMaskingActorId}
+                />
               </div>
 
-              {/* MAIN STAGE VIEWPORT & ACTOR STAGING PANELS */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                
-                {/* DIRECTOR'S CANVAS VIEWPORT (8 cols on lg) */}
-                <div className="lg:col-span-8 flex flex-col gap-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
-                        <Clapperboard className="w-3.5 h-3.5 text-indigo-400" />
-                        Director's 2D Stage Viewport ({viewportRatio})
-                      </span>
+              {/* ACTOR BLOCKING CONTROLS (HORIZONTAL SECTION BELOW VIEWPORT) */}
+              <div className="w-full bg-zinc-900/60 border border-zinc-800 rounded-xl p-5 space-y-4 shadow-sm">
+                {/* Header Bar */}
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
+                      <Sliders className="w-4 h-4" />
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setKeyingTargetSubject(activeSubject || stagedActors[selectedActorIndex]?.characterName || "");
-                          setIsPoseKeyingOpen(true);
-                        }}
-                        className="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow"
-                      >
-                        <UserPlus className="w-3.5 h-3.5" />
-                        <span>Add Actor Pose</span>
-                      </button>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-xs font-bold text-zinc-200 uppercase tracking-wider">
+                          Actor Blocking Controls
+                        </h4>
+                        {stagedActors[selectedActorIndex] && (
+                          <span className="text-xs font-semibold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                            {stagedActors[selectedActorIndex].characterName}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-zinc-400">
+                        Spatial positioning, scale, floor anchor, stance, and layer masking
+                      </p>
                     </div>
                   </div>
 
-                  {/* Interactive 2D Staging Canvas with Drag, Scale, Flip, and Layer controls */}
-                  <StagingInteractiveCanvas
-                    actors={stagedActors}
-                    selectedActorId={selectedActorId}
-                    onSelectActor={(id) => setSelectedActorId(id)}
-                    onUpdateActor={handleUpdateActor}
-                    onRemoveActor={handleRemoveActor}
-                    onReorderActors={handleReorderActors}
-                    activeLocationAsset={activeLocationAsset}
-                    locationAssets={locationAssets}
-                    customBackgroundUrl={customBackgroundUrl}
-                    onSelectLocationAsset={(filename) => {
-                      setSelectedLocationFilename(filename);
-                      setCustomBackgroundUrl(undefined);
-                    }}
-                    onUploadCustomBackground={handleUploadCustomBackground}
-                    onClearBackground={handleClearBackground}
-                    aspectRatio={viewportRatio}
-                    showGrid={showGrid}
-                    showSafeAreas={showSafeAreas}
-                    activeMaskingActorId={activeMaskingActorId}
-                    onSetMaskingActorId={setActiveMaskingActorId}
-                  />
+                  {/* Cast Quick-Add Buttons & Pose Inspector */}
+                  <div className="flex items-center flex-wrap gap-2">
+                    <span className="text-[11px] font-medium text-zinc-400">Add Cast:</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {availableCharacters.map(char => {
+                        const isStaged = stagedActors.some(a => a.characterName.toLowerCase() === char.toLowerCase());
+                        return (
+                          <button
+                            key={char}
+                            type="button"
+                            onClick={() => handleAddActorToStage(char)}
+                            className={`px-2 py-1 rounded text-[11px] font-medium transition-colors flex items-center gap-1 cursor-pointer ${
+                              isStaged 
+                                ? "bg-zinc-800 text-zinc-300 border border-zinc-700" 
+                                : "bg-indigo-950/60 text-indigo-300 border border-indigo-800/60 hover:bg-indigo-900"
+                            }`}
+                          >
+                            <Plus className="w-3 h-3" />
+                            {char}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setKeyingTargetSubject(activeSubject || "");
+                        setIsPoseKeyingOpen(true);
+                      }}
+                      className="px-2.5 py-1 bg-indigo-950/70 hover:bg-indigo-900 border border-indigo-800/80 text-indigo-300 hover:text-white rounded-lg text-xs font-medium flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      <UserPlus className="w-3 h-3" />
+                      <span>Pose Inspector</span>
+                    </button>
+                  </div>
                 </div>
 
-                {/* ACTOR BLOCKING & CONTROLS PANEL (4 cols on lg) */}
-                <div className="lg:col-span-4 bg-zinc-900/60 border border-zinc-800 rounded-xl p-4 flex flex-col gap-4">
-                  <div className="flex items-center justify-between border-b border-zinc-800 pb-2.5">
-                    <div>
-                      <h4 className="text-xs font-bold text-zinc-200 uppercase tracking-wider">
-                        Actor Blocking Controls
-                      </h4>
-                      <p className="text-[11px] text-zinc-500">Spatial positioning & actor stance</p>
-                    </div>
-                    {stagedActors[selectedActorIndex] && (
-                      <span className="text-xs font-semibold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
-                        {stagedActors[selectedActorIndex].characterName}
-                      </span>
-                    )}
-                  </div>
-
-                  {stagedActors[selectedActorIndex] ? (
-                    <div className="space-y-3.5">
-                      {/* Posed Actor Cutout Status / Keying Action */}
-                      <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 flex flex-col gap-2">
+                {stagedActors[selectedActorIndex] ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
+                    {/* Col 1: Figure Representation & Live Masking */}
+                    <div className="space-y-3 bg-zinc-950/50 border border-zinc-800/80 rounded-xl p-3.5 flex flex-col justify-between h-full">
+                      <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-[11px] font-medium text-zinc-400">Actor Figure Representation</span>
+                          <span className="text-[11px] font-semibold text-zinc-300">Figure Representation</span>
                           {stagedActors[selectedActorIndex].cutoutDataUrl ? (
                             <span className="text-[10px] text-emerald-400 font-mono bg-emerald-950/60 border border-emerald-800/60 px-1.5 py-0.5 rounded">
                               Transparent Cutout Active
                             </span>
                           ) : (
-                            <span className="text-[10px] text-zinc-500 font-mono">
-                              Headshot Token
-                            </span>
+                            <span className="text-[10px] text-zinc-500 font-mono">Headshot Token</span>
                           )}
                         </div>
 
                         {stagedActors[selectedActorIndex].cutoutDataUrl ? (
-                          <div className="flex items-center justify-between gap-2 pt-1 border-t border-zinc-850">
+                          <div className="flex items-center justify-between gap-2 pt-1 border-t border-zinc-800">
                             <div className="flex items-center gap-2.5">
                               <div 
                                 className="w-10 h-10 rounded border border-zinc-700 overflow-hidden flex items-center justify-center shrink-0"
@@ -1382,12 +1349,12 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
                         )}
                       </div>
 
-                      {/* Live In-Place Actor Mask / Eraser Brush Action */}
-                      <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 flex flex-col gap-2">
+                      {/* Live In-Place Actor Mask / Eraser Brush */}
+                      <div className="pt-2 border-t border-zinc-800 space-y-1.5">
                         <div className="flex items-center justify-between">
                           <span className="text-[11px] font-semibold text-zinc-300 flex items-center gap-1.5">
                             <Eraser className="w-3.5 h-3.5 text-indigo-400" />
-                            Actor Layer Mask / Eraser
+                            Layer Mask / Eraser
                           </span>
                           {stagedActors[selectedActorIndex].maskDataUrl && (
                             <span className="text-[9px] font-semibold text-indigo-300 bg-indigo-950/80 border border-indigo-800/80 px-1.5 py-0.5 rounded">
@@ -1395,10 +1362,7 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
                             </span>
                           )}
                         </div>
-                        <p className="text-[10px] text-zinc-400">
-                          Erase pixels live on the canvas to tuck limbs or clothing behind desks, tables, or walls.
-                        </p>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5">
                           <button
                             type="button"
                             onClick={() => {
@@ -1419,7 +1383,7 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
                             <span>
                               {activeMaskingActorId === stagedActors[selectedActorIndex].id
                                 ? "Done Masking"
-                                : "Erase / Mask on Stage"}
+                                : "Erase on Stage"}
                             </span>
                           </button>
                           {stagedActors[selectedActorIndex].maskDataUrl && (
@@ -1441,10 +1405,13 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
                           )}
                         </div>
                       </div>
+                    </div>
 
+                    {/* Col 2: Depth Plane & Scale Factor */}
+                    <div className="space-y-3 bg-zinc-950/50 border border-zinc-800/80 rounded-xl p-3.5 flex flex-col justify-between h-full">
                       {/* Depth Plane */}
                       <div>
-                        <label className="block text-[11px] font-medium text-zinc-400 mb-1">Depth Plane</label>
+                        <label className="block text-[11px] font-medium text-zinc-400 mb-1.5">Depth Plane</label>
                         <div className="grid grid-cols-3 gap-1.5">
                           {(["foreground", "midground", "background"] as const).map(plane => (
                             <button
@@ -1466,7 +1433,7 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
                       {/* Depth Scale Factor Slider */}
                       <div>
                         <div className="flex items-center justify-between text-[11px] font-medium text-zinc-400 mb-1">
-                          <span>Depth Scale Factor (20% – 350%+)</span>
+                          <span>Depth Scale Factor (20% – 350%)</span>
                           <span className="font-mono text-zinc-200 font-semibold">
                             {Math.round((stagedActors[selectedActorIndex].scale || 1.0) * 100)}% ({((stagedActors[selectedActorIndex].scale || 1.0)).toFixed(2)}x)
                           </span>
@@ -1499,17 +1466,20 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
                           ))}
                         </div>
                       </div>
+                    </div>
 
-                      {/* Horizontal Placement Slider (Unconstrained Off-Canvas Framing) */}
+                    {/* Col 3: Stage Position (X-Axis) & Floor Anchor (Y-Axis) */}
+                    <div className="space-y-3 bg-zinc-950/50 border border-zinc-800/80 rounded-xl p-3.5 flex flex-col justify-between h-full">
+                      {/* Horizontal Placement Slider */}
                       <div>
                         <div className="flex items-center justify-between text-[11px] font-medium text-zinc-400 mb-1">
                           <span>Stage Position (X-Axis)</span>
                           <span className="font-mono text-zinc-300">
                             {Math.round(stagedActors[selectedActorIndex].xPercent)}%
                             {stagedActors[selectedActorIndex].xPercent < 0 ? (
-                              <span className="text-amber-400 text-[10px] ml-1">(Off-Stage Left)</span>
+                              <span className="text-amber-400 text-[10px] ml-1">(Off-L)</span>
                             ) : stagedActors[selectedActorIndex].xPercent > 100 ? (
-                              <span className="text-amber-400 text-[10px] ml-1">(Off-Stage Right)</span>
+                              <span className="text-amber-400 text-[10px] ml-1">(Off-R)</span>
                             ) : null}
                           </span>
                         </div>
@@ -1527,11 +1497,11 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
                         />
                         <div className="flex justify-between gap-1 text-[9px] text-zinc-500 font-mono mt-1">
                           {[
-                            { label: "Off-L (-20%)", val: -20 },
-                            { label: "Left (20%)", val: 20 },
-                            { label: "Center (50%)", val: 50 },
-                            { label: "Right (80%)", val: 80 },
-                            { label: "Off-R (120%)", val: 120 }
+                            { label: "Off-L", val: -20 },
+                            { label: "L (20%)", val: 20 },
+                            { label: "Center", val: 50 },
+                            { label: "R (80%)", val: 80 },
+                            { label: "Off-R", val: 120 }
                           ].map((preset) => (
                             <button
                               key={preset.label}
@@ -1548,11 +1518,11 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
                       {/* Vertical Floor Anchor Slider */}
                       <div>
                         <div className="flex items-center justify-between text-[11px] font-medium text-zinc-400 mb-1">
-                          <span>Floor Anchor Depth (Y-Axis)</span>
+                          <span>Floor Anchor (Y-Axis)</span>
                           <span className="font-mono text-zinc-300">
                             {Math.round(stagedActors[selectedActorIndex].yPercent)}%
                             {stagedActors[selectedActorIndex].yPercent > 100 ? (
-                              <span className="text-amber-400 text-[10px] ml-1">(Bleed Bottom)</span>
+                              <span className="text-amber-400 text-[10px] ml-1">(Bleed)</span>
                             ) : null}
                           </span>
                         </div>
@@ -1567,10 +1537,10 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
                         />
                         <div className="flex justify-between gap-1 text-[9px] text-zinc-500 font-mono mt-1">
                           {[
-                            { label: "Deep Bg (42%)", val: 42 },
+                            { label: "Deep (42%)", val: 42 },
                             { label: "Mid (65%)", val: 65 },
                             { label: "Fg (88%)", val: 88 },
-                            { label: "Bleed (115%)", val: 115 }
+                            { label: "Bleed", val: 115 }
                           ].map((preset) => (
                             <button
                               key={preset.label}
@@ -1588,12 +1558,15 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
                       <button
                         type="button"
                         onClick={() => updateSelectedActor({ xPercent: 50, horizontalPercent: 50, yPercent: 85, scale: 1.0 })}
-                        className="w-full py-1.5 text-xs text-indigo-300 hover:text-white bg-indigo-950/40 hover:bg-indigo-900/60 border border-indigo-800/50 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                        className="w-full py-1 text-xs text-indigo-300 hover:text-white bg-indigo-950/40 hover:bg-indigo-900/60 border border-indigo-800/50 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer mt-1"
                       >
                         <Compass className="w-3.5 h-3.5 text-indigo-400" />
-                        <span>Center on Stage (X: 50%, Y: 85%, Scale: 100%)</span>
+                        <span>Center on Stage</span>
                       </button>
+                    </div>
 
+                    {/* Col 4: Stance, Direction & Actions */}
+                    <div className="space-y-3 bg-zinc-950/50 border border-zinc-800/80 rounded-xl p-3.5 flex flex-col justify-between h-full">
                       {/* Facing & Gaze Direction */}
                       <div>
                         <label className="block text-[11px] font-medium text-zinc-400 mb-1">Gaze & Facing Direction</label>
@@ -1618,168 +1591,178 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
                           type="text"
                           value={stagedActors[selectedActorIndex].posture}
                           onChange={(e) => updateSelectedActor({ posture: e.target.value })}
-                          placeholder="e.g. Standing Heroic, Seated Casual, Mid-Motion..."
+                          placeholder="e.g. Standing Heroic, Seated Casual..."
                           className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 outline-none"
                         />
                       </div>
 
                       {/* Quick remove from stage */}
-                      {stagedActors.length > 1 && (
+                      {stagedActors.length > 0 && stagedActors[selectedActorIndex] && (
                         <button
                           type="button"
                           onClick={() => handleRemoveActorFromStage(selectedActorIndex)}
-                          className="w-full py-1.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-950/30 border border-red-900/40 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                          className="w-full py-1.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-950/30 border border-red-900/40 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer mt-1"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
-                          Remove {stagedActors[selectedActorIndex].characterName} from Stage
+                          <span>Remove {stagedActors[selectedActorIndex].characterName}</span>
                         </button>
                       )}
                     </div>
-                  ) : (
-                    <div className="text-center py-6 text-zinc-500 text-xs">
-                      No actor selected.
-                    </div>
-                  )}
+                  </div>
+                ) : (
+                  <div className="text-center py-6 px-4 bg-zinc-950/40 border border-zinc-800/60 rounded-xl space-y-1.5">
+                    <User className="w-5 h-5 text-zinc-600 mx-auto" />
+                    <p className="text-xs font-medium text-zinc-400">No actors currently on stage</p>
+                    <p className="text-[11px] text-zinc-500">Select a character above or open Pose Inspector to stage an actor.</p>
+                  </div>
+                )}
+              </div>
 
-                  {/* Add Available Characters to Stage */}
-                  <div className="pt-3 border-t border-zinc-800 space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <label className="block text-[11px] font-medium text-zinc-400">Add Cast to Stage</label>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setKeyingTargetSubject(activeSubject || "");
-                          setIsPoseKeyingOpen(true);
-                        }}
-                        className="text-[11px] font-medium text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition-colors cursor-pointer"
-                      >
-                        <UserPlus className="w-3 h-3" />
-                        <span>Pose Inspector</span>
-                      </button>
+              {/* LOCATION-FIRST REFERENCE SAVE PANEL */}
+              <div className="bg-gradient-to-br from-zinc-900/90 via-zinc-900/60 to-zinc-950 border border-zinc-800 rounded-xl p-5 space-y-4 shadow-xl">
+                {/* Header with contextual location info */}
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800/80 pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                      <MapPin className="w-4 h-4" />
                     </div>
-
-                    <div className="flex flex-wrap gap-1.5">
-                      {availableCharacters.map(char => {
-                        const isStaged = stagedActors.some(a => a.characterName.toLowerCase() === char.toLowerCase());
-                        return (
-                          <button
-                            key={char}
-                            type="button"
-                            onClick={() => handleAddActorToStage(char)}
-                            className={`px-2 py-1 rounded text-[11px] font-medium transition-colors flex items-center gap-1 cursor-pointer ${
-                              isStaged 
-                                ? "bg-zinc-800 text-zinc-300 border border-zinc-700" 
-                                : "bg-indigo-950/60 text-indigo-300 border border-indigo-800/60 hover:bg-indigo-900"
-                            }`}
-                          >
-                            <Plus className="w-3 h-3" />
-                            {char}
-                          </button>
-                        );
-                      })}
+                    <div>
+                      <h4 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
+                        <span>Save Composite Reference to Gallery</span>
+                      </h4>
+                      <p className="text-xs text-zinc-400">
+                        Flattens 2D staging layout & environment into a persistent scene reference asset.
+                      </p>
                     </div>
+                  </div>
 
+                  {/* Active background environment badge */}
+                  <div className="flex items-center gap-2 text-xs bg-zinc-950/80 border border-zinc-800 px-2.5 py-1 rounded-lg">
+                    <span className="text-zinc-500">Stage Background:</span>
+                    <span className="font-semibold text-zinc-200 truncate max-w-[200px]" title={defaultEnvironmentName}>
+                      {defaultEnvironmentName}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Form fields: Location/Reference Name & Semantic Type Selector */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-300 mb-1">
+                      Location / Reference Name
+                    </label>
+                    <input
+                      type="text"
+                      value={compositeRefName}
+                      onChange={(e) => {
+                        setHasUserEditedRefName(true);
+                        setCompositeRefName(e.target.value);
+                      }}
+                      placeholder="e.g. Couch 3/4 or Living Room"
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-amber-500/60 transition-colors"
+                    />
+                    <span className="block mt-1 text-[11px] text-zinc-500">
+                      Asset subject identifier for gallery organization (avoids phantom characters)
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-300 mb-1">
+                      Semantic Type Selector
+                    </label>
+                    <select
+                      value={semanticRefType}
+                      onChange={(e) => setSemanticRefType(e.target.value)}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-amber-400 font-medium focus:outline-none focus:border-amber-500/60 transition-colors cursor-pointer"
+                    >
+                      <option value="Scene / Location Reference">Scene / Location Reference (Default)</option>
+                      <option value="Scene Reference">Scene Reference</option>
+                      <option value="Character Staging Reference">Character Staging Reference</option>
+                    </select>
+                    <span className="block mt-1 text-[11px] text-zinc-500">
+                      Semantic reference category passed to ComfyUI & workflow pipelines
+                    </span>
+                  </div>
+                </div>
+
+                {/* Visual Description textarea */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-semibold text-zinc-300">
+                      Visual Description
+                    </label>
                     <button
                       type="button"
                       onClick={() => {
-                        setKeyingTargetSubject(activeSubject || "");
-                        setIsPoseKeyingOpen(true);
+                        setCompositeDescription(synthesizedStagingText);
+                        setHasUserEditedDescription(false);
+                        if (addToast) addToast("Visual description re-synced with staging directions", "info");
                       }}
-                      className="w-full py-2 bg-indigo-950/60 hover:bg-indigo-900 border border-indigo-800/80 text-indigo-300 hover:text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                      className="text-[11px] text-amber-400 hover:text-amber-300 flex items-center gap-1 font-medium transition-colors cursor-pointer"
                     >
-                      <UserPlus className="w-3.5 h-3.5" />
-                      <span>Add Actor Pose & Key Background</span>
+                      <RefreshCw className="w-3 h-3" />
+                      <span>Re-sync from Staging Prompt</span>
                     </button>
                   </div>
+                  <textarea
+                    rows={2}
+                    value={compositeDescription}
+                    onChange={(e) => {
+                      setHasUserEditedDescription(true);
+                      setCompositeDescription(e.target.value);
+                    }}
+                    placeholder="Visual description pre-filled from staging directions..."
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 font-mono text-xs text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-amber-500/60 transition-colors resize-y leading-relaxed"
+                  />
                 </div>
 
-              </div>
+                {/* Bottom Action Bar: Optional Slot Assignment & Save Action Button */}
+                <div className="flex flex-wrap items-center justify-between gap-4 pt-2 border-t border-zinc-800/60">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <label className="flex items-center gap-2 cursor-pointer select-none group">
+                      <input
+                        type="checkbox"
+                        checked={assignToShotSlot}
+                        onChange={(e) => setAssignToShotSlot(e.target.checked)}
+                        className="w-4 h-4 rounded border-zinc-700 bg-zinc-950 text-amber-500 focus:ring-amber-500/40 cursor-pointer accent-amber-500"
+                      />
+                      <span className="text-xs font-medium text-zinc-300 group-hover:text-zinc-100 transition-colors">
+                        Also assign to active shot input slot
+                        {activeShot && (
+                          <span className="ml-1.5 text-[10px] font-mono text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                            Shot {activeShot.shot_number.toString().padStart(2, "0")}
+                          </span>
+                        )}
+                      </span>
+                    </label>
 
-              {/* SYNTHESIZED STAGING PROMPT & INTEGRATION BAR */}
-              <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4 space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h4 className="text-xs font-bold text-zinc-200 uppercase tracking-wider flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                      Synthesized Cinematic Staging Context
-                    </h4>
-                    <p className="text-[11px] text-zinc-400">
-                      Formatted spatial prompt directions ready for AI video generation and shot planning
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handleCopyStaging}
-                      className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border border-zinc-700"
-                    >
-                      {copiedStaging ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-zinc-400" />}
-                      <span>{copiedStaging ? "Copied!" : "Copy Directions"}</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleApplyToActiveShot}
-                      className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow"
-                    >
-                      <Layers className="w-3.5 h-3.5" />
-                      <span>Apply to Shot Plan</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 font-mono text-xs text-zinc-300 leading-relaxed select-all">
-                  {synthesizedStagingText}
-                </div>
-              </div>
-
-              {/* STAGING COMPOSITE EXPORT ACTION BAR */}
-              <div className="bg-gradient-to-r from-zinc-900 via-indigo-950/40 to-zinc-900 border border-zinc-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-xl">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
-                    <Clapperboard className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
-                      <span>Save Composite Reference to Shot</span>
-                      {activeShot && (
-                        <span className="text-xs font-mono font-normal text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
-                          Shot {activeShot.shot_number.toString().padStart(2, "0")}
-                        </span>
-                      )}
-                    </h4>
-                    <p className="text-xs text-zinc-400">
-                      Flattens current 2D actor arrangement and backdrop into a PNG reference asset for AI generation.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex items-center gap-2 bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-zinc-300">
-                    <span className="text-zinc-500 font-medium">Target Slot:</span>
-                    <select
-                      value={targetSlotIndex}
-                      onChange={(e) => setTargetSlotIndex(Number(e.target.value))}
-                      className="bg-transparent border-none text-amber-400 font-semibold outline-none cursor-pointer"
-                    >
-                      <option value={8}>Slot 9 (Location / Staging Ref)</option>
-                      <option value={0}>Slot 1 (Subject / Primary Ref)</option>
-                      <option value={1}>Slot 2 (Secondary Ref)</option>
-                      <option value={2}>Slot 3 (Tertiary Ref)</option>
-                      <option value={3}>Slot 4 (Shot Composition Ref)</option>
-                      <option value={4}>Slot 5 (Lighting Ref)</option>
-                      <option value={5}>Slot 6 (Atmosphere Ref)</option>
-                      <option value={6}>Slot 7 (Action Ref)</option>
-                      <option value={7}>Slot 8 (Style Ref)</option>
-                    </select>
+                    {assignToShotSlot && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-zinc-500 font-medium">Slot:</span>
+                        <select
+                          value={targetSlotIndex}
+                          onChange={(e) => setTargetSlotIndex(Number(e.target.value))}
+                          className="bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-1 text-xs text-amber-400 font-semibold focus:outline-none focus:border-amber-500/60 cursor-pointer"
+                        >
+                          <option value={8}>Slot 9 (Location / Staging Ref) - Default</option>
+                          <option value={0}>Slot 1 (Subject / Primary Ref)</option>
+                          <option value={1}>Slot 2 (Secondary Ref)</option>
+                          <option value={2}>Slot 3 (Tertiary Ref)</option>
+                          <option value={3}>Slot 4 (Shot Composition Ref)</option>
+                          <option value={4}>Slot 5 (Lighting Ref)</option>
+                          <option value={5}>Slot 6 (Atmosphere Ref)</option>
+                          <option value={6}>Slot 7 (Action Ref)</option>
+                          <option value={7}>Slot 8 (Style Ref)</option>
+                        </select>
+                      </div>
+                    )}
                   </div>
 
                   <button
                     type="button"
                     onClick={handleSaveCompositeReference}
                     disabled={isExportingComposite}
-                    className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:opacity-50 text-black font-bold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 transition-all cursor-pointer shadow-lg shadow-amber-500/20 hover:scale-[1.02] active:scale-[0.98]"
+                    className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:opacity-50 text-black font-bold px-6 py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg shadow-amber-500/20 hover:scale-[1.02] active:scale-[0.98] shrink-0"
                   >
                     {isExportingComposite ? (
                       <>

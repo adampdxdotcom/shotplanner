@@ -15,6 +15,8 @@ import { AssetRecord } from "../types";
 import { sanitizeSlug } from "../utils/formatters";
 
 const COMPOUND_REFERENCE_TYPES = [
+  "scene_location_reference",
+  "character_staging_reference",
   "motion_reference_video",
   "voiceover_audio",
   "motion_reference",
@@ -98,8 +100,17 @@ export function parseAssetFilename(filename: string): {
     subjectDisplay = subjectClean.replace(/_/g, " ");
   }
 
+  let typeDisplay = assetType;
+  if (assetType === "scene_location_reference") {
+    typeDisplay = "Scene / Location Reference";
+  } else if (assetType === "character_staging_reference") {
+    typeDisplay = "Character Staging Reference";
+  } else if (assetType === "scene_reference") {
+    typeDisplay = "Scene Reference";
+  }
+
   return {
-    type: assetType,
+    type: typeDisplay,
     subject_name: subjectDisplay,
     media_type: mediaType
   };
@@ -145,6 +156,21 @@ class AssetService {
     const assets: AssetRecord[] = [];
     const seen = new Set<string>();
 
+    const dbMap = new Map<string, any>();
+    if (fs.existsSync(ASSET_DB_FILE)) {
+      try {
+        const raw = fs.readFileSync(ASSET_DB_FILE, "utf-8");
+        const entries = JSON.parse(raw);
+        if (Array.isArray(entries)) {
+          for (const item of entries) {
+            if (item && item.filename) {
+              dbMap.set(item.filename, item);
+            }
+          }
+        }
+      } catch (e) {}
+    }
+
     const dirsToScan = [];
     if (sceneName) {
       const sceneDirs = ensureSceneDirectories(sceneName);
@@ -178,19 +204,22 @@ class AssetService {
             } catch(e) {}
             
             const parsedInfo = parseAssetFilename(file.name);
+            const dbRecord = dbMap.get(file.name);
 
             assets.push({
               id: file.name,
               filename: file.name,
-              original_name: file.name,
-              media_type: (mediaType || parsedInfo.media_type) as any,
-              type: parsedInfo.type,
-              subject_name: parsedInfo.subject_name,
-              description: "",
+              original_name: dbRecord?.original_name || file.name,
+              media_type: (dbRecord?.media_type || mediaType || parsedInfo.media_type) as any,
+              type: dbRecord?.type || parsedInfo.type,
+              subject_name: dbRecord?.subject_name || parsedInfo.subject_name,
+              description: dbRecord?.description || "",
+              tags: dbRecord?.tags,
               size_bytes: size,
-              created_at: mtime,
+              created_at: dbRecord?.created_at || mtime,
               preview_url: `/api/uploads/${file.name}`,
-              scene_name: sceneName || "unknown",
+              slot_index: dbRecord?.slot_index,
+              scene_name: dbRecord?.scene_name || sceneName || "unknown",
               path: path.join(dir, file.name)
             });
           }
@@ -447,7 +476,7 @@ class AssetService {
         ? parseInt(String(meta.slot_index))
         : undefined;
         
-    return {
+    const record: AssetRecord = {
       id: targetFilename,
       original_name: file.originalname,
       filename: targetFilename,
@@ -462,6 +491,26 @@ class AssetService {
       scene_name: sceneName,
       path: destinationPath
     };
+
+    try {
+      let dbRecords: any[] = [];
+      if (fs.existsSync(ASSET_DB_FILE)) {
+        try {
+          const raw = fs.readFileSync(ASSET_DB_FILE, "utf-8");
+          const loaded = JSON.parse(raw);
+          if (Array.isArray(loaded)) dbRecords = loaded;
+        } catch (e) {}
+      }
+      const existingIdx = dbRecords.findIndex((r: any) => r.filename === targetFilename);
+      if (existingIdx !== -1) {
+        dbRecords[existingIdx] = record;
+      } else {
+        dbRecords.push(record);
+      }
+      fs.writeFileSync(ASSET_DB_FILE, JSON.stringify(dbRecords, null, 2), "utf-8");
+    } catch (e) {}
+
+    return record;
   }
 
   public handleChunkUpload(

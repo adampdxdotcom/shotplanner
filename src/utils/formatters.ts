@@ -227,3 +227,12 @@ export const assembleFinalPrompt = (prompt: string, prefix: string, hasSceneRef:
   }
   return final;
 };
+
+export const sanitizeSlug = (str: string): string => {
+  if (!str) return "";
+  return str
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+};

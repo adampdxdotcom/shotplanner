@@ -5,6 +5,7 @@ export {
   generatePromptPrefix, 
   formatShotNumber, 
   sanitizeFilenamePart, 
+  sanitizeSlug,
   generateSaveVideoPrefix,
   buildSubjectDefinitions,
   computePrePromptContext
