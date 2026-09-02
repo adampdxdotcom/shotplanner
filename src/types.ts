@@ -179,7 +179,11 @@ export interface CivitaiModelMetadata {
   default_destination_folder: string;
   suggested_remote_path: string;
   files?: any[];
+  trained_words?: string[];
+  trainedWords?: string[];
   description?: string;
+  clean_description?: string;
+  download_command?: string;
   tags?: string[];
   allow_commercial_use?: boolean | string;
   nsfw?: boolean;

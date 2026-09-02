@@ -925,9 +925,17 @@
 - **`src/types.ts`**
   - Added `files?: any[]` to `CivitaiModelMetadata` interface to carry the version's complete files list to the client.
 
-## Python FastAPI Headshot Service Fixes
-- **`backend/services/headshot_service.py`**
-  - Imported `sanitize_filename` from `backend.utils.file_handlers` in `backend/services/headshot_service.py` to fix `NameError: name 'sanitize_filename' is not defined` when saving user-approved headshot variations.
+## Civitai Metadata Extraction & CLI Command Synthesis
+- **`server/services/civitaiService.ts` & `backend/services/civitai_service.py`**
+  - **Trained Trigger Words Extraction**: Extracts the `trainedWords` array from the Civitai API response and maps it to `trained_words` (and `trainedWords`) as a structured array of trigger strings.
+  - **HTML Description Sanitization**: Implemented `cleanHtmlDescription` (`clean_html_description` in Python) using regex rules to strip HTML tags (`<p>`, `<a>`, `<span>`, `<div>`, etc.), replace `<br>` and `<li>` with newlines/bullets, decode HTML entities (`&amp;`, `&quot;`, `&#39;`, `&lt;`, `&gt;`), and collapse excessive whitespace for clean presentation.
+  - **Shell CLI Download Command Synthesis**: Implemented `generateCivitaiDownloadCommand` (`generate_civitai_download_command` in Python) to build pre-formatted shell commands using `mkdir -p` and `aria2c` (with 8 parallel connections `-x 8 -s 8 -k 1M`, destination directory `-d`, output filename `-o`, and Bearer token header) with seamless fallback to `curl -L -C - --fail --retry 3`.
+- **`src/types.ts`**
+  - Updated `CivitaiModelMetadata` to include `trained_words?: string[]`, `clean_description?: string`, and `download_command?: string`.
+- **`src/components/config/ModelHubConfig.tsx` & `src/components/config/CivitaiConfig.tsx`**
+  - **Trained Trigger Words Badge Chips**: Interactive badge chips for each trigger word with one-click copy feedback ("Copied!") and a "Copy All" trigger words action.
+  - **Description & Release Notes Section**: Displays sanitized description notes in a scrollable container.
+  - **Dedicated "Copy Download Command" Button**: Added alongside the remote ingestion CTA with clipboard copy, immediate "Command Copied!" feedback state, and toast notifications.
 
 
 

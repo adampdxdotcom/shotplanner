@@ -60,6 +60,47 @@ def format_bytes(bytes_val: int) -> str:
     mb = bytes_val / (1024 * 1024)
     return f"{mb:.1f} MB"
 
+def clean_html_description(raw_html: Optional[str]) -> str:
+    """Clean raw HTML markup from Civitai descriptions to produce clean plain text."""
+    if not raw_html:
+        return ""
+    text = raw_html
+    text = re.sub(r"<br\s*/?>", "\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"</p>", "\n\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"</li>", "\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"</h[1-6]>", "\n\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"</div>", "\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"<[^>]+>", "", text)
+    text = (
+        text.replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", '"')
+        .replace("&#39;", "'")
+        .replace("&nbsp;", " ")
+        .replace("&ndash;", "–")
+        .replace("&mdash;", "—")
+    )
+    text = re.sub(r"\n{3,}", "\n\n", text).strip()
+    return text
+
+def generate_civitai_download_command(
+    download_url: str,
+    destination_folder: str,
+    filename: str,
+    token: Optional[str] = None
+) -> str:
+    """Synthesize pre-formatted remote CLI download command using aria2c with curl fallback."""
+    clean_dest = (destination_folder or "models/checkpoints/").strip().rstrip("/")
+    clean_filename = (filename or "model.safetensors").strip()
+    clean_url = (download_url or "").strip()
+    clean_token = (token or "").strip()
+
+    auth_aria = f'--header="Authorization: Bearer {clean_token}" ' if clean_token else ""
+    auth_curl = f'-H "Authorization: Bearer {clean_token}" ' if clean_token else ""
+
+    return f'mkdir -p "{clean_dest}" && (aria2c -c -x 8 -s 8 -k 1M {auth_aria}-d "{clean_dest}" -o "{clean_filename}" "{clean_url}" || curl -L -C - --fail --retry 3 {auth_curl}-o "{clean_dest}/{clean_filename}" "{clean_url}")'
+
 def parse_civitai_query(raw_query: str) -> Dict[str, Any]:
     """
     Parse input string, AIR URN, or URL to extract version ID and/or model ID.
@@ -201,6 +242,29 @@ async def fetch_civitai_model_info(query: str, token_override: Optional[str] = N
     default_dest = determine_comfyui_destination(category)
     suggested_remote_path = f"{default_dest.rstrip('/')}/{filename}"
 
+    # Extract and normalize trained trigger words
+    raw_trained_words = version_data.get("trainedWords") or (model_data or {}).get("trainedWords") or []
+    trained_words_list = []
+    if isinstance(raw_trained_words, list):
+        for w in raw_trained_words:
+            if isinstance(w, str):
+                for part in w.split(","):
+                    p = part.strip()
+                    if p and p not in trained_words_list:
+                        trained_words_list.append(p)
+
+    # Extract and clean HTML description / release notes
+    raw_description = version_data.get("description") or (model_data or {}).get("description") or ""
+    cleaned_desc = clean_html_description(raw_description)
+
+    # Synthesize pre-formatted remote CLI download command
+    download_command = generate_civitai_download_command(
+        download_url=download_url,
+        destination_folder=default_dest,
+        filename=filename,
+        token=token
+    )
+
     available_versions = []
     if model_data and "modelVersions" in model_data:
         for v in model_data["modelVersions"]:
@@ -227,7 +291,11 @@ async def fetch_civitai_model_info(query: str, token_override: Optional[str] = N
         "default_destination_folder": default_dest,
         "suggested_remote_path": suggested_remote_path,
         "files": files,
-        "description": version_data.get("description") or (model_data or {}).get("description") or "",
+        "trained_words": trained_words_list,
+        "trainedWords": trained_words_list,
+        "description": cleaned_desc or raw_description,
+        "clean_description": cleaned_desc,
+        "download_command": download_command,
         "tags": (model_data or {}).get("tags") or [],
         "allow_commercial_use": (model_data or {}).get("allowCommercialUse"),
         "nsfw": (model_data or {}).get("nsfw") or False,

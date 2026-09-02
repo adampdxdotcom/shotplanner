@@ -26,7 +26,11 @@ export interface CivitaiModelMetadata {
   default_destination_folder: string;
   suggested_remote_path: string;
   files?: any[];
+  trained_words?: string[];
+  trainedWords?: string[];
   description?: string;
+  clean_description?: string;
+  download_command?: string;
   tags?: string[];
   allow_commercial_use?: boolean | string;
   nsfw?: boolean;
@@ -131,6 +135,55 @@ export function formatBytes(bytes: number): string {
   }
   const mb = bytes / (1024 * 1024);
   return `${mb.toFixed(1)} MB`;
+}
+
+/**
+ * Clean raw HTML markup from Civitai descriptions to produce clean plain text
+ */
+export function cleanHtmlDescription(rawHtml?: string): string {
+  if (!rawHtml) return "";
+  let text = rawHtml;
+  // Convert line breaks and paragraph closings to appropriate newlines
+  text = text.replace(/<br\s*[\/]?>/gi, "\n");
+  text = text.replace(/<\/p>/gi, "\n\n");
+  text = text.replace(/<\/li>/gi, "\n");
+  text = text.replace(/<\/h[1-6]>/gi, "\n\n");
+  text = text.replace(/<\/div>/gi, "\n");
+  // Strip all other HTML tags
+  text = text.replace(/<[^>]+>/g, "");
+  // Decode common HTML entities
+  text = text
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&ndash;/g, "–")
+    .replace(/&mdash;/g, "—");
+  // Collapse excess blank lines
+  text = text.replace(/\n{3,}/g, "\n\n").trim();
+  return text;
+}
+
+/**
+ * Synthesize pre-formatted remote CLI download command using aria2c with curl fallback
+ */
+export function generateCivitaiDownloadCommand(
+  downloadUrl: string,
+  destinationFolder: string,
+  filename: string,
+  token?: string
+): string {
+  const cleanDest = (destinationFolder || "models/checkpoints/").trim().replace(/\/$/, "");
+  const cleanFilename = (filename || "model.safetensors").trim();
+  const cleanUrl = (downloadUrl || "").trim();
+  const cleanToken = (token || "").trim();
+
+  const authAria = cleanToken ? `--header="Authorization: Bearer ${cleanToken}" ` : "";
+  const authCurl = cleanToken ? `-H "Authorization: Bearer ${cleanToken}" ` : "";
+
+  return `mkdir -p "${cleanDest}" && (aria2c -c -x 8 -s 8 -k 1M ${authAria}-d "${cleanDest}" -o "${cleanFilename}" "${cleanUrl}" || curl -L -C - --fail --retry 3 ${authCurl}-o "${cleanDest}/${cleanFilename}" "${cleanUrl}")`;
 }
 
 export interface ParsedCivitaiQuery {
@@ -311,6 +364,26 @@ export async function fetchCivitaiModelInfo(
   const defaultDestination = determineComfyUIDestination(category);
   const suggestedRemotePath = path.posix.join(defaultDestination, filename);
 
+  // Extract and normalize trained trigger words
+  const rawTrainedWords = versionData.trainedWords || modelData?.trainedWords || [];
+  const trainedWordsList: string[] = Array.isArray(rawTrainedWords)
+    ? rawTrainedWords
+        .flatMap((w: any) => (typeof w === "string" ? w.split(",").map((s) => s.trim()).filter(Boolean) : []))
+        .filter((w, idx, arr) => arr.indexOf(w) === idx)
+    : [];
+
+  // Extract and clean HTML description / release notes
+  const rawDescription = versionData.description || modelData?.description || "";
+  const cleanedDescription = cleanHtmlDescription(rawDescription);
+
+  // Synthesize pre-formatted remote CLI download command
+  const downloadCommand = generateCivitaiDownloadCommand(
+    downloadUrl,
+    defaultDestination,
+    filename,
+    token
+  );
+
   const availableVersions: CivitaiModelVersionOption[] = (modelData?.modelVersions || []).map((v: any) => ({
     id: v.id,
     name: v.name,
@@ -334,7 +407,11 @@ export async function fetchCivitaiModelInfo(
     default_destination_folder: defaultDestination,
     suggested_remote_path: suggestedRemotePath,
     files,
-    description: versionData.description || modelData?.description || "",
+    trained_words: trainedWordsList,
+    trainedWords: trainedWordsList,
+    description: cleanedDescription || rawDescription,
+    clean_description: cleanedDescription,
+    download_command: downloadCommand,
     tags: modelData?.tags || [],
     allow_commercial_use: modelData?.allowCommercialUse,
     nsfw: modelData?.nsfw || versionData.images?.[0]?.nsfwLevel > 1,

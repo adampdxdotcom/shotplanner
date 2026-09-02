@@ -7,6 +7,7 @@ import {
   HuggingFaceFileOption,
   ModelCategoryPreset
 } from "../../types";
+import { copyToClipboard } from "../../utils/clipboard";
 import { 
   DownloadCloud, 
   Key, 
@@ -27,7 +28,11 @@ import {
   Sparkles,
   Server,
   Lock,
-  ArrowRight
+  ArrowRight,
+  Copy,
+  Check,
+  FileText,
+  Terminal
 } from "lucide-react";
 
 export const COMFYUI_MODEL_CATEGORIES: ModelCategoryPreset[] = [
@@ -129,6 +134,8 @@ export const ModelHubConfig: React.FC<ModelHubConfigProps> = ({
   const [civitaiTargetDest, setCivitaiTargetDest] = useState<string>("models/checkpoints/");
   const [civitaiTargetFilename, setCivitaiTargetFilename] = useState<string>("");
   const [selectedVersionId, setSelectedVersionId] = useState<number | null>(null);
+  const [copiedCivitaiCmd, setCopiedCivitaiCmd] = useState(false);
+  const [copiedTriggerWord, setCopiedTriggerWord] = useState<string | null>(null);
 
   // ==========================================
   // 3. HUGGING FACE / DIRECT URL STATE
@@ -369,6 +376,62 @@ export const ModelHubConfig: React.FC<ModelHubConfigProps> = ({
     const preset = COMFYUI_MODEL_CATEGORIES.find((p) => p.id === presetId);
     if (preset && preset.id !== "custom") {
       setCivitaiTargetDest(preset.subfolder);
+    }
+  };
+
+  // Copy trigger word to clipboard
+  const handleCopyTriggerWord = async (word: string) => {
+    const success = await copyToClipboard(word);
+    if (success) {
+      setCopiedTriggerWord(word);
+      setTimeout(() => setCopiedTriggerWord(null), 1500);
+      if (onShowToast) {
+        onShowToast(`Copied trigger word "${word}" to clipboard.`, "info");
+      }
+    }
+  };
+
+  // Copy all trigger words joined by commas
+  const handleCopyAllTriggerWords = async () => {
+    if (!civitaiMetadata) return;
+    const words = civitaiMetadata.trained_words || civitaiMetadata.trainedWords || [];
+    if (!words || words.length === 0) return;
+    const joined = words.join(", ");
+    const success = await copyToClipboard(joined);
+    if (success) {
+      setCopiedTriggerWord("__ALL__");
+      setTimeout(() => setCopiedTriggerWord(null), 1500);
+      if (onShowToast) {
+        onShowToast(`Copied all ${words.length} trigger words to clipboard.`, "info");
+      }
+    }
+  };
+
+  // Copy synthesized shell download command to clipboard
+  const handleCopyCivitaiCommand = async () => {
+    if (!civitaiMetadata) return;
+
+    const dest = (civitaiTargetDest || civitaiMetadata.default_destination_folder || "models/checkpoints/").trim().replace(/\/$/, "");
+    const filename = (civitaiTargetFilename || civitaiMetadata.filename || "model.safetensors").trim();
+    const downloadUrl = (civitaiMetadata.download_url || "").trim();
+    const token = civitaiKeyInput.trim();
+
+    const authAria = (token || civitaiConfigured) ? `--header="Authorization: Bearer ${token || '$CIVITAI_API_KEY'}" ` : "";
+    const authCurl = (token || civitaiConfigured) ? `-H "Authorization: Bearer ${token || '$CIVITAI_API_KEY'}" ` : "";
+
+    const cmd = `mkdir -p "${dest}" && (aria2c -c -x 8 -s 8 -k 1M ${authAria}-d "${dest}" -o "${filename}" "${downloadUrl}" || curl -L -C - --fail --retry 3 ${authCurl}-o "${dest}/${filename}" "${downloadUrl}")`;
+
+    const success = await copyToClipboard(cmd);
+    if (success) {
+      setCopiedCivitaiCmd(true);
+      setTimeout(() => setCopiedCivitaiCmd(false), 2000);
+      if (onShowToast) {
+        onShowToast("Download command copied to clipboard. Ready to paste in any remote terminal!", "success");
+      }
+    } else {
+      if (onShowToast) {
+        onShowToast("Failed to copy command to clipboard.", "error");
+      }
     }
   };
 
@@ -1141,6 +1204,81 @@ export const ModelHubConfig: React.FC<ModelHubConfigProps> = ({
                 </div>
               )}
 
+              {/* Trained Trigger Words Section */}
+              {((civitaiMetadata.trained_words && civitaiMetadata.trained_words.length > 0) ||
+                (civitaiMetadata.trainedWords && civitaiMetadata.trainedWords.length > 0)) && (
+                <div className="bg-neutral-950/70 border border-neutral-800/80 rounded-lg p-3.5 space-y-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-neutral-300">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                      <span>Trained Trigger Words</span>
+                      <span className="text-[10px] font-mono bg-neutral-800 text-neutral-400 px-1.5 py-0.5 rounded-full">
+                        {(civitaiMetadata.trained_words || civitaiMetadata.trainedWords || []).length}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleCopyAllTriggerWords}
+                      className="text-[11px] font-medium text-blue-400 hover:text-blue-300 flex items-center gap-1 bg-blue-950/40 hover:bg-blue-900/50 px-2.5 py-1 rounded border border-blue-800/50 transition-colors cursor-pointer"
+                    >
+                      {copiedTriggerWord === "__ALL__" ? (
+                        <>
+                          <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                          <span className="text-emerald-300 font-semibold">Copied All</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3 h-3" />
+                          <span>Copy All</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pr-1">
+                    {(civitaiMetadata.trained_words || civitaiMetadata.trainedWords || []).map((word, idx) => {
+                      const isCopied = copiedTriggerWord === word;
+                      return (
+                        <button
+                          key={`${word}-${idx}`}
+                          type="button"
+                          onClick={() => handleCopyTriggerWord(word)}
+                          title="Click to copy trigger word"
+                          className={`text-xs px-2.5 py-1 rounded-md border font-mono flex items-center gap-1.5 transition-all text-left group active:scale-95 cursor-pointer ${
+                            isCopied
+                              ? "bg-emerald-950/60 border-emerald-700 text-emerald-300"
+                              : "bg-blue-950/30 hover:bg-blue-900/40 border-blue-800/40 hover:border-blue-700 text-blue-200"
+                          }`}
+                        >
+                          {isCopied ? (
+                            <Check className="w-3 h-3 text-emerald-400 shrink-0" />
+                          ) : (
+                            <Copy className="w-3 h-3 text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                          )}
+                          <span className="truncate max-w-[280px]">{word}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Description & Release Notes Section */}
+              {(civitaiMetadata.clean_description || civitaiMetadata.description) && (
+                <div className="bg-neutral-950/70 border border-neutral-800/80 rounded-lg p-3.5 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-neutral-300">
+                      <FileText className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                      <span>Model Description & Release Notes</span>
+                    </div>
+                    <span className="text-[10px] text-neutral-500 font-mono">Civitai API</span>
+                  </div>
+                  <div className="text-xs text-neutral-300/90 leading-relaxed font-sans whitespace-pre-wrap max-h-36 overflow-y-auto bg-neutral-900/60 p-2.5 rounded border border-neutral-800/60 select-text">
+                    {civitaiMetadata.clean_description || civitaiMetadata.description}
+                  </div>
+                </div>
+              )}
+
               {/* Destination Configuration Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Category Preset Selector */}
@@ -1209,32 +1347,53 @@ export const ModelHubConfig: React.FC<ModelHubConfigProps> = ({
                 </div>
               </div>
 
-              {/* Download CTA */}
+              {/* Download CTA & Actions */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
                 <div className="text-xs text-neutral-400">
                   <span>Method: </span>
                   <span className="font-mono text-neutral-300">aria2c (multi-stream 8x) / curl fallback</span>
                 </div>
 
-                <button
-                  id="btn-download-civitai-model"
-                  type="button"
-                  onClick={() => handleExecuteRemoteDownload("civitai")}
-                  disabled={downloading || !config.remote_host}
-                  className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs disabled:opacity-50 transition-all shadow-md shrink-0"
-                >
-                  {downloading ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span>Ingesting Model ({downloadElapsed}s)...</span>
-                    </>
-                  ) : (
-                    <>
-                      <DownloadCloud className="w-4 h-4" />
-                      <span>Ingest to Remote ComfyUI</span>
-                    </>
-                  )}
-                </button>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    id="btn-copy-civitai-command"
+                    type="button"
+                    onClick={handleCopyCivitaiCommand}
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-neutral-200 hover:text-white font-semibold text-xs transition-all shadow-sm active:scale-95 cursor-pointer"
+                  >
+                    {copiedCivitaiCmd ? (
+                      <>
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        <span className="text-emerald-300 font-bold">Command Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Terminal className="w-4 h-4 text-blue-400" />
+                        <span>Copy Download Command</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    id="btn-download-civitai-model"
+                    type="button"
+                    onClick={() => handleExecuteRemoteDownload("civitai")}
+                    disabled={downloading || !config.remote_host}
+                    className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs disabled:opacity-50 transition-all shadow-md shrink-0 active:scale-95 cursor-pointer"
+                  >
+                    {downloading ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>Ingesting Model ({downloadElapsed}s)...</span>
+                      </>
+                    ) : (
+                      <>
+                        <DownloadCloud className="w-4 h-4" />
+                        <span>Ingest to Remote ComfyUI</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           )}
