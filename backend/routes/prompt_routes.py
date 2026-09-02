@@ -1,7 +1,9 @@
 import os
 import json
+import httpx
 from typing import Dict, Any, List, Optional, Union
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from backend.utils.file_handlers import ASSETS_DIR
@@ -37,6 +39,22 @@ class LLMGenerateRequest(BaseModel):
 
 class GeminiSettingsRequest(BaseModel):
     api_key: Optional[str] = None
+
+    class Config:
+        extra = "allow"
+
+class LMStudioTestRequest(BaseModel):
+    url: Optional[str] = None
+    lm_studio_url: Optional[str] = None
+    endpoint: Optional[str] = None
+    targetUrl: Optional[str] = None
+
+    class Config:
+        extra = "allow"
+
+class GeminiTestRequest(BaseModel):
+    api_key: Optional[str] = None
+    apiKey: Optional[str] = None
 
     class Config:
         extra = "allow"
@@ -102,3 +120,110 @@ async def save_gemini_settings(req: GeminiSettingsRequest):
         return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/settings/test-lm-studio")
+async def test_lm_studio(req: LMStudioTestRequest):
+    """Test LM Studio endpoint reachability and list available models."""
+    raw_url = req.url or req.lm_studio_url or req.endpoint or req.targetUrl or "http://localhost:1234/v1"
+    url = raw_url.strip().rstrip("/")
+    print(f"[LM Studio Test] Testing reachability for URL: {url}", flush=True)
+
+    if not url.endswith("/models"):
+        if url.endswith("/v1"):
+            probe_url = f"{url}/models"
+        else:
+            probe_url = f"{url}/v1/models"
+    else:
+        probe_url = url
+
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            res = await client.get(probe_url)
+            status_code = res.status_code
+            if status_code == 200:
+                data = res.json()
+                models_data = data.get("data", []) if isinstance(data, dict) else []
+                count = len(models_data)
+                names_list = [m.get("id") or m.get("name") or str(m) for m in models_data if isinstance(m, dict)]
+                model_names_str = ", ".join(names_list[:3]) if names_list else "None"
+                print(f"[LM Studio Test] Success (HTTP {status_code}) - Found {count} models: {model_names_str}", flush=True)
+                return {
+                    "success": True,
+                    "modelsCount": count,
+                    "models": names_list,
+                    "modelNames": model_names_str,
+                    "probeUrl": probe_url
+                }
+            else:
+                err_msg = f"HTTP {status_code} - {res.text[:200]}"
+                print(f"[LM Studio Test] Failed to connect to {url}: {err_msg}", flush=True)
+                return JSONResponse(status_code=400, content={"success": False, "error": f"Failed to connect to LM Studio: {err_msg}"})
+    except Exception as e:
+        err_msg = str(e)
+        print(f"[LM Studio Test] Failed to connect to {url}: {err_msg}", flush=True)
+        return JSONResponse(status_code=400, content={"success": False, "error": f"Failed to connect to {url}: {err_msg}"})
+
+@router.post("/settings/test-gemini")
+async def test_gemini(req: GeminiTestRequest):
+    """Test Gemini API key validity with a lightweight test query."""
+    print("[Gemini Test] Validating API key...", flush=True)
+    key_to_use = (req.api_key or req.apiKey or "").strip()
+
+    if not key_to_use:
+        gemini_file = ASSETS_DIR / "gemini_config.json"
+        if gemini_file.exists():
+            try:
+                with open(gemini_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    key_to_use = (data.get("api_key") or "").strip()
+            except Exception:
+                pass
+        if not key_to_use:
+            key_to_use = (os.environ.get("GEMINI_API_KEY") or "").strip()
+
+    if not key_to_use:
+        err_text = "No Gemini API key is configured"
+        print(f"[Gemini Test] Validation failed: {err_text}", flush=True)
+        return JSONResponse(status_code=400, content={
+            "success": False,
+            "error": err_text
+        })
+
+    model_name = "gemini-2.5-flash"
+    endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={key_to_use}"
+    payload = {
+        "contents": [
+            {
+                "parts": [
+                    {"text": "Ping test connection verification"}
+                ]
+            }
+        ]
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            res = await client.post(endpoint, json=payload)
+            if res.status_code == 200:
+                print(f"[Gemini Test] Verified successfully with model {model_name}", flush=True)
+                return {
+                    "success": True,
+                    "activeModel": model_name,
+                    "modelUsed": model_name
+                }
+            else:
+                err_data = res.json() if res.headers.get("content-type", "").startswith("application/json") else {}
+                err_msg = err_data.get("error", {}).get("message") or f"HTTP {res.status_code}: {res.text[:200]}"
+                print(f"[Gemini Test] Validation failed: {err_msg}", flush=True)
+                return JSONResponse(status_code=400, content={
+                    "success": False,
+                    "error": err_msg
+                })
+    except Exception as e:
+        err_msg = str(e)
+        print(f"[Gemini Test] Validation failed: {err_msg}", flush=True)
+        return JSONResponse(status_code=400, content={
+            "success": False,
+            "error": err_msg
+        })
+
