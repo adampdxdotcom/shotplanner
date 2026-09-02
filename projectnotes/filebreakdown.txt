@@ -780,6 +780,25 @@
   - Bound the "Test ComfyUI" button strictly to isolated `/api/settings/test-comfyui` calls without triggering Gemini or LM Studio validation.
   - Displays reactive connected/unreachable badges with server messages and device stats.
 
+## Subject & Character Deduplication and Canonical Normalization
+- **`src/utils/subjectUtils.ts`**
+  - Implemented `toCanonicalSubjectName()` to standardize entity strings into clean Title Case while stripping accidental prefixes (`reference_`, `ref_`, leading/trailing underscores and punctuation).
+  - Implemented `findCanonicalSubject()` for case-insensitive lookup in registered subject lists.
+  - Implemented `mergeCharacterProfiles()` to unify character metadata, notes, scene outfits, and quick slots when consolidating duplicate case entries.
+  - Implemented `normalizeProjectCastAndAssets()` performing comprehensive project-level deduplication across `subjects`, `characters`, and `assets`, re-aligning asset `subject_name` keys to canonical names.
+- **`src/hooks/useAppLogic.ts`**
+  - Updated `handleRegisterSubject` to check for existing subjects case-insensitively before registration; reuses existing canonical names without duplicating and normalizes new entries into Title Case.
+  - Refactored `handleUpdateCharacter` to resolve character updates strictly against canonical names and purge legacy casing keys.
+  - Integrated `normalizeProjectCastAndAssets` in the asset sync `useEffect`, `handleSaveProject`, and `handleLoadProject` to guarantee persistent deduplication and case alignment upon save, load, and asset ingestion.
+- **`src/components/CastSection.tsx`**
+  - Derived `renderedSubjects` from a case-insensitive deduplicated registry combining `subjects`, `characters`, and `assets`.
+  - Enforced case-insensitive character profile and asset lookups so duplicate character cards never appear in the Cast & Characters dashboard.
+- **`src/components/SubjectCombobox.tsx`**
+  - Updated to use `toCanonicalSubjectName` and `findCanonicalSubject` for suggestion derivation, query filtering, and selection dispatching.
+- **`src/components/AssetManagerSection.tsx`**
+  - Updated `projectSubjects` computation to use canonical case-insensitive deduplication across shot context props.
+
+
 
 
 

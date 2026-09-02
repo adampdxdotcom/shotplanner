@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { User, ChevronDown, Check, Plus, X, Tag } from "lucide-react";
 import { MediaAsset } from "../types";
+import { toCanonicalSubjectName, findCanonicalSubject } from "../utils/subjectUtils";
 
 interface SubjectComboboxProps {
   value: string;
@@ -30,31 +31,12 @@ export const SubjectCombobox: React.FC<SubjectComboboxProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Helper to clean accidental 'reference_' prefixes and normalize formatting
-  const cleanSubjectName = (raw: string): string => {
-    if (!raw) return "";
-    let clean = raw.trim();
-    clean = clean.replace(/^reference[_\-\s]+/i, "").replace(/^_+|_+$/g, "").trim();
-    if (!clean || ["unknown", "null", "undefined", "subject"].includes(clean.toLowerCase())) {
-      return "";
-    }
-    if (clean === clean.toLowerCase()) {
-      clean = clean
-        .split(/[_\s]+/)
-        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(" ");
-    } else {
-      clean = clean.replace(/_/g, " ");
-    }
-    return clean;
-  };
-
   // Derive consolidated subjects (registered subjects + any subject found in assets)
-  // Strips accidental 'reference_' prefixes and deduplicates case-insensitively
+  // Strips accidental 'reference_' prefixes and deduplicates case-insensitively into canonical Title Case
   const normalizedMap = new Map<string, string>();
   [
-    ...subjects.map(cleanSubjectName),
-    ...assets.map(a => cleanSubjectName(a.subject_name || ""))
+    ...subjects.map(toCanonicalSubjectName),
+    ...assets.map(a => toCanonicalSubjectName(a.subject_name || ""))
   ].forEach(s => {
     if (!s) return;
     const key = s.toLowerCase();
@@ -80,9 +62,9 @@ export const SubjectCombobox: React.FC<SubjectComboboxProps> = ({
 
   // Compute stats/categories where each subject is used
   const getSubjectMeta = (name: string) => {
-    const cleanTarget = cleanSubjectName(name).toLowerCase();
+    const cleanTarget = toCanonicalSubjectName(name).toLowerCase();
     const matchedAssets = assets.filter(a => {
-      const assetSubj = cleanSubjectName(a.subject_name || "").toLowerCase();
+      const assetSubj = toCanonicalSubjectName(a.subject_name || "").toLowerCase();
       return assetSubj === cleanTarget || (a.subject_name || "").trim().toLowerCase() === name.trim().toLowerCase();
     });
     const types = Array.from(new Set(matchedAssets.map(a => a.type).filter(Boolean)));
@@ -104,9 +86,9 @@ export const SubjectCombobox: React.FC<SubjectComboboxProps> = ({
   }, []);
 
   const handleSelectSubject = (name: string) => {
-    const trimmed = name.trim();
-    onChange(trimmed);
-    onRegisterSubject(trimmed);
+    const canonical = findCanonicalSubject(name, allKnownSubjects) || toCanonicalSubjectName(name) || name.trim();
+    onChange(canonical);
+    onRegisterSubject(canonical);
     setIsOpen(false);
     setHighlightedIndex(-1);
   };
@@ -114,8 +96,9 @@ export const SubjectCombobox: React.FC<SubjectComboboxProps> = ({
   const handleCreateNew = () => {
     const trimmed = value.trim();
     if (!trimmed) return;
-    onChange(trimmed);
-    onRegisterSubject(trimmed);
+    const canonical = findCanonicalSubject(trimmed, allKnownSubjects) || toCanonicalSubjectName(trimmed) || trimmed;
+    onChange(canonical);
+    onRegisterSubject(canonical);
     setIsOpen(false);
     setHighlightedIndex(-1);
   };

@@ -14,6 +14,7 @@ import { AssetUploadModal } from "./AssetUploadModal";
 import { AssetEditModal } from "./AssetEditModal";
 import { AssetLightbox } from "./AssetLightbox";
 import { AssetCard, EmptySlotCard } from "./AssetSlotGrid";
+import { toCanonicalSubjectName } from "../utils/subjectUtils";
 
 const MAX_IMAGES = 9;
 const MAX_VIDEOS = 3;
@@ -149,15 +150,23 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
     onAssetUploaded(asset, slotIndex, type);
   };
 
-  const projectSubjects = Array.from(
-    new Set([
-      ...(sceneProject.subjects || []),
-      ...(subjects || []),
-      ...assets.map(a => a.subject_name).filter(Boolean),
-      ...(activeShot?.ots_anchor_subject ? [activeShot.ots_anchor_subject] : []),
-      ...(activeShot?.ots_focus_subject ? [activeShot.ots_focus_subject] : [])
-    ])
-  ).filter(s => s && typeof s === "string" && s.trim().length > 0) as string[];
+  const projectSubjectsMap = new Map<string, string>();
+  [
+    ...(sceneProject.subjects || []),
+    ...(subjects || []),
+    ...assets.map(a => a.subject_name).filter(Boolean),
+    ...(activeShot?.ots_anchor_subject ? [activeShot.ots_anchor_subject] : []),
+    ...(activeShot?.ots_focus_subject ? [activeShot.ots_focus_subject] : [])
+  ].forEach(raw => {
+    if (!raw) return;
+    const canonical = toCanonicalSubjectName(String(raw));
+    if (!canonical) return;
+    const lower = canonical.toLowerCase();
+    if (!projectSubjectsMap.has(lower)) {
+      projectSubjectsMap.set(lower, canonical);
+    }
+  });
+  const projectSubjects = Array.from(projectSubjectsMap.values());
 
   const currentMax = activeTab === "image" ? MAX_IMAGES : activeTab === "video" ? MAX_VIDEOS : MAX_AUDIOS;
 

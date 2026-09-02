@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { MediaAsset, CharacterProfile, SceneProjectFile } from "../types";
 import { ChevronRight, Settings, Trash2, AlertTriangle, X, Users, Plus, Zap } from "lucide-react";
 import { getAssetMediaUrl } from "../utils/assetUrl";
+import { toCanonicalSubjectName } from "../utils/subjectUtils";
 import { GalleryBulkUploadModal } from "./gallery/GalleryBulkUploadModal";
 import { AssetLightbox } from "./AssetLightbox";
 import { HeadshotGeneratorModal } from "./cast/HeadshotGeneratorModal";
@@ -55,6 +56,23 @@ export const CastSection: React.FC<CastSectionProps> = ({
     }
   };
 
+  // Derive strictly deduplicated canonical list of subjects
+  const deduplicatedSubjectsMap = new Map<string, string>();
+  [
+    ...(subjects || []),
+    ...Object.keys(characters || {}),
+    ...(assets || []).map(a => a.subject_name)
+  ].forEach(raw => {
+    if (!raw) return;
+    const canonical = toCanonicalSubjectName(raw);
+    if (!canonical) return;
+    const lower = canonical.toLowerCase();
+    if (!deduplicatedSubjectsMap.has(lower)) {
+      deduplicatedSubjectsMap.set(lower, canonical);
+    }
+  });
+  const renderedSubjects = Array.from(deduplicatedSubjectsMap.values());
+
   return (
     <div className="flex flex-col h-full bg-zinc-950">
       {/* Header */}
@@ -68,7 +86,7 @@ export const CastSection: React.FC<CastSectionProps> = ({
               <h2 className="text-xl font-bold text-zinc-100 flex items-center gap-2 flex-wrap">
                 Cast & Characters
                 <span className="text-xs font-medium text-zinc-500 bg-zinc-800 px-2 py-0.5 rounded-full">
-                  {subjects.length} subjects
+                  {renderedSubjects.length} subjects
                 </span>
               </h2>
               <p className="text-xs text-zinc-400 mt-0.5 truncate">Manage reference identities and consistent appearances</p>
@@ -87,7 +105,7 @@ export const CastSection: React.FC<CastSectionProps> = ({
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto p-4 md:p-8">
         <div className="max-w-7xl mx-auto space-y-8">
-          {subjects.length === 0 ? (
+          {renderedSubjects.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed border-zinc-800 rounded-xl bg-zinc-900/30">
               <div className="w-16 h-16 bg-zinc-800/50 rounded-full flex items-center justify-center mb-4">
                 <Users className="w-8 h-8 text-zinc-600" />
@@ -105,10 +123,12 @@ export const CastSection: React.FC<CastSectionProps> = ({
               </button>
             </div>
           ) : (
-            subjects.map(subject => {
+            renderedSubjects.map(subject => {
               const charAssets = assets.filter(a => (a.subject_name || "").trim().toLowerCase() === subject.trim().toLowerCase());
               
-              const profile = characters[subject] || { name: subject, notes: "", quick_slots: [], scene_outfit_ref: "" };
+              const profile = characters[subject] || 
+                Object.entries(characters || {}).find(([k]) => k.toLowerCase() === subject.toLowerCase())?.[1] || 
+                { name: subject, notes: "", quick_slots: [], scene_outfit_ref: "" };
               
               const profilePic = charAssets.find(a => a.type === "Headshot") ||
                                  charAssets.find(a => a.type === "Body Reference") ||

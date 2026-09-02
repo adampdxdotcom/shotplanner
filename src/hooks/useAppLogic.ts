@@ -5,6 +5,7 @@ import { AppConfig, MediaAsset, WorkflowItem, ParsedWorkflow, ToastMessage, Gene
 import { useComfyMonitor } from './useComfyMonitor';
 import { generatePromptPrefix } from '../components/ScenePlanningHeader';
 import { generateUUID } from '../utils/formatters';
+import { toCanonicalSubjectName, findCanonicalSubject, normalizeProjectCastAndAssets } from '../utils/subjectUtils';
 
 const getDefaultLlmProvider = (): LLMProvider => {
   try {
@@ -82,56 +83,125 @@ export function useAppLogic() {
   });
   const assets = sceneProject?.assets || [];
   const subjects = sceneProject?.subjects || [];
-  // Function to register subject in project registry
+  // Function to register subject in project registry with strict case-insensitive deduplication
   const handleRegisterSubject = (name: string) => {
-    const trimmed = name.trim();
-    if (trimmed && !subjects.includes(trimmed)) {
-      setSceneProject(prev => {
-        const nextSubjects = [...(prev.subjects || []), trimmed];
-        const nextCharacters = { ...(prev.characters || {}) };
-        if (!nextCharacters[trimmed]) {
-          nextCharacters[trimmed] = {
-            id: generateUUID(),
-            name: trimmed,
-            notes: "",
-            quick_slots: [],
-            scene_outfit_ref: ""
-          };
-        }
-        return { ...prev, subjects: nextSubjects, characters: nextCharacters };
-      });
-      setIsDirty(true);
+    const rawTrimmed = (name || "").trim();
+    if (!rawTrimmed) return "";
+
+    // 1. Check existing subjects case-insensitively. If one exists, retain and reuse the existing canonical subject name.
+    const existingCanonical = findCanonicalSubject(rawTrimmed, subjects);
+    if (existingCanonical) {
+      return existingCanonical;
     }
+
+    // 2. Automatically normalize user-entered subject names to clean Title Case
+    const canonicalName = toCanonicalSubjectName(rawTrimmed);
+    if (!canonicalName) return "";
+
+    // Double check with canonicalName
+    const doubleCheck = findCanonicalSubject(canonicalName, subjects);
+    if (doubleCheck) {
+      return doubleCheck;
+    }
+
+    setSceneProject(prev => {
+      const currentSubjects = prev.subjects || [];
+      const matchInPrev = findCanonicalSubject(canonicalName, currentSubjects);
+      if (matchInPrev) {
+        return prev;
+      }
+
+      const nextSubjects = [...currentSubjects, canonicalName];
+      const nextCharacters = { ...(prev.characters || {}) };
+
+      // Find if character profile exists under another casing key
+      const existingKey = Object.keys(nextCharacters).find(
+        k => k.toLowerCase() === canonicalName.toLowerCase()
+      );
+
+      if (existingKey) {
+        const existingProfile = nextCharacters[existingKey];
+        if (existingKey !== canonicalName) {
+          delete nextCharacters[existingKey];
+        }
+        nextCharacters[canonicalName] = {
+          ...existingProfile,
+          name: canonicalName
+        };
+      } else {
+        nextCharacters[canonicalName] = {
+          id: generateUUID(),
+          name: canonicalName,
+          notes: "",
+          quick_slots: [],
+          scene_outfit_ref: ""
+        };
+      }
+
+      return { ...prev, subjects: nextSubjects, characters: nextCharacters };
+    });
+    setIsDirty(true);
+    return canonicalName;
   };
 
   const handleUpdateCharacter = (profile: any) => {
-    setSceneProject(prev => ({
-      ...prev,
-      characters: {
-        ...(prev.characters || {}),
-        [profile.name]: profile
-      }
-    }));
+    if (!profile || !profile.name) return;
+    // Resolve against canonical character name
+    const rawName = String(profile.name).trim();
+    const canonicalName = findCanonicalSubject(rawName, subjects) || toCanonicalSubjectName(rawName) || rawName;
+
+    setSceneProject(prev => {
+      const nextCharacters = { ...(prev.characters || {}) };
+      // Remove any case variation keys
+      Object.keys(nextCharacters).forEach(k => {
+        if (k.toLowerCase() === canonicalName.toLowerCase() && k !== canonicalName) {
+          delete nextCharacters[k];
+        }
+      });
+      nextCharacters[canonicalName] = {
+        ...profile,
+        name: canonicalName
+      };
+      return {
+        ...prev,
+        characters: nextCharacters
+      };
+    });
     setIsDirty(true);
   };
 
-  // Sync subjects when assets change
+  // Sync and deduplicate subjects and characters when assets change
   useEffect(() => {
     if (assets.length > 0) {
       setSceneProject(prevProject => {
-        const prev = prevProject.subjects || [];
-        let changed = false;
-        const currentLower = new Set(prev.map(s => s.toLowerCase()));
-        const next = [...prev];
-        for (const a of assets) {
-          const s = (a.subject_name || "").trim();
-          if (s && !currentLower.has(s.toLowerCase())) {
-            currentLower.add(s.toLowerCase());
-            next.push(s);
-            changed = true;
-          }
+        const normalized = normalizeProjectCastAndAssets(prevProject);
+        
+        const prevSubjects = prevProject.subjects || [];
+        const subjectsChanged = 
+          normalized.subjects.length !== prevSubjects.length ||
+          normalized.subjects.some((s, idx) => s !== prevSubjects[idx]);
+
+        const prevCharKeys = Object.keys(prevProject.characters || {});
+        const nextCharKeys = Object.keys(normalized.characters);
+        const charactersChanged = 
+          prevCharKeys.length !== nextCharKeys.length ||
+          nextCharKeys.some(k => !prevProject.characters?.[k]);
+
+        const assetsChanged = (prevProject.assets || []).some((a, idx) => {
+          const normA = normalized.assets[idx];
+          return normA && a.subject_name !== normA.subject_name;
+        });
+
+        if (!subjectsChanged && !charactersChanged && !assetsChanged) {
+          return prevProject;
         }
-        return changed ? { ...prevProject, subjects: next } : prevProject;
+
+        return {
+          ...prevProject,
+          subjects: normalized.subjects,
+          characters: normalized.characters,
+          assets: normalized.assets
+        };
       });
     }
   }, [assets]);
@@ -637,12 +707,16 @@ export function useAppLogic() {
   };
 
   const handleSaveProject = async (filename: string) => {
-    const consolidatedSubjects = Array.from(
-      new Set([
-        ...subjects.map(s => s.trim()).filter(Boolean),
-        ...assets.map(a => (a.subject_name || "").trim()).filter(Boolean)
-      ])
-    );
+    const normalized = normalizeProjectCastAndAssets({
+      ...sceneProject,
+      subjects: [
+        ...(sceneProject.subjects || []),
+        ...subjects,
+        ...assets.map(a => a.subject_name).filter(Boolean)
+      ],
+      characters: sceneProject.characters,
+      assets
+    });
 
     const payload: SceneProjectFile = {
       ...sceneProject,
@@ -656,8 +730,9 @@ export function useAppLogic() {
       llm_provider: llmProvider,
       parameter_node_mappings: parameterNodeMappings,
       generation_params: generationParams,
-      assets,
-      subjects: consolidatedSubjects
+      assets: normalized.assets,
+      subjects: normalized.subjects,
+      characters: normalized.characters
     };
     
     const res = await fetch("/api/projects", {
@@ -686,7 +761,14 @@ export function useAppLogic() {
       const err = await res.json();
       throw new Error(err.error || "Failed to load project.");
     }
-    const data = await res.json();
+    const rawData = await res.json();
+    const normalizedData = normalizeProjectCastAndAssets(rawData);
+    const data = {
+      ...rawData,
+      subjects: normalizedData.subjects,
+      characters: normalizedData.characters,
+      assets: normalizedData.assets
+    };
 
     // Restore local LLM IP / URL & provider
     const restoredLlmUrl = data.lm_studio_url || data.config?.lm_studio_url || data.local_llm_url || data.llm_url || data.llm_endpoint;
