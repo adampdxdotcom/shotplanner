@@ -925,6 +925,11 @@
 - **`src/types.ts`**
   - Added `files?: any[]` to `CivitaiModelMetadata` interface to carry the version's complete files list to the client.
 
+## Python FastAPI Headshot Service Fixes
+- **`backend/services/headshot_service.py`**
+  - Imported `sanitize_filename` from `backend.utils.file_handlers` in `backend/services/headshot_service.py` to fix `NameError: name 'sanitize_filename' is not defined` when saving user-approved headshot variations.
+
+
 
 
 

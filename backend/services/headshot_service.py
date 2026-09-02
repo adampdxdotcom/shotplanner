@@ -13,7 +13,8 @@ from backend.utils.file_handlers import (
     find_asset_file_path,
     generate_target_filename,
     save_uploaded_file,
-    generate_thumbnail
+    generate_thumbnail,
+    sanitize_filename
 )
 
 HEADSHOT_TEMPLATES: Dict[str, str] = {
