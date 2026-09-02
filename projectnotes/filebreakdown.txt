@@ -798,6 +798,23 @@
 - **`src/components/AssetManagerSection.tsx`**
   - Updated `projectSubjects` computation to use canonical case-insensitive deduplication across shot context props.
 
+## Character Reference Pack Grid & Revamped Bulk Library Upload Modal
+- **`src/components/gallery/CharacterReferencePackGrid.tsx`**
+  - Created a modular 4-slot reference pack panel featuring 4 dedicated, independently interactive upload drop cards:
+    1. **Headshot (Facing)**: Sets type to `Headshot` with pre-filled description `headshot facing, `.
+    2. **Headshot (3/4 Profile)**: Sets type to `Headshot` with pre-filled description `headshot 3/4 profile, `.
+    3. **Body Reference (Primary)**: Sets type to `Body Reference` with pre-filled description `body reference, `.
+    4. **Body Reference (Secondary / Outfit)**: Sets type to `Body Reference` with pre-filled description `body reference, `.
+  - Integrated independent drag-and-drop zones and click-to-browse file pickers per slot with image thumbnail previews.
+  - Added inline editable prompt description input directly beneath each slot image and clear/remove action buttons.
+  - Handled unfilled slots as fully optional (safely ignored during execution).
+- **`src/components/gallery/GalleryBulkUploadModal.tsx`**
+  - Positioned the 4-slot Character Reference Pack panel above the general bulk upload dropzone.
+  - Embedded `SubjectCombobox` for target character/subject assignment applying across pack slots and batch files.
+  - Enhanced the general bulk upload section with the companion "Modifier" dropdown (Facing, 3/4 Profile, Full Profile) aligned with `ASSET_REFERENCE_MODIFIERS` when "Headshot" semantic type is selected.
+  - Implemented unified batch upload submission dispatching all populated pack slots and general queue files to `POST /api/assets/upload` with `scene_name` explicitly included.
+  - Ingests all newly returned asset records into the project asset registry and marks project state dirty for auto-save.
+
 
 
 
