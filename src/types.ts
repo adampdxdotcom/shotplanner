@@ -156,6 +156,33 @@ export interface ModelCategoryPreset {
   description?: string;
 }
 
+export interface CivitaiFavorite {
+  version_id: number;
+  model_id: number;
+  name: string;
+  model_name?: string;
+  version_name: string;
+  category: string;
+  base_model: string;
+  image_url?: string;
+  preview_image_url?: string;
+  file_size?: string;
+  file_size_formatted?: string;
+  file_size_bytes?: number;
+  filename?: string;
+  download_url?: string;
+  default_destination_folder?: string;
+  suggested_remote_path?: string;
+  trigger_words?: string[];
+  trained_words?: string[];
+  trainedWords?: string[];
+  description?: string;
+  clean_description?: string;
+  download_command?: string;
+  tags?: string[];
+  added_at?: string;
+}
+
 export interface CivitaiModelVersionOption {
   id: number;
   name: string;

@@ -937,6 +937,26 @@
   - **Description & Release Notes Section**: Displays sanitized description notes in a scrollable container.
   - **Dedicated "Copy Download Command" Button**: Added alongside the remote ingestion CTA with clipboard copy, immediate "Command Copied!" feedback state, and toast notifications.
 
+## Civitai Favorites Persistence & 1-Click UI Workflow
+- **`backend/services/civitai_service.py` & `backend/routes/civitai_routes.py`**
+  - Implemented persistent favorite records in `assets/civitai_favorites.json`.
+  - `GET /api/civitai/favorites`: Retrieves the complete list of saved favorite model records.
+  - `POST /api/civitai/favorites`: Adds or updates a saved model favorite entry (storing model ID, version ID, model name, version name, category, base model, cover preview URL, file size, trigger words, description, and download URL).
+  - `DELETE /api/civitai/favorites/{version_id}`: Removes a saved favorite model by its version ID.
+- **`server/services/civitaiService.ts` & `server/routes/civitaiRoutes.ts`**
+  - Mirrored favorite persistence operations in the Node/Express backend (`CIVITAI_FAVORITES_FILE`).
+- **`src/types.ts` & `src/services/civitaiFavoritesService.ts`**
+  - Defined `CivitaiFavorite` data structure and created `civitaiFavoritesService` with automatic write-through caching (`localStorage` fallback) and error handling.
+- **`src/components/config/CivitaiFavoritesTray.tsx`**
+  - Interactive collapsible tray placed directly beneath the search input.
+  - Displays compact cards with cover image preview, model title, version name, category badge, and formatted file size.
+  - 1-Click selection populates the lookup input, instantly hydrates model preview state, and triggers background inspection.
+  - Quick hover action button to remove models from saved favorites.
+  - Provides an empty state helper guide when no favorites are saved yet.
+- **`src/components/config/ModelHubConfig.tsx` & `src/components/config/CivitaiConfig.tsx`**
+  - Integrated `CivitaiFavoritesTray` in place of the static "Popular" presets bar.
+  - Added a prominent **"⭐ Favorite"** / **"★ Favorited"** toggle button directly on the Model Preview Card header with real-time UI synchronization and feedback toasts.
+
 
 
 

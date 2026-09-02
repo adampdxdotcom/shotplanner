@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { AppConfig, CivitaiModelMetadata, CivitaiModelVersionOption } from "../../types";
+import { AppConfig, CivitaiModelMetadata, CivitaiModelVersionOption, CivitaiFavorite } from "../../types";
 import { copyToClipboard } from "../../utils/clipboard";
+import { 
+  fetchCivitaiFavorites, 
+  addCivitaiFavorite, 
+  removeCivitaiFavorite 
+} from "../../services/civitaiFavoritesService";
+import { CivitaiFavoritesTray } from "./CivitaiFavoritesTray";
 import { 
   DownloadCloud, 
   Key, 
@@ -21,7 +27,8 @@ import {
   Copy,
   Check,
   FileText,
-  Terminal
+  Terminal,
+  Star
 } from "lucide-react";
 
 export interface CivitaiConfigProps {
@@ -54,6 +61,8 @@ export const CivitaiConfig: React.FC<CivitaiConfigProps> = ({
   const [selectedVersionId, setSelectedVersionId] = useState<number | null>(null);
   const [copiedCommand, setCopiedCommand] = useState(false);
   const [copiedTriggerWord, setCopiedTriggerWord] = useState<string | null>(null);
+  const [favorites, setFavorites] = useState<CivitaiFavorite[]>([]);
+  const [loadingFavorites, setLoadingFavorites] = useState(false);
 
   // 4. Download Execution State
   const [downloading, setDownloading] = useState(false);
@@ -68,7 +77,7 @@ export const CivitaiConfig: React.FC<CivitaiConfigProps> = ({
     error?: string;
   } | null>(null);
 
-  // Initial fetch of Civitai token configuration status
+  // Initial fetch of Civitai token configuration status and favorites
   useEffect(() => {
     fetch("/api/settings/civitai")
       .then((res) => res.json())
@@ -78,6 +87,10 @@ export const CivitaiConfig: React.FC<CivitaiConfigProps> = ({
           setMaskedKey(data.masked_key || (data.api_key ? `${data.api_key}...` : "Configured"));
         }
       })
+      .catch(() => {});
+
+    fetchCivitaiFavorites()
+      .then((favs) => setFavorites(favs))
       .catch(() => {});
   }, []);
 
@@ -304,6 +317,84 @@ export const CivitaiConfig: React.FC<CivitaiConfigProps> = ({
     }
   };
 
+  // 1-Click loading of full model preview from favorites tray
+  const handleSelectFavorite = (fav: CivitaiFavorite) => {
+    const versionIdStr = String(fav.version_id);
+    setLookupQuery(versionIdStr);
+
+    const meta: CivitaiModelMetadata = {
+      model_id: Number(fav.model_id) || 0,
+      model_name: fav.name || fav.model_name || "Civitai Model",
+      version_id: Number(fav.version_id),
+      version_name: fav.version_name || "Latest",
+      category: fav.category || "Checkpoint",
+      base_model: fav.base_model || "SDXL 1.0",
+      file_size_bytes: fav.file_size_bytes || 0,
+      file_size_formatted: fav.file_size_formatted || fav.file_size || "",
+      filename: fav.filename || `${(fav.name || "model").toLowerCase().replace(/[^a-z0-9_-]/g, "_")}.safetensors`,
+      preview_image_url: fav.preview_image_url || fav.image_url || "",
+      download_url: fav.download_url || "",
+      default_destination_folder: fav.default_destination_folder || "models/checkpoints/",
+      suggested_remote_path: fav.suggested_remote_path || "",
+      trained_words: fav.trained_words || fav.trigger_words || [],
+      trainedWords: fav.trained_words || fav.trigger_words || [],
+      description: fav.description || "",
+      clean_description: fav.clean_description || fav.description || "",
+      download_command: fav.download_command || "",
+      tags: fav.tags || []
+    };
+
+    setModelMetadata(meta);
+    setTargetDestination(meta.default_destination_folder || "models/checkpoints/");
+    setTargetFilename(meta.filename);
+    setSelectedVersionId(meta.version_id);
+
+    // Background fetch to load all versions and full metadata
+    handleLookupModel(versionIdStr);
+  };
+
+  // Remove a favorite
+  const handleRemoveFavorite = async (versionId: number | string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await removeCivitaiFavorite(versionId);
+      setFavorites((prev) => prev.filter((f) => String(f.version_id) !== String(versionId)));
+      if (onShowToast) {
+        onShowToast("Model removed from favorites.", "info");
+      }
+    } catch (err) {
+      console.error("Failed to delete favorite:", err);
+    }
+  };
+
+  // Check if active model is favorited
+  const isFavorited = Boolean(
+    modelMetadata && favorites.some((f) => String(f.version_id) === String(modelMetadata.version_id))
+  );
+
+  // Toggle favorite on active model
+  const handleToggleFavorite = async () => {
+    if (!modelMetadata) return;
+    const versionId = modelMetadata.version_id;
+
+    if (isFavorited) {
+      await removeCivitaiFavorite(versionId);
+      setFavorites((prev) => prev.filter((f) => String(f.version_id) !== String(versionId)));
+      if (onShowToast) {
+        onShowToast(`Removed "${modelMetadata.model_name}" from Favorites`, "info");
+      }
+    } else {
+      const saved = await addCivitaiFavorite(modelMetadata);
+      setFavorites((prev) => {
+        const filtered = prev.filter((f) => String(f.version_id) !== String(versionId));
+        return [saved, ...filtered];
+      });
+      if (onShowToast) {
+        onShowToast(`Saved "${modelMetadata.model_name}" to Favorites! ⭐`, "success");
+      }
+    }
+  };
+
   const cleanComfyUIRoot = (config.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI").replace(/\/$/, "");
   const fullDestinationPath = targetDestination.startsWith("/")
     ? `${targetDestination.replace(/\/$/, "")}/${targetFilename}`
@@ -437,28 +528,15 @@ export const CivitaiConfig: React.FC<CivitaiConfigProps> = ({
             </button>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] text-zinc-500">
-            <span>Quick Presets:</span>
-            <button
-              type="button"
-              onClick={() => {
-                setLookupQuery("https://civitai.com/models/133005");
-                handleLookupModel("https://civitai.com/models/133005");
-              }}
-              className="px-2 py-0.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded border border-zinc-700 text-[10px] cursor-pointer"
-            >
-              Juggernaut XL
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setLookupQuery("https://civitai.com/models/26186");
-                handleLookupModel("https://civitai.com/models/26186");
-              }}
-              className="px-2 py-0.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded border border-zinc-700 text-[10px] cursor-pointer"
-            >
-              Realistic Vision
-            </button>
+          {/* Collapsible Saved Favorites Tray */}
+          <div className="pt-1">
+            <CivitaiFavoritesTray
+              favorites={favorites}
+              activeVersionId={modelMetadata?.version_id}
+              onSelectFavorite={handleSelectFavorite}
+              onRemoveFavorite={handleRemoveFavorite}
+              isLoading={loadingFavorites}
+            />
           </div>
         </div>
 
@@ -503,7 +581,27 @@ export const CivitaiConfig: React.FC<CivitaiConfigProps> = ({
                   <h3 className="text-base font-bold text-zinc-100 truncate" title={modelMetadata.model_name}>
                     {modelMetadata.model_name}
                   </h3>
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                    {/* Prominent Favorite Toggle Button */}
+                    <button
+                      id="btn-toggle-favorite-standalone"
+                      type="button"
+                      onClick={handleToggleFavorite}
+                      title={isFavorited ? "Remove model from saved favorites" : "Save model to favorites"}
+                      className={`flex items-center gap-1.5 px-3 py-1 rounded-md border text-xs font-semibold transition-all cursor-pointer shadow-xs ${
+                        isFavorited
+                          ? "bg-amber-950/70 hover:bg-amber-900/80 border-amber-500/80 text-amber-300 ring-1 ring-amber-500/30"
+                          : "bg-zinc-800 hover:bg-zinc-700 border-zinc-700 text-zinc-300 hover:text-amber-300"
+                      }`}
+                    >
+                      <Star
+                        className={`w-3.5 h-3.5 ${
+                          isFavorited ? "text-amber-400 fill-amber-400" : "text-zinc-400"
+                        }`}
+                      />
+                      <span>{isFavorited ? "★ Favorited" : "⭐ Favorite"}</span>
+                    </button>
+
                     <span className="text-[11px] font-semibold text-purple-300 bg-purple-950/60 border border-purple-800/50 px-2 py-0.5 rounded-md">
                       {modelMetadata.base_model}
                     </span>

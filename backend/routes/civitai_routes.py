@@ -1,8 +1,13 @@
-from typing import Optional
-from fastapi import APIRouter, HTTPException, Query
+from typing import Optional, Dict, Any
+from fastapi import APIRouter, HTTPException, Query, Body
 from pydantic import BaseModel
 
-from backend.services.civitai_service import fetch_civitai_model_info
+from backend.services.civitai_service import (
+    fetch_civitai_model_info,
+    get_civitai_favorites,
+    save_civitai_favorite,
+    delete_civitai_favorite
+)
 from backend.services.model_hub_service import execute_unified_remote_download
 
 router = APIRouter(prefix="/civitai", tags=["Civitai Integration"])
@@ -22,6 +27,48 @@ class CivitaiDownloadRequest(BaseModel):
 
     class Config:
         extra = "allow"
+
+@router.get("/favorites")
+async def list_civitai_favorites():
+    """Return all saved Civitai favorites from persistent storage."""
+    try:
+        favorites = get_civitai_favorites()
+        return {
+            "success": True,
+            "favorites": favorites,
+            "count": len(favorites)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load favorites: {str(e)}")
+
+@router.post("/favorites")
+async def add_or_update_civitai_favorite(payload: Dict[str, Any] = Body(...)):
+    """Add or update a model record in persistent favorites."""
+    try:
+        saved = save_civitai_favorite(payload)
+        return {
+            "success": True,
+            "favorite": saved,
+            "message": f"Successfully favorited '{saved.get('name')}'"
+        }
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save favorite: {str(e)}")
+
+@router.delete("/favorites/{version_id}")
+async def remove_civitai_favorite(version_id: str):
+    """Remove a model from favorites by version ID."""
+    try:
+        removed = delete_civitai_favorite(version_id)
+        return {
+            "success": True,
+            "removed": removed,
+            "version_id": version_id,
+            "message": f"Removed favorite {version_id}" if removed else f"Favorite {version_id} not found"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete favorite: {str(e)}")
 
 @router.get("/model-info")
 async def get_civitai_model_info(

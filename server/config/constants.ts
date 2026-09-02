@@ -7,6 +7,7 @@ export const ASSETS_DIR = path.join(ROOT_DIR, "assets");
 export const PROJECTS_DIR = path.join(ASSETS_DIR, "project_jsons");
 export const GEMINI_CONFIG_FILE = path.join(ASSETS_DIR, "gemini_config.json");
 export const CIVITAI_CONFIG_FILE = path.join(ASSETS_DIR, "civitai_config.json");
+export const CIVITAI_FAVORITES_FILE = path.join(ASSETS_DIR, "civitai_favorites.json");
 export const HUGGINGFACE_CONFIG_FILE = path.join(ASSETS_DIR, "huggingface_config.json");
 export const ASSET_DB_FILE = path.join(ASSETS_DIR, "assets_db.json");
 export const TMP_DIR = path.join(ROOT_DIR, "tmp");

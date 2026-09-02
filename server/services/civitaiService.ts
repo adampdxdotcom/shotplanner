@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { Client, ConnectConfig } from "ssh2";
-import { CIVITAI_CONFIG_FILE } from "../config/constants";
+import { CIVITAI_CONFIG_FILE, CIVITAI_FAVORITES_FILE } from "../config/constants";
 
 export interface CivitaiModelVersionOption {
   id: number;
@@ -9,6 +9,33 @@ export interface CivitaiModelVersionOption {
   baseModel?: string;
   downloadUrl?: string;
   createdAt?: string;
+}
+
+export interface CivitaiFavorite {
+  version_id: number;
+  model_id: number;
+  name: string;
+  model_name?: string;
+  version_name: string;
+  category: string;
+  base_model: string;
+  image_url?: string;
+  preview_image_url?: string;
+  file_size?: string;
+  file_size_formatted?: string;
+  file_size_bytes?: number;
+  filename?: string;
+  download_url?: string;
+  default_destination_folder?: string;
+  suggested_remote_path?: string;
+  trigger_words?: string[];
+  trained_words?: string[];
+  trainedWords?: string[];
+  description?: string;
+  clean_description?: string;
+  download_command?: string;
+  tags?: string[];
+  added_at?: string;
 }
 
 export interface CivitaiModelMetadata {
@@ -83,6 +110,110 @@ export function getStoredCivitaiKey(): string {
 export function saveCivitaiKey(apiKey: string): void {
   const cleanKey = (apiKey || "").trim();
   fs.writeFileSync(CIVITAI_CONFIG_FILE, JSON.stringify({ api_key: cleanKey, updated_at: new Date().toISOString() }, null, 2));
+}
+
+/**
+ * Retrieve saved Civitai favorites from assets/civitai_favorites.json
+ */
+export function getStoredCivitaiFavorites(): CivitaiFavorite[] {
+  if (fs.existsSync(CIVITAI_FAVORITES_FILE)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(CIVITAI_FAVORITES_FILE, "utf-8"));
+      if (Array.isArray(data)) {
+        return data;
+      } else if (data && Array.isArray(data.favorites)) {
+        return data.favorites;
+      }
+    } catch (e) {
+      console.error("[Civitai] Error reading favorites file:", e);
+    }
+  }
+  return [];
+}
+
+/**
+ * Add or update a Civitai model in favorites
+ */
+export function saveCivitaiFavorite(modelData: Partial<CivitaiFavorite> & { [key: string]: any }): CivitaiFavorite {
+  const versionId = modelData.version_id || modelData.versionId || modelData.id;
+  if (!versionId) {
+    throw new Error("Missing 'version_id' in model favorite data.");
+  }
+
+  const normVersionId = Number(versionId) || Number(String(versionId).replace(/\D/g, "")) || 0;
+  const normModelId = Number(modelData.model_id || modelData.modelId) || 0;
+
+  const trainedWords = (
+    modelData.trained_words ||
+    modelData.trainedWords ||
+    modelData.trigger_words ||
+    []
+  );
+
+  const cleanItem: CivitaiFavorite = {
+    version_id: normVersionId,
+    model_id: normModelId,
+    name: modelData.name || modelData.model_name || "Unnamed Model",
+    model_name: modelData.model_name || modelData.name || "Unnamed Model",
+    version_name: modelData.version_name || modelData.versionName || "",
+    category: modelData.category || "Checkpoint",
+    base_model: modelData.base_model || modelData.baseModel || "SDXL 1.0",
+    image_url: modelData.image_url || modelData.preview_image_url || "",
+    preview_image_url: modelData.preview_image_url || modelData.image_url || "",
+    file_size: modelData.file_size || modelData.file_size_formatted || "",
+    file_size_formatted: modelData.file_size_formatted || modelData.file_size || "",
+    file_size_bytes: modelData.file_size_bytes || 0,
+    filename: modelData.filename || "",
+    download_url: modelData.download_url || "",
+    default_destination_folder: modelData.default_destination_folder || "models/checkpoints/",
+    suggested_remote_path: modelData.suggested_remote_path || "",
+    trigger_words: trainedWords,
+    trained_words: trainedWords,
+    trainedWords: trainedWords,
+    description: modelData.description || "",
+    clean_description: modelData.clean_description || modelData.description || "",
+    download_command: modelData.download_command || "",
+    tags: modelData.tags || [],
+    added_at: modelData.added_at || new Date().toISOString()
+  };
+
+  const favorites = getStoredCivitaiFavorites();
+  const existingIndex = favorites.findIndex((f) => String(f.version_id) === String(normVersionId));
+
+  if (existingIndex >= 0) {
+    favorites[existingIndex] = cleanItem;
+  } else {
+    favorites.unshift(cleanItem);
+  }
+
+  const dir = path.dirname(CIVITAI_FAVORITES_FILE);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
+  fs.writeFileSync(CIVITAI_FAVORITES_FILE, JSON.stringify(favorites, null, 2), "utf-8");
+  return cleanItem;
+}
+
+/**
+ * Remove a Civitai model from favorites by version ID
+ */
+export function deleteCivitaiFavorite(versionId: string | number): boolean {
+  const favorites = getStoredCivitaiFavorites();
+  const targetStr = String(versionId).trim();
+  const filtered = favorites.filter((f) => String(f.version_id) !== targetStr);
+
+  if (filtered.length === favorites.length) {
+    return false;
+  }
+
+  const dir = path.dirname(CIVITAI_FAVORITES_FILE);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
+  fs.writeFileSync(CIVITAI_FAVORITES_FILE, JSON.stringify(filtered, null, 2), "utf-8");
+  return true;
 }
 
 /**

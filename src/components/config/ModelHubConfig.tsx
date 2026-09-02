@@ -3,11 +3,18 @@ import {
   AppConfig, 
   CivitaiModelMetadata, 
   CivitaiModelVersionOption,
+  CivitaiFavorite,
   HuggingFaceModelMetadata,
   HuggingFaceFileOption,
   ModelCategoryPreset
 } from "../../types";
 import { copyToClipboard } from "../../utils/clipboard";
+import { 
+  fetchCivitaiFavorites, 
+  addCivitaiFavorite, 
+  removeCivitaiFavorite 
+} from "../../services/civitaiFavoritesService";
+import { CivitaiFavoritesTray } from "./CivitaiFavoritesTray";
 import { 
   DownloadCloud, 
   Key, 
@@ -32,7 +39,8 @@ import {
   Copy,
   Check,
   FileText,
-  Terminal
+  Terminal,
+  Star
 } from "lucide-react";
 
 export const COMFYUI_MODEL_CATEGORIES: ModelCategoryPreset[] = [
@@ -136,6 +144,8 @@ export const ModelHubConfig: React.FC<ModelHubConfigProps> = ({
   const [selectedVersionId, setSelectedVersionId] = useState<number | null>(null);
   const [copiedCivitaiCmd, setCopiedCivitaiCmd] = useState(false);
   const [copiedTriggerWord, setCopiedTriggerWord] = useState<string | null>(null);
+  const [favorites, setFavorites] = useState<CivitaiFavorite[]>([]);
+  const [loadingFavorites, setLoadingFavorites] = useState(false);
 
   // ==========================================
   // 3. HUGGING FACE / DIRECT URL STATE
@@ -186,6 +196,11 @@ export const ModelHubConfig: React.FC<ModelHubConfigProps> = ({
           setHfMaskedToken(data.masked_token || (data.token ? `${data.token}...` : "Configured"));
         }
       })
+      .catch(() => {});
+
+    // Civitai Favorites
+    fetchCivitaiFavorites()
+      .then((favs) => setFavorites(favs))
       .catch(() => {});
   }, []);
 
@@ -431,6 +446,103 @@ export const ModelHubConfig: React.FC<ModelHubConfigProps> = ({
     } else {
       if (onShowToast) {
         onShowToast("Failed to copy command to clipboard.", "error");
+      }
+    }
+  };
+
+  // 1-Click loading of full model preview from favorites tray
+  const handleSelectCivitaiFavorite = (fav: CivitaiFavorite) => {
+    const versionIdStr = String(fav.version_id);
+    setCivitaiQuery(versionIdStr);
+
+    // Immediately hydrate preview metadata for instantaneous UX
+    const meta: CivitaiModelMetadata = {
+      model_id: Number(fav.model_id) || 0,
+      model_name: fav.name || fav.model_name || "Civitai Model",
+      version_id: Number(fav.version_id),
+      version_name: fav.version_name || "Latest",
+      category: fav.category || "Checkpoint",
+      base_model: fav.base_model || "SDXL 1.0",
+      file_size_bytes: fav.file_size_bytes || 0,
+      file_size_formatted: fav.file_size_formatted || fav.file_size || "",
+      filename: fav.filename || `${(fav.name || "model").toLowerCase().replace(/[^a-z0-9_-]/g, "_")}.safetensors`,
+      preview_image_url: fav.preview_image_url || fav.image_url || "",
+      download_url: fav.download_url || "",
+      default_destination_folder: fav.default_destination_folder || "models/checkpoints/",
+      suggested_remote_path: fav.suggested_remote_path || "",
+      trained_words: fav.trained_words || fav.trigger_words || [],
+      trainedWords: fav.trained_words || fav.trigger_words || [],
+      description: fav.description || "",
+      clean_description: fav.clean_description || fav.description || "",
+      download_command: fav.download_command || "",
+      tags: fav.tags || []
+    };
+
+    setCivitaiMetadata(meta);
+    setCivitaiTargetFilename(meta.filename);
+    setSelectedVersionId(meta.version_id);
+
+    const catLower = (meta.category || "").toLowerCase();
+    let matchedPreset = "checkpoints";
+    if (catLower.includes("lora") || catLower.includes("dora") || catLower.includes("locon")) {
+      matchedPreset = "loras";
+    } else if (catLower.includes("controlnet") || catLower.includes("adapter")) {
+      matchedPreset = "controlnet";
+    } else if (catLower.includes("vae")) {
+      matchedPreset = "vae";
+    } else if (catLower.includes("upscaler") || catLower.includes("upscale")) {
+      matchedPreset = "upscalers";
+    } else if (catLower.includes("embedding")) {
+      matchedPreset = "embeddings";
+    } else if (catLower.includes("unet") || catLower.includes("diffusion")) {
+      matchedPreset = "diffusion_models";
+    }
+    setCivitaiCategoryPreset(matchedPreset);
+    const presetObj = COMFYUI_MODEL_CATEGORIES.find((p) => p.id === matchedPreset);
+    setCivitaiTargetDest(presetObj ? presetObj.subfolder : meta.default_destination_folder || "models/checkpoints/");
+
+    // Inspect Civitai API in background to load version options and full assets
+    handleLookupCivitaiModel(versionIdStr);
+  };
+
+  // Remove a favorite
+  const handleRemoveCivitaiFavorite = async (versionId: number | string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await removeCivitaiFavorite(versionId);
+      setFavorites((prev) => prev.filter((f) => String(f.version_id) !== String(versionId)));
+      if (onShowToast) {
+        onShowToast("Model removed from favorites.", "info");
+      }
+    } catch (err) {
+      console.error("Failed to delete favorite:", err);
+    }
+  };
+
+  // Check if active model is favorited
+  const isCivitaiFavorited = Boolean(
+    civitaiMetadata && favorites.some((f) => String(f.version_id) === String(civitaiMetadata.version_id))
+  );
+
+  // Toggle favorite on active model
+  const handleToggleCivitaiFavorite = async () => {
+    if (!civitaiMetadata) return;
+    const versionId = civitaiMetadata.version_id;
+
+    if (isCivitaiFavorited) {
+      await removeCivitaiFavorite(versionId);
+      setFavorites((prev) => prev.filter((f) => String(f.version_id) !== String(versionId)));
+      if (onShowToast) {
+        onShowToast(`Removed "${civitaiMetadata.model_name}" from Favorites`, "info");
+      }
+    } else {
+      const saved = await addCivitaiFavorite(civitaiMetadata);
+      setFavorites((prev) => {
+        const filtered = prev.filter((f) => String(f.version_id) !== String(versionId));
+        return [saved, ...filtered];
+      });
+      if (onShowToast) {
+        onShowToast(`Saved "${civitaiMetadata.model_name}" to Favorites! ⭐`, "success");
       }
     }
   };
@@ -1099,30 +1211,15 @@ export const ModelHubConfig: React.FC<ModelHubConfigProps> = ({
               </button>
             </div>
 
-            {/* Quick Presets */}
-            <div className="mt-3 flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] text-neutral-400 font-medium mr-1 flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-blue-400" />
-                Popular:
-              </span>
-              {[
-                { label: "Juggernaut XL", query: "133005" },
-                { label: "Realistic Vision V6.0", query: "4201" },
-                { label: "CyberRealistic", query: "15003" },
-                { label: "Pony Diffusion V6 XL", query: "257749" }
-              ].map((preset, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => {
-                    setCivitaiQuery(preset.query);
-                    handleLookupCivitaiModel(preset.query);
-                  }}
-                  className="px-2.5 py-1 rounded bg-neutral-800/80 hover:bg-neutral-700/80 text-[11px] text-neutral-300 hover:text-blue-300 border border-neutral-700/60 transition-colors font-mono"
-                >
-                  {preset.label}
-                </button>
-              ))}
+            {/* Collapsible Saved Favorites Tray */}
+            <div className="mt-3">
+              <CivitaiFavoritesTray
+                favorites={favorites}
+                activeVersionId={civitaiMetadata?.version_id}
+                onSelectFavorite={handleSelectCivitaiFavorite}
+                onRemoveFavorite={handleRemoveCivitaiFavorite}
+                isLoading={loadingFavorites}
+              />
             </div>
 
             {civitaiLookupError && (
@@ -1169,7 +1266,27 @@ export const ModelHubConfig: React.FC<ModelHubConfigProps> = ({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2.5 flex-wrap self-start">
+                  {/* Prominent Favorite Toggle Button */}
+                  <button
+                    id="btn-toggle-favorite-civitai"
+                    type="button"
+                    onClick={handleToggleCivitaiFavorite}
+                    title={isCivitaiFavorited ? "Remove model from saved favorites" : "Save model to favorites"}
+                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg border text-xs font-semibold transition-all cursor-pointer shadow-xs ${
+                      isCivitaiFavorited
+                        ? "bg-amber-950/70 hover:bg-amber-900/80 border-amber-500/80 text-amber-300 ring-1 ring-amber-500/30"
+                        : "bg-neutral-800 hover:bg-neutral-750 border-neutral-700 text-neutral-300 hover:text-amber-300"
+                    }`}
+                  >
+                    <Star
+                      className={`w-3.5 h-3.5 ${
+                        isCivitaiFavorited ? "text-amber-400 fill-amber-400" : "text-neutral-400"
+                      }`}
+                    />
+                    <span>{isCivitaiFavorited ? "★ Favorited" : "⭐ Favorite"}</span>
+                  </button>
+
                   <div className="bg-neutral-950 px-3 py-1.5 rounded-lg border border-neutral-800 text-right">
                     <span className="text-[10px] text-neutral-400 block font-medium">Model Size</span>
                     <span className="text-xs font-mono font-bold text-blue-300">

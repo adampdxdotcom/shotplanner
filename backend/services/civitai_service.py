@@ -1,12 +1,15 @@
 import os
 import re
 import json
+import time
+from datetime import datetime
 import httpx
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
 from backend.utils.file_handlers import ASSETS_DIR
 
 CIVITAI_CONFIG_FILE = ASSETS_DIR / "civitai_config.json"
+CIVITAI_FAVORITES_FILE = ASSETS_DIR / "civitai_favorites.json"
 
 def get_stored_civitai_key() -> str:
     """Retrieve saved Civitai API key from filesystem or environment."""
@@ -28,6 +31,114 @@ def save_civitai_key(api_key: str) -> None:
     ASSETS_DIR.mkdir(parents=True, exist_ok=True)
     with open(CIVITAI_CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump({"api_key": clean_key}, f, indent=2)
+
+def get_civitai_favorites() -> List[Dict[str, Any]]:
+    """Retrieve list of saved Civitai favorites from assets/civitai_favorites.json."""
+    if not CIVITAI_FAVORITES_FILE.exists():
+        return []
+    try:
+        with open(CIVITAI_FAVORITES_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if isinstance(data, list):
+                return data
+            elif isinstance(data, dict) and "favorites" in data:
+                return data["favorites"]
+            return []
+    except Exception:
+        return []
+
+def save_civitai_favorite(model_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Add or update a Civitai model record in assets/civitai_favorites.json."""
+    version_id = model_data.get("version_id") or model_data.get("versionId") or model_data.get("id")
+    if not version_id:
+        raise ValueError("Missing 'version_id' in model favorite data.")
+
+    try:
+        norm_v_id = int(version_id)
+    except (ValueError, TypeError):
+        norm_v_id = str(version_id)
+
+    model_id = model_data.get("model_id") or model_data.get("modelId")
+    try:
+        norm_m_id = int(model_id) if model_id else 0
+    except (ValueError, TypeError):
+        norm_m_id = str(model_id) if model_id else ""
+
+    trained_words = (
+        model_data.get("trained_words") or
+        model_data.get("trainedWords") or
+        model_data.get("trigger_words") or
+        []
+    )
+
+    clean_item = {
+        "version_id": norm_v_id,
+        "model_id": norm_m_id,
+        "name": model_data.get("name") or model_data.get("model_name") or "Unnamed Model",
+        "model_name": model_data.get("model_name") or model_data.get("name") or "Unnamed Model",
+        "version_name": model_data.get("version_name") or model_data.get("versionName") or "",
+        "category": model_data.get("category") or "Checkpoint",
+        "base_model": model_data.get("base_model") or model_data.get("baseModel") or "SDXL 1.0",
+        "image_url": (
+            model_data.get("image_url") or
+            model_data.get("preview_image_url") or
+            model_data.get("cover_image_url") or
+            ""
+        ),
+        "preview_image_url": (
+            model_data.get("preview_image_url") or
+            model_data.get("image_url") or
+            ""
+        ),
+        "file_size": model_data.get("file_size") or model_data.get("file_size_formatted") or "",
+        "file_size_formatted": model_data.get("file_size_formatted") or model_data.get("file_size") or "",
+        "file_size_bytes": model_data.get("file_size_bytes") or 0,
+        "filename": model_data.get("filename") or "",
+        "download_url": model_data.get("download_url") or "",
+        "default_destination_folder": model_data.get("default_destination_folder") or "models/checkpoints/",
+        "suggested_remote_path": model_data.get("suggested_remote_path") or "",
+        "trigger_words": trained_words,
+        "trained_words": trained_words,
+        "trainedWords": trained_words,
+        "description": model_data.get("description") or "",
+        "clean_description": model_data.get("clean_description") or model_data.get("description") or "",
+        "download_command": model_data.get("download_command") or "",
+        "tags": model_data.get("tags") or [],
+        "added_at": model_data.get("added_at") or datetime.utcnow().isoformat()
+    }
+
+    favorites = get_civitai_favorites()
+    # Check if existing item exists
+    updated = False
+    for i, fav in enumerate(favorites):
+        fav_vid = fav.get("version_id")
+        if str(fav_vid) == str(norm_v_id):
+            favorites[i] = clean_item
+            updated = True
+            break
+
+    if not updated:
+        favorites.insert(0, clean_item)
+
+    ASSETS_DIR.mkdir(parents=True, exist_ok=True)
+    with open(CIVITAI_FAVORITES_FILE, "w", encoding="utf-8") as f:
+        json.dump(favorites, f, indent=2)
+
+    return clean_item
+
+def delete_civitai_favorite(version_id: Union[int, str]) -> bool:
+    """Remove a favorite model by its version ID from assets/civitai_favorites.json."""
+    favorites = get_civitai_favorites()
+    target_str = str(version_id).strip()
+    new_favorites = [fav for fav in favorites if str(fav.get("version_id")) != target_str]
+
+    if len(new_favorites) == len(favorites):
+        return False
+
+    ASSETS_DIR.mkdir(parents=True, exist_ok=True)
+    with open(CIVITAI_FAVORITES_FILE, "w", encoding="utf-8") as f:
+        json.dump(new_favorites, f, indent=2)
+    return True
 
 def determine_comfyui_destination(category: str) -> str:
     """Determine the appropriate remote ComfyUI destination subfolder based on model category."""
