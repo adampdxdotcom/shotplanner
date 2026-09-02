@@ -19,6 +19,7 @@ import { RemoteGPUConfig } from "./config/RemoteGPUConfig";
 import { ComfyUIConfig } from "./config/ComfyUIConfig";
 import { GeminiConfig, probeGeminiConnection } from "./config/GeminiConfig";
 import { CivitaiConfig } from "./config/CivitaiConfig";
+import { ModelHubConfig } from "./config/ModelHubConfig";
 import { SSHKeypairModal } from "./config/SSHKeypairModal";
 
 export async function probeLMStudioConnection(url?: string): Promise<{ success: boolean; message: string }> {
@@ -540,8 +541,8 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({
         </div> */}
       </section>
 
-      {/* 3. Civitai & Model Downloader Panel */}
-      <CivitaiConfig 
+      {/* 3. Remote Model Ingestion Hub (Civitai & Hugging Face / Direct URL) */}
+      <ModelHubConfig 
         config={config} 
         onChange={onChange} 
         onShowToast={onShowToast} 

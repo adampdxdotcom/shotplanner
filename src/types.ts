@@ -144,8 +144,16 @@ export interface AppConfig {
   lm_studio_url: string;
   gemini_api_key?: string;
   civitai_api_key?: string;
+  huggingface_token?: string;
   llm_provider?: LLMProvider;
   default_llm_provider?: LLMProvider;
+}
+
+export interface ModelCategoryPreset {
+  id: string;
+  label: string;
+  subfolder: string;
+  description?: string;
 }
 
 export interface CivitaiModelVersionOption {
@@ -175,6 +183,35 @@ export interface CivitaiModelMetadata {
   allow_commercial_use?: boolean | string;
   nsfw?: boolean;
   versions?: CivitaiModelVersionOption[];
+}
+
+export interface HuggingFaceFileOption {
+  filename: string;
+  downloadUrl: string;
+  sizeBytes?: number;
+  sizeFormatted?: string;
+  isPrimary?: boolean;
+}
+
+export interface HuggingFaceModelMetadata {
+  repo_id: string;
+  model_name: string;
+  author: string;
+  pipeline_tag?: string;
+  tags: string[];
+  filename: string;
+  file_size_bytes?: number;
+  file_size_formatted?: string;
+  download_url: string;
+  raw_url: string;
+  detected_category: string;
+  category_preset_key: string;
+  default_destination_folder: string;
+  suggested_remote_path: string;
+  is_gated?: boolean;
+  private?: boolean;
+  available_files?: HuggingFaceFileOption[];
+  description?: string;
 }
 
 export type AssetType = 

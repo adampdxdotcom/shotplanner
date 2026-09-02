@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { getStoredGeminiKey, saveGeminiKey, generateWithGeminiAPI } from "../services/geminiService";
 import { getStoredCivitaiKey, saveCivitaiKey } from "../services/civitaiService";
+import { getStoredHuggingFaceToken, saveHuggingFaceToken } from "../services/huggingfaceService";
 
 const router = Router();
 
@@ -31,6 +32,24 @@ router.get("/civitai", (req: Request, res: Response) => {
 router.post("/civitai", (req: Request, res: Response) => {
   const { api_key, apiKey } = req.body || {};
   saveCivitaiKey(api_key || apiKey || "");
+  res.json({ success: true });
+});
+
+/**
+ * Get stored Hugging Face token status & masked value
+ */
+router.get("/huggingface", (req: Request, res: Response) => {
+  const token = getStoredHuggingFaceToken();
+  const maskedToken = token && token.length > 8 ? `${token.slice(0, 4)}...${token.slice(-4)}` : token ? "***" : null;
+  res.json({ configured: !!token, token: token ? token.substring(0, 5) + "..." : null, masked_token: maskedToken });
+});
+
+/**
+ * Save Hugging Face token
+ */
+router.post("/huggingface", (req: Request, res: Response) => {
+  const { token, api_token, apiKey } = req.body || {};
+  saveHuggingFaceToken(token || api_token || apiKey || "");
   res.json({ success: true });
 });
 

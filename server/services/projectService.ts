@@ -13,6 +13,7 @@ const IGNORED_JSON_FILENAMES = new Set([
   "assets_db.json",
   "gemini_config.json",
   "civitai_config.json",
+  "huggingface_config.json",
   "package.json",
   "tsconfig.json",
   "metadata.json"

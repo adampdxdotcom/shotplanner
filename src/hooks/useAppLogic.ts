@@ -34,7 +34,8 @@ export function useAppLogic() {
     lm_studio_url: "http://localhost:1234/v1",
     default_llm_provider: getDefaultLlmProvider(),
     gemini_api_key: "",
-    civitai_api_key: ""
+    civitai_api_key: "",
+    huggingface_token: ""
   });
 
   // 2. Workflow & Node Mapping State
@@ -727,7 +728,8 @@ export function useAppLogic() {
         ...config,
         lm_studio_url: config.lm_studio_url,
         gemini_api_key: "",
-        civitai_api_key: ""
+        civitai_api_key: "",
+        huggingface_token: ""
       },
       llm_provider: llmProvider,
       parameter_node_mappings: parameterNodeMappings,

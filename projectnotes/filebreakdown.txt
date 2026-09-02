@@ -844,7 +844,45 @@
     3. **Interactive Model Preview Card**: Cover thumbnail, title, version selector, category & base model badges, formatted file size (GB/MB), editable destination subfolder and filename inputs, and full remote GPU path preview.
     4. **⚡ Download to Remote ComfyUI Action**: Dispatches remote SSH download with real-time progress timer and animated streaming feedback, structured success/error cards, and toast notifications.
 - **`src/components/ConfigSection.tsx`**
-  - Integrated `CivitaiConfig` panel directly into the Configuration view.
+  - Integrated `CivitaiConfig` and `ModelHubConfig` panels directly into the Configuration view.
+
+## Remote Model Ingestion Hub (Civitai, Hugging Face, & Direct URLs)
+- **`server/config/constants.ts`**
+  - Added `HUGGINGFACE_CONFIG_FILE` constant (`assets/huggingface_config.json`) for persistent storage of optional Hugging Face access tokens.
+- **`server/services/assetService.ts` & `server/services/projectService.ts`**
+  - Added `huggingface_config.json` to ignored JSON lists preventing configuration leakage into project scene listings and database synchronization.
+- **`server/services/huggingfaceService.ts`**
+  - Implemented `getStoredHuggingFaceToken()` and `saveHuggingFaceToken()` for secure token persistence.
+  - Implemented `normalizeHuggingFaceUrl(rawUrl)` converting `/blob/` path segments to direct `/resolve/` streaming endpoints and parsing repository IDs, revisions, and filenames.
+  - Implemented `detectHFCategory()` auto-detecting model categories (Checkpoints, Diffusion Models, LoRAs, ControlNet, Text Encoders/CLIP, VAE, Upscalers, Embeddings).
+  - Implemented `fetchHuggingFaceModelInfo(queryUrl, tokenOverride)` querying Hugging Face API or direct URLs with Bearer token authentication, discovering available siblings files, inspecting content-length, and auto-routing destination paths.
+- **`server/services/modelHubService.ts`**
+  - Standardized `COMFYUI_MODEL_CATEGORIES` preset definitions.
+  - Implemented `executeUnifiedRemoteDownload(options)` supporting Civitai, Hugging Face, and direct model downloads via SSH, executing multi-threaded `aria2c` (8x streams) with Bearer token authentication headers, fallback to `curl -L` resume streaming or `wget`, directory verification (`mkdir -p`), and file existence validation.
+- **`server/routes/settingsRoutes.ts`**
+  - Added `GET /api/settings/huggingface` and `POST /api/settings/huggingface` for token retrieval and updates.
+- **`server/routes/modelHubRoutes.ts` & `server.ts`**
+  - Mounted `/api/model-hub` router:
+    - `GET /api/model-hub/categories`: Returns ComfyUI category presets.
+    - `GET /api/model-hub/hf-info`: Inspects Hugging Face / direct URL metadata.
+    - `GET /api/model-hub/civitai-info`: Inspects Civitai metadata.
+    - `POST /api/model-hub/download-remote`: Dispatches unified remote SSH downloads.
+- **`src/types.ts` & `src/hooks/useAppLogic.ts`**
+  - Added `huggingface_token?: string` to `AppConfig`.
+  - Added `HuggingFaceModelMetadata`, `HuggingFaceFileOption`, and `ModelCategoryPreset` interfaces.
+  - Initialized `huggingface_token: ""` in state and save/load pipelines.
+- **`src/components/config/ModelHubConfig.tsx`**
+  - Created unified "Remote Model Ingestion Hub" component with:
+    1. Tabbed navigation between **Hugging Face / Direct URL** and **Civitai Models & LoRAs**.
+    2. Remote ComfyUI Root Path dynamic display and anchoring.
+    3. Hugging Face Access Token manager with masked status and direct token generation link.
+    4. Model search bar accepting HF URLs, repos, or direct `.safetensors` links, with popular model presets (Wan 2.1 14B, FLUX T5-XXL FP8, FLUX CLIP-L, SDXL VAE, RealESRGAN x4plus).
+    5. Multi-file repository selector allowing selection of specific `.safetensors` files from repo trees.
+    6. Standard "Target Model Category" selector dropdown across both tabs (Checkpoints, Diffusion Models, LoRAs, ControlNet, Text Encoders/CLIP, VAE, Upscalers, Embeddings, Custom Subfolder).
+    7. Editable destination subfolder and filename with dynamic full remote path preview (`{remote_comfyui_root}/{destination_folder}/{filename}`).
+    8. Remote SSH ingestion button with animated elapsed timer, multi-stream `aria2c` execution, structured result card, and terminal logs viewer.
+- **`src/components/ConfigSection.tsx`**
+  - Replaced legacy Civitai-only panel with the unified `ModelHubConfig` (Remote Model Ingestion Hub).
 
 
 
