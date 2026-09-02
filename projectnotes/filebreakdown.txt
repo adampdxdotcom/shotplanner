@@ -738,4 +738,15 @@
 - **Image Generation & Variations**: `gemini-3.1-flash-image` (Nano Banana 2) with automatic fallback to `gemini-2.5-flash-image` applied directly in character headshot generation pipelines across `server/services/headshotService.ts` and `backend/services/headshot_service.py` with custom aspect ratio configuration (`imageConfig: { aspectRatio }`).
 - **Service-Layer Enforcement & Error Propagation**: Models and error propagation operate directly at the service layer for zero-friction execution without silent fallbacks, surfacing Google API errors directly to users.
 
+## Edit Asset Modal Refactoring & Metadata Taxonomy Parity
+- **`src/components/AssetEditModal.tsx`**
+  - Refactored the modal interface to achieve complete visual, metadata, and taxonomy parity with `AssetUploadModal`.
+  - Replaced freeform "Asset Type" text input with the standardized "Type of Reference" dropdown featuring presets for Headshot (Face), Body / Outfit, Scene / Location, Object / Prop, Style / Mood, and Other (custom text input).
+  - Integrated conditional "Modifier" dropdown selector bound to `ASSET_REFERENCE_MODIFIERS`, enabling reactive tag insertion/replacement into the "Visual Description" editor via `updateDescriptionWithModifier`.
+  - Retained `SubjectCombobox` for subject/entity assignment, visual description prompting editor, asset thumbnail preview header card, semantic metadata preview tag, and optional file replacement dropzone.
+  - Passes updated metadata (`type`, `subject_name`, `description`) to `onAssetUpdated` to synchronize runtime state across gallery, cast cards, and project assets while setting `isDirty: true` for auto-save.
+- **`server/routes/assetRoutes.ts`**
+  - Updated `PUT /api/assets/:filename` and added `PUT /api/assets/update` with `upload.single("file")` middleware to parse multipart FormData fields (`type`, `subject_name`, `description`, `original_filename`), enabling backend synchronization for metadata edits with or without file replacement.
+
+
 

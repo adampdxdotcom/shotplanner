@@ -65,11 +65,17 @@ router.delete("/:filename", (req: Request, res: Response) => {
 });
 
 // Update asset metadata
-router.put("/:filename", (req: Request, res: Response) => {
-  const { filename } = req.params;
+router.put("/update", upload.single("file"), (req: Request, res: Response) => {
+  const filename = req.body.original_filename || req.body.filename;
   const { type, subject_name, description } = req.body;
   const updated = assetService.updateAssetMetadata(filename, { type, subject_name, description });
-  if (!updated) return res.status(404).json({ error: "Asset not found" });
+  res.json({ success: true, asset: updated });
+});
+
+router.put("/:filename", upload.single("file"), (req: Request, res: Response) => {
+  const targetFilename = req.params.filename === "update" ? (req.body.original_filename || "asset") : req.params.filename;
+  const { type, subject_name, description } = req.body;
+  const updated = assetService.updateAssetMetadata(targetFilename, { type, subject_name, description });
   res.json({ success: true, asset: updated });
 });
 
