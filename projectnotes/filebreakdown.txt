@@ -1150,6 +1150,15 @@
     - **Right-Side Boundary Squeeze Elimination:** Resolved the container compression bug where positioning an actor near or past the stage's right border (`left: > 50%`) squeezed the actor's width and distorted its scale. Applied `maxWidth: "none"`, `width: "max-content"`, and `whiteSpace: "nowrap"` to the outer positioning style alongside `max-w-none shrink-0` across all nested flex wrappers, figure elements, tokens, and masking canvases. This ensures cutouts flow naturally off-stage without horizontal compression or aspect-ratio distortion at any horizontal coordinate.
     - **Top-Level Masking HUD & Cursor Layering Parity:** Fixed z-index layering so the floating Masking HUD toolbar (`z-[100]`) is never obscured, clipped, or pointer-intercepted by tall, scaled-up, or high-positioned actors. Calibrated the active masking actor layer container (`zIndex: 40`, and `30` when selected) cleanly below the HUD while retaining priority over other staged actors (`20+`) and environment plates (`z-0`). Elevated the circular brush cursor overlay to `z-[110]` with `pointer-events-none` to ensure sharp top-level visual feedback, and bound `onPointerDown={(e) => e.stopPropagation()}` on the HUD container to guarantee that all toolbar controls (Erase/Restore toggles, brush size slider and presets, Reset Mask, and Done Masking) remain 100% unobstructed, clickable, and interactive regardless of actor size or stage placement.
 
+## Actor Pose Keying & Staging Streamline
+- **`src/components/cast/ActorPoseKeyingPanel.tsx` & `src/components/cast/AiReferenceStagingStudioModal.tsx`**
+  - **Role:** Actor pose keying, background removal, transparent cutout preparation, and stage insertion modal.
+  - **Updates:**
+    - **Removed Stance/Pose Description Field:** Removed the "Actor Stance / Pose Description" text input from the keying panel footer, eliminating manual typing overhead when preparing posed cutouts.
+    - **Removed Initial Depth Plane Settings:** Removed the "Initial Depth Plane" (foreground/midground/background) segmented buttons from the keying panel footer. Posed actors now stage cleanly using the stage's contextual defaults without forcing pre-configuration during keying.
+    - **Streamlined Actor Blocking Controls:** Removed the "Depth Plane" segmented selector from the actor blocking controls card, streamlined the scale slider label to "Scale", removed the "Gaze & Facing Direction" and "Action / Stance" dropdown controls, and removed the "Visual Description" textarea block from the save panel to keep the staging controls focused, uncluttered, and performant.
+
+
 
 
 

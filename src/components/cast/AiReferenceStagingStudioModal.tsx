@@ -492,7 +492,7 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
     characterName: string;
     cutoutDataUrl: string;
     referenceAssetFilename?: string;
-    posture: string;
+    posture?: string;
     facing?: "facing_camera" | "turn_left" | "turn_right" | "profile_left" | "profile_right" | "back_camera";
     plane?: "foreground" | "midground" | "background";
   }) => {
@@ -1230,7 +1230,7 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
                         )}
                       </div>
                       <p className="text-[11px] text-zinc-400">
-                        Spatial positioning, scale, floor anchor, stance, and layer masking
+                        Spatial positioning, scale, floor anchor, and layer masking
                       </p>
                     </div>
                   </div>
@@ -1273,7 +1273,7 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
                 </div>
 
                 {stagedActors[selectedActorIndex] ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
                     {/* Col 1: Figure Representation & Live Masking */}
                     <div className="space-y-3 bg-zinc-950/50 border border-zinc-800/80 rounded-xl p-3.5 flex flex-col justify-between h-full">
                       <div className="space-y-2">
@@ -1407,33 +1407,11 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
                       </div>
                     </div>
 
-                    {/* Col 2: Depth Plane & Scale Factor */}
+                    {/* Col 2: Scale Factor */}
                     <div className="space-y-3 bg-zinc-950/50 border border-zinc-800/80 rounded-xl p-3.5 flex flex-col justify-between h-full">
-                      {/* Depth Plane */}
-                      <div>
-                        <label className="block text-[11px] font-medium text-zinc-400 mb-1.5">Depth Plane</label>
-                        <div className="grid grid-cols-3 gap-1.5">
-                          {(["foreground", "midground", "background"] as const).map(plane => (
-                            <button
-                              key={plane}
-                              type="button"
-                              onClick={() => updateSelectedActor({ plane })}
-                              className={`py-1.5 text-xs font-medium rounded-lg capitalize border transition-colors cursor-pointer ${
-                                stagedActors[selectedActorIndex].plane === plane
-                                  ? "bg-indigo-600 text-white border-indigo-500"
-                                  : "bg-zinc-950 text-zinc-400 border-zinc-800 hover:text-zinc-200"
-                              }`}
-                            >
-                              {plane}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Depth Scale Factor Slider */}
                       <div>
                         <div className="flex items-center justify-between text-[11px] font-medium text-zinc-400 mb-1">
-                          <span>Depth Scale Factor (20% – 350%)</span>
+                          <span>Scale</span>
                           <span className="font-mono text-zinc-200 font-semibold">
                             {Math.round((stagedActors[selectedActorIndex].scale || 1.0) * 100)}% ({((stagedActors[selectedActorIndex].scale || 1.0)).toFixed(2)}x)
                           </span>
@@ -1466,6 +1444,18 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
                           ))}
                         </div>
                       </div>
+
+                      {/* Quick remove from stage */}
+                      {stagedActors.length > 0 && stagedActors[selectedActorIndex] && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveActorFromStage(selectedActorIndex)}
+                          className="w-full py-1.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-950/30 border border-red-900/40 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer mt-1"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Remove {stagedActors[selectedActorIndex].characterName}</span>
+                        </button>
+                      )}
                     </div>
 
                     {/* Col 3: Stage Position (X-Axis) & Floor Anchor (Y-Axis) */}
@@ -1564,50 +1554,6 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
                         <span>Center on Stage</span>
                       </button>
                     </div>
-
-                    {/* Col 4: Stance, Direction & Actions */}
-                    <div className="space-y-3 bg-zinc-950/50 border border-zinc-800/80 rounded-xl p-3.5 flex flex-col justify-between h-full">
-                      {/* Facing & Gaze Direction */}
-                      <div>
-                        <label className="block text-[11px] font-medium text-zinc-400 mb-1">Gaze & Facing Direction</label>
-                        <select
-                          value={stagedActors[selectedActorIndex].facing}
-                          onChange={(e) => updateSelectedActor({ facing: e.target.value as any })}
-                          className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 outline-none"
-                        >
-                          <option value="facing_camera">Facing Camera (Direct)</option>
-                          <option value="turn_left">3/4 Turn Stage Left</option>
-                          <option value="turn_right">3/4 Turn Stage Right</option>
-                          <option value="profile_left">Full Profile Left</option>
-                          <option value="profile_right">Full Profile Right</option>
-                          <option value="back_camera">Back to Camera</option>
-                        </select>
-                      </div>
-
-                      {/* Posture / Action */}
-                      <div>
-                        <label className="block text-[11px] font-medium text-zinc-400 mb-1">Action / Stance</label>
-                        <input
-                          type="text"
-                          value={stagedActors[selectedActorIndex].posture}
-                          onChange={(e) => updateSelectedActor({ posture: e.target.value })}
-                          placeholder="e.g. Standing Heroic, Seated Casual..."
-                          className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 outline-none"
-                        />
-                      </div>
-
-                      {/* Quick remove from stage */}
-                      {stagedActors.length > 0 && stagedActors[selectedActorIndex] && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveActorFromStage(selectedActorIndex)}
-                          className="w-full py-1.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-950/30 border border-red-900/40 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer mt-1"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          <span>Remove {stagedActors[selectedActorIndex].characterName}</span>
-                        </button>
-                      )}
-                    </div>
                   </div>
                 ) : (
                   <div className="text-center py-6 px-4 bg-zinc-950/40 border border-zinc-800/60 rounded-xl space-y-1.5">
@@ -1683,37 +1629,6 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
                       Semantic reference category passed to ComfyUI & workflow pipelines
                     </span>
                   </div>
-                </div>
-
-                {/* Visual Description textarea */}
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-semibold text-zinc-300">
-                      Visual Description
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCompositeDescription(synthesizedStagingText);
-                        setHasUserEditedDescription(false);
-                        if (addToast) addToast("Visual description re-synced with staging directions", "info");
-                      }}
-                      className="text-[11px] text-amber-400 hover:text-amber-300 flex items-center gap-1 font-medium transition-colors cursor-pointer"
-                    >
-                      <RefreshCw className="w-3 h-3" />
-                      <span>Re-sync from Staging Prompt</span>
-                    </button>
-                  </div>
-                  <textarea
-                    rows={2}
-                    value={compositeDescription}
-                    onChange={(e) => {
-                      setHasUserEditedDescription(true);
-                      setCompositeDescription(e.target.value);
-                    }}
-                    placeholder="Visual description pre-filled from staging directions..."
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 font-mono text-xs text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-amber-500/60 transition-colors resize-y leading-relaxed"
-                  />
                 </div>
 
                 {/* Bottom Action Bar: Optional Slot Assignment & Save Action Button */}

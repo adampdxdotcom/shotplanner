@@ -38,7 +38,7 @@ export interface ActorPoseKeyingPanelProps {
     characterName: string;
     cutoutDataUrl: string;
     referenceAssetFilename?: string;
-    posture: string;
+    posture?: string;
     facing?: "facing_camera" | "turn_left" | "turn_right" | "profile_left" | "profile_right" | "back_camera";
     plane?: "foreground" | "midground" | "background";
   }) => void;
@@ -126,8 +126,6 @@ export const ActorPoseKeyingPanel: React.FC<ActorPoseKeyingPanelProps> = ({
   const [tolerance, setTolerance] = useState<number>(35); // 0 to 100
   const [softness, setSoftness] = useState<number>(15); // 0 to 100
   const [despill, setDespill] = useState<boolean>(true);
-  const [postureName, setPostureName] = useState<string>("Standing Pose");
-  const [selectedPlane, setSelectedPlane] = useState<"foreground" | "midground" | "background">("midground");
 
   // Eyedropper state
   const [isEyedropperActive, setIsEyedropperActive] = useState<boolean>(false);
@@ -307,9 +305,7 @@ export const ActorPoseKeyingPanel: React.FC<ActorPoseKeyingPanelProps> = ({
       characterName: selectedCharacter,
       cutoutDataUrl: cutoutResult.dataUrl,
       referenceAssetFilename: selectedAsset?.filename,
-      posture: postureName.trim() || "Standing Pose",
       facing: "facing_camera",
-      plane: selectedPlane,
     });
 
     if (addToast) {
@@ -744,44 +740,6 @@ export const ActorPoseKeyingPanel: React.FC<ActorPoseKeyingPanelProps> = ({
             </div>
           </div>
 
-        </div>
-
-        {/* STAGING METADATA (STANCE & PLANE) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-zinc-800">
-          <div>
-            <label className="block text-xs font-medium text-zinc-300 mb-1">
-              Actor Stance / Pose Description
-            </label>
-            <input
-              type="text"
-              value={postureName}
-              onChange={(e) => setPostureName(e.target.value)}
-              placeholder="e.g. Standing Heroic, Walking Forward, Reaching..."
-              className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 outline-none focus:border-indigo-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-zinc-300 mb-1">
-              Initial Depth Plane
-            </label>
-            <div className="grid grid-cols-3 gap-1.5">
-              {(["foreground", "midground", "background"] as const).map(plane => (
-                <button
-                  key={plane}
-                  type="button"
-                  onClick={() => setSelectedPlane(plane)}
-                  className={`py-1.5 text-xs font-medium rounded-lg capitalize border transition-colors cursor-pointer ${
-                    selectedPlane === plane
-                      ? "bg-indigo-600 text-white border-indigo-500 font-bold"
-                      : "bg-zinc-950 text-zinc-400 border-zinc-800 hover:text-zinc-200"
-                  }`}
-                >
-                  {plane}
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
 
       </div>
