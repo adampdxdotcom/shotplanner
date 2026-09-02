@@ -125,8 +125,12 @@ router.post("/test-gemini", async (req: Request, res: Response) => {
  * Test ComfyUI endpoint connection
  */
 router.post("/test-comfyui", async (req: Request, res: Response) => {
-  const { url, token } = req.body;
-  const targetUrl = (url || "http://127.0.0.1:8188").trim().replace(/\/$/, "");
+  const { url, comfyui_url, comfyui_api_url, token, remote_api_token } = req.body;
+  const rawUrl = comfyui_url || url || comfyui_api_url || "http://127.0.0.1:8188";
+  const targetUrl = rawUrl.trim().replace(/\/$/, "");
+  const authToken = (remote_api_token || token || "").trim();
+
+  console.log(`[ComfyUI Test] Testing reachability for URL: ${targetUrl}`);
 
   let probeUrl = `${targetUrl}/system_stats`;
 
@@ -135,45 +139,59 @@ router.post("/test-comfyui", async (req: Request, res: Response) => {
     const timeout = setTimeout(() => controller.abort(), 5000);
 
     const headers: Record<string, string> = { "Accept": "application/json" };
-    if (token && token.trim()) {
-      headers["Authorization"] = `Bearer ${token.trim()}`;
+    if (authToken) {
+      headers["Authorization"] = `Bearer ${authToken}`;
     }
 
-    const lmRes = await fetch(probeUrl, {
+    let lmRes = await fetch(probeUrl, {
       method: "GET",
       headers,
       signal: controller.signal
+    }).catch(async () => {
+      // Fallback probe
+      probeUrl = `${targetUrl}/object_info`;
+      return await fetch(probeUrl, {
+        method: "GET",
+        headers,
+        signal: controller.signal
+      });
     });
     clearTimeout(timeout);
 
-    if (lmRes.ok) {
+    if (lmRes && lmRes.ok) {
       const data = await lmRes.json().catch(() => ({}));
       
-      let systemInfo = "";
+      const systemInfoParts: string[] = [];
       if (data && data.system && data.system.os) {
-        systemInfo = `OS: ${data.system.os}`;
+        systemInfoParts.push(`OS: ${data.system.os}`);
       }
       if (data && data.devices && data.devices.length > 0) {
         const device = data.devices[0];
-        if (device.name) {
-          systemInfo += systemInfo ? ` | GPU: ${device.name}` : `GPU: ${device.name}`;
-        }
+        let devStr = device.name ? `GPU: ${device.name}` : "GPU detected";
         if (device.vram_total) {
           const vramGB = (device.vram_total / (1024 * 1024 * 1024)).toFixed(1);
-          systemInfo += ` (${vramGB}GB VRAM)`;
+          devStr += ` (${vramGB}GB VRAM)`;
         }
+        systemInfoParts.push(devStr);
       }
+
+      const systemInfo = systemInfoParts.length > 0 ? systemInfoParts.join(" | ") : `${targetUrl} (Active)`;
+      console.log(`[ComfyUI Test] Success (HTTP 200) - Connected to: ${systemInfo}`);
 
       return res.json({
         success: true,
         message: `ComfyUI server responsive at ${targetUrl}`,
         systemInfo,
-        probeUrl
+        probeUrl,
+        system_stats: data
       });
     } else {
+      const statusText = lmRes ? `HTTP ${lmRes.status} ${lmRes.statusText}` : "No response";
+      const errorMessage = `Server responded with ${statusText}`;
+      console.log(`[ComfyUI Test] Failed to connect to ${targetUrl}: ${errorMessage}`);
       return res.status(400).json({
         success: false,
-        error: `Server responded with HTTP ${lmRes.status} ${lmRes.statusText}`
+        error: errorMessage
       });
     }
   } catch (err: any) {
@@ -182,6 +200,7 @@ router.post("/test-comfyui", async (req: Request, res: Response) => {
       ? "Connection timed out (5s limit reached)" 
       : (err.message || "Connection refused or endpoint unreachable");
 
+    console.log(`[ComfyUI Test] Failed to connect to ${targetUrl}: ${errorMessage}`);
     return res.status(400).json({
       success: false,
       error: errorMessage

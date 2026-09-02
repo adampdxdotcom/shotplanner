@@ -59,6 +59,16 @@ class GeminiTestRequest(BaseModel):
     class Config:
         extra = "allow"
 
+class ComfyUITestRequest(BaseModel):
+    url: Optional[str] = None
+    comfyui_url: Optional[str] = None
+    comfyui_api_url: Optional[str] = None
+    token: Optional[str] = None
+    remote_api_token: Optional[str] = None
+
+    class Config:
+        extra = "allow"
+
 @router.post("/generate-prompt")
 @router.post("/llm/expand")
 async def generate_prompt_endpoint(req: LLMGenerateRequest):
@@ -226,4 +236,88 @@ async def test_gemini(req: GeminiTestRequest):
             "success": False,
             "error": err_msg
         })
+
+@router.post("/settings/test-comfyui")
+async def test_comfyui(req: ComfyUITestRequest):
+    """Test ComfyUI endpoint reachability and extract system/device stats."""
+    raw_url = req.comfyui_url or req.url or req.comfyui_api_url or "http://127.0.0.1:8188"
+    url = raw_url.strip().rstrip("/")
+    token = (req.remote_api_token or req.token or "").strip()
+
+    print(f"[ComfyUI Test] Testing reachability for URL: {url}", flush=True)
+
+    headers = {"Accept": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
+    probe_url = f"{url}/system_stats"
+
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            try:
+                res = await client.get(probe_url, headers=headers)
+            except Exception as probe_err:
+                # If /system_stats failed, try /object_info as fallback probe
+                probe_url = f"{url}/object_info"
+                res = await client.get(probe_url, headers=headers)
+
+            if res.status_code == 200:
+                data = {}
+                try:
+                    data = res.json()
+                except Exception:
+                    pass
+
+                system_info_parts = []
+                if isinstance(data, dict):
+                    sys_info = data.get("system", {})
+                    if isinstance(sys_info, dict) and sys_info.get("os"):
+                        system_info_parts.append(f"OS: {sys_info['os']}")
+
+                    devices = data.get("devices", [])
+                    if isinstance(devices, list) and len(devices) > 0:
+                        first_dev = devices[0]
+                        if isinstance(first_dev, dict):
+                            dev_name = first_dev.get("name")
+                            dev_str = f"GPU: {dev_name}" if dev_name else "GPU detected"
+                            vram_total = first_dev.get("vram_total")
+                            if vram_total and isinstance(vram_total, (int, float)):
+                                vram_gb = f"{vram_total / (1024 * 1024 * 1024):.1f}GB VRAM"
+                                dev_str += f" ({vram_gb})"
+                            system_info_parts.append(dev_str)
+
+                device_info = " | ".join(system_info_parts) if system_info_parts else f"{url} (Active)"
+                print(f"[ComfyUI Test] Success (HTTP 200) - Connected to: {device_info}", flush=True)
+
+                return {
+                    "success": True,
+                    "message": f"ComfyUI server responsive at {url}",
+                    "systemInfo": device_info,
+                    "probeUrl": probe_url,
+                    "system_stats": data
+                }
+            else:
+                err_msg = f"Server responded with HTTP {res.status_code}"
+                if res.reason_phrase:
+                    err_msg += f" {res.reason_phrase}"
+                print(f"[ComfyUI Test] Failed to connect to {url}: {err_msg}", flush=True)
+                return JSONResponse(
+                    status_code=400,
+                    content={"success": False, "error": err_msg}
+                )
+    except httpx.TimeoutException:
+        err_msg = "Connection timed out (5s limit reached)"
+        print(f"[ComfyUI Test] Failed to connect to {url}: {err_msg}", flush=True)
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "error": err_msg}
+        )
+    except Exception as e:
+        err_msg = str(e) or "Connection refused or endpoint unreachable"
+        print(f"[ComfyUI Test] Failed to connect to {url}: {err_msg}", flush=True)
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "error": err_msg}
+        )
+
 

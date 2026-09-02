@@ -767,5 +767,19 @@
   - Implemented case-insensitive deduplication and formatting for subject suggestions, combobox dropdown options, and quick-selection chips.
   - Updated `getSubjectMeta` to resolve matched assets using normalized subject comparison.
 
+## ComfyUI Endpoint Verification & Health Check API
+- **`backend/routes/prompt_routes.py`**
+  - Implemented `POST /api/settings/test-comfyui` endpoint accepting target URL aliases (`comfyui_url`, `url`, `comfyui_api_url`) and Bearer authorization tokens (`remote_api_token`, `token`).
+  - Added request model `ComfyUITestRequest` with flexible field parsing and extra field allowance.
+  - Implemented asynchronous probe querying `{url}/system_stats` (with `{url}/object_info` fallback) using `httpx.AsyncClient` with a strict 5-second timeout.
+  - Outputs formatted terminal logs: `[ComfyUI Test] Testing reachability for URL: {url}`, `[ComfyUI Test] Success (HTTP 200) - Connected to: {device_info}`, and `[ComfyUI Test] Failed to connect to {url}: {error_message}`.
+  - Extracts and formats hardware stats including OS, detected GPU model names, and total VRAM GB.
+- **`server/routes/settingsRoutes.ts`**
+  - Enhanced Express `POST /api/settings/test-comfyui` endpoint to mirror FastAPI endpoint semantics, field aliases, and terminal log formats.
+- **`src/components/config/ComfyUIConfig.tsx`**
+  - Bound the "Test ComfyUI" button strictly to isolated `/api/settings/test-comfyui` calls without triggering Gemini or LM Studio validation.
+  - Displays reactive connected/unreachable badges with server messages and device stats.
+
+
 
 

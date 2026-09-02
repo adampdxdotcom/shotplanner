@@ -25,8 +25,11 @@ export const ComfyUIConfig: React.FC<ComfyUIConfigProps> = ({ config, handleInpu
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
+          comfyui_url: config.comfyui_api_url,
           url: config.comfyui_api_url, 
-          token: config.remote_api_token 
+          comfyui_api_url: config.comfyui_api_url,
+          token: config.remote_api_token,
+          remote_api_token: config.remote_api_token
         })
       });
       const data = await res.json();
