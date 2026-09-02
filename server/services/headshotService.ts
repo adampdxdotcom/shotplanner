@@ -8,10 +8,10 @@ import { assetService } from './assetService';
 import { AssetRecord } from '../types';
 
 export const HEADSHOT_TEMPLATES: Record<string, string> = {
-  "Facing": "Front-facing studio portrait with direct eye contact. Preserve facial likeness, hair texture, and identity from the reference image. Request maximum resolution/quality. Clean neutral background.",
-  "3/4 Profile": "Angled 3/4 perspective with cinematic soft lighting. Preserve facial likeness, hair texture, and identity from the reference image. Request maximum resolution/quality. Deep cinematic depth of field.",
-  "Full Profile": "Side profile silhouette or detailed profile portrait. Preserve facial likeness, hair texture, and identity from the reference image. Request maximum resolution/quality. Dramatic lighting.",
-  "Cinematic / Mood": "Dramatic high-key portrait emphasizing character aura and mood. Preserve facial likeness, hair texture, and identity from the reference image. Request maximum resolution/quality. Moody cinematic lighting."
+  "Facing": "Front-facing studio portrait with direct eye contact. Preserve facial likeness, hair texture, and identity from the reference image. Request maximum resolution/quality. Placed on a pure solid white studio backdrop, isolated on clean white background, studio lighting.",
+  "3/4 Profile": "Angled 3/4 perspective with cinematic soft lighting. Preserve facial likeness, hair texture, and identity from the reference image. Request maximum resolution/quality. Placed on a pure solid white studio backdrop, isolated on clean white background, studio lighting.",
+  "Full Profile": "Side profile silhouette or detailed profile portrait. Preserve facial likeness, hair texture, and identity from the reference image. Request maximum resolution/quality. Placed on a pure solid white studio backdrop, isolated on clean white background, studio lighting.",
+  "Cinematic / Mood": "Dramatic high-key portrait emphasizing character aura and mood. Preserve facial likeness, hair texture, and identity from the reference image. Request maximum resolution/quality. Placed on a pure solid white studio backdrop, isolated on clean white background, studio lighting."
 };
 
 export async function generateVariations(

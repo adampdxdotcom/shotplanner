@@ -692,6 +692,7 @@
   - Configured `@google/genai` client with default `gemini-3.7-flash` model identifier for prompt expansion and validation routines, including mandatory telemetry headers (`User-Agent: aistudio-build`).
 - **`server/services/headshotService.ts`**
   - Implemented `HEADSHOT_TEMPLATES` constant block explicitly defining visual directives for presets ("Facing", "3/4 Profile", "Full Profile", "Cinematic / Mood") demanding maximum quality and likeness preservation.
+  - **Updates:** Updated templates across all presets to strictly instruct the generation model to place every subject against an isolated, seamless, pure solid white background ("on a pure solid white studio backdrop, isolated on clean white background, studio lighting").
   - Implemented `generateVariations()` utilizing the `@google/genai` client configured with `gemini-3.1-flash-image` (Nano Banana 2) and automatic fallback to `gemini-2.5-flash-image` to dispatch parallel image-to-image requests via multimodal payloads (`inlineData` + text directive) with custom `aspectRatio` settings.
   - Removed silent fallbacks on error: logs exact Google API errors to terminal and raises explicit errors to the client to surface billing, quota, or parameter issues.
   - Implemented `saveSelectedVariations()` to persist images securely into the active scene's image directory with collision-free filenames (`headshot_{character}_{variation_key}_{timestamp}_{index}.png`), generate separate physical files with companion thumbnails via the `sharp` library, and orchestrate synchronous database registration using `assetService.upsertAsset`.
@@ -1014,12 +1015,20 @@
   - **Updates:** Expanded initial pack slot templates to include Upper Body and Full Body references, adding inline modifier selectors in the quick description card.
 
 ## AI Reference & Staging Studio Modal & Action Triggers
+## AI Reference & Staging Studio Modal & Action Triggers
 - **`src/components/cast/AiReferenceStagingStudioModal.tsx`**
   - **Role:** Unified, 2-tab production studio modal integrating character asset generation and 2D spatial scene blocking.
+  - **Updates:** Refactored into modular sub-components and custom hooks for better maintainability. Houses the shared modal shell, context synchronization, and active tab state.
   - **Tabs:**
-    - **Tab 1: "AI Headshots" (`#studio-tab-headshots`)**: Houses the AI headshot variation generator, positive/negative prompts, seed selector, aspect ratio controls, candidate grid, and save-to-character asset pipeline.
-    - **Tab 2: "Scene Staging & Blocking" (`#studio-tab-staging`)**: Interactive canvas for shot-level spatial staging with character cutouts/avatars, positioning, scale, orientation, camera angle, focal length, depth layers, and prompt synchronization.
-  - **Context Synchronization:** Preserves active character context, active scene name, and parent state bindings across tab transitions.
+    - **Tab 1: "AI Headshots"**: Delegated to `HeadshotGeneratorTab.tsx`.
+    - **Tab 2: "Scene Staging & Blocking"**: Interactive canvas for shot-level spatial staging.
+- **`src/components/cast/HeadshotGeneratorTab.tsx`**
+  - **Role:** Interactive UI panel for the AI headshot variation generator.
+  - **Updates:** Added "2:3 (Portrait)" aspect ratio control to the generation payload. Connects to backend headshot service.
+- **`src/hooks/useHeadshotGenerator.ts`**
+  - **Role:** Custom hook managing the asynchronous generation pipeline and API calls (`/api/headshots/generate`, `/api/headshots/save-selected`) and candidate tracking state.
+- **`src/hooks/useCompositeExporter.ts`**
+  - **Role:** Custom hook managing the composite staging canvas export, Blob translation, and saving to backend asset storage.
 - **`src/components/cast/HeadshotGeneratorModal.tsx`**
   - **Role:** Backward-compatible wrapper delegating to `AiReferenceStagingStudioModal` with `initialTab="headshots"`.
 - **`src/components/CastSection.tsx`**
