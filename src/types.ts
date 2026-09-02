@@ -143,8 +143,38 @@ export interface AppConfig {
   remote_api_token: string;
   lm_studio_url: string;
   gemini_api_key?: string;
+  civitai_api_key?: string;
   llm_provider?: LLMProvider;
   default_llm_provider?: LLMProvider;
+}
+
+export interface CivitaiModelVersionOption {
+  id: number;
+  name: string;
+  baseModel?: string;
+  downloadUrl?: string;
+  createdAt?: string;
+}
+
+export interface CivitaiModelMetadata {
+  model_id: number;
+  model_name: string;
+  version_id: number;
+  version_name: string;
+  category: string;
+  base_model: string;
+  file_size_bytes: number;
+  file_size_formatted: string;
+  filename: string;
+  preview_image_url: string;
+  download_url: string;
+  default_destination_folder: string;
+  suggested_remote_path: string;
+  description?: string;
+  tags?: string[];
+  allow_commercial_use?: boolean | string;
+  nsfw?: boolean;
+  versions?: CivitaiModelVersionOption[];
 }
 
 export type AssetType = 

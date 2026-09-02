@@ -33,7 +33,8 @@ export function useAppLogic() {
     remote_api_token: "",
     lm_studio_url: "http://localhost:1234/v1",
     default_llm_provider: getDefaultLlmProvider(),
-    gemini_api_key: ""
+    gemini_api_key: "",
+    civitai_api_key: ""
   });
 
   // 2. Workflow & Node Mapping State
@@ -725,7 +726,8 @@ export function useAppLogic() {
         ...(sceneProject.config || {}),
         ...config,
         lm_studio_url: config.lm_studio_url,
-        gemini_api_key: ""
+        gemini_api_key: "",
+        civitai_api_key: ""
       },
       llm_provider: llmProvider,
       parameter_node_mappings: parameterNodeMappings,
@@ -881,6 +883,7 @@ export function useAppLogic() {
         ...prev,
         ...data.config,
         gemini_api_key: "",
+        civitai_api_key: data.config.civitai_api_key || prev.civitai_api_key || "",
         remote_host: data.config.remote_host || data.config.runpod_ip || prev.remote_host,
         remote_api_token: data.config.remote_api_token || data.config.runpod_api_token || prev.remote_api_token,
         remote_comfyui_root: data.config.remote_comfyui_root || (data.config.remote_input_dir ? data.config.remote_input_dir.replace(/\/input\/?$/, "") : null) || prev.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI"

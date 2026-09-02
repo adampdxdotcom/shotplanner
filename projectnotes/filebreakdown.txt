@@ -815,6 +815,38 @@
   - Implemented unified batch upload submission dispatching all populated pack slots and general queue files to `POST /api/assets/upload` with `scene_name` explicitly included.
   - Ingests all newly returned asset records into the project asset registry and marks project state dirty for auto-save.
 
+## Civitai Configuration & Remote Model Downloader
+- **`server/config/constants.ts`**
+  - Added `CIVITAI_CONFIG_FILE` constant resolving to `assets/civitai_config.json` for persistent storage of the Civitai API token.
+- **`server/services/assetService.ts` & `server/services/projectService.ts`**
+  - Added `civitai_config.json` to ignored JSON lists preventing configuration leakage into project scene listings and database synchronization.
+- **`server/services/civitaiService.ts`**
+  - Implemented `getStoredCivitaiKey()` and `saveCivitaiKey()` for secure token persistence in `civitai_config.json` and `process.env.CIVITAI_API_KEY`.
+  - Implemented `determineComfyUIDestination(category)` to auto-route model categories to appropriate ComfyUI subfolders (`Checkpoints` -> `models/checkpoints/`, `LoRA/DoRA` -> `models/loras/`, `ControlNet` -> `models/controlnet/`, `VAE` -> `models/vae/`, `Upscalers` -> `models/upscale_models/`, `Embeddings` -> `models/embeddings/`, `AnimateDiff/Motion` -> `models/animatediff_models/`, `ClipVision` -> `models/clip_vision/`, `UNet` -> `models/unet/`).
+  - Implemented `fetchCivitaiModelInfo(query, tokenOverride)` to parse model IDs, version IDs, and full Civitai URLs; queries Civitai API with optional Bearer token authentication to retrieve model name, version name, category, base model architecture, file size, primary image preview URL, direct download URL, and available versions list.
+  - Implemented `executeRemoteModelDownload(options)` executing SSH commands on the remote GPU host; prepares remote destination directories via `mkdir -p` and downloads model weights directly onto remote disk using `aria2c` multi-connection acceleration with Bearer token headers, falling back gracefully to `curl -L` resume streaming or `wget`.
+- **`server/routes/settingsRoutes.ts`**
+  - Added `GET /api/settings/civitai` and `POST /api/settings/civitai` for retrieving masked token status and securely updating the Civitai API key.
+- **`server/routes/civitaiRoutes.ts` & `server.ts`**
+  - Mounted `/api/civitai` router endpoints:
+    - `GET /api/civitai/model-info`: Inspects model metadata and determines remote destination folder.
+    - `POST /api/civitai/download-remote`: Dispatches remote SSH download execution and returns structured logs, elapsed duration, and disk location.
+- **`src/types.ts`**
+  - Added `civitai_api_key?: string` to `AppConfig`.
+  - Defined `CivitaiModelMetadata` and `CivitaiModelVersionOption` interfaces.
+- **`src/hooks/useAppLogic.ts`**
+  - Initialized `civitai_api_key: ""` in default `config` state.
+  - Added `civitai_api_key` to project save payloads and load pipelines.
+- **`src/components/config/CivitaiConfig.tsx`**
+  - Created "Civitai & Model Downloader" panel in configuration interface:
+    1. **Credentials Sub-Panel**: Masked Civitai API key input, Save/Clear action buttons, active status badge, and helper link to Civitai API key generation settings.
+    2. **Model Lookup & Downloader Tool**: Search bar accepting Civitai Model IDs or URLs with quick presets ("Juggernaut XL", "Realistic Vision") and "Lookup Model" action.
+    3. **Interactive Model Preview Card**: Cover thumbnail, title, version selector, category & base model badges, formatted file size (GB/MB), editable destination subfolder and filename inputs, and full remote GPU path preview.
+    4. **⚡ Download to Remote ComfyUI Action**: Dispatches remote SSH download with real-time progress timer and animated streaming feedback, structured success/error cards, and toast notifications.
+- **`src/components/ConfigSection.tsx`**
+  - Integrated `CivitaiConfig` panel directly into the Configuration view.
+
+
 
 
 

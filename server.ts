@@ -12,6 +12,7 @@ import workflowRoutes from "./server/routes/workflowRoutes";
 
 import outputRoutes from "./server/routes/outputRoutes";
 import headshotRoutes from "./server/routes/headshotRoutes";
+import civitaiRoutes from "./server/routes/civitaiRoutes";
 
 // Re-export utility functions for external consumers
 export {
@@ -36,6 +37,7 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // Domain API routes
 app.use("/api/settings", settingsRoutes);
+app.use("/api/civitai", civitaiRoutes);
 app.use("/api/workflows", workflowRoutes);
 app.use("/api/assets", assetRoutes);
 app.use("/api/projects", projectRoutes);

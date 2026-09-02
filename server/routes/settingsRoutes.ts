@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { getStoredGeminiKey, saveGeminiKey, generateWithGeminiAPI } from "../services/geminiService";
+import { getStoredCivitaiKey, saveCivitaiKey } from "../services/civitaiService";
 
 const router = Router();
 
@@ -12,6 +13,24 @@ router.get("/gemini", (req: Request, res: Response) => {
 router.post("/gemini", (req: Request, res: Response) => {
   const { api_key } = req.body;
   saveGeminiKey(api_key);
+  res.json({ success: true });
+});
+
+/**
+ * Get stored Civitai API key status & masked value
+ */
+router.get("/civitai", (req: Request, res: Response) => {
+  const key = getStoredCivitaiKey();
+  const maskedKey = key && key.length > 8 ? `${key.slice(0, 4)}...${key.slice(-4)}` : key ? "***" : null;
+  res.json({ configured: !!key, api_key: key ? key.substring(0, 5) + "..." : null, masked_key: maskedKey });
+});
+
+/**
+ * Save Civitai API key
+ */
+router.post("/civitai", (req: Request, res: Response) => {
+  const { api_key, apiKey } = req.body || {};
+  saveCivitaiKey(api_key || apiKey || "");
   res.json({ success: true });
 });
 

@@ -318,7 +318,7 @@ class AssetService {
 
     // 2. Synchronize project JSON files in assets/
     try {
-      const ignoredFiles = new Set(["assets_db.json", "gemini_config.json", "package.json", "tsconfig.json", "metadata.json"]);
+      const ignoredFiles = new Set(["assets_db.json", "gemini_config.json", "civitai_config.json", "package.json", "tsconfig.json", "metadata.json"]);
       if (fs.existsSync(ASSETS_DIR)) {
         const dirs = fs.readdirSync(ASSETS_DIR, { withFileTypes: true });
         for (const d of dirs) {

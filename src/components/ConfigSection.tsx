@@ -18,6 +18,7 @@ import {
 import { RemoteGPUConfig } from "./config/RemoteGPUConfig";
 import { ComfyUIConfig } from "./config/ComfyUIConfig";
 import { GeminiConfig, probeGeminiConnection } from "./config/GeminiConfig";
+import { CivitaiConfig } from "./config/CivitaiConfig";
 import { SSHKeypairModal } from "./config/SSHKeypairModal";
 
 export async function probeLMStudioConnection(url?: string): Promise<{ success: boolean; message: string }> {
@@ -538,6 +539,13 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({
           <RemoteSSHPrimerCard publicKey={generatedKeyPair?.public_key || config.ssh_public_key || undefined} />
         </div> */}
       </section>
+
+      {/* 3. Civitai & Model Downloader Panel */}
+      <CivitaiConfig 
+        config={config} 
+        onChange={onChange} 
+        onShowToast={onShowToast} 
+      />
 
       {/* SSH Keypair Modal */}
       <SSHKeypairModal 
