@@ -118,6 +118,12 @@ export const StagingInteractiveCanvas: React.FC<StagingInteractiveCanvasProps> =
   const originalImageRef = useRef<HTMLImageElement | null>(null);
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
 
+  // Actor DOM Image, token refs and instant-commit cache to eliminate visual flickers
+  const actorImgRefs = useRef<Record<string, HTMLImageElement | null>>({});
+  const lastCommittedCutoutRef = useRef<Record<string, string>>({});
+  const initializedActorIdRef = useRef<string | null>(null);
+  const prevMaskingActorIdRef = useRef<string | null>(null);
+
   // Helper: Create a stylized silhouette fallback if character has no image asset
   const createSilhouetteImage = useCallback((name: string): HTMLImageElement => {
     const canvas = document.createElement("canvas");
@@ -155,19 +161,81 @@ export const StagingInteractiveCanvas: React.FC<StagingInteractiveCanvasProps> =
     return img;
   }, []);
 
+  // Commit current mask buffer to actor state and cache to prevent any visual shift/flicker
+  const commitMask = useCallback((targetActorId: string) => {
+    const canvas = activeMaskCanvasRef.current;
+    const maskCanvas = offscreenMaskCanvasRef.current;
+    const origImg = originalImageRef.current;
+
+    let updatedCutout: string | null = null;
+    let updatedMask: string | null = null;
+
+    if (canvas && maskCanvas) {
+      try {
+        updatedCutout = canvas.toDataURL("image/png");
+        updatedMask = maskCanvas.toDataURL("image/png");
+      } catch (err) {
+        console.warn("Could not export live canvas directly, falling back to offscreen composite:", err);
+      }
+    }
+
+    if ((!updatedCutout || !updatedMask) && maskCanvas && origImg) {
+      try {
+        const commitCanvas = document.createElement("canvas");
+        commitCanvas.width = maskCanvas.width;
+        commitCanvas.height = maskCanvas.height;
+        const cCtx = commitCanvas.getContext("2d");
+        if (cCtx) {
+          cCtx.drawImage(origImg, 0, 0);
+          cCtx.globalCompositeOperation = "destination-in";
+          cCtx.drawImage(maskCanvas, 0, 0);
+          updatedCutout = commitCanvas.toDataURL("image/png");
+          updatedMask = maskCanvas.toDataURL("image/png");
+        }
+      } catch (err) {
+        console.warn("Failed to compose offscreen mask commit:", err);
+      }
+    }
+
+    if (updatedCutout && updatedMask) {
+      lastCommittedCutoutRef.current[targetActorId] = updatedCutout;
+      onUpdateActor(targetActorId, {
+        cutoutDataUrl: updatedCutout,
+        maskDataUrl: updatedMask
+      });
+    }
+  }, [onUpdateActor]);
+
   // Initialize and synchronize display & offscreen mask canvases when entering masking mode
   useEffect(() => {
     if (!maskingActorId) {
+      if (prevMaskingActorIdRef.current) {
+        // Exiting mask mode externally: commit modified mask
+        commitMask(prevMaskingActorIdRef.current);
+      }
+      initializedActorIdRef.current = null;
+      prevMaskingActorIdRef.current = null;
       originalImageRef.current = null;
       activeMaskCanvasRef.current = null;
       offscreenMaskCanvasRef.current = null;
       return;
     }
 
+    // Prevent resetting mask or tearing down canvas on every re-render or brush stroke
+    if (initializedActorIdRef.current === maskingActorId) {
+      return;
+    }
+
     const actor = actors.find((a) => a.id === maskingActorId);
     if (!actor) return;
 
+    initializedActorIdRef.current = maskingActorId;
+    prevMaskingActorIdRef.current = maskingActorId;
+
     let isCancelled = false;
+
+    // Fast synchronous initialization if DOM image is already available and loaded
+    const domImg = actorImgRefs.current[actor.id];
     const rawSrc =
       actor.originalCutoutDataUrl ||
       actor.cutoutDataUrl ||
@@ -180,7 +248,7 @@ export const StagingInteractiveCanvas: React.FC<StagingInteractiveCanvasProps> =
       const width = img.naturalWidth || 600;
       const height = img.naturalHeight || 900;
 
-      // Offscreen alpha mask canvas: 1 = visible (source-over), 0 = erased (transparent)
+      // Offscreen alpha mask canvas: 1 = visible (white), 0 = erased (transparent)
       const maskCanvas = document.createElement("canvas");
       maskCanvas.width = width;
       maskCanvas.height = height;
@@ -240,7 +308,10 @@ export const StagingInteractiveCanvas: React.FC<StagingInteractiveCanvasProps> =
       displayCtx.globalCompositeOperation = "source-over";
     };
 
-    if (rawSrc) {
+    // If DOM image is already decoded and mounted, initialize without async flicker
+    if (domImg && domImg.complete && domImg.naturalWidth > 0 && !actor.originalCutoutDataUrl) {
+      initCanvasWithImage(domImg);
+    } else if (rawSrc) {
       const img = new Image();
       img.crossOrigin = "anonymous";
       img.onload = () => initCanvasWithImage(img);
@@ -257,7 +328,7 @@ export const StagingInteractiveCanvas: React.FC<StagingInteractiveCanvasProps> =
     return () => {
       isCancelled = true;
     };
-  }, [maskingActorId, createSilhouetteImage, actors, onUpdateActor]);
+  }, [maskingActorId, actors, createSilhouetteImage, onUpdateActor, commitMask]);
 
   // Callback ref for active mask display canvas in DOM
   const setActiveMaskCanvas = useCallback((canvas: HTMLCanvasElement | null) => {
@@ -287,7 +358,7 @@ export const StagingInteractiveCanvas: React.FC<StagingInteractiveCanvasProps> =
     });
   }, []);
 
-  // Core Painting Execution
+  // Core Painting Execution with exact on-screen scale mapping
   const paintStroke = useCallback((
     canvas: HTMLCanvasElement,
     x: number,
@@ -346,16 +417,20 @@ export const StagingInteractiveCanvas: React.FC<StagingInteractiveCanvasProps> =
     displayCtx.restore();
   }, []);
 
+  // Strict pixel-accurate mapping from scaled & flipped viewport coordinates to local buffer
   const getCanvasCoords = useCallback((clientX: number, clientY: number, canvas: HTMLCanvasElement, isFlipped: boolean) => {
     const rect = canvas.getBoundingClientRect();
-    const screenX = clientX - rect.left;
-    const screenY = clientY - rect.top;
+    const screenX = Math.max(0, Math.min(rect.width, clientX - rect.left));
+    const screenY = Math.max(0, Math.min(rect.height, clientY - rect.top));
 
-    let x = (screenX / Math.max(rect.width, 1)) * canvas.width;
+    let normX = screenX / Math.max(rect.width, 1);
     if (isFlipped) {
-      x = canvas.width - x;
+      normX = 1 - normX;
     }
-    const y = (screenY / Math.max(rect.height, 1)) * canvas.height;
+    const normY = screenY / Math.max(rect.height, 1);
+
+    const x = normX * canvas.width;
+    const y = normY * canvas.height;
     return { x, y };
   }, []);
 
@@ -371,22 +446,15 @@ export const StagingInteractiveCanvas: React.FC<StagingInteractiveCanvasProps> =
     }
   }, [onSelectActor, setMaskingActorId, onUpdateActor]);
 
-  // Exit / Done Masking Action
+  // Exit / Done Masking Action with atomic commit
   const handleExitMaskingMode = useCallback(() => {
-    const canvas = activeMaskCanvasRef.current;
-    const maskCanvas = offscreenMaskCanvasRef.current;
-    if (canvas && maskCanvas && maskingActor) {
-      const updatedCutout = canvas.toDataURL("image/png");
-      const updatedMask = maskCanvas.toDataURL("image/png");
-      onUpdateActor(maskingActor.id, {
-        cutoutDataUrl: updatedCutout,
-        maskDataUrl: updatedMask
-      });
+    if (maskingActorId) {
+      commitMask(maskingActorId);
     }
     setMaskingActorId(null);
     setIsPainting(false);
     lastPointRef.current = null;
-  }, [maskingActor, onUpdateActor, setMaskingActorId]);
+  }, [maskingActorId, commitMask, setMaskingActorId]);
 
   // 1-Click Reset Mask Action
   const handleResetMask = useCallback(() => {
@@ -395,7 +463,7 @@ export const StagingInteractiveCanvas: React.FC<StagingInteractiveCanvasProps> =
     const canvas = activeMaskCanvasRef.current;
     const maskCanvas = offscreenMaskCanvasRef.current;
 
-    if (maskCanvas && origImg && canvas) {
+    if (maskCanvas && canvas) {
       const maskCtx = maskCanvas.getContext("2d", { willReadFrequently: true });
       if (maskCtx) {
         maskCtx.save();
@@ -406,13 +474,16 @@ export const StagingInteractiveCanvas: React.FC<StagingInteractiveCanvasProps> =
       }
 
       const displayCtx = canvas.getContext("2d");
-      if (displayCtx) {
+      if (displayCtx && origImg) {
         displayCtx.clearRect(0, 0, canvas.width, canvas.height);
         displayCtx.drawImage(origImg, 0, 0, canvas.width, canvas.height);
       }
     }
 
     const origUrl = maskingActor.originalCutoutDataUrl || maskingActor.cutoutDataUrl;
+    if (origUrl) {
+      lastCommittedCutoutRef.current[maskingActor.id] = origUrl;
+    }
     onUpdateActor(maskingActor.id, {
       cutoutDataUrl: origUrl,
       maskDataUrl: undefined
@@ -467,12 +538,17 @@ export const StagingInteractiveCanvas: React.FC<StagingInteractiveCanvasProps> =
     const canvas = activeMaskCanvasRef.current;
     const maskCanvas = offscreenMaskCanvasRef.current;
     if (canvas && maskCanvas) {
-      const updatedCutout = canvas.toDataURL("image/png");
-      const updatedMask = maskCanvas.toDataURL("image/png");
-      onUpdateActor(actor.id, {
-        cutoutDataUrl: updatedCutout,
-        maskDataUrl: updatedMask
-      });
+      try {
+        const updatedCutout = canvas.toDataURL("image/png");
+        const updatedMask = maskCanvas.toDataURL("image/png");
+        lastCommittedCutoutRef.current[actor.id] = updatedCutout;
+        onUpdateActor(actor.id, {
+          cutoutDataUrl: updatedCutout,
+          maskDataUrl: updatedMask
+        });
+      } catch (err) {
+        console.warn("Failed to capture stroke mask:", err);
+      }
     }
   }, [isPainting, onUpdateActor]);
 
@@ -1132,7 +1208,7 @@ export const StagingInteractiveCanvas: React.FC<StagingInteractiveCanvasProps> =
           const actorScale = actor.scale || 1.0;
 
           // Height is scaled relative to standard 55% height
-          const displayHeightPercent = Math.round(55 * actorScale);
+          const displayHeightPercent = 55 * actorScale;
 
           return (
             <div
@@ -1191,60 +1267,74 @@ export const StagingInteractiveCanvas: React.FC<StagingInteractiveCanvasProps> =
               <div
                 className={`relative h-full flex flex-col items-center justify-end transition-shadow ${
                   isCurrentMasking
-                    ? "ring-2 ring-indigo-400 ring-offset-2 ring-offset-zinc-950 rounded-lg shadow-2xl border border-dashed border-indigo-400/80"
+                    ? "ring-2 ring-indigo-400 ring-offset-2 ring-offset-zinc-950 rounded-lg shadow-2xl"
                     : isSelected
                     ? "ring-2 ring-indigo-400 ring-offset-2 ring-offset-zinc-950 rounded-lg shadow-2xl"
                     : "hover:ring-1 hover:ring-white/40 rounded-lg"
                 }`}
               >
-                {/* When Masking is active on this actor: Render live in-place painting canvas directly over stage */}
-                {isCurrentMasking ? (
-                  <canvas
-                    ref={setActiveMaskCanvas}
-                    style={{
-                      height: "100%",
-                      width: "auto",
-                      aspectRatio: originalImageRef.current
-                        ? `${originalImageRef.current.naturalWidth} / ${originalImageRef.current.naturalHeight}`
-                        : undefined,
-                      transform: actor.isFlipped ? "scaleX(-1)" : "none",
-                      touchAction: "none"
-                    }}
-                    className="h-full w-auto object-contain select-none filter drop-shadow-[0_8px_16px_rgba(0,0,0,0.7)] cursor-crosshair"
-                    onPointerDown={(e) => handleMaskPointerDown(e, actor)}
-                    onPointerMove={(e) => handleMaskPointerMove(e, actor)}
-                    onPointerUp={(e) => handleMaskPointerUp(e, actor)}
-                    onPointerCancel={(e) => handleMaskPointerUp(e, actor)}
-                  />
-                ) : actor.cutoutDataUrl ? (
-                  <img
-                    src={actor.cutoutDataUrl}
-                    alt={actor.characterName}
-                    draggable={false}
-                    style={{
-                      transform: actor.isFlipped ? "scaleX(-1)" : "none"
-                    }}
-                    className="h-full w-auto object-contain select-none filter drop-shadow-[0_8px_16px_rgba(0,0,0,0.7)]"
-                  />
-                ) : (
-                  // Fallback Avatar Token
-                  <div
-                    style={{
-                      height: "100%",
-                      aspectRatio: "2/3",
-                      transform: actor.isFlipped ? "scaleX(-1)" : "none"
-                    }}
-                    className="bg-gradient-to-t from-indigo-950 to-zinc-900 border-2 border-indigo-500/60 rounded-t-full flex flex-col items-center justify-center p-2 text-center shadow-lg"
-                  >
-                    <User className="w-8 h-8 text-indigo-300 mb-1" />
-                    <span className="text-[11px] font-bold text-white truncate max-w-full">
-                      {actor.characterName}
-                    </span>
-                    <span className="text-[9px] text-zinc-400 font-mono">
-                      {actor.posture || "Posed"}
-                    </span>
-                  </div>
+                {/* Non-shifting dashed outline overlay during masking */}
+                {isCurrentMasking && (
+                  <div className="pointer-events-none absolute inset-0 rounded-lg border-2 border-dashed border-indigo-400/90 z-20 shadow-[0_0_15px_rgba(99,102,241,0.3)]" />
                 )}
+
+                {/* Figure wrapper strictly maintaining scale, aspect ratio, and horizontal flip */}
+                <div
+                  className="relative h-full w-auto flex items-end justify-center select-none"
+                  style={{
+                    transform: actor.isFlipped ? "scaleX(-1)" : "none",
+                    transformOrigin: "bottom center"
+                  }}
+                >
+                  {/* Cutout Image or Silhouette Fallback: ALWAYS in the DOM to anchor layout dimensions */}
+                  {actor.cutoutDataUrl || actor.originalCutoutDataUrl ? (
+                    <img
+                      ref={(el) => {
+                        actorImgRefs.current[actor.id] = el;
+                      }}
+                      src={lastCommittedCutoutRef.current[actor.id] || actor.cutoutDataUrl || actor.originalCutoutDataUrl}
+                      alt={actor.characterName}
+                      draggable={false}
+                      style={{
+                        opacity: isCurrentMasking ? 0 : 1
+                      }}
+                      className="h-full w-auto object-contain select-none filter drop-shadow-[0_8px_16px_rgba(0,0,0,0.7)] pointer-events-none"
+                    />
+                  ) : (
+                    // Fallback Avatar Token
+                    <div
+                      style={{
+                        height: "100%",
+                        aspectRatio: "2/3",
+                        opacity: isCurrentMasking ? 0 : 1
+                      }}
+                      className="bg-gradient-to-t from-indigo-950 to-zinc-900 border-2 border-indigo-500/60 rounded-t-full flex flex-col items-center justify-center p-2 text-center shadow-lg pointer-events-none"
+                    >
+                      <User className="w-8 h-8 text-indigo-300 mb-1" />
+                      <span className="text-[11px] font-bold text-white truncate max-w-full">
+                        {actor.characterName}
+                      </span>
+                      <span className="text-[9px] text-zinc-400 font-mono">
+                        {actor.posture || "Posed"}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Masking Layer Canvas: Pixel-locked absolute overlay directly matching figure dimensions */}
+                  {isCurrentMasking && (
+                    <canvas
+                      ref={setActiveMaskCanvas}
+                      className="absolute inset-0 w-full h-full object-contain select-none filter drop-shadow-[0_8px_16px_rgba(0,0,0,0.7)] cursor-crosshair z-10"
+                      style={{
+                        touchAction: "none"
+                      }}
+                      onPointerDown={(e) => handleMaskPointerDown(e, actor)}
+                      onPointerMove={(e) => handleMaskPointerMove(e, actor)}
+                      onPointerUp={(e) => handleMaskPointerUp(e, actor)}
+                      onPointerCancel={(e) => handleMaskPointerUp(e, actor)}
+                    />
+                  )}
+                </div>
 
                 {/* ACTIVE BOUNDING BOX & CORNER RESIZE HANDLES (Shown When Selected) */}
                 {isSelected && (

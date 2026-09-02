@@ -1138,9 +1138,15 @@
     - **Header Clutter Removal:** Removed the top three cards ("Environment / Location Plate", "Lighting & Atmosphere", and "Framing Specification") from the Scene Staging tab, allowing the Director's 2D Stage Viewport and Actor Blocking Controls to take primary visual focus immediately upon entering the staging tab. Backdrop selection and room photo uploads remain cleanly accessible directly inside the interactive canvas toolbar.
     - **Full-Width Viewport & Horizontal Actor Blocking Controls:** Expanded the Director's 2D Stage Viewport to 100% full width of the staging studio workspace. Moved the Actor Blocking Controls directly below the stage as a streamlined, responsive 4-column horizontal module with cast roster quick-add buttons, cutout representation status, live stage mask/eraser, depth plane, scale factor, X/Y placement sliders with presets, and posture/facing controls.
 
-
-
-
+## 2D Staging Actor Masking & Transformation Parity Fixes
+- **`src/components/cast/StagingInteractiveCanvas.tsx`**
+  - **Role:** Interactive 2D stage canvas rendering positioned actors, backdrops, depth layers, transform handles, and in-place alpha masking canvas overlays.
+  - **Updates:**
+    - **Pixel-Locked Visual Alignment:** Solved scale jumping and size distortion when entering and exiting Mask/Erase mode by maintaining the underlying actor `<img>` permanently in the layout tree (with zeroed opacity during masking) and rendering the masking `<canvas>` as an exact `absolute inset-0 w-full h-full object-contain` overlay within a shared figure container.
+    - **Transformation Parity & Horizontal Flip Inheritance:** The figure container applies `transform: actor.isFlipped ? "scaleX(-1)" : "none"` and `transformOrigin: "bottom center"`, guaranteeing that scale, aspect ratio, position offsets, and horizontal flip transforms remain unified between normal and masking states without dimension resetting.
+    - **Accurate Viewport-to-Buffer Coordinate Mapping:** Refactored `getCanvasCoords` to calculate normalized coordinates `normX = screenX / rect.width` and `normY = screenY / rect.height`, strictly inverting `normX = 1 - normX` when `actor.isFlipped` is active. This ensures brush strokes on mirrored characters accurately register in the local mask pixel buffer.
+    - **Scale-Invariant Brush Size:** Calculated `scaleRatio = canvas.width / Math.max(rect.width, 1)` and scaled brush radius dynamically in `paintStroke`, ensuring brush strokes retain their exact visual diameter on the actor regardless of zoom or scale factors.
+    - **Seamless & Atomic Mask Commit:** Implemented `commitMask` with instant cached cutout tracking (`lastCommittedCutoutRef`) and cleanup detection on mask mode exit (both internal button clicks and external modal state changes). Commits modified alpha masks cleanly without layout shifts, coordinate jumps, or scaling flickers.
 
 
 
