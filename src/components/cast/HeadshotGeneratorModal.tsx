@@ -105,6 +105,8 @@ export const HeadshotGeneratorModal: React.FC<HeadshotGeneratorModalProps> = ({
       const payload: any = {
         characterName: subjectName,
         aspectRatio: aspectRatio,
+        sceneName: activeSceneName,
+        activeSceneName: activeSceneName,
         variationKeys: JSON.stringify(selectedPresets)
       };
 
@@ -122,14 +124,15 @@ export const HeadshotGeneratorModal: React.FC<HeadshotGeneratorModalProps> = ({
       });
 
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to generate variations");
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || data.error || `HTTP ${res.status}: Failed to generate variations`);
       }
 
       const data = await res.json();
-      setCandidates(data.results || []);
+      const generatedList = data.results || data.candidates || [];
+      setCandidates(generatedList);
       // Auto-select all successful candidates
-      setSelectedCandidates(new Set((data.results || []).map((_: any, i: number) => i)));
+      setSelectedCandidates(new Set(generatedList.map((_: any, i: number) => i)));
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -152,13 +155,14 @@ export const HeadshotGeneratorModal: React.FC<HeadshotGeneratorModalProps> = ({
           selections,
           characterName: subjectName,
           sceneName: activeSceneName,
+          activeSceneName: activeSceneName,
           tags: ["AI Generated"]
         })
       });
 
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to save selected headshots");
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || data.error || "Failed to save selected headshots");
       }
 
       const data = await res.json();
@@ -191,7 +195,7 @@ export const HeadshotGeneratorModal: React.FC<HeadshotGeneratorModalProps> = ({
               <h2 className="text-lg font-bold text-zinc-100 flex items-center gap-2">
                 AI Headshots
                 <span className="text-xs font-semibold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
-                  Gemini Flash
+                  Gemini 3.1 Flash Image
                 </span>
               </h2>
               <p className="text-xs text-zinc-400">Generate studio-quality character portraits for {subjectName}</p>

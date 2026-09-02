@@ -10,11 +10,14 @@ router = APIRouter(prefix="/headshots", tags=["AI Headshots"])
 class HeadshotGenerateRequest(BaseModel):
     seed_image: Optional[str] = None
     seedImage: Optional[str] = None
+    imageBase64: Optional[str] = None
+    existingAssetFilename: Optional[str] = None
+    imageMimeType: Optional[str] = None
     aspect_ratio: Optional[str] = "1:1"
     aspectRatio: Optional[str] = None
     character_name: Optional[str] = None
     characterName: Optional[str] = None
-    scene_name: Optional[str] = "scene01"
+    scene_name: Optional[str] = None
     sceneName: Optional[str] = None
     activeSceneName: Optional[str] = None
     variation_keys: Optional[Union[List[str], str]] = None
@@ -61,7 +64,7 @@ async def generate_headshots_endpoint(
         char_name = req.characterName or req.character_name
         target_scene = req.sceneName or req.activeSceneName or req.scene_name or "scene01"
         ar = req.aspectRatio or req.aspect_ratio or "1:1"
-        seed_img = req.seedImage or req.seed_image
+        seed_img = req.seedImage or req.seed_image or req.imageBase64 or req.existingAssetFilename
 
         keys_raw = req.variationKeys or req.variation_keys
         keys_list: List[str] = []

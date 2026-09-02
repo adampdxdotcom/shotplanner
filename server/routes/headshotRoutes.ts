@@ -69,8 +69,8 @@ router.post("/generate", upload.single("image"), async (req: Request, res: Respo
 
     res.json({ results });
   } catch (error: any) {
-    console.error("Error generating headshots:", error);
-    res.status(500).json({ error: error.message || "Failed to generate headshots" });
+    console.error(`[Headshot Generation] Google API Error 400: ${error.message || error}`);
+    res.status(400).json({ error: error.message || "Failed to generate headshots" });
   }
 });
 

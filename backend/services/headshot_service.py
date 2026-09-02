@@ -48,63 +48,96 @@ async def generate_headshots(
     variation_keys: Optional[List[str]] = None,
     gemini_api_key: Optional[str] = None
 ) -> Dict[str, Any]:
-    """Generate headshot variation preview candidates using Gemini API or fallback rendering."""
+    """Generate headshot variation preview candidates using Gemini API (gemini-3.1-flash-image with gemini-2.5-flash-image fallback)."""
     if not variation_keys:
-        variation_keys = ["facing", "three_quarter", "profile", "cinematic"]
+        variation_keys = ["Facing", "3/4 Profile", "Full Profile", "Cinematic / Mood"]
 
-    print(f"[Headshot Generation] Generating headshots for {character_name} in scene '{scene_name}' with presets: {variation_keys}", flush=True)
+    target_scene = scene_name or "scene01"
+    print(f"[Headshot Generation] Generating headshots for {character_name} in scene '{target_scene}' with presets: {variation_keys}", flush=True)
 
     api_key = gemini_api_key or get_stored_gemini_key()
+    if not api_key:
+        err_msg = "Gemini API key is not configured"
+        print(f"[Headshot Generation] Google API Error 400: {err_msg}", flush=True)
+        raise HTTPException(status_code=400, detail=err_msg)
+
     seed_b64: Optional[str] = None
+    mime_type: str = "image/png"
 
     if seed_image and seed_image.strip():
-        if seed_image.startswith("data:image/"):
-            parts = seed_image.split(",", 1)
-            seed_b64 = parts[1] if len(parts) > 1 else parts[0]
+        raw_seed = seed_image.strip()
+        if raw_seed.startswith("data:image/"):
+            header_part, data_part = raw_seed.split(",", 1) if "," in raw_seed else ("", raw_seed)
+            seed_b64 = data_part
+            if "image/jpeg" in header_part or "image/jpg" in header_part:
+                mime_type = "image/jpeg"
+            elif "image/webp" in header_part:
+                mime_type = "image/webp"
+            else:
+                mime_type = "image/png"
         else:
-            file_path = find_asset_file_path(seed_image.strip())
+            file_path = find_asset_file_path(raw_seed)
             if file_path and file_path.exists():
                 try:
                     raw_bytes = file_path.read_bytes()
                     seed_b64 = base64.b64encode(raw_bytes).decode("utf-8")
+                    if file_path.suffix.lower() in [".jpg", ".jpeg"]:
+                        mime_type = "image/jpeg"
+                    elif file_path.suffix.lower() == ".webp":
+                        mime_type = "image/webp"
+                    else:
+                        mime_type = "image/png"
                 except Exception as e:
-                    print(f"[Headshot Generation] Failed to read seed file {seed_image}: {e}", flush=True)
+                    print(f"[Headshot Generation] Failed to read seed file {raw_seed}: {e}", flush=True)
+            elif len(raw_seed) > 100:
+                seed_b64 = raw_seed
+                if seed_b64.startswith("/9j/"):
+                    mime_type = "image/jpeg"
+
+    if not seed_b64:
+        err_msg = "Seed reference image is required for headshot generation"
+        print(f"[Headshot Generation] Google API Error 400: {err_msg}", flush=True)
+        raise HTTPException(status_code=400, detail=err_msg)
 
     candidates = []
+    models_to_try = ["gemini-3.1-flash-image", "gemini-2.5-flash-image"]
 
     for idx, key in enumerate(variation_keys):
         prompt_text = HEADSHOT_TEMPLATES.get(key, key)
         cand_id = f"cand_{key}_{int(time.time() * 1000)}_{idx}"
         generated_b64: Optional[str] = None
+        last_error_status: int = 400
+        last_error_body: str = ""
 
-        if api_key:
-            try:
-                endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image:generateContent?key={api_key}"
-                parts: List[Dict[str, Any]] = []
+        for model_name in models_to_try:
+            endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+            parts: List[Dict[str, Any]] = [
+                {
+                    "inline_data": {
+                        "mime_type": mime_type,
+                        "data": seed_b64
+                    }
+                },
+                {
+                    "text": f"Generate a character portrait for \"{character_name}\". {prompt_text}"
+                }
+            ]
 
-                if seed_b64:
-                    parts.append({
-                        "inline_data": {
-                            "mime_type": "image/png",
-                            "data": seed_b64
-                        }
-                    })
-
-                parts.append({
-                    "text": f"Generate a high-quality character headshot variation for '{character_name}'. Directive: {prompt_text}."
-                })
-
-                payload = {
-                    "contents": [{"parts": parts}],
-                    "generationConfig": {
-                        "imageConfig": {
-                            "aspectRatio": aspect_ratio
-                        }
+            payload = {
+                "contents": [{"parts": parts}],
+                "generationConfig": {
+                    "imageConfig": {
+                        "aspectRatio": aspect_ratio
                     }
                 }
+            }
 
-                async with httpx.AsyncClient(timeout=30.0) as client:
+            try:
+                async with httpx.AsyncClient(timeout=45.0) as client:
                     res = await client.post(endpoint, json=payload)
+                    last_error_status = res.status_code
+                    last_error_body = res.text
+
                     if res.status_code == 200:
                         res_json = res.json()
                         candidates_data = res_json.get("candidates", [])
@@ -114,32 +147,47 @@ async def generate_headshots(
                                 if "inline_data" in p and "data" in p["inline_data"]:
                                     generated_b64 = p["inline_data"]["data"]
                                     break
+                                elif "inlineData" in p and "data" in p["inlineData"]:
+                                    generated_b64 = p["inlineData"]["data"]
+                                    break
+                        if generated_b64:
+                            break
+                    else:
+                        print(f"[Headshot Generation] Model {model_name} failed (HTTP {res.status_code}): {res.text[:200]}", flush=True)
             except Exception as e:
-                print(f"[Headshot Generation] Gemini API request failed for preset {key}: {e}", flush=True)
-
-        if not generated_b64 and seed_b64:
-            generated_b64 = seed_b64
+                last_error_body = str(e)
+                print(f"[Headshot Generation] Request exception for {model_name}: {e}", flush=True)
 
         if not generated_b64:
-            # Fallback 1x1 placeholder PNG image
-            generated_b64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+            print(f"[Headshot Generation] Google API Error {last_error_status}: {last_error_body}", flush=True)
+            try:
+                err_json = json.loads(last_error_body)
+                error_msg = err_json.get("error", {}).get("message") or last_error_body
+            except Exception:
+                error_msg = last_error_body or "Google API returned no image candidates"
+            raise HTTPException(
+                status_code=last_error_status if last_error_status >= 400 else 400,
+                detail=f"Google API Error ({last_error_status}): {error_msg}"
+            )
 
         preview_data_uri = f"data:image/png;base64,{generated_b64}"
 
         candidates.append({
             "candidateId": cand_id,
             "variationKey": key,
+            "key": key,
             "prompt": prompt_text,
             "aspectRatio": aspect_ratio,
-            "base64": preview_data_uri,
+            "base64": generated_b64,
             "previewUrl": preview_data_uri
         })
 
     return {
         "success": True,
         "candidates": candidates,
+        "results": [{"key": c["variationKey"], "base64": c["base64"], "mimeType": "image/png"} for c in candidates],
         "characterName": character_name,
-        "sceneName": scene_name
+        "sceneName": target_scene
     }
 
 async def save_selected_headshots(

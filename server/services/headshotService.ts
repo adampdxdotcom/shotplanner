@@ -29,47 +29,55 @@ export async function generateVariations(
     httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
   });
 
+  const normalizedMimeType = imageMimeType || (imageBase64.startsWith("/9j/") ? "image/jpeg" : "image/png");
+  const modelsToTry = ['gemini-3.1-flash-image', 'gemini-2.5-flash-image'];
+
   const promises = variationKeys.map(async (key) => {
-    const template = HEADSHOT_TEMPLATES[key];
-    if (!template) return null;
-
+    const template = HEADSHOT_TEMPLATES[key] || key;
     const promptText = `Generate a character portrait for "${characterName}". ${template}`;
+    let lastError: any = null;
+    let base64Image = "";
 
-    try {
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-image',
-        contents: {
-          parts: [
-            { text: promptText },
-            { inlineData: { data: imageBase64, mimeType: imageMimeType } },
-          ],
-        },
-        config: {
-          imageConfig: {
-            aspectRatio: aspectRatio as any,
+    for (const model of modelsToTry) {
+      try {
+        const response = await ai.models.generateContent({
+          model,
+          contents: {
+            parts: [
+              { inlineData: { data: imageBase64, mimeType: normalizedMimeType } },
+              { text: promptText },
+            ],
+          },
+          config: {
+            imageConfig: {
+              aspectRatio: aspectRatio as any,
+            }
+          }
+        });
+        
+        for (const part of response.candidates?.[0]?.content?.parts || []) {
+          if (part.inlineData) {
+            base64Image = part.inlineData.data;
+            break;
           }
         }
-      });
-      
-      let base64Image = "";
-      for (const part of response.candidates?.[0]?.content?.parts || []) {
-        if (part.inlineData) {
-          base64Image = part.inlineData.data;
-          break;
+
+        if (base64Image) {
+          return {
+            key,
+            base64: base64Image,
+            mimeType: "image/png"
+          };
         }
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[Headshot Generation] Model ${model} failed for preset ${key}:`, err?.message || err);
       }
-
-      if (!base64Image) throw new Error("No image generated");
-
-      return {
-        key,
-        base64: base64Image,
-        mimeType: "image/png" // GenAI usually returns jpeg/png
-      };
-    } catch (err: any) {
-      console.error(`Failed to generate variation ${key}:`, err);
-      return { key, error: err.message };
     }
+
+    const errDetail = lastError?.message || "No image data returned by Google API";
+    console.error(`[Headshot Generation] Google API Error: ${errDetail}`);
+    throw new Error(`Google API Error: ${errDetail}`);
   });
 
   const results = await Promise.all(promises);
