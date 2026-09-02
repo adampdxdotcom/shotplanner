@@ -1017,7 +1017,7 @@ export const StagingInteractiveCanvas: React.FC<StagingInteractiveCanvasProps> =
               height: `${brushSize}px`,
               transform: "translate(-50%, -50%)",
             }}
-            className={`pointer-events-none absolute rounded-full z-50 flex items-center justify-center transition-[width,height] duration-75 ${
+            className={`pointer-events-none absolute rounded-full z-[110] flex items-center justify-center transition-[width,height] duration-75 ${
               maskMode === "erase"
                 ? "border-2 border-red-400 bg-red-500/20 shadow-[0_0_12px_rgba(239,68,68,0.6)]"
                 : "border-2 border-emerald-400 bg-emerald-500/20 shadow-[0_0_12px_rgba(16,185,129,0.6)]"
@@ -1034,7 +1034,10 @@ export const StagingInteractiveCanvas: React.FC<StagingInteractiveCanvasProps> =
 
         {/* LIVE FLOATING MASKING HUD & CONTROLS */}
         {isMaskingMode && maskingActor && (
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-40 bg-zinc-950/95 border border-indigo-500/70 rounded-xl px-3 py-2 shadow-2xl backdrop-blur flex items-center gap-3 text-xs max-w-[95%] sm:max-w-none flex-wrap sm:flex-nowrap justify-center animate-in fade-in zoom-in-95 duration-150">
+          <div
+            onPointerDown={(e) => e.stopPropagation()}
+            className="absolute top-3 left-1/2 -translate-x-1/2 z-[100] bg-zinc-950/95 border border-indigo-500/70 rounded-xl px-3 py-2 shadow-2xl backdrop-blur flex items-center gap-3 text-xs max-w-[95%] sm:max-w-none flex-wrap sm:flex-nowrap justify-center animate-in fade-in zoom-in-95 duration-150"
+          >
             {/* Actor Header */}
             <div className="flex items-center gap-1.5 border-r border-zinc-800 pr-2.5">
               <div className="w-5 h-5 rounded bg-indigo-950 border border-indigo-600/60 flex items-center justify-center text-indigo-400">
@@ -1216,7 +1219,7 @@ export const StagingInteractiveCanvas: React.FC<StagingInteractiveCanvasProps> =
               style={{
                 left: `${actor.xPercent}%`,
                 top: `${actor.yPercent}%`,
-                zIndex: isCurrentMasking ? 50 : isSelected ? 40 : 20 + (actor.zIndex || 1),
+                zIndex: isCurrentMasking ? 40 : isSelected ? 30 : 20 + (actor.zIndex || 1),
                 transform: "translate(-50%, -100%)",
                 height: `${displayHeightPercent}%`,
                 maxWidth: "none",
