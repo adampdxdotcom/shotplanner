@@ -66,6 +66,7 @@ export interface AssetRecord {
   type: string;
   subject_name: string;
   description: string;
+  tags?: string[];
   size_bytes: number;
   created_at: number;
   preview_url?: string;

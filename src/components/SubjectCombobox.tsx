@@ -30,13 +30,40 @@ export const SubjectCombobox: React.FC<SubjectComboboxProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Helper to clean accidental 'reference_' prefixes and normalize formatting
+  const cleanSubjectName = (raw: string): string => {
+    if (!raw) return "";
+    let clean = raw.trim();
+    clean = clean.replace(/^reference[_\-\s]+/i, "").replace(/^_+|_+$/g, "").trim();
+    if (!clean || ["unknown", "null", "undefined", "subject"].includes(clean.toLowerCase())) {
+      return "";
+    }
+    if (clean === clean.toLowerCase()) {
+      clean = clean
+        .split(/[_\s]+/)
+        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(" ");
+    } else {
+      clean = clean.replace(/_/g, " ");
+    }
+    return clean;
+  };
+
   // Derive consolidated subjects (registered subjects + any subject found in assets)
-  const allKnownSubjects = Array.from(
-    new Set([
-      ...subjects.map(s => s.trim()).filter(Boolean),
-      ...assets.map(a => (a.subject_name || "").trim()).filter(Boolean)
-    ])
-  );
+  // Strips accidental 'reference_' prefixes and deduplicates case-insensitively
+  const normalizedMap = new Map<string, string>();
+  [
+    ...subjects.map(cleanSubjectName),
+    ...assets.map(a => cleanSubjectName(a.subject_name || ""))
+  ].forEach(s => {
+    if (!s) return;
+    const key = s.toLowerCase();
+    if (!normalizedMap.has(key)) {
+      normalizedMap.set(key, s);
+    }
+  });
+
+  const allKnownSubjects = Array.from(normalizedMap.values());
 
   const query = value.trim().toLowerCase();
 
@@ -53,9 +80,11 @@ export const SubjectCombobox: React.FC<SubjectComboboxProps> = ({
 
   // Compute stats/categories where each subject is used
   const getSubjectMeta = (name: string) => {
-    const matchedAssets = assets.filter(
-      a => (a.subject_name || "").trim().toLowerCase() === name.trim().toLowerCase()
-    );
+    const cleanTarget = cleanSubjectName(name).toLowerCase();
+    const matchedAssets = assets.filter(a => {
+      const assetSubj = cleanSubjectName(a.subject_name || "").toLowerCase();
+      return assetSubj === cleanTarget || (a.subject_name || "").trim().toLowerCase() === name.trim().toLowerCase();
+    });
     const types = Array.from(new Set(matchedAssets.map(a => a.type).filter(Boolean)));
     return {
       count: matchedAssets.length,

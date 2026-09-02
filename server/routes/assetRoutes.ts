@@ -66,17 +66,35 @@ router.delete("/:filename", (req: Request, res: Response) => {
 
 // Update asset metadata
 router.put("/update", upload.single("file"), (req: Request, res: Response) => {
-  const filename = req.body.original_filename || req.body.filename;
-  const { type, subject_name, description } = req.body;
-  const updated = assetService.updateAssetMetadata(filename, { type, subject_name, description });
-  res.json({ success: true, asset: updated });
+  try {
+    const filename = req.body.original_filename || req.body.filename;
+    if (req.file && filename) {
+      const existingPath = assetService.getAssetFilePath(filename);
+      if (existingPath && fs.existsSync(existingPath)) {
+        try { fs.copyFileSync(req.file.path, existingPath); } catch (e) {}
+      }
+    }
+    const updated = assetService.updateAssetMetadata(filename, req.body);
+    res.json({ success: true, asset: updated });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 router.put("/:filename", upload.single("file"), (req: Request, res: Response) => {
-  const targetFilename = req.params.filename === "update" ? (req.body.original_filename || "asset") : req.params.filename;
-  const { type, subject_name, description } = req.body;
-  const updated = assetService.updateAssetMetadata(targetFilename, { type, subject_name, description });
-  res.json({ success: true, asset: updated });
+  try {
+    const targetFilename = req.params.filename === "update" ? (req.body.original_filename || "asset") : req.params.filename;
+    if (req.file && targetFilename) {
+      const existingPath = assetService.getAssetFilePath(targetFilename);
+      if (existingPath && fs.existsSync(existingPath)) {
+        try { fs.copyFileSync(req.file.path, existingPath); } catch (e) {}
+      }
+    }
+    const updated = assetService.updateAssetMetadata(targetFilename, req.body);
+    res.json({ success: true, asset: updated });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Sync assets array from client

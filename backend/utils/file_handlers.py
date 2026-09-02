@@ -129,6 +129,92 @@ def ensure_scene_directories(scene_name: Optional[str] = "scene01") -> Dict[str,
 ASSETS_DIR.mkdir(parents=True, exist_ok=True)
 TMP_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+COMPOUND_REFERENCE_TYPES = [
+    "motion_reference_video",
+    "voiceover_audio",
+    "motion_reference",
+    "voice_reference",
+    "body_reference",
+    "scene_reference",
+    "object_reference",
+    "style_reference",
+    "character_reference",
+    "location_reference",
+    "prop_reference",
+    "mood_reference",
+    "face_reference",
+]
+
+def parse_asset_filename(filename: str) -> Dict[str, str]:
+    """
+    Parses asset filename extracting compound reference type, clean subject name, and media type.
+    Correctly recognizes compound types like 'body_reference_jackie_1724859281.png'
+    without splitting 'reference' into the subject name.
+    """
+    path_obj = Path(filename)
+    stem = path_obj.stem
+    ext = path_obj.suffix.lower()
+
+    if ext in [".mp4", ".mov", ".webm", ".mkv", ".avi"]:
+        media_type = "video"
+    elif ext in [".mp3", ".wav", ".ogg", ".flac", ".m4a", ".aac"]:
+        media_type = "audio"
+    else:
+        media_type = "image"
+
+    stem_lower = stem.lower()
+    asset_type = "unknown"
+    remainder = stem
+
+    # 1. Match compound multi-word prefixes (longest first)
+    matched_prefix = False
+    for prefix in COMPOUND_REFERENCE_TYPES:
+        if stem_lower.startswith(f"{prefix}_"):
+            asset_type = prefix
+            remainder = stem[len(prefix) + 1:]
+            matched_prefix = True
+            break
+
+    # 2. Check if second token is 'reference' (e.g. custom_reference_name_123)
+    if not matched_prefix:
+        parts = stem.split("_")
+        if len(parts) >= 3 and parts[1].lower() == "reference":
+            asset_type = f"{parts[0]}_reference".lower()
+            remainder = "_".join(parts[2:])
+        elif len(parts) >= 3:
+            asset_type = parts[0].lower()
+            remainder = "_".join(parts[1:])
+        elif len(parts) == 2:
+            asset_type = parts[0].lower()
+            remainder = parts[1]
+        else:
+            asset_type = "headshot" if media_type == "image" else "unknown"
+            remainder = stem
+
+    # 3. Strip trailing timestamp / numeric tokens from remainder
+    rem_parts = remainder.split("_")
+    while len(rem_parts) > 1 and rem_parts[-1].isdigit():
+        rem_parts.pop()
+
+    subject_raw = "_".join(rem_parts) if rem_parts else "subject"
+
+    # 4. Strip accidental 'reference_' prefix from subject name
+    subject_clean = re.sub(r'^reference[_\-\s]+', '', subject_raw, flags=re.IGNORECASE).strip('_ ')
+    if not subject_clean or subject_clean.lower() in ("unknown", "null", "undefined", ""):
+        subject_clean = "subject"
+
+    # 5. Format subject display nicely
+    if subject_clean.islower():
+        subject_display = " ".join([w.capitalize() for w in subject_clean.split("_")])
+    else:
+        subject_display = subject_clean.replace("_", " ")
+
+    return {
+        "type": asset_type,
+        "subject_name": subject_display,
+        "media_type": media_type
+    }
+
 def sanitize_filename(name: str) -> str:
     """Sanitize subject names or labels to be safe in filenames."""
     name = name.strip().lower()

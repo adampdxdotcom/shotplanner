@@ -748,5 +748,24 @@
 - **`server/routes/assetRoutes.ts`**
   - Updated `PUT /api/assets/:filename` and added `PUT /api/assets/update` with `upload.single("file")` middleware to parse multipart FormData fields (`type`, `subject_name`, `description`, `original_filename`), enabling backend synchronization for metadata edits with or without file replacement.
 
+## Asset Metadata Persistence & Compound Type Parsing Fixes
+- **`backend/routes/asset_routes.py`**
+  - Updated `AssetUpdate` Pydantic model with snake_case and camelCase field aliases (`subject_name` / `subjectName`, `type` / `assetType` / `asset_type`, `description`, `tags`, `scene_name` / `sceneName`, `original_filename` / `filename`).
+  - Enabled `Config.extra = "allow"` and `Config.populate_by_name = True` to prevent `422 Unprocessable Entity` rejections on extended asset payloads.
+  - Implemented resilient `PUT /api/assets/update` and `PUT /api/assets/{filename}` handler supporting both JSON and Multipart FormData, handling optional file replacements, and persisting updates via `update_asset_metadata_service`.
+- **`backend/services/asset_service.py` & `backend/utils/file_handlers.py`**
+  - Implemented `parse_asset_filename()` recognizing compound multi-word reference types (`body_reference`, `scene_reference`, `voice_reference`, `motion_reference`, `style_reference`, `object_reference`, `character_reference`, `location_reference`, `prop_reference`, `mood_reference`, `face_reference`, `motion_reference_video`, `voiceover_audio`) without splitting "reference" into the subject name.
+  - Added automatic extraction and cleanup stripping accidental `reference_` prefixes from subject tokens and standardizing casing/spaces for display.
+  - Implemented `update_asset_metadata_service()` to persist updated `type`, `subject_name`, `description`, and `tags` into `assets/assets_db.json` and synchronize across all active scene project JSON files (`assets/{scene_name}/{scene_name}.json` and `assets/project_jsons/*.json`).
+  - Augmented `list_scene_and_shared_assets()` with authoritative lookup from `assets_db.json` and fallback to `parse_asset_filename()`.
+- **`server/services/assetService.ts` & `server/routes/assetRoutes.ts`**
+  - Added `parseAssetFilename` helper matching the compound reference type detection in TypeScript.
+  - Updated `getAllAssets` to use `parseAssetFilename` for robust filename decoding.
+  - Implemented full persistence in `updateAssetMetadata()` writing updates to `assets/assets_db.json` and active project JSON files.
+- **`src/components/SubjectCombobox.tsx`**
+  - Added `cleanSubjectName` normalization routine to strip accidental `reference_` / `reference-` prefixes from raw subject strings.
+  - Implemented case-insensitive deduplication and formatting for subject suggestions, combobox dropdown options, and quick-selection chips.
+  - Updated `getSubjectMeta` to resolve matched assets using normalized subject comparison.
+
 
 

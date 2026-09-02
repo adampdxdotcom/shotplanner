@@ -1,6 +1,6 @@
-from typing import Optional
-from fastapi import APIRouter, UploadFile, File, Form
-from pydantic import BaseModel
+from typing import Optional, List, Union, Dict, Any
+from fastapi import APIRouter, UploadFile, File, Form, Request, HTTPException
+from pydantic import BaseModel, Field
 
 from backend.services.asset_service import (
     save_single_asset,
@@ -8,15 +8,28 @@ from backend.services.asset_service import (
     get_asset_file_response,
     get_thumbnail_file_response,
     delete_asset_file,
-    handle_chunk_upload
+    handle_chunk_upload,
+    update_asset_metadata_service
 )
 
 router = APIRouter(tags=["Assets"])
 
 class AssetUpdate(BaseModel):
     type: Optional[str] = None
+    assetType: Optional[str] = None
+    asset_type: Optional[str] = None
     subject_name: Optional[str] = None
+    subjectName: Optional[str] = None
     description: Optional[str] = None
+    tags: Optional[Union[List[str], str]] = None
+    scene_name: Optional[str] = None
+    sceneName: Optional[str] = None
+    original_filename: Optional[str] = None
+    filename: Optional[str] = None
+
+    class Config:
+        extra = "allow"
+        populate_by_name = True
 
 @router.get("/assets")
 async def get_assets(scene_name: Optional[str] = None):
@@ -85,23 +98,58 @@ async def serve_thumbnail(filename: str):
     """Serve cached lightweight thumbnail or generate on demand."""
     return get_thumbnail_file_response(filename)
 
+@router.put("/assets/update")
 @router.put("/assets/{filename}")
-async def update_asset_metadata(filename: str, updates: AssetUpdate):
-    """Update asset metadata representation."""
+async def update_asset_metadata(
+    request: Request,
+    filename: Optional[str] = None
+):
+    """
+    Update asset metadata with full persistence into companion registry and project files.
+    Resiliently handles both JSON payloads and Multipart FormData (with optional file replacement).
+    """
+    content_type = request.headers.get("content-type", "").lower()
+    replacement_bytes = None
+    replacement_filename = None
+    updates_dict: Dict[str, Any] = {}
+
+    if "multipart/form-data" in content_type or "application/x-www-form-urlencoded" in content_type:
+        form = await request.form()
+        for k, v in form.items():
+            if k == "file" and hasattr(v, "read"):
+                replacement_bytes = await v.read()
+                replacement_filename = getattr(v, "filename", None)
+            else:
+                updates_dict[k] = v
+    elif "application/json" in content_type:
+        try:
+            updates_dict = await request.json()
+        except Exception:
+            updates_dict = {}
+    else:
+        # Fallback query / raw attempt
+        try:
+            updates_dict = await request.json()
+        except Exception:
+            pass
+
+    target_name = (
+        updates_dict.get("original_filename")
+        or updates_dict.get("filename")
+        or (filename if filename and filename != "update" else None)
+        or "asset"
+    )
+
+    updated_record = update_asset_metadata_service(
+        filename=target_name,
+        updates=updates_dict,
+        replacement_content=replacement_bytes,
+        replacement_filename=replacement_filename
+    )
+
     return {
         "success": True,
-        "asset": {
-            "id": filename,
-            "filename": filename,
-            "original_name": filename,
-            "media_type": "image",
-            "type": updates.type or "unknown",
-            "subject_name": updates.subject_name or "subject",
-            "description": updates.description or "",
-            "size_bytes": 0,
-            "preview_url": f"/api/uploads/{filename}",
-            "path": ""
-        }
+        "asset": updated_record
     }
 
 @router.delete("/assets/{filename}")
