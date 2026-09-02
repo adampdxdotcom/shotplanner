@@ -1147,6 +1147,7 @@
     - **Accurate Viewport-to-Buffer Coordinate Mapping:** Refactored `getCanvasCoords` to calculate normalized coordinates `normX = screenX / rect.width` and `normY = screenY / rect.height`, strictly inverting `normX = 1 - normX` when `actor.isFlipped` is active. This ensures brush strokes on mirrored characters accurately register in the local mask pixel buffer.
     - **Scale-Invariant Brush Size:** Calculated `scaleRatio = canvas.width / Math.max(rect.width, 1)` and scaled brush radius dynamically in `paintStroke`, ensuring brush strokes retain their exact visual diameter on the actor regardless of zoom or scale factors.
     - **Seamless & Atomic Mask Commit:** Implemented `commitMask` with instant cached cutout tracking (`lastCommittedCutoutRef`) and cleanup detection on mask mode exit (both internal button clicks and external modal state changes). Commits modified alpha masks cleanly without layout shifts, coordinate jumps, or scaling flickers.
+    - **Right-Side Boundary Squeeze Elimination:** Resolved the container compression bug where positioning an actor near or past the stage's right border (`left: > 50%`) squeezed the actor's width and distorted its scale. Applied `maxWidth: "none"`, `width: "max-content"`, and `whiteSpace: "nowrap"` to the outer positioning style alongside `max-w-none shrink-0` across all nested flex wrappers, figure elements, tokens, and masking canvases. This ensures cutouts flow naturally off-stage without horizontal compression or aspect-ratio distortion at any horizontal coordinate.
 
 
 

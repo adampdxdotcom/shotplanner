@@ -1218,9 +1218,12 @@ export const StagingInteractiveCanvas: React.FC<StagingInteractiveCanvasProps> =
                 top: `${actor.yPercent}%`,
                 zIndex: isCurrentMasking ? 50 : isSelected ? 40 : 20 + (actor.zIndex || 1),
                 transform: "translate(-50%, -100%)",
-                height: `${displayHeightPercent}%`
+                height: `${displayHeightPercent}%`,
+                maxWidth: "none",
+                width: "max-content",
+                whiteSpace: "nowrap"
               }}
-              className={`absolute flex flex-col items-center justify-end ${
+              className={`absolute flex flex-col items-center justify-end max-w-none shrink-0 ${
                 isCurrentMasking
                   ? "cursor-crosshair pointer-events-auto"
                   : isSelected
@@ -1265,7 +1268,7 @@ export const StagingInteractiveCanvas: React.FC<StagingInteractiveCanvasProps> =
 
               {/* Actor Cutout Image Container with Bounding Box */}
               <div
-                className={`relative h-full flex flex-col items-center justify-end transition-shadow ${
+                className={`relative h-full flex flex-col items-center justify-end max-w-none shrink-0 transition-shadow ${
                   isCurrentMasking
                     ? "ring-2 ring-indigo-400 ring-offset-2 ring-offset-zinc-950 rounded-lg shadow-2xl"
                     : isSelected
@@ -1280,7 +1283,7 @@ export const StagingInteractiveCanvas: React.FC<StagingInteractiveCanvasProps> =
 
                 {/* Figure wrapper strictly maintaining scale, aspect ratio, and horizontal flip */}
                 <div
-                  className="relative h-full w-auto flex items-end justify-center select-none"
+                  className="relative h-full w-auto flex items-end justify-center select-none max-w-none shrink-0"
                   style={{
                     transform: actor.isFlipped ? "scaleX(-1)" : "none",
                     transformOrigin: "bottom center"
@@ -1298,7 +1301,7 @@ export const StagingInteractiveCanvas: React.FC<StagingInteractiveCanvasProps> =
                       style={{
                         opacity: isCurrentMasking ? 0 : 1
                       }}
-                      className="h-full w-auto object-contain select-none filter drop-shadow-[0_8px_16px_rgba(0,0,0,0.7)] pointer-events-none"
+                      className="h-full w-auto max-w-none shrink-0 object-contain select-none filter drop-shadow-[0_8px_16px_rgba(0,0,0,0.7)] pointer-events-none"
                     />
                   ) : (
                     // Fallback Avatar Token
@@ -1308,7 +1311,7 @@ export const StagingInteractiveCanvas: React.FC<StagingInteractiveCanvasProps> =
                         aspectRatio: "2/3",
                         opacity: isCurrentMasking ? 0 : 1
                       }}
-                      className="bg-gradient-to-t from-indigo-950 to-zinc-900 border-2 border-indigo-500/60 rounded-t-full flex flex-col items-center justify-center p-2 text-center shadow-lg pointer-events-none"
+                      className="bg-gradient-to-t from-indigo-950 to-zinc-900 border-2 border-indigo-500/60 rounded-t-full flex flex-col items-center justify-center p-2 text-center shadow-lg pointer-events-none max-w-none shrink-0"
                     >
                       <User className="w-8 h-8 text-indigo-300 mb-1" />
                       <span className="text-[11px] font-bold text-white truncate max-w-full">
@@ -1324,7 +1327,7 @@ export const StagingInteractiveCanvas: React.FC<StagingInteractiveCanvasProps> =
                   {isCurrentMasking && (
                     <canvas
                       ref={setActiveMaskCanvas}
-                      className="absolute inset-0 w-full h-full object-contain select-none filter drop-shadow-[0_8px_16px_rgba(0,0,0,0.7)] cursor-crosshair z-10"
+                      className="absolute inset-0 w-full h-full max-w-none shrink-0 object-contain select-none filter drop-shadow-[0_8px_16px_rgba(0,0,0,0.7)] cursor-crosshair z-10"
                       style={{
                         touchAction: "none"
                       }}
