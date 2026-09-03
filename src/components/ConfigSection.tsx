@@ -265,18 +265,20 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({
     setTestingSSH(true);
     setTestResult(null);
     try {
+      // Explicitly bundle current live in-memory input values for SSH credentials
+      const payload = {
+        host: config.remote_host ? config.remote_host.trim() : "",
+        port: Number(config.ssh_port) || 22,
+        username: config.ssh_username ? config.ssh_username.trim() : "root",
+        password: config.ssh_password || "",
+        key_path: config.ssh_key_path || "",
+        ssh_private_key: config.ssh_private_key || "",
+        remote_dir: config.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI/input/"
+      };
       const res = await fetch("/api/ssh/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          host: config.remote_host,
-          port: config.ssh_port,
-          username: config.ssh_username,
-          password: config.ssh_password,
-          key_path: config.ssh_key_path,
-          ssh_private_key: config.ssh_private_key,
-          remote_dir: config.remote_comfyui_root || "/workspace/remote-slim/ComfyUI/input/"
-        })
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
       setTestResult(data);
@@ -300,7 +302,12 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({
       }
       const data = await res.json();
       if (data.private_key && data.public_key) {
-        handleInputChange("ssh_private_key", data.private_key);
+        // Unconditionally persist generated key pair into application state
+        onChange({
+          ...config,
+          ssh_private_key: data.private_key,
+          ssh_public_key: data.public_key
+        });
         setGeneratedKeyPair(data);
         setShowPublicKeyModal(true);
         setHasCopiedPublicKey(false);

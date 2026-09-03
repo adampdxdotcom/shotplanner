@@ -173,6 +173,7 @@ export interface AppConfig {
   ssh_password: string;
   ssh_key_path: string;
   ssh_private_key?: string;
+  ssh_public_key?: string;
   remote_comfyui_root: string;
   comfyui_api_url: string;
   remote_api_token: string;

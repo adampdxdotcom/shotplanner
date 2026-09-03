@@ -21,7 +21,7 @@ export const RemoteGPUConfig: React.FC<RemoteGPUConfigProps> = ({
   const [copiedCommand, setCopiedCommand] = useState(false);
   const [copiedPublicKey, setCopiedPublicKey] = useState(false);
 
-  const effectivePublicKey = generatedKeyPair?.public_key?.trim() || "";
+  const effectivePublicKey = generatedKeyPair?.public_key?.trim() || config.ssh_public_key?.trim() || "";
   const authCommandOneLiner = effectivePublicKey
     ? `mkdir -p ~/.ssh && echo "${effectivePublicKey}" >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys`
     : `mkdir -p ~/.ssh && echo "YOUR_PUBLIC_KEY" >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys`;
@@ -45,10 +45,10 @@ export const RemoteGPUConfig: React.FC<RemoteGPUConfigProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Remote Host, SSH Port & Username settings */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Remote Host, SSH Port, Username & Password settings */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* Remote GPU IP */}
-        <div className="space-y-1.5 md:col-span-2">
+        <div className="space-y-1.5 sm:col-span-2 lg:col-span-1">
           <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
             <Terminal className="w-3.5 h-3.5 text-zinc-400" />
             Remote GPU Host / IP
@@ -56,34 +56,46 @@ export const RemoteGPUConfig: React.FC<RemoteGPUConfigProps> = ({
           <input
             type="text"
             placeholder="194.26.196.xxx"
-            value={config.remote_host}
+            value={config.remote_host || ""}
             onChange={(e) => handleInputChange("remote_host", e.target.value)}
             className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
           />
         </div>
 
-        {/* SSH Port & Username */}
-        <div className="grid grid-cols-2 gap-2 md:col-span-1">
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-300">SSH Port</label>
-            <input
-              type="number"
-              placeholder="22"
-              value={config.ssh_port}
-              onChange={(e) => handleInputChange("ssh_port", parseInt(e.target.value) || 22)}
-              className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-300">Username</label>
-            <input
-              type="text"
-              placeholder="root"
-              value={config.ssh_username}
-              onChange={(e) => handleInputChange("ssh_username", e.target.value)}
-              className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
-            />
-          </div>
+        {/* SSH Port */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-zinc-300">SSH Port</label>
+          <input
+            type="number"
+            placeholder="22"
+            value={config.ssh_port || ""}
+            onChange={(e) => handleInputChange("ssh_port", parseInt(e.target.value) || 22)}
+            className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
+          />
+        </div>
+
+        {/* Username */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-zinc-300">Username</label>
+          <input
+            type="text"
+            placeholder="root"
+            value={config.ssh_username || ""}
+            onChange={(e) => handleInputChange("ssh_username", e.target.value)}
+            className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
+          />
+        </div>
+
+        {/* Password / Passphrase */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-zinc-300">Password / Passphrase</label>
+          <input
+            type="password"
+            placeholder="Optional root / key pass"
+            value={config.ssh_password || ""}
+            onChange={(e) => handleInputChange("ssh_password", e.target.value)}
+            className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
+          />
         </div>
       </div>
 
@@ -97,7 +109,7 @@ export const RemoteGPUConfig: React.FC<RemoteGPUConfigProps> = ({
             </label>
             {config.ssh_private_key ? (
               <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/60 font-mono">
-                {config.ssh_private_key.includes("ED25519") ? "Ed25519 Key Loaded" : config.ssh_private_key.includes("RSA") ? "RSA Key Loaded" : "Key Loaded"}
+                {config.ssh_private_key.includes("ED25519") ? "Ed25519 Key Loaded" : config.ssh_private_key.includes("RSA") ? "RSA Key Loaded" : config.ssh_private_key.includes("ECDSA") ? "ECDSA Key Loaded" : "Key Loaded"}
               </span>
             ) : null}
           </div>
@@ -123,6 +135,28 @@ export const RemoteGPUConfig: React.FC<RemoteGPUConfigProps> = ({
               </button>
             )}
           </div>
+        </div>
+
+        {/* Private Key Textarea Input */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-zinc-400">
+              Paste your OpenSSH or PEM private key below, or click Generate to create a fresh Ed25519 keypair:
+            </span>
+            {config.ssh_private_key && (
+              <span className="text-[10px] text-zinc-500 font-mono">
+                {config.ssh_private_key.trim().split("\n").length} lines
+              </span>
+            )}
+          </div>
+          <textarea
+            rows={4}
+            placeholder="-----BEGIN OPENSSH PRIVATE KEY-----&#10;...&#10;-----END OPENSSH PRIVATE KEY-----"
+            value={config.ssh_private_key || ""}
+            onChange={(e) => handleInputChange("ssh_private_key", e.target.value)}
+            className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-amber-500 rounded-lg p-2.5 text-xs font-mono text-zinc-200 placeholder-zinc-600 outline-none transition-colors resize-y leading-relaxed"
+            spellCheck={false}
+          />
         </div>
 
         {/* Public Key on a new line */}

@@ -1239,6 +1239,31 @@
     - **Asset Deletion Workflow:** Implemented `handleDeleteAsset` with confirmation prompt, unlinking the asset from the character, calling the backend DELETE endpoint (`/api/assets/:filename`), notifying `onAssetDeleted`, cleaning up active lightbox/editing state, and displaying toast feedback.
     - **Lightbox Deletion Alignment:** Updated `AssetLightbox` deletion callback to utilize `handleDeleteAsset` for consistent confirmation and unlinking behavior.
 
+## Remote Server & SSH Configuration: Real-time Key Sync & Paramiko Key Normalization
+- **`src/types.ts`**
+  - **Role:** Global TypeScript interface definitions for application configuration and project state.
+  - **Updates:**
+    - Added `ssh_public_key?: string` to the `AppConfig` interface to persist both halves of generated or configured SSH keypairs in central project state.
+- **`src/components/config/RemoteGPUConfig.tsx`**
+  - **Role:** Remote GPU and SSH host configuration tab.
+  - **Updates:**
+    - Integrated direct `<textarea>` input binding for `ssh_private_key`, syncing immediately on every keystroke to `handleInputChange("ssh_private_key", value)` without requiring a successful test connection.
+    - Exposed quick Clear Key and Generate Keypair action buttons with real-time key type badge indicators (Ed25519, RSA, ECDSA).
+    - Updated grid layout for Host IP, Port, Username, and Password fields with fallback default values.
+- **`src/components/ConfigSection.tsx`**
+  - **Role:** Master settings dashboard coordinating tabbed configurations and test actions.
+  - **Updates:**
+    - Updated `handleTestSSH` to explicitly bundle live in-memory input values (`host`, `port`, `username`, `password`, `key_path`, `ssh_private_key`, `remote_dir`) into the `POST /api/ssh/test` request payload.
+    - Persisted both generated `private_key` and `public_key` directly into `config` state via `onChange` upon keypair generation.
+- **`backend/services/ssh_service.py`**
+  - **Role:** Python SSH connection service handling Paramiko authentication and SFTP transfers to remote RunPod GPU instances.
+  - **Updates:**
+    - Added `normalize_private_key_string` to trim whitespace, un-escape literal `\n` characters into true multi-line linebreaks, strip carriage returns (`\r`), and ensure valid OpenSSH/PEM trailing newlines.
+    - Updated `load_private_key` to attempt loading with `paramiko.Ed25519Key.from_private_key(io.StringIO(norm_key))` first, falling back to `paramiko.RSAKey` and `paramiko.ECDSAKey`.
+    - Ensured `client.set_missing_host_key_policy(paramiko.AutoAddPolicy())` is set on every client instance prior to authentication.
+    - Added verbose connection logging with key type identification and explicit password fallback.
+
+
 
 
 
