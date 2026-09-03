@@ -1052,7 +1052,13 @@ export function useAppLogic() {
         });
         const data = await res.json();
         if (res.ok && data.nodes_info) {
-          setParsedWorkflow(data);
+          const rawPayload = data.raw_json || data.workflow || data.raw_workflow || {};
+          setParsedWorkflow({
+            ...data,
+            raw_json: rawPayload,
+            workflow: rawPayload,
+            raw_workflow: rawPayload
+          });
 
           // Auto-sync detected parameter nodes while preserving user manual overrides
           const detected = data.detected_nodes || data.nodes_info.detected_nodes;

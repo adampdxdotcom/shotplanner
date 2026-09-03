@@ -376,11 +376,21 @@ async def execute_workflow_pipeline(req_dict: Dict[str, Any]) -> Dict[str, Any]:
             shot=shot_dict,
             scene_name=scene_name
         )
+        
+        # Save assembled JSON locally in assets/{scene_name}/workflows/{scene_name}_Shot_{shot_number}.json
+        scene_dirs = get_scene_directories(scene_name)
+        scene_wf_dir = scene_dirs.get("workflows")
+        scene_wf_dir.mkdir(parents=True, exist_ok=True)
+        final_wf_filename = f"{scene_name}_Shot_{shot_num_str}.json"
+        target_file_path = scene_wf_dir / final_wf_filename
+        with open(target_file_path, "w", encoding="utf-8") as f:
+            json.dump(modified_workflow, f, indent=2)
+
         steps_log.append({
             "step": "B",
-            "title": "Workflow Synthesized",
+            "title": "Workflow Synthesized & Saved",
             "status": "success",
-            "detail": f"Successfully prepared workflow for '{workflow_filename}' with {len(modified_workflow)} nodes."
+            "detail": f"Successfully prepared and saved workflow to '{target_file_path.name}' with {len(modified_workflow)} nodes."
         })
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed building workflow: {str(e)}")
@@ -431,9 +441,13 @@ async def execute_workflow_pipeline(req_dict: Dict[str, Any]) -> Dict[str, Any]:
                         if k in inputs and isinstance(inputs[k], str):
                             add_file_to_transfer(inputs[k])
 
-    # 3. SSH Transfer
+    # 3. SSH Transfer (both assets to /input and workflow JSON to /user/default/workflows/{scene_name})
     runpod_host = req_dict.get("runpod_ip") or req_dict.get("remote_host")
-    if files_to_transfer and runpod_host:
+    remote_root = req_dict.get("remote_comfyui_root") or "/workspace/runpod-slim/ComfyUI"
+    clean_root = remote_root.rstrip('/')
+    remote_input_dir = req_dict.get("remote_input_dir") or f"{clean_root}/input"
+
+    if runpod_host and (files_to_transfer or target_file_path.exists()):
         try:
             ssh_service = RunPodSSHService(
                 host=runpod_host,
@@ -443,20 +457,32 @@ async def execute_workflow_pipeline(req_dict: Dict[str, Any]) -> Dict[str, Any]:
                 key_path=req_dict.get("ssh_key_path"),
                 private_key=req_dict.get("ssh_private_key")
             )
-            transfer_res = ssh_service.transfer_files_to_runpod(
-                local_files=files_to_transfer,
-                remote_dir=req_dict.get("remote_input_dir", "/workspace/runpod-slim/ComfyUI/input"),
-                overwrite=False
-            )
+            trans_res = {}
+            if files_to_transfer:
+                trans_res = ssh_service.transfer_files_to_runpod(
+                    local_files=files_to_transfer,
+                    remote_dir=remote_input_dir,
+                    overwrite=False
+                )
+
+            # Also transfer synthesized workflow JSON to remote user workflow directory
+            if target_file_path.exists():
+                remote_wf_dir = f"{clean_root}/user/default/workflows/{scene_name}"
+                ssh_service.transfer_files_to_runpod(
+                    local_files=[target_file_path],
+                    remote_dir=remote_wf_dir,
+                    overwrite=True
+                )
+
             steps_log.append({
                 "step": "A",
-                "title": "SSH Asset Sync Completed",
+                "title": "SSH Asset & Workflow Sync Completed",
                 "status": "success",
-                "detail": transfer_res["message"],
-                "transferred_count": transfer_res["transferred_count"],
-                "skipped_count": transfer_res["skipped_count"],
-                "total_checked": transfer_res["total_checked"],
-                "files": transfer_res.get("files", [])
+                "detail": trans_res.get("message", "Staged media assets and shot workflow via SFTP."),
+                "transferred_count": trans_res.get("transferred_count", 0),
+                "skipped_count": trans_res.get("skipped_count", 0),
+                "total_checked": trans_res.get("total_checked", len(files_to_transfer)),
+                "files": trans_res.get("files", [])
             })
         except Exception as e:
             steps_log.append({
@@ -538,3 +564,39 @@ async def execute_workflow_pipeline(req_dict: Dict[str, Any]) -> Dict[str, Any]:
             "steps": steps_log,
             "modified_workflow": modified_workflow
         }
+
+def stage_single_shot_pipeline(
+    host: Optional[str] = None,
+    port: int = 22,
+    username: str = "root",
+    password: Optional[str] = None,
+    key_path: Optional[str] = None,
+    private_key: Optional[str] = None,
+    remote_root: str = "/workspace/runpod-slim/ComfyUI",
+    remote_input_dir: Optional[str] = None,
+    scene_name: str = "Scene",
+    workflow_filename: Optional[str] = None,
+    shot: Optional[Any] = None,
+    bypass_missing: bool = True,
+    safe_placeholder: str = "empty.png",
+    project_data: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """Stage a single shot: injects workflow, saves local JSON, and transfers files/workflow via SFTP."""
+    shot_item = shot or {"shot_number": 1, "workflow_filename": workflow_filename, "node_mappings": {}}
+    return stage_scene_pipeline(
+        host=host,
+        port=port,
+        username=username,
+        password=password,
+        key_path=key_path,
+        private_key=private_key,
+        remote_root=remote_root,
+        remote_input_dir=remote_input_dir,
+        scene_name=scene_name,
+        workflow_filename=workflow_filename,
+        shots=[shot_item],
+        bypass_missing=bypass_missing,
+        safe_placeholder=safe_placeholder,
+        project_data=project_data
+    )
+

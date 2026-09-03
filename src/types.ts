@@ -345,6 +345,7 @@ export interface ParameterNodeMappings {
 export interface ParsedWorkflow {
   filename: string;
   detected_nodes?: DetectedNodes;
+  detected_values?: Record<string, any>;
   nodes_info: {
     prompt_nodes: WorkflowNodeInfo[];
     image_loader_nodes: WorkflowNodeInfo[];
@@ -354,6 +355,8 @@ export interface ParsedWorkflow {
     detected_nodes?: DetectedNodes;
   };
   raw_json: Record<string, any>;
+  workflow?: Record<string, any>;
+  raw_workflow?: Record<string, any>;
 }
 
 export interface ExecutionStepLog {

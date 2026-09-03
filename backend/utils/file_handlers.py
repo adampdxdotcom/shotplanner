@@ -376,34 +376,87 @@ def list_workflows(scene_name: Optional[str] = None) -> List[Dict[str, Any]]:
 
     return sorted(list(workflows_map.values()), key=lambda x: x["filename"])
 
-def load_workflow_json(filename: str, scene_name: Optional[str] = None) -> Dict[str, Any]:
-    """Load and parse a workflow JSON file searching scene folders and legacy folders."""
-    clean_name = os.path.basename(filename)
-    candidate_paths = []
+def find_workflow_file(filename: str, scene_name: Optional[str] = None) -> Optional[Path]:
+    """
+    Finds a workflow file path by searching:
+    1. Active scene's workflow directory (assets/{scene_name}/workflows/{clean_name})
+    2. All other scene workflow directories (assets/*/workflows/{clean_name})
+    3. Root workflows directory (assets/workflows/{clean_name}) and legacy subdirectories
+    4. Recursive rglob across all assets/*/workflows/ and assets/workflows/
+    5. Case-insensitive and stem-based fallback in assets
+    """
+    if not filename:
+        return None
+        
+    clean_name = os.path.basename(filename).strip()
+    if not clean_name:
+        return None
+
+    clean_name_json = clean_name if clean_name.endswith(".json") else f"{clean_name}.json"
+    candidate_paths: List[Path] = []
     
+    # 1. Check requested active scene first
     if scene_name:
         scene_dirs = get_scene_directories(scene_name)
-        candidate_paths.append(scene_dirs.get("workflows") / clean_name)
+        wf_dir = scene_dirs.get("workflows")
+        if wf_dir:
+            candidate_paths.append(wf_dir / clean_name_json)
+            if clean_name != clean_name_json:
+                candidate_paths.append(wf_dir / clean_name)
     
-    # Add all other scene folders
+    # 2. Check all top-level scene workflow folders inside ASSETS_DIR
     if ASSETS_DIR.exists():
         for sub in ASSETS_DIR.iterdir():
             if sub.is_dir() and sub.name.startswith("scene"):
-                candidate_paths.append(sub / "workflows" / clean_name)
+                wf_dir = sub / "workflows"
+                candidate_paths.append(wf_dir / clean_name_json)
+                if clean_name != clean_name_json:
+                    candidate_paths.append(wf_dir / clean_name)
                 
-    # Add legacy workflows
-    candidate_paths.append(LEGACY_WORKFLOWS_DIR / clean_name)
+    # 3. Check legacy workflows and legacy subdirectories
+    candidate_paths.append(LEGACY_WORKFLOWS_DIR / clean_name_json)
+    if clean_name != clean_name_json:
+        candidate_paths.append(LEGACY_WORKFLOWS_DIR / clean_name)
+
     if LEGACY_WORKFLOWS_DIR.exists():
         for sub in LEGACY_WORKFLOWS_DIR.iterdir():
             if sub.is_dir():
-                candidate_paths.append(sub / clean_name)
+                candidate_paths.append(sub / clean_name_json)
+                if clean_name != clean_name_json:
+                    candidate_paths.append(sub / clean_name)
 
+    # Check direct candidate paths
     for p in candidate_paths:
         if p.exists() and p.is_file():
-            with open(p, "r", encoding="utf-8") as f:
-                return json.load(f)
+            return p
+
+    # 4. Global recursive search for exact filename across entire ASSETS_DIR
+    if ASSETS_DIR.exists():
+        for match in ASSETS_DIR.rglob(clean_name_json):
+            if match.is_file():
+                return match
+        if clean_name != clean_name_json:
+            for match in ASSETS_DIR.rglob(clean_name):
+                if match.is_file():
+                    return match
+
+    # 5. Case-insensitive fallback
+    lower_target = clean_name_json.lower()
+    if ASSETS_DIR.exists():
+        for match in ASSETS_DIR.rglob("*.json"):
+            if match.is_file() and match.name.lower() == lower_target:
+                return match
+
+    return None
+
+def load_workflow_json(filename: str, scene_name: Optional[str] = None) -> Dict[str, Any]:
+    """Load and parse a workflow JSON file searching scene folders, cross-scene directories, and legacy folders."""
+    found_path = find_workflow_file(filename, scene_name=scene_name)
+    if found_path and found_path.exists() and found_path.is_file():
+        with open(found_path, "r", encoding="utf-8") as f:
+            return json.load(f)
                 
-    raise FileNotFoundError(f"Workflow file '{filename}' not found in any workflow directory.")
+    raise FileNotFoundError(f"Workflow file '{filename}' not found in any scene or workflow directory.")
 
 def find_asset_file_path(filename: str, include_thumbnails: bool = False) -> Optional[Path]:
     """Finds an asset file path checking recursively across the entire assets directory, prioritizing full-resolution media."""

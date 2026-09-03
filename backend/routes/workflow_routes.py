@@ -39,5 +39,9 @@ async def parse_workflow(payload: Dict[str, str]):
     return {
         "filename": filename,
         "nodes_info": nodes_info,
-        "raw_json": data
+        "raw_json": data,
+        "workflow": data,
+        "raw_workflow": data,
+        "detected_nodes": nodes_info.get("detected_nodes"),
+        "detected_values": nodes_info.get("detected_values")
     }

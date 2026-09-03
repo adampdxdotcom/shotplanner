@@ -64,7 +64,25 @@ router.post("/parse", (req: Request, res: Response) => {
       });
     }
 
-    let foundPath = candidatePaths.find(p => fs.existsSync(p));
+    let foundPath: string | undefined = candidatePaths.find(p => fs.existsSync(p));
+
+    // Recursive search across ASSETS_DIR if not found in candidate paths
+    if (!foundPath && fs.existsSync(ASSETS_DIR)) {
+      const searchRecursively = (dir: string): string | null => {
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          const fullPath = path.join(dir, entry.name);
+          if (entry.isDirectory()) {
+            const res = searchRecursively(fullPath);
+            if (res) return res;
+          } else if (entry.isFile() && (entry.name === cleanFilename || entry.name.toLowerCase() === cleanFilename.toLowerCase())) {
+            return fullPath;
+          }
+        }
+        return null;
+      };
+      foundPath = searchRecursively(ASSETS_DIR) || undefined;
+    }
 
     if (!foundPath || !fs.existsSync(foundPath)) {
       return res.status(404).json({ error: `Workflow file '${cleanFilename}' not found.` });
@@ -85,7 +103,9 @@ router.post("/parse", (req: Request, res: Response) => {
         detected_nodes: parsed.detectedNodes,
         total_nodes: parsed.totalNodes
       },
-      raw_json: workflow
+      raw_json: workflow,
+      workflow: workflow,
+      raw_workflow: workflow
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

@@ -17,7 +17,20 @@ export function generateLiveInjectedWorkflow(
   const placeholder = "empty.png";
 
   const effectivePromptNodeId = activeShot?.prompt_node_id || selectedPromptNodeId;
-  const effectivePrompt = activeShot?.expanded_prompt || "";
+  
+  // Resolve effective prompt with hero take prioritization
+  let effectivePrompt = "";
+  if (activeShot) {
+    const heroTake = activeShot.takes?.find((t: any) => t.is_hero || t.isHero);
+    effectivePrompt = (
+      heroTake?.expanded_prompt ||
+      activeShot.expanded_prompt ||
+      (heroTake as any)?.prompt ||
+      (activeShot as any)?.prompt ||
+      activeShot.basic_stub ||
+      ""
+    ).trim();
+  }
 
   // Merge shot assigned_slots and nodeMappings
   const effectiveMappings: Record<string, string> = {
@@ -34,7 +47,7 @@ export function generateLiveInjectedWorkflow(
   const effectiveParams = activeShot?.generation_params || generationParams;
   const effectiveParamNodes = activeShot?.parameter_node_mappings || parameterNodeMappings;
   const shotNumStr = activeShot ? formatShotNumber(activeShot.shot_number) : "01";
-  const saveVideoPrefix = generateSaveVideoPrefix(activeSceneName, shotNumStr);
+  const saveVideoPrefix = generateSaveVideoPrefix(activeSceneName || "Scene", shotNumStr);
 
   // 1. Visual Canvas format (nodes array)
   if (Array.isArray(cloned.nodes)) {
@@ -139,7 +152,7 @@ export function generateLiveInjectedWorkflow(
 
       // SaveVideo Node Target Injection
       if (
-        (classType === "SaveVideo" || node.type === "SaveVideo" || strId === "92" || title.toLowerCase().includes("save video")) &&
+        (classType === "SaveVideo" || node.type === "SaveVideo" || strId === "92" || title.toLowerCase().includes("save video") || classType.includes("VHS_VideoCombine")) &&
         saveVideoPrefix
       ) {
         if (Array.isArray(node.widgets_values) && node.widgets_values.length > 0) {
@@ -205,5 +218,106 @@ export function generateLiveInjectedWorkflow(
     }
 
     return cloned;
-}
+  }
+
+  // 2. Flat API Prompt Dictionary format ({ [node_id]: { class_type, inputs: {...} } })
+  if (cloned && typeof cloned === "object") {
+    for (const [nodeId, nodeData] of Object.entries(cloned)) {
+      if (!nodeData || typeof nodeData !== "object") continue;
+      const n = nodeData as any;
+      const classType = String(n.class_type || n._meta?.title || "");
+      if (!n.inputs || typeof n.inputs !== "object") {
+        n.inputs = {};
+      }
+
+      // Prompt Node Injection
+      if (
+        (effectivePromptNodeId && String(nodeId) === String(effectivePromptNodeId)) ||
+        (!effectivePromptNodeId && (["PrimitiveStringMultiline", "CLIPTextEncode", "StringLiteral", "ShowText"].includes(classType) || classType.toLowerCase().includes("prompt")))
+      ) {
+        if (effectivePrompt) {
+          if ("text" in n.inputs) n.inputs.text = effectivePrompt;
+          else if ("value" in n.inputs) n.inputs.value = effectivePrompt;
+          else if ("string" in n.inputs) n.inputs.string = effectivePrompt;
+          else n.inputs.text = effectivePrompt;
+        }
+      }
+
+      // Image Loaders
+      if (
+        ["LoadImage", "LoadImageMask", "LoadImageFromUrl", "LoadImageBase64"].includes(classType) ||
+        classType.toLowerCase().includes("image") ||
+        String(nodeId) in effectiveMappings
+      ) {
+        if (effectiveMappings[String(nodeId)] && String(effectiveMappings[String(nodeId)]).trim()) {
+          n.inputs.image = String(effectiveMappings[String(nodeId)]).trim();
+        } else if (bypassMissing) {
+          if (!n.inputs.image || n.inputs.image === "example.png") {
+            n.inputs.image = placeholder;
+          }
+        }
+      }
+
+      // Video Loaders
+      if (["LoadVideo", "VHS_LoadVideo", "VHS_LoadVideoPath"].includes(classType)) {
+        if (effectiveMappings[String(nodeId)] && String(effectiveMappings[String(nodeId)]).trim()) {
+          const assigned = String(effectiveMappings[String(nodeId)]).trim();
+          n.inputs.video = assigned;
+          if ("video_path" in n.inputs) n.inputs.video_path = assigned;
+        } else if (bypassMissing) {
+          n.inputs.video = placeholder;
+        }
+      }
+
+      // Audio Loaders
+      if (["LoadAudio", "VHS_LoadAudio"].includes(classType)) {
+        if (effectiveMappings[String(nodeId)] && String(effectiveMappings[String(nodeId)]).trim()) {
+          n.inputs.audio = String(effectiveMappings[String(nodeId)]).trim();
+        } else if (bypassMissing) {
+          n.inputs.audio = placeholder;
+        }
+      }
+
+      // SaveVideo Prefix
+      if (
+        (classType === "SaveVideo" || String(nodeId) === "92" || classType.includes("VHS_VideoCombine")) &&
+        saveVideoPrefix
+      ) {
+        n.inputs.filename_prefix = saveVideoPrefix;
+      }
+
+      // Parameter Overrides (API format)
+      if (effectiveParams && effectiveParamNodes) {
+        if (effectiveParamNodes.steps === String(nodeId) && effectiveParams.steps !== undefined) {
+          const val = parseInt(String(effectiveParams.steps), 10);
+          if (!isNaN(val)) {
+            if ("steps" in n.inputs) n.inputs.steps = val;
+            else if ("value" in n.inputs) n.inputs.value = val;
+          }
+        }
+        if (effectiveParamNodes.megapixels === String(nodeId) && effectiveParams.megapixels !== undefined) {
+          const val = parseFloat(String(effectiveParams.megapixels));
+          if (!isNaN(val)) {
+            if ("megapixels" in n.inputs) n.inputs.megapixels = val;
+            else if ("value" in n.inputs) n.inputs.value = val;
+          }
+        }
+        if (effectiveParamNodes.frames === String(nodeId) && effectiveParams.frames !== undefined) {
+          const val = parseInt(String(effectiveParams.frames), 10);
+          if (!isNaN(val)) {
+            for (const k of ["frames", "length", "num_frames", "duration", "frame_count", "video_length", "value"]) {
+              if (k in n.inputs) {
+                n.inputs[k] = val;
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return cloned;
+  }
+
+  return cloned;
 }

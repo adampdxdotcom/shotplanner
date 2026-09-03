@@ -6,6 +6,7 @@ from backend.services.ssh_service import RunPodSSHService
 from backend.services.execution_service import (
     transfer_assets_to_remote,
     stage_scene_pipeline,
+    stage_single_shot_pipeline,
     execute_workflow_pipeline,
     generate_ed25519_keypair
 )
@@ -192,6 +193,29 @@ async def stage_scene_endpoint(req: StageSceneRequest):
         scene_name=req.scene_name or "Scene",
         workflow_filename=req.workflow_filename,
         shots=req.shots,
+        bypass_missing=req.bypass_missing,
+        safe_placeholder=req.safe_placeholder,
+        project_data=req.project_data
+    )
+
+@router.post("/workflow/stage-shot")
+@router.post("/workflow/stage-single")
+async def stage_single_shot_endpoint(req: StageSceneRequest):
+    """Stage a single shot: asset transfer + workflow injection + staged upload."""
+    host = req.runpod_ip or req.remote_host
+    shot = req.shots[0] if (req.shots and len(req.shots) > 0) else None
+    return stage_single_shot_pipeline(
+        host=host,
+        port=req.ssh_port,
+        username=req.ssh_username,
+        password=req.ssh_password,
+        key_path=req.ssh_key_path,
+        private_key=req.ssh_private_key,
+        remote_root=req.remote_comfyui_root or "/workspace/runpod-slim/ComfyUI",
+        remote_input_dir=req.remote_input_dir,
+        scene_name=req.scene_name or "Scene",
+        workflow_filename=req.workflow_filename,
+        shot=shot,
         bypass_missing=req.bypass_missing,
         safe_placeholder=req.safe_placeholder,
         project_data=req.project_data

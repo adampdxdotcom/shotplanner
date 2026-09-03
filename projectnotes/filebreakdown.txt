@@ -1244,6 +1244,7 @@
   - **Role:** Global TypeScript interface definitions for application configuration and project state.
   - **Updates:**
     - Added `ssh_public_key?: string` to the `AppConfig` interface to persist both halves of generated or configured SSH keypairs in central project state.
+    - Updated `ParsedWorkflow` interface with `workflow?: Record<string, any>`, `raw_workflow?: Record<string, any>`, and `detected_values?: Record<string, any>` to ensure rich workflow payloads are type-safe.
 - **`src/components/config/RemoteGPUConfig.tsx`**
   - **Role:** Remote GPU and SSH host configuration tab.
   - **Updates:**
@@ -1262,6 +1263,39 @@
     - Updated `load_private_key` to attempt loading with `paramiko.Ed25519Key.from_private_key(io.StringIO(norm_key))` first, falling back to `paramiko.RSAKey` and `paramiko.ECDSAKey`.
     - Ensured `client.set_missing_host_key_policy(paramiko.AutoAddPolicy())` is set on every client instance prior to authentication.
     - Added verbose connection logging with key type identification and explicit password fallback.
+
+## Global Cross-Scene Workflow Resolution & Shot Staging Pipeline
+- **`backend/utils/file_handlers.py`**
+  - **Role:** Centralized file resolution and workflow JSON loading.
+  - **Updates:**
+    - Implemented `find_workflow_file(filename, scene_name)` to perform hierarchical search: (1) active scene workflow directory (`assets/{scene_name}/workflows/`), (2) all other scene workflow directories (`assets/*/workflows/`), (3) root `assets/workflows/` and legacy subdirectories, (4) global recursive `rglob` search across all assets directories, and (5) case-insensitive fallback matching.
+    - Updated `load_workflow_json` to seamlessly resolve workflows across scenes (such as `minimax_16x9(1).json` uploaded under `scene01`) from any active scene context.
+- **`backend/services/workflow_service.py`**
+  - **Role:** Workflow service facade.
+  - **Updates:**
+    - Re-exported `find_workflow_file` and `load_workflow_json` to support cross-service workflow discovery.
+- **`backend/routes/workflow_routes.py`** & **`server/routes/workflowRoutes.ts`**
+  - **Role:** Workflow API controllers for `/api/workflows/*`.
+  - **Updates:**
+    - Enhanced `POST /api/workflows/parse` endpoint to return the full raw workflow JSON payload in `workflow`, `raw_workflow`, and `raw_json` alongside `nodes_info`, `detected_nodes`, and `detected_values`.
+    - Added recursive asset directory fallback in Express workflow parsing route.
+- **`src/utils/workflowInjection.ts`**
+  - **Role:** Client-side workflow injection and visualization generator.
+  - **Updates:**
+    - Enhanced `generateLiveInjectedWorkflow` to support both ComfyUI Visual Canvas (`nodes: [...]`) and API Prompt dictionary (`{ [node_id]: { class_type, inputs } }`) graph formats.
+    - Injects active shot's expanded prompt (with hero take resolution and fallbacks), generation parameter overrides (`steps`, `megapixels`, `frames`), dynamic `SaveVideo` filename prefix (`{scene_name}_Shot_{shot_num}_Take_{take_num}`), and mapped media loader slot filenames with placeholder bypass handling.
+- **`src/components/WorkflowSection.tsx`**
+  - **Role:** Workflow selection and node configuration panel.
+  - **Updates:**
+    - Updated `liveInjectedWorkflow` memoization to consume `raw_json`, `workflow`, or `raw_workflow` from `parsedWorkflow`.
+    - Displays the complete live-injected workflow JSON in `LiveWorkflowPreview` when clicking "Show JSON".
+- **`backend/services/execution_service.py`** & **`backend/routes/execution_routes.py`**
+  - **Role:** Orchestration service for scene and shot staging and execution.
+  - **Updates:**
+    - In `stage_scene_pipeline`: For every shot in the scene, calls `build_shot_workflow` to inject prompts, parameters, and mapped assets, saves the assembled JSON to `assets/{scene_name}/workflows/{scene_name}_Shot_{shot_number}.json`, transfers the generated workflow JSON via SFTP to `{remote_comfyui_root}/user/default/workflows/{scene_name}/`, and transfers all unique assigned media assets to `{remote_comfyui_root}/input/`.
+    - Added `stage_single_shot_pipeline` and exposed route `POST /api/workflow/stage-shot` (`/api/workflow/stage-single`).
+    - In `execute_workflow_pipeline`: Saves the synthesized shot workflow JSON locally and performs remote SFTP synchronization for both media assets and the workflow JSON.
+
 
 
 

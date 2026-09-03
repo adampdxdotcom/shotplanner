@@ -92,10 +92,12 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
 
   const activeShot = sceneProject.shots.find((s) => s.id === activeShotId);
 
+  const rawWorkflowData = parsedWorkflow?.raw_json || parsedWorkflow?.workflow || parsedWorkflow?.raw_workflow;
+
   // Compute live in-memory injected workflow JSON for the active shot
   const liveInjectedWorkflow = useMemo(() => {
     return generateLiveInjectedWorkflow(
-      parsedWorkflow?.raw_json,
+      rawWorkflowData,
       activeShot,
       selectedPromptNodeId,
       nodeMappings,
@@ -106,7 +108,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
       imageNodes
     );
   }, [
-    parsedWorkflow?.raw_json,
+    rawWorkflowData,
     activeShot,
     selectedPromptNodeId,
     nodeMappings,
@@ -119,7 +121,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
   ]);
 
   const handleCopyJson = async () => {
-    const targetJson = liveInjectedWorkflow || parsedWorkflow?.raw_json;
+    const targetJson = liveInjectedWorkflow || rawWorkflowData;
     if (!targetJson) return;
     try {
       const textToCopy = JSON.stringify(targetJson, null, 2);
