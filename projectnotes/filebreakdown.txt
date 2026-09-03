@@ -1289,11 +1289,21 @@
   - **Updates:**
     - Updated `liveInjectedWorkflow` memoization to consume `raw_json`, `workflow`, or `raw_workflow` from `parsedWorkflow`.
     - Displays the complete live-injected workflow JSON in `LiveWorkflowPreview` when clicking "Show JSON".
+- **`src/components/ExecutionSection.tsx`**
+  - **Role:** Master execution, staging, and live monitoring panel for shots and full scenes.
+  - **Updates:**
+    - Updated `handleSendShot` to target the dedicated staging endpoint `POST /api/workflow/stage-shot` instead of `/api/assets/sync_remote`.
+    - Formats the single shot payload under `shots: [formattedShot]` with `scene_name`, `workflow_filename` (resolving `activeShot.workflow_file` with fallback to `selectedWorkflowFile` or `sceneProject.workflow_file`), `assigned_slots`, `generation_parameters`, `parameter_node_mappings`, and full SSH credentials.
+    - Updated `handleSendScene` to iterate and forward `assigned_slots`, `generation_params`, `parameter_node_mappings`, and `workflow_file` for each shot in `shots`.
+    - Added `selectedWorkflowFile?: string` to `ExecutionSectionProps` and connected it in `src/App.tsx`.
 - **`backend/services/execution_service.py`** & **`backend/routes/execution_routes.py`**
   - **Role:** Orchestration service for scene and shot staging and execution.
   - **Updates:**
     - In `stage_scene_pipeline`: For every shot in the scene, calls `build_shot_workflow` to inject prompts, parameters, and mapped assets, saves the assembled JSON to `assets/{scene_name}/workflows/{scene_name}_Shot_{shot_number}.json`, transfers the generated workflow JSON via SFTP to `{remote_comfyui_root}/user/default/workflows/{scene_name}/`, and transfers all unique assigned media assets to `{remote_comfyui_root}/input/`.
     - Added `stage_single_shot_pipeline` and exposed route `POST /api/workflow/stage-shot` (`/api/workflow/stage-single`).
+    - Explicitly included `workflows_created: [wf.name for wf in staged_workflow_files]`, `staged_workflows: [wf.name for wf in staged_workflow_files]`, and `transferred_assets: uploaded_files` in the response payload.
+    - Added explicit terminal logging: `[Staging Service] Assembled {len(staged_workflow_files)} shot workflow(s) for scene '{scene_name}'` and `[Staging Service] Transferred {transferred_count} files via SFTP to {clean_root}`.
+    - Enhanced error handling to print `[Staging Error]` with exact details when workflow compilation fails for any shot.
     - In `execute_workflow_pipeline`: Saves the synthesized shot workflow JSON locally and performs remote SFTP synchronization for both media assets and the workflow JSON.
 
 

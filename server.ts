@@ -52,6 +52,8 @@ app.use("/api/headshots", headshotRoutes);
 // Compatibility aliases for remote sync and staging
 app.post("/api/assets/sync_remote", handleAssetTransfer);
 app.post("/api/workflow/stage", handleAssetTransfer);
+app.post("/api/workflow/stage-shot", handleSceneTransferController);
+app.post("/api/workflow/stage-single", handleSceneTransferController);
 app.post("/api/workflow/stage-scene", handleSceneTransferController);
 
 // Direct thumbnail serving fallback routes

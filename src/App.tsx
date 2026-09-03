@@ -181,6 +181,7 @@ export default function App() {
             monitorState={monitorState}
             activeShotId={activeShotId}
             sceneProject={sceneProject}
+            selectedWorkflowFile={selectedWorkflowFile}
             onSelectShot={setActiveShotId}
             onUpdateShot={updateActiveShot}
             onUpdateSceneProject={setSceneProject}

@@ -14,6 +14,7 @@ interface ExecutionSectionProps {
   monitorState?: ComfyMonitorState;
   activeShotId: string | null;
   sceneProject: SceneProjectFile;
+  selectedWorkflowFile?: string;
   onSelectShot: (id: string | null) => void;
   onUpdateShot: (updater: (prev: ShotItem) => ShotItem) => void;
   onUpdateSceneProject: (updater: (prev: SceneProjectFile) => SceneProjectFile) => void;
@@ -25,6 +26,7 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
   monitorState,
   activeShotId,
   sceneProject,
+  selectedWorkflowFile,
   onSelectShot,
   onUpdateShot,
   onUpdateSceneProject,
@@ -90,28 +92,48 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
     simulateProgress();
     
     try {
-      const res = await fetch("/api/assets/sync_remote", {
+      const resolvedWorkflowFilename =
+        activeShot.workflow_file ||
+        selectedWorkflowFile ||
+        sceneProject.workflow_file ||
+        (sceneProject as any).selected_workflow ||
+        "default.json";
+
+      const formattedShot = {
+        ...activeShot,
+        shot_number: activeShot.shot_number,
+        shot_type: activeShot.shot_type,
+        camera_movement: activeShot.camera_movement,
+        expanded_prompt: activeShot.expanded_prompt,
+        prompt_node_id: activeShot.prompt_node_id,
+        assigned_slots: activeShot.assigned_slots || {},
+        node_mappings: activeShot.assigned_slots || {},
+        generation_params: activeShot.generation_params,
+        generation_parameters: activeShot.generation_params,
+        parameter_node_mappings: activeShot.parameter_node_mappings,
+        workflow_file: resolvedWorkflowFilename,
+        workflow_filename: resolvedWorkflowFilename,
+      };
+
+      const res = await fetch("/api/workflow/stage-shot", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           remote_host: config.remote_host,
+          runpod_ip: config.remote_host,
           ssh_port: config.ssh_port,
           ssh_username: config.ssh_username,
           ssh_password: config.ssh_password,
           ssh_key_path: config.ssh_key_path,
           ssh_private_key: config.ssh_private_key,
           remote_comfyui_root: config.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI",
-          workflow_filename: activeShot.workflow_file,
-          output_workflow_filename: `${sanitizedSceneName}_Shot_${formatShotNumber(activeShot.shot_number)}.json`,
-          prompt_node_id: activeShot.prompt_node_id,
-          expanded_prompt: activeShot.expanded_prompt,
           scene_name: sanitizedSceneName,
-          shot_number: activeShot.shot_number,
-          shot_type: activeShot.shot_type,
-          camera_movement: activeShot.camera_movement,
-          node_mappings: activeShot.assigned_slots,
+          workflow_filename: resolvedWorkflowFilename,
+          assigned_slots: activeShot.assigned_slots || {},
           generation_parameters: activeShot.generation_params,
           parameter_node_mappings: activeShot.parameter_node_mappings,
+          shots: [formattedShot],
+          project_data: sceneProject
         })
       });
       
@@ -219,11 +241,18 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
     simulateProgress();
     
     try {
+      const sceneWorkflowFilename =
+        selectedWorkflowFile ||
+        sceneProject.workflow_file ||
+        (sceneProject as any).selected_workflow ||
+        "default.json";
+
       const res = await fetch("/api/workflow/stage-scene", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           remote_host: config.remote_host,
+          runpod_ip: config.remote_host,
           ssh_port: config.ssh_port,
           ssh_username: config.ssh_username,
           ssh_password: config.ssh_password,
@@ -231,15 +260,28 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
           ssh_private_key: config.ssh_private_key,
           remote_comfyui_root: config.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI",
           scene_name: sanitizedSceneName,
-          shots: sceneProject.shots.map(s => ({
-            shot_number: s.shot_number,
-            shot_type: s.shot_type,
-            camera_movement: s.camera_movement,
-            expanded_prompt: s.expanded_prompt,
-            prompt_node_id: s.prompt_node_id,
-            node_mappings: s.assigned_slots,
-            workflow_filename: s.workflow_file,
-          }))
+          workflow_filename: sceneWorkflowFilename,
+          shots: sceneProject.shots.map(s => {
+            const shotWf =
+              s.workflow_file ||
+              sceneWorkflowFilename;
+            return {
+              ...s,
+              shot_number: s.shot_number,
+              shot_type: s.shot_type,
+              camera_movement: s.camera_movement,
+              expanded_prompt: s.expanded_prompt,
+              prompt_node_id: s.prompt_node_id,
+              assigned_slots: s.assigned_slots || {},
+              node_mappings: s.assigned_slots || {},
+              generation_params: s.generation_params,
+              generation_parameters: s.generation_params,
+              parameter_node_mappings: s.parameter_node_mappings,
+              workflow_file: shotWf,
+              workflow_filename: shotWf,
+            };
+          }),
+          project_data: sceneProject
         })
       });
       

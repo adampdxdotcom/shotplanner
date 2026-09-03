@@ -244,7 +244,9 @@ def stage_scene_pipeline(
             if target_file_path.exists():
                 staged_workflow_files.append(target_file_path)
         except Exception as wf_err:
-            print(f"Notice: Failed to prepare staged workflow for Shot {shot_num_str}: {wf_err}")
+            print(f"[Staging Error] Failed to prepare staged workflow for Shot {shot_num_str} in scene '{scene_name}': {wf_err}")
+
+    print(f"[Staging Service] Assembled {len(staged_workflow_files)} shot workflow(s) for scene '{scene_name}'")
 
     if host:
         try:
@@ -282,6 +284,8 @@ def stage_scene_pipeline(
                 uploaded_files.extend(wf_transfer_res.get("uploaded_files", []))
                 transferred_summary.extend(wf_transfer_res.get("files", []))
 
+            print(f"[Staging Service] Transferred {transferred_count} files via SFTP to {clean_root}")
+
         except Exception as ssh_err:
             raise HTTPException(status_code=500, detail=f"Staging failed via SSH: {str(ssh_err)}")
     else:
@@ -304,6 +308,8 @@ def stage_scene_pipeline(
                 "message": f"Saved workflow into scene directory: {wf_p.name}"
             })
 
+        print(f"[Staging Service] Transferred {transferred_count} files via SFTP to {clean_root}")
+
     return {
         "success": True,
         "remote_dir": clean_input,
@@ -311,6 +317,9 @@ def stage_scene_pipeline(
         "skipped_count": skipped_count,
         "total_checked": len(files_to_transfer),
         "uploaded_files": uploaded_files,
+        "transferred_assets": uploaded_files,
+        "workflows_created": [wf.name for wf in staged_workflow_files],
+        "staged_workflows": [wf.name for wf in staged_workflow_files],
         "skipped_files": skipped_files,
         "transferred_files": transferred_summary,
         "message": f"Successfully staged scene '{scene_name}' ({len(shot_items)} shot(s))."
