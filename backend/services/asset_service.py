@@ -31,27 +31,36 @@ async def save_single_asset(
     content: bytes,
     original_name: str,
     media_type: str = "image",
-    asset_type: str = "headshot",
+    asset_type: str = "Headshot",
     subject_name: str = "jackie",
     description: str = "",
     scene_name: str = "scene01"
 ) -> Dict[str, Any]:
     """Save a single uploaded asset file to scene media directory."""
-    target_filename = generate_target_filename(asset_type, subject_name, original_name)
+    raw_type = (asset_type or "Headshot").strip()
+    if "body" in raw_type.lower():
+        normalized_type = "Body Reference"
+    elif "headshot" in raw_type.lower():
+        normalized_type = "Headshot"
+    else:
+        normalized_type = raw_type
+
+    target_filename = generate_target_filename(normalized_type, subject_name, original_name)
     saved_path = await save_uploaded_file(content, target_filename, scene_name=scene_name, media_type=media_type)
+    actual_filename = saved_path.name
 
     return {
-        "id": target_filename,
+        "id": actual_filename,
         "original_name": original_name,
-        "filename": target_filename,
+        "filename": actual_filename,
         "media_type": media_type,
-        "type": asset_type,
+        "type": normalized_type,
         "subject_name": subject_name,
         "description": description,
         "size_bytes": len(content),
         "scene_name": scene_name,
         "path": str(saved_path),
-        "preview_url": f"/api/uploads/{target_filename}"
+        "preview_url": f"/api/uploads/{actual_filename}"
     }
 
 def list_scene_and_shared_assets(scene_name: Optional[str] = None) -> List[Dict[str, Any]]:

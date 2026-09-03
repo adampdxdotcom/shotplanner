@@ -209,8 +209,20 @@ def parse_asset_filename(filename: str) -> Dict[str, str]:
     else:
         subject_display = subject_clean.replace("_", " ")
 
+    type_display = asset_type
+    if asset_type == "body_reference":
+        type_display = "Body Reference"
+    elif asset_type == "headshot":
+        type_display = "Headshot"
+    elif asset_type == "scene_reference":
+        type_display = "Scene Reference"
+    elif asset_type == "scene_location_reference":
+        type_display = "Scene / Location Reference"
+    elif asset_type == "character_staging_reference":
+        type_display = "Character Staging Reference"
+
     return {
-        "type": asset_type,
+        "type": type_display,
         "subject_name": subject_display,
         "media_type": media_type
     }
@@ -284,14 +296,32 @@ async def save_uploaded_file(file_bytes: bytes, target_filename: str, scene_name
         
     target_dir.mkdir(parents=True, exist_ok=True)
     destination = target_dir / target_filename
+
+    # Avoid collision: advance timestamp if destination already exists so references of the same type never overwrite
+    if destination.exists():
+        stem, ext = os.path.splitext(target_filename)
+        parts = stem.split("_")
+        if len(parts) >= 3 and parts[-1].isdigit():
+            ts = int(parts[-1])
+            while destination.exists():
+                ts += 1
+                new_fn = f"{'_'.join(parts[:-1])}_{ts}{ext}"
+                destination = target_dir / new_fn
+        else:
+            counter = 1
+            while destination.exists():
+                new_fn = f"{stem}_{counter}{ext}"
+                destination = target_dir / new_fn
+                counter += 1
+
     async with aiofiles.open(destination, "wb") as f:
         await f.write(file_bytes)
         
-    if media_type == "image" or target_filename.lower().endswith(('.png', '.jpg', '.jpeg', '.webp', '.bmp', '.gif')):
+    if media_type == "image" or destination.name.lower().endswith(('.png', '.jpg', '.jpeg', '.webp', '.bmp', '.gif')):
         generate_thumbnail(destination)
     
     # Also write into legacy uploads for flat fallback
-    flat_dest = LEGACY_UPLOADS_DIR / target_filename
+    flat_dest = LEGACY_UPLOADS_DIR / destination.name
     if not flat_dest.exists():
         try:
             async with aiofiles.open(flat_dest, "wb") as f2:

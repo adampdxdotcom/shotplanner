@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { X, UploadCloud, FileText, Music, Image as ImageIcon, Loader2, Check, UserPlus, SlidersHorizontal, AlertCircle } from "lucide-react";
+import { X, UploadCloud, FileText, Music, Image as ImageIcon, Loader2, Check, UserPlus, SlidersHorizontal, AlertCircle, MapPin, User, Sparkles } from "lucide-react";
 import { formatSize } from "../../utils/formatters";
 import { MediaAsset } from "../../types";
 import { toCanonicalSubjectName } from "../../utils/subjectUtils";
+import { isLocationEntity } from "../../utils/locationUtils";
 import {
   ASSET_REFERENCE_MODIFIERS,
   getModifierConfig,
@@ -13,8 +14,9 @@ import { SubjectCombobox } from "../SubjectCombobox";
 import {
   CharacterReferencePackGrid,
   CharacterPackSlot,
-  CharacterPackSlotId,
-  INITIAL_PACK_SLOTS
+  ReferencePackSlotId,
+  INITIAL_PACK_SLOTS,
+  INITIAL_LOCATION_PACK_SLOTS
 } from "./CharacterReferencePackGrid";
 
 export interface BulkQueueItem {
@@ -29,6 +31,9 @@ interface GalleryBulkUploadModalProps {
   onClose: () => void;
   subjects: string[];
   defaultSubject?: string;
+  isLocation?: boolean;
+  characters?: Record<string, any>;
+  assets?: MediaAsset[];
   sceneName?: string;
   onAssetUploaded: (asset: MediaAsset) => void;
   onRegisterSubject: (name: string) => void;
@@ -39,37 +44,87 @@ export const GalleryBulkUploadModal: React.FC<GalleryBulkUploadModalProps> = ({
   onClose,
   subjects,
   defaultSubject,
+  isLocation,
+  characters,
+  assets,
   sceneName,
   onAssetUploaded,
   onRegisterSubject
 }) => {
-  // Target Subject
+  // Target Subject and Entity Mode ("character" | "location")
   const [bulkSubject, setBulkSubject] = useState(defaultSubject || "");
+  const [entityMode, setEntityMode] = useState<"character" | "location">("character");
 
-  // 4-Slot Character Reference Pack
+  // 4-Slot Reference Pack (Character or Location)
   const [packSlots, setPackSlots] = useState<CharacterPackSlot[]>(INITIAL_PACK_SLOTS);
 
   // General Bulk Upload Queue & Options
   const [bulkQueue, setBulkQueue] = useState<BulkQueueItem[]>([]);
   const [bulkDescription, setBulkDescription] = useState("");
-  const [bulkAssetType, setBulkAssetType] = useState(defaultSubject ? "Body Reference" : "Scene Reference");
+  const [bulkAssetType, setBulkAssetType] = useState("Body Reference");
   const [bulkModifier, setBulkModifier] = useState("");
   const [isBulkUploading, setIsBulkUploading] = useState(false);
   const [bulkDragActive, setBulkDragActive] = useState(false);
   const [uploadSummary, setUploadSummary] = useState<{ total: number; completed: number; errors: number } | null>(null);
 
-  // Reset/Initialize state when modal opens or defaultSubject changes
+  // Switch entity mode between character and location
+  const switchEntityMode = (mode: "character" | "location") => {
+    setEntityMode(mode);
+    packSlots.forEach(s => {
+      if (s.previewUrl) URL.revokeObjectURL(s.previewUrl);
+    });
+
+    if (mode === "location") {
+      setBulkAssetType("Scene Reference");
+      if (!bulkDescription || bulkDescription.startsWith("body reference") || bulkDescription.startsWith("headshot")) {
+        setBulkDescription("scene reference, ");
+      }
+      setPackSlots(INITIAL_LOCATION_PACK_SLOTS.map(s => ({
+        ...s,
+        file: null,
+        previewUrl: null,
+        description: s.defaultDescription,
+        status: "idle",
+        progress: 0,
+        error: undefined
+      })));
+    } else {
+      setBulkAssetType(bulkSubject ? "Body Reference" : "Headshot");
+      if (bulkDescription.startsWith("scene reference")) {
+        setBulkDescription("");
+      }
+      setPackSlots(INITIAL_PACK_SLOTS.map(s => ({
+        ...s,
+        file: null,
+        previewUrl: null,
+        description: s.defaultDescription,
+        status: "idle",
+        progress: 0,
+        error: undefined
+      })));
+    }
+  };
+
+  // Reset/Initialize state when modal opens or target changes
   useEffect(() => {
     if (isOpen) {
       const initialSubj = defaultSubject || "";
       setBulkSubject(initialSubj);
-      setBulkAssetType(initialSubj ? "Body Reference" : "Scene Reference");
+
+      const isLoc = isLocation !== undefined
+        ? isLocation
+        : isLocationEntity(initialSubj, characters?.[initialSubj], assets);
+      const mode = isLoc ? "location" : "character";
+      setEntityMode(mode);
+
+      setBulkAssetType(isLoc ? "Scene Reference" : (initialSubj ? "Body Reference" : "Scene Reference"));
       setBulkModifier("");
-      setBulkDescription("");
+      setBulkDescription(isLoc ? "scene reference, " : "");
       setUploadSummary(null);
       setBulkQueue([]);
-      // Reset pack slots
-      setPackSlots(INITIAL_PACK_SLOTS.map(s => ({
+
+      const initialTemplate = isLoc ? INITIAL_LOCATION_PACK_SLOTS : INITIAL_PACK_SLOTS;
+      setPackSlots(initialTemplate.map(s => ({
         ...s,
         file: null,
         previewUrl: null,
@@ -84,7 +139,18 @@ export const GalleryBulkUploadModal: React.FC<GalleryBulkUploadModalProps> = ({
         if (s.previewUrl) URL.revokeObjectURL(s.previewUrl);
       });
     }
-  }, [isOpen, defaultSubject]);
+  }, [isOpen, defaultSubject, isLocation]);
+
+  // Handle subject change from Combobox with smart auto-detection
+  const handleSubjectChange = (val: string) => {
+    setBulkSubject(val);
+    const isLoc = isLocationEntity(val, characters?.[val], assets);
+    if (isLoc && entityMode !== "location") {
+      switchEntityMode("location");
+    } else if (!isLoc && entityMode !== "character" && val.trim().length > 0) {
+      switchEntityMode("character");
+    }
+  };
 
   const bulkModifierConfig = useMemo(() => getModifierConfig(bulkAssetType), [bulkAssetType]);
 
@@ -100,11 +166,10 @@ export const GalleryBulkUploadModal: React.FC<GalleryBulkUploadModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Handler for updating a single Character Pack slot
-  const handleUpdatePackSlot = (slotId: CharacterPackSlotId, updater: Partial<CharacterPackSlot>) => {
+  // Handler for updating a single Reference Pack slot
+  const handleUpdatePackSlot = (slotId: ReferencePackSlotId, updater: Partial<CharacterPackSlot>) => {
     setPackSlots(prev => prev.map(s => {
       if (s.id !== slotId) return s;
-      // Revoke previous preview URL if changing previewUrl
       if (updater.previewUrl !== undefined && s.previewUrl && s.previewUrl !== updater.previewUrl) {
         URL.revokeObjectURL(s.previewUrl);
       }
@@ -112,8 +177,8 @@ export const GalleryBulkUploadModal: React.FC<GalleryBulkUploadModalProps> = ({
     }));
   };
 
-  // Handler for clearing a single Character Pack slot
-  const handleClearPackSlot = (slotId: CharacterPackSlotId) => {
+  // Handler for clearing a single Reference Pack slot
+  const handleClearPackSlot = (slotId: ReferencePackSlotId) => {
     setPackSlots(prev => prev.map(s => {
       if (s.id !== slotId) return s;
       if (s.previewUrl) URL.revokeObjectURL(s.previewUrl);
@@ -187,14 +252,29 @@ export const GalleryBulkUploadModal: React.FC<GalleryBulkUploadModalProps> = ({
 
       handleUpdatePackSlot(slot.id, { status: "uploading", progress: 15, error: undefined });
 
+      // Explicitly assign semantic asset types:
+      // In location mode or for Scene Reference slots: "Scene Reference"
+      // In character mode: Slot 1 & 2 -> "Headshot", Slot 3 & 4 -> "Body Reference"
+      let explicitType: "Headshot" | "Body Reference" | "Scene Reference";
+      if (entityMode === "location" || slot.assetType === "Scene Reference") {
+        explicitType = "Scene Reference";
+      } else if (slot.id === "body_primary" || slot.id === "body_secondary") {
+        explicitType = "Body Reference";
+      } else {
+        explicitType = "Headshot";
+      }
+
       const formData = new FormData();
       formData.append("file", slot.file);
       if (sceneName) {
         formData.append("scene_name", sceneName);
       }
       formData.append("subject_name", canonicalSubject);
-      formData.append("type", slot.assetType);
+      formData.append("type", explicitType);
+      formData.append("asset_type", explicitType);
+      formData.append("media_type", "image");
       formData.append("description", slot.description.trim());
+      formData.append("slot_id", slot.id);
 
       try {
         const res = await fetch("/api/assets/upload", { method: "POST", body: formData });
@@ -239,6 +319,7 @@ export const GalleryBulkUploadModal: React.FC<GalleryBulkUploadModalProps> = ({
       }
       formData.append("subject_name", canonicalSubject);
       formData.append("type", bulkAssetType);
+      formData.append("asset_type", bulkAssetType);
       formData.append("description", bulkDescription.trim());
 
       try {
@@ -297,15 +378,27 @@ export const GalleryBulkUploadModal: React.FC<GalleryBulkUploadModalProps> = ({
         {/* Modal Header */}
         <div className="flex items-center justify-between p-4 border-b border-zinc-800 bg-zinc-950/70 shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="p-1.5 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-              <UploadCloud className="w-4 h-4 text-amber-400" />
+            <div className={`p-1.5 rounded-lg border ${
+              entityMode === "location"
+                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                : "bg-amber-500/10 border-amber-500/30 text-amber-400"
+            }`}>
+              {entityMode === "location" ? (
+                <MapPin className="w-4 h-4" />
+              ) : (
+                <UploadCloud className="w-4 h-4" />
+              )}
             </div>
             <div>
               <h3 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
-                Library Bulk Upload & Character Reference Pack
+                {entityMode === "location"
+                  ? "Library Bulk Upload & Location Reference Slots"
+                  : "Library Bulk Upload & Character Reference Pack"}
               </h3>
               <p className="text-[11px] text-zinc-400">
-                Quickly populate character reference slots or batch upload assets to your library
+                {entityMode === "location"
+                  ? "Quickly populate location reference slots or batch upload assets to your library"
+                  : "Quickly populate character reference slots or batch upload assets to your library"}
                 {sceneName ? ` for "${sceneName}"` : ""}
               </p>
             </div>
@@ -323,34 +416,78 @@ export const GalleryBulkUploadModal: React.FC<GalleryBulkUploadModalProps> = ({
         <div className="p-5 overflow-y-auto space-y-6 flex-1 custom-scrollbar">
           {/* Top Target Subject Section */}
           <div className="bg-zinc-950/90 p-4 rounded-xl border border-zinc-800 space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                <UserPlus className="w-3.5 h-3.5" />
-                Target Subject / Character Name
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <label className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
+                entityMode === "location" ? "text-emerald-400" : "text-amber-400"
+              }`}>
+                {entityMode === "location" ? (
+                  <>
+                    <MapPin className="w-3.5 h-3.5" />
+                    Target Location / Environment Name
+                  </>
+                ) : (
+                  <>
+                    <UserPlus className="w-3.5 h-3.5" />
+                    Target Subject / Character Name
+                  </>
+                )}
               </label>
-              <span className="text-[10px] text-zinc-500">
-                Applied to Character Pack slots and batch items
-              </span>
+
+              {/* Context Mode Toggle */}
+              <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-lg p-0.5">
+                <button
+                  type="button"
+                  onClick={() => switchEntityMode("character")}
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-all ${
+                    entityMode === "character"
+                      ? "bg-indigo-950 text-indigo-300 border border-indigo-700/60 shadow-sm"
+                      : "text-zinc-400 hover:text-zinc-200"
+                  }`}
+                  title="Switch to Character Reference Pack"
+                >
+                  <User className="w-3 h-3" />
+                  Character
+                </button>
+                <button
+                  type="button"
+                  onClick={() => switchEntityMode("location")}
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-bold flex items-center gap-1.5 transition-all ${
+                    entityMode === "location"
+                      ? "bg-emerald-950 text-emerald-300 border border-emerald-700/60 shadow-sm"
+                      : "text-zinc-400 hover:text-zinc-200"
+                  }`}
+                  title="Switch to Location Reference Slots"
+                >
+                  <MapPin className="w-3 h-3" />
+                  Location
+                </button>
+              </div>
             </div>
+
             <div className="max-w-md">
               <SubjectCombobox
                 value={bulkSubject}
-                onChange={(val) => setBulkSubject(val)}
+                onChange={handleSubjectChange}
                 subjects={subjects}
                 onRegisterSubject={onRegisterSubject}
-                placeholder="e.g. Jackie, John Doe, Cyberpunk Agent"
+                placeholder={
+                  entityMode === "location"
+                    ? "e.g. Living Room, Rooftop, Neon Alley, Cyber Cafe"
+                    : "e.g. Jackie, John Doe, Cyberpunk Agent"
+                }
                 disabled={isBulkUploading}
               />
             </div>
           </div>
 
-          {/* 4-Slot Character Reference Pack Panel */}
+          {/* 4-Slot Reference Pack Panel */}
           <div className="bg-zinc-900/60 p-4 rounded-xl border border-zinc-800/90">
             <CharacterReferencePackGrid
               slots={packSlots}
               onUpdateSlot={handleUpdatePackSlot}
               onClearSlot={handleClearPackSlot}
               disabled={isBulkUploading}
+              isLocationMode={entityMode === "location"}
             />
           </div>
 
@@ -415,7 +552,7 @@ export const GalleryBulkUploadModal: React.FC<GalleryBulkUploadModalProps> = ({
                     Companion Modifier
                   </label>
                   <div className="w-full bg-zinc-900/40 border border-zinc-850 rounded-lg px-2.5 py-2 text-xs text-zinc-500 cursor-not-allowed">
-                    Only active for Headshot & Body Reference
+                    Only active for Headshot, Body & Scene Reference
                   </div>
                 </div>
               )}
@@ -428,7 +565,11 @@ export const GalleryBulkUploadModal: React.FC<GalleryBulkUploadModalProps> = ({
               <textarea
                 value={bulkDescription}
                 onChange={(e) => setBulkDescription(e.target.value)}
-                placeholder="Brief prompt description applied to batch files (e.g. moody tavern lighting, wide establishing angle)..."
+                placeholder={
+                  entityMode === "location"
+                    ? "Brief prompt description applied to batch files (e.g. scene reference, wide establishing angle, ambient daylight)..."
+                    : "Brief prompt description applied to batch files (e.g. moody tavern lighting, 8k portrait, cinematic outfit)..."
+                }
                 rows={2}
                 className="w-full bg-zinc-900 border border-zinc-800 focus:border-amber-500 rounded-lg px-3 py-2 text-xs text-zinc-200 outline-none resize-none placeholder-zinc-600"
                 disabled={isBulkUploading}

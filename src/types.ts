@@ -36,12 +36,15 @@ export function hasSceneReferencePhoto(assets: Array<{ type?: string; media_type
   });
 }
 
+export { isLocationEntity, LOCATION_KEYWORDS } from "./utils/locationUtils";
+
 export interface CharacterProfile {
   id: string;
   name: string;
   notes: string;
   quick_slots: string[];
   scene_outfit_ref: string;
+  is_location?: boolean;
 }
 
 export interface SceneProjectFile {

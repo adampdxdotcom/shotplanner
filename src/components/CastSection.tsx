@@ -1,10 +1,12 @@
 import React, { useState } from "react";
 import { MediaAsset, CharacterProfile, SceneProjectFile } from "../types";
-import { ChevronRight, Settings, Trash2, AlertTriangle, X, Users, Plus, Sparkles } from "lucide-react";
+import { ChevronRight, Settings, Trash2, AlertTriangle, X, Users, Plus, Sparkles, MapPin, User, Pencil } from "lucide-react";
 import { getAssetMediaUrl } from "../utils/assetUrl";
 import { toCanonicalSubjectName } from "../utils/subjectUtils";
+import { isLocationEntity } from "../utils/locationUtils";
 import { GalleryBulkUploadModal } from "./gallery/GalleryBulkUploadModal";
 import { AssetLightbox } from "./AssetLightbox";
+import { AssetEditModal } from "./AssetEditModal";
 import { AiReferenceStagingStudioModal } from "./cast/AiReferenceStagingStudioModal";
 
 interface CastSectionProps {
@@ -18,7 +20,7 @@ interface CastSectionProps {
   onRegisterSubject: (subject: string) => void;
   onAssetUploaded: (asset: MediaAsset) => void;
   onAssetDeleted: (filename: string) => void;
-  onAssetUpdated: (asset: MediaAsset) => void;
+  onAssetUpdated: (oldFilename: string, newAsset: MediaAsset) => void;
   onUpdateProject: React.Dispatch<React.SetStateAction<SceneProjectFile>>;
   addToast: (msg: string, type?: "success" | "error" | "info") => void;
 }
@@ -43,16 +45,65 @@ export const CastSection: React.FC<CastSectionProps> = ({
   const [studioInitialTab, setStudioInitialTab] = useState<"headshots" | "staging">("headshots");
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [bulkModalSubject, setBulkModalSubject] = useState<string | undefined>();
+  const [bulkModalIsLocation, setBulkModalIsLocation] = useState<boolean | undefined>();
   const [lightboxAsset, setLightboxAsset] = useState<MediaAsset | null>(null);
   const [isNewCharacterModalOpen, setIsNewCharacterModalOpen] = useState(false);
   const [newCharacterName, setNewCharacterName] = useState("");
+  const [newEntityType, setNewEntityType] = useState<"character" | "location">("character");
+  const [editingAsset, setEditingAsset] = useState<MediaAsset | null>(null);
+
+  const handleDeleteAsset = async (asset: MediaAsset) => {
+    const displayName = asset.original_name || asset.subject_name || asset.filename;
+    if (!window.confirm(`Are you sure you want to permanently delete "${displayName}"? This will unlink it from this character and remove it from the project gallery.`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/assets/${encodeURIComponent(asset.filename)}?scene_name=${encodeURIComponent(activeSceneName)}`, {
+        method: "DELETE"
+      });
+      if (res.ok) {
+        onAssetDeleted(asset.filename);
+        if (lightboxAsset?.filename === asset.filename) {
+          setLightboxAsset(null);
+        }
+        if (editingAsset?.filename === asset.filename) {
+          setEditingAsset(null);
+        }
+        addToast(`Deleted asset "${displayName}"`, "success");
+      } else {
+        const data = await res.json().catch(() => ({}));
+        addToast(data.error || "Failed to delete asset", "error");
+      }
+    } catch (err: any) {
+      console.error("Failed to delete asset:", err);
+      addToast("Error deleting asset: " + (err.message || "Network error"), "error");
+    }
+  };
+
+  const handleAssetUpdated = (oldFilename: string, newAsset: MediaAsset) => {
+    onAssetUpdated(oldFilename, newAsset);
+    if (lightboxAsset?.filename === oldFilename) {
+      setLightboxAsset(newAsset);
+    }
+    addToast(`Updated asset metadata for "${newAsset.subject_name || newAsset.filename}"`, "success");
+  };
 
   const handleCreateNewCharacter = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = newCharacterName.trim();
     if (trimmed) {
       onRegisterSubject(trimmed);
+      if (newEntityType === "location") {
+        onUpdateCharacter?.({
+          name: trimmed,
+          notes: "",
+          quick_slots: [],
+          scene_outfit_ref: "",
+          is_location: true
+        });
+      }
       setNewCharacterName("");
+      setNewEntityType("character");
       setIsNewCharacterModalOpen(false);
     }
   };
@@ -131,36 +182,72 @@ export const CastSection: React.FC<CastSectionProps> = ({
                 Object.entries(characters || {}).find(([k]) => k.toLowerCase() === subject.toLowerCase())?.[1] || 
                 { name: subject, notes: "", quick_slots: [], scene_outfit_ref: "" };
               
-              const profilePic = charAssets.find(a => a.type === "Headshot") ||
-                                 charAssets.find(a => a.type === "Body Reference") ||
-                                 charAssets.find(a => a.media_type === "image");
+              const isLoc = isLocationEntity(subject, profile, charAssets);
+
+              const profilePic = isLoc
+                ? (charAssets.find(a => a.type === "Scene Reference") ||
+                   charAssets.find(a => a.type === "Body Reference") ||
+                   charAssets.find(a => a.media_type === "image"))
+                : (charAssets.find(a => a.type === "Headshot") ||
+                   charAssets.find(a => a.type === "Body Reference") ||
+                   charAssets.find(a => a.media_type === "image"));
                                  
               return (
                 <div key={subject} className="bg-zinc-900/50 border border-zinc-800/80 rounded-2xl overflow-hidden flex flex-col md:flex-row shadow-lg">
                   <div className="w-full md:w-72 lg:w-80 bg-zinc-900 p-6 border-b md:border-b-0 md:border-r border-zinc-800 flex flex-col shrink-0">
                     <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-14 h-14 rounded-full bg-zinc-950 border-2 border-zinc-800 overflow-hidden shrink-0 flex items-center justify-center">
+                        <div className={`w-14 h-14 rounded-full bg-zinc-950 border-2 overflow-hidden shrink-0 flex items-center justify-center ${
+                          isLoc ? "border-emerald-500/40 text-emerald-400" : "border-zinc-800 text-zinc-600"
+                        }`}>
                           {profilePic ? (
                             <img src={getAssetMediaUrl(profilePic.filename, true)} className="w-full h-full object-cover" alt={subject} referrerPolicy="no-referrer" />
+                          ) : isLoc ? (
+                            <MapPin className="w-6 h-6 text-emerald-400" />
                           ) : (
                             <span className="text-lg font-bold text-zinc-600">{subject.charAt(0).toUpperCase()}</span>
                           )}
                         </div>
                         <div className="min-w-0">
-                          <h3 className="text-base font-bold text-zinc-100 line-clamp-1" title={subject}>{subject}</h3>
-                          <p className="text-xs text-amber-500 font-medium">{charAssets.length} reference{charAssets.length === 1 ? "" : "s"}</p>
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-base font-bold text-zinc-100 line-clamp-1" title={subject}>{subject}</h3>
+                            <button
+                              type="button"
+                              onClick={() => onUpdateCharacter?.({ ...profile, is_location: !isLoc })}
+                              title={isLoc ? "Classified as Location. Click to toggle to Character." : "Classified as Character. Click to toggle to Location."}
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-bold inline-flex items-center gap-1 transition-colors border ${
+                                isLoc
+                                  ? "bg-emerald-950/70 border-emerald-700/60 text-emerald-300 hover:bg-emerald-900/80"
+                                  : "bg-indigo-950/70 border-indigo-700/60 text-indigo-300 hover:bg-indigo-900/80"
+                              }`}
+                            >
+                              {isLoc ? (
+                                <>
+                                  <MapPin className="w-2.5 h-2.5 text-emerald-400" />
+                                  Location
+                                </>
+                              ) : (
+                                <>
+                                  <User className="w-2.5 h-2.5 text-indigo-400" />
+                                  Character
+                                </>
+                              )}
+                            </button>
+                          </div>
+                          <p className={`text-xs font-medium ${isLoc ? "text-emerald-400" : "text-amber-500"}`}>
+                            {charAssets.length} reference{charAssets.length === 1 ? "" : "s"}
+                          </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <button
                           type="button"
                           onClick={() => {
-                            setStudioInitialTab("headshots");
+                            setStudioInitialTab(isLoc ? "staging" : "headshots");
                             setHeadshotModalSubject(subject);
                           }}
                           className="bg-indigo-950/60 hover:bg-indigo-900/80 text-indigo-300 border border-indigo-800/60 px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer shadow-sm"
-                          title="Generate AI Assets, Headshots & Scene Staging"
+                          title={isLoc ? "Generate AI Location Reference & Scene Staging" : "Generate AI Assets, Headshots & Scene Staging"}
                         >
                           <Sparkles className="w-3.5 h-3.5 text-amber-400" />
                           <span>Asset Generation</span>
@@ -181,26 +268,29 @@ export const CastSection: React.FC<CastSectionProps> = ({
                     <div className="flex-1 space-y-4">
                       <div>
                         <label className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider mb-1.5 flex items-center justify-between">
-                          Notes
+                          {isLoc ? "Location Details & Notes" : "Notes"}
                           <Settings className="w-3 h-3 text-zinc-600" />
                         </label>
                         <textarea
                           value={profile.notes || ""}
                           onChange={e => onUpdateCharacter?.({ ...profile, notes: e.target.value })}
-                          placeholder="Physical traits, lore, etc..."
+                          placeholder={isLoc ? "Architectural features, lighting, atmosphere, time of day..." : "Physical traits, lore, etc..."}
                           className="w-full bg-zinc-950/50 border border-zinc-800 rounded-lg p-2 text-xs text-zinc-300 resize-none outline-none focus:border-amber-500/50 min-h-[60px]"
                         />
                       </div>
-                      <div>
-                        <label className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider mb-1.5 block">Scene Outfit</label>
-                        <input
-                          type="text"
-                          value={profile.scene_outfit_ref || ""}
-                          onChange={e => onUpdateCharacter?.({ ...profile, scene_outfit_ref: e.target.value })}
-                          placeholder="e.g. Red leather jacket, torn jeans"
-                          className="w-full bg-zinc-950/50 border border-zinc-800 rounded-lg p-2 text-xs text-zinc-300 outline-none focus:border-amber-500/50"
-                        />
-                      </div>
+                      {/* Strictly hide character-specific Scene Outfit when managing location entities */}
+                      {!isLoc && (
+                        <div>
+                          <label className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider mb-1.5 block">Scene Outfit</label>
+                          <input
+                            type="text"
+                            value={profile.scene_outfit_ref || ""}
+                            onChange={e => onUpdateCharacter?.({ ...profile, scene_outfit_ref: e.target.value })}
+                            placeholder="e.g. Red leather jacket, torn jeans"
+                            className="w-full bg-zinc-950/50 border border-zinc-800 rounded-lg p-2 text-xs text-zinc-300 outline-none focus:border-amber-500/50"
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -236,8 +326,37 @@ export const CastSection: React.FC<CastSectionProps> = ({
                                 {asset.filename.split('.').pop()?.toUpperCase()}
                               </div>
                             )}
+
+                            {/* Quick Action Overlay: Edit Pencil & Delete Trash Can */}
+                            <div className="absolute top-1.5 right-1.5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingAsset(asset);
+                                }}
+                                className="p-1.5 bg-black/60 hover:bg-black text-white rounded backdrop-blur shadow transition-colors cursor-pointer"
+                                title="Edit Asset Metadata"
+                                aria-label="Edit Asset Metadata"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteAsset(asset);
+                                }}
+                                className="p-1.5 bg-black/60 hover:bg-red-500 text-white rounded backdrop-blur shadow transition-colors cursor-pointer"
+                                title="Delete Asset"
+                                aria-label="Delete Asset"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+
                             {asset.type && (
-                              <div className="absolute bottom-0 inset-x-0 bg-black/80 backdrop-blur-sm p-1.5">
+                              <div className="absolute bottom-0 inset-x-0 bg-black/80 backdrop-blur-sm p-1.5 pointer-events-none">
                                 <p className="text-[9px] font-bold text-zinc-300 truncate text-center">{asset.type}</p>
                               </div>
                             )}
@@ -251,6 +370,7 @@ export const CastSection: React.FC<CastSectionProps> = ({
                       <div 
                         onClick={() => {
                           setBulkModalSubject(subject);
+                          setBulkModalIsLocation(isLoc);
                           setIsBulkModalOpen(true);
                         }}
                         className="w-32 h-40 border-2 border-dashed border-zinc-800 rounded-xl flex flex-col items-center justify-center text-zinc-600 hover:text-amber-400 hover:border-amber-500/50 hover:bg-zinc-900/50 transition-colors cursor-pointer shrink-0"
@@ -284,23 +404,53 @@ export const CastSection: React.FC<CastSectionProps> = ({
               </div>
               
               <h3 className="text-lg font-bold text-zinc-100 mb-2">
-                Register New Character
+                {newEntityType === "location" ? "Register New Location" : "Register New Character"}
               </h3>
-              <p className="text-sm text-zinc-400 mb-6">
-                Create a new character profile to organize their reference assets and scene context.
+              <p className="text-sm text-zinc-400 mb-4">
+                {newEntityType === "location"
+                  ? "Create a new location profile to organize scene references and environment context."
+                  : "Create a new character profile to organize their reference assets and scene context."}
               </p>
+
+              {/* Entity Type Toggle */}
+              <div className="flex items-center gap-1 bg-zinc-950 border border-zinc-800 rounded-lg p-1 mb-5">
+                <button
+                  type="button"
+                  onClick={() => setNewEntityType("character")}
+                  className={`flex-1 py-1.5 rounded-md text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                    newEntityType === "character"
+                      ? "bg-indigo-950 text-indigo-300 border border-indigo-700/60 shadow-sm"
+                      : "text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  <User className="w-3.5 h-3.5" />
+                  Character
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNewEntityType("location")}
+                  className={`flex-1 py-1.5 rounded-md text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                    newEntityType === "location"
+                      ? "bg-emerald-950 text-emerald-300 border border-emerald-700/60 shadow-sm"
+                      : "text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  <MapPin className="w-3.5 h-3.5" />
+                  Location
+                </button>
+              </div>
               
               <form onSubmit={handleCreateNewCharacter}>
                 <div className="mb-6">
                   <label htmlFor="charName" className="block text-xs font-bold text-zinc-300 uppercase tracking-wider mb-2">
-                    Character Name
+                    {newEntityType === "location" ? "Location Name" : "Character Name"}
                   </label>
                   <input
                     id="charName"
                     type="text"
                     value={newCharacterName}
                     onChange={e => setNewCharacterName(e.target.value)}
-                    placeholder="e.g. John Doe"
+                    placeholder={newEntityType === "location" ? "e.g. Living Room, Rooftop Bar" : "e.g. John Doe, Cyberpunk Agent"}
                     className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-sm text-zinc-200 outline-none focus:border-indigo-500/50"
                     autoFocus
                   />
@@ -317,7 +467,11 @@ export const CastSection: React.FC<CastSectionProps> = ({
                   <button
                     type="submit"
                     disabled={!newCharacterName.trim()}
-                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:hover:bg-indigo-600 text-white text-sm font-semibold rounded-lg transition-colors shadow-lg shadow-indigo-950/50"
+                    className={`flex items-center gap-2 px-4 py-2 text-white text-sm font-semibold rounded-lg transition-colors shadow-lg disabled:opacity-50 ${
+                      newEntityType === "location"
+                        ? "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-950/50 disabled:hover:bg-emerald-600"
+                        : "bg-indigo-600 hover:bg-indigo-500 shadow-indigo-950/50 disabled:hover:bg-indigo-600"
+                    }`}
                   >
                     Register
                   </button>
@@ -344,7 +498,9 @@ export const CastSection: React.FC<CastSectionProps> = ({
                 </button>
               </div>
               <h3 className="text-lg font-bold text-zinc-100 mb-2">
-                Delete Character Profile
+                {isLocationEntity(characterToDelete, characters?.[characterToDelete], assets)
+                  ? "Delete Location Profile"
+                  : "Delete Character Profile"}
               </h3>
               <p className="text-sm text-zinc-300 mb-3">
                 Are you sure you want to delete <span className="font-semibold text-amber-400">{characterToDelete}</span>?
@@ -352,10 +508,10 @@ export const CastSection: React.FC<CastSectionProps> = ({
               
               <div className="bg-zinc-950/70 border border-zinc-800/80 rounded-xl p-3.5 text-xs text-zinc-400 space-y-2 mb-6">
                 <p>
-                  • Deletes the character profile and removes them from project subjects.
+                  • Deletes the {isLocationEntity(characterToDelete, characters?.[characterToDelete], assets) ? "location" : "character"} profile and removes it from project subjects.
                 </p>
                 <p>
-                  • De-assigns this character&apos;s images from all shot input slots and OTS framing.
+                  • De-assigns this reference image from all shot input slots and scene framing.
                 </p>
                 <p className="text-emerald-400 font-medium">
                   ✓ All original media files remain safe and accessible in your gallery.
@@ -381,7 +537,9 @@ export const CastSection: React.FC<CastSectionProps> = ({
                   className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg transition-colors shadow-lg shadow-red-950/50"
                 >
                   <Trash2 className="w-4 h-4" />
-                  Delete Character
+                  {isLocationEntity(characterToDelete, characters?.[characterToDelete], assets)
+                    ? "Delete Location"
+                    : "Delete Character"}
                 </button>
               </div>
             </div>
@@ -394,18 +552,31 @@ export const CastSection: React.FC<CastSectionProps> = ({
         onClose={() => {
           setIsBulkModalOpen(false);
           setBulkModalSubject(undefined);
+          setBulkModalIsLocation(undefined);
         }}
         subjects={subjects}
         defaultSubject={bulkModalSubject}
+        isLocation={bulkModalIsLocation}
+        characters={characters}
+        assets={assets}
         sceneName={activeSceneName}
         onAssetUploaded={onAssetUploaded}
         onRegisterSubject={onRegisterSubject}
       />
 
+      <AssetEditModal
+        asset={editingAsset}
+        subjects={renderedSubjects}
+        characters={characters}
+        onRegisterSubject={onRegisterSubject}
+        onClose={() => setEditingAsset(null)}
+        onAssetUpdated={handleAssetUpdated}
+      />
+
       <AssetLightbox
         asset={lightboxAsset}
         onClose={() => setLightboxAsset(null)}
-        onDelete={onAssetDeleted}
+        onDelete={handleDeleteAsset}
       />
 
       <AiReferenceStagingStudioModal

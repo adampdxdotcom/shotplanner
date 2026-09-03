@@ -107,6 +107,10 @@ export function parseAssetFilename(filename: string): {
     typeDisplay = "Character Staging Reference";
   } else if (assetType === "scene_reference") {
     typeDisplay = "Scene Reference";
+  } else if (assetType === "body_reference" || assetType === "body reference") {
+    typeDisplay = "Body Reference";
+  } else if (assetType === "headshot") {
+    typeDisplay = "Headshot";
   }
 
   return {
@@ -428,6 +432,8 @@ class AssetService {
     meta: {
       media_type?: string;
       type?: string;
+      asset_type?: string;
+      assetType?: string;
       subject_name?: string;
       description?: string;
       slot_index?: string | number;
@@ -435,17 +441,25 @@ class AssetService {
     }
   ): AssetRecord {
     const mediaType = (meta.media_type || "image") as "image" | "audio" | "video";
-    const assetType = meta.type || "headshot";
+    const rawType = (meta.type || meta.asset_type || (meta as any).assetType || "").trim();
+    let assetType = "Headshot";
+    if (rawType.toLowerCase().replace(/[\s_-]+/g, " ").includes("body")) {
+      assetType = "Body Reference";
+    } else if (rawType.toLowerCase().includes("headshot")) {
+      assetType = "Headshot";
+    } else if (rawType) {
+      assetType = rawType;
+    }
     const subjectName = meta.subject_name || "subject";
     const description = meta.description || "";
     const sceneName = meta.scene_name || "scene01";
     const cleanType = sanitizeSlug(assetType);
     const cleanName = sanitizeSlug(subjectName);
-    const timestamp = Math.floor(Date.now() / 1000);
+    let timestamp = Math.floor(Date.now() / 1000);
     const ext =
       path.extname(file.originalname) ||
       (mediaType === "image" ? ".png" : mediaType === "audio" ? ".mp3" : ".mp4");
-    const targetFilename = `${cleanType}_${cleanName}_${timestamp}${ext}`;
+    let targetFilename = `${cleanType}_${cleanName}_${timestamp}${ext}`;
 
     const sceneDirs = ensureSceneDirectories(sceneName);
     let targetDir = sceneDirs.images;
@@ -462,7 +476,14 @@ class AssetService {
     if (!fs.existsSync(targetDir)) {
       fs.mkdirSync(targetDir, { recursive: true });
     }
-    const destinationPath = path.join(targetDir, targetFilename);
+
+    // Ensure collision-free unique filename so multiple references of the same type never overwrite each other
+    let destinationPath = path.join(targetDir, targetFilename);
+    while (fs.existsSync(destinationPath)) {
+      timestamp++;
+      targetFilename = `${cleanType}_${cleanName}_${timestamp}${ext}`;
+      destinationPath = path.join(targetDir, targetFilename);
+    }
     fs.copyFileSync(file.path, destinationPath);
     try {
       fs.unlinkSync(file.path);

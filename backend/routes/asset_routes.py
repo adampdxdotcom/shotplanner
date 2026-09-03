@@ -41,18 +41,27 @@ async def get_assets(scene_name: Optional[str] = None):
 async def upload_asset(
     file: UploadFile = File(...),
     media_type: str = Form("image"),
-    asset_type: str = Form("headshot"),
+    asset_type: Optional[str] = Form(None),
+    type: Optional[str] = Form(None),
     subject_name: str = Form("jackie"),
     description: str = Form(""),
     scene_name: str = Form("scene01")
 ):
     """Upload and save media file into scene-specific directory."""
+    raw_type = (asset_type or type or "Headshot").strip()
+    if "body" in raw_type.lower():
+        resolved_type = "Body Reference"
+    elif "headshot" in raw_type.lower():
+        resolved_type = "Headshot"
+    else:
+        resolved_type = raw_type
+
     content = await file.read()
     asset_record = await save_single_asset(
         content=content,
         original_name=file.filename or "media",
         media_type=media_type,
-        asset_type=asset_type,
+        asset_type=resolved_type,
         subject_name=subject_name,
         description=description,
         scene_name=scene_name

@@ -43,6 +43,26 @@ export const ASSET_REFERENCE_MODIFIERS: Record<string, AssetTypeModifierConfig> 
       { id: "upper_body", label: "Upper Body / Outfit", modifier: "upper body" },
     ],
   },
+  "Scene Reference": {
+    assetType: "Scene Reference",
+    baseTag: "scene reference",
+    modifiers: [
+      { id: "wide", label: "Wide / Establishing", modifier: "wide shot" },
+      { id: "medium", label: "Medium View", modifier: "medium view" },
+      { id: "reverse", label: "Reverse Angle", modifier: "reverse angle" },
+      { id: "detail", label: "Detail / Close", modifier: "detail view" },
+    ],
+  },
+  "Scene / Location Reference": {
+    assetType: "Scene Reference",
+    baseTag: "scene reference",
+    modifiers: [
+      { id: "wide", label: "Wide / Establishing", modifier: "wide shot" },
+      { id: "medium", label: "Medium View", modifier: "medium view" },
+      { id: "reverse", label: "Reverse Angle", modifier: "reverse angle" },
+      { id: "detail", label: "Detail / Close", modifier: "detail view" },
+    ],
+  },
 };
 
 /**
@@ -55,6 +75,7 @@ export function getModifierConfig(assetType?: string): AssetTypeModifierConfig |
   const lower = trimmed.toLowerCase();
   if (lower.includes("headshot")) return ASSET_REFERENCE_MODIFIERS.Headshot;
   if (lower.includes("body") || lower.includes("outfit")) return ASSET_REFERENCE_MODIFIERS["Body Reference"];
+  if (lower.includes("scene") || lower.includes("location") || lower.includes("environment")) return ASSET_REFERENCE_MODIFIERS["Scene Reference"];
   return undefined;
 }
 

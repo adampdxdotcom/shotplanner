@@ -273,6 +273,8 @@ export const GallerySection: React.FC<GallerySectionProps> = ({
         }}
         subjects={subjects}
         defaultSubject={bulkModalSubject}
+        characters={characters}
+        assets={assets}
         sceneName={sceneName}
         onAssetUploaded={onAssetUploaded}
         onRegisterSubject={onRegisterSubject}

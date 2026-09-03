@@ -1168,6 +1168,78 @@
     - **Streamlined Actor Blocking Controls:** Removed the "Depth Plane" segmented selector from the actor blocking controls card, streamlined the scale slider label to "Scale", removed the "Gaze & Facing Direction" and "Action / Stance" dropdown controls, and removed the "Visual Description" textarea block from the save panel to keep the staging controls focused, uncluttered, and performant.
     - **Hardcoded Scene Reference Export:** Enforced strict "Scene Reference" semantics for all composite staging exports. Removed the semantic asset type dropdown, locked payload types to `Scene Reference`, mapped generated filenames to `scene_reference_*`, bound subject names strictly to the location name to organize in the gallery, and stripped out automatic synthesized boilerplate descriptions so assets upload with clean metadata.
 
+## Character Reference Pack Semantic Asset Type Assignment & Robust Multi-Slot Ingestion
+- **`src/components/gallery/GalleryBulkUploadModal.tsx`**
+  - **Role:** Bulk asset ingestion modal supporting unified batch uploads and the 4-slot Character Reference Pack.
+  - **Updates:**
+    - **Explicit Semantic Asset Type Assignment:** Enforced strict semantic type mapping in the Character Reference Pack upload loop: Slot 1 (`headshot_facing`) and Slot 2 (`headshot_3_4`) explicitly submit `type` and `asset_type` as `"Headshot"`; Slot 3 (`body_primary`) and Slot 4 (`body_secondary`) explicitly submit `type` and `asset_type` as `"Body Reference"`, eliminating any default or fallback to `"Headshot"`.
+    - **Multi-Slot Independent Upload Loop:** Ensured the submission iterator processes all populated pack slots independently without filtering or premature exit, uploading each slot with its specific `slot_id`, semantic type, description, and canonical character name.
+    - **Individual Asset Ingestion:** Dispatches `onAssetUploaded(newAsset)` for every successfully uploaded slot, ensuring newly ingested assets immediately append to the active project asset list and gallery state.
+- **`server/services/assetService.ts`**
+  - **Role:** Express multipart upload service, asset registry persistence, and disk storage manager.
+  - **Updates:**
+    - **Semantic Asset Type Normalization:** In `handleSingleFileUpload`, normalized incoming `type` / `asset_type` metadata. Strings containing `"body"` strictly resolve to `"Body Reference"`, and `"headshot"` strings resolve to `"Headshot"`.
+    - **Disk Filename & Database Categorization:** Formats filenames as `body_reference_{subject}_{timestamp}.ext` for Body References and categorizes them with `type: "Body Reference"` in asset database records.
+    - **Collision-Free Storage Resolution:** Added timestamp collision resolution to ensure multiple references uploaded within the same second receive unique sequential filenames and never overwrite each other on disk or in the registry.
+    - **Display Name Mapping:** Updated `parseAssetFilename` to map `body_reference` to `"Body Reference"` and `headshot` to `"Headshot"`.
+- **`backend/routes/asset_routes.py`, `backend/services/asset_service.py`, & `backend/utils/file_handlers.py`**
+  - **Role:** FastAPI asset routes, upload handlers, and filesystem filename generators.
+  - **Updates:**
+    - **Form Field Support:** Updated FastAPI `/assets/upload` route to accept both `type` and `asset_type` form fields, resolving `"Body Reference"` for body-related uploads and `"Headshot"` for headshots.
+    - **Filename Generation & Collision Guarding:** In `generate_target_filename` and `save_uploaded_file`, sanitized `"Body Reference"` to `body_reference_{subject}_{timestamp}.ext` and integrated collision-avoidance logic to ensure all populated character pack slots persist independently without disk overwrites.
+    - **Filename Parsing:** Updated `parse_asset_filename` to display `body_reference` as `"Body Reference"` across dynamic directory scans.
+
+## Context-Aware Location Entity Handling & Reference Ingestion
+- **`src/utils/locationUtils.ts`**
+  - **Role:** Centralized location detection heuristics and entity classification utility.
+  - **Updates:**
+    - Implemented `isLocationEntity` helper that analyzes entity names, character profile flags (`is_location`), and existing asset collections against `LOCATION_KEYWORDS` (e.g., room, house, bar, street, interior, exterior, kitchen, bedroom, park, office, studio, rooftop, alley, cafe, restaurant, forest, beach, cabin, etc.) to reliably detect location entities across the app.
+- **`src/types.ts`**
+  - **Role:** Shared TypeScript interface definitions.
+  - **Updates:**
+    - Extended `CharacterProfile` interface with optional `is_location?: boolean` attribute for explicit entity categorization.
+- **`src/utils/assetModifiers.ts`**
+  - **Role:** Prompt modifiers and visual presets for asset generation and tagging.
+  - **Updates:**
+    - Configured `Scene Reference` and `Scene / Location Reference` presets with high-fidelity environmental modifier keywords (lighting, architectural texture, wide angle, depth of field) to support location reference staging.
+- **`src/components/gallery/CharacterReferencePackGrid.tsx`**
+  - **Role:** 4-slot reference pack upload grid component.
+  - **Updates:**
+    - Added `isLocationMode` prop support.
+    - When in Location mode, adapts the 4-slot grid to represent **Location Reference Slots** (`loc_wide`, `loc_medium`, `loc_detail`, `loc_alt`), uniformly configured with semantic type `"Scene Reference"` and preset prompts (`"scene reference, "`), completely hiding character-specific Headshot and Body Reference slots.
+    - When in Character mode, preserves the standard 4-slot Character Reference Pack (Headshot Facing, Headshot 3/4, Full Body Front, and Full Body 3/4).
+- **`src/components/gallery/GalleryBulkUploadModal.tsx`**
+  - **Role:** Bulk asset ingestion modal supporting unified batch uploads and context-aware reference pack grids.
+  - **Updates:**
+    - Implemented entity mode state (`isLocationMode` / `entityMode`), auto-detecting location entities via `isLocationEntity` based on `defaultSubject`, `isLocation`, or selected subject changes, while providing a manual toggle between "Character Profile" and "Location Profile".
+    - Dynamically swaps between `INITIAL_PACK_SLOTS` and `INITIAL_LOCATION_PACK_SLOTS`.
+    - Automatically sets the default semantic type in the general batch dropzone to `"Scene Reference"` when in location mode, and `"Headshot"` when in character mode.
+    - Updated `runUnifiedUpload` submission loop to dynamically assign `explicitType` (`"Scene Reference"`, `"Body Reference"`, or `"Headshot"`) matching the active mode and slot configuration.
+- **`src/components/CastSection.tsx`**
+  - **Role:** Cast & Location profile management dashboard.
+  - **Updates:**
+    - Integrated `isLocationEntity` to identify location entities on entity cards.
+    - Styled location entities with emerald iconography (`MapPin`), distinct badges, and location-appropriate avatar borders.
+    - **Strictly hid character-specific inputs**: Conditionally hides the `"Scene Outfit"` input field when managing location entities, while adapting the notes field to `"Location Details & Notes"`.
+    - Added an entity type toggle ("Character" vs. "Location") in the profile creation modal, allowing direct registration of locations.
+    - Updated the delete confirmation modal to dynamically display "Delete Location Profile" vs. "Delete Character Profile".
+    - Connected the "Add Ref" slot to open `GalleryBulkUploadModal` with `isLocation` and entity context pre-bound.
+- **`src/components/GallerySection.tsx`**
+  - **Role:** Global asset library browser and bulk uploader interface.
+  - **Updates:**
+    - Forwarded project `characters` and `assets` collections to `GalleryBulkUploadModal` to ensure accurate automatic location detection during gallery-level bulk uploads.
+
+## Cast & Characters Dashboard: Reference Card Quick Actions & In-Place Metadata Editing
+- **`src/components/CastSection.tsx`**
+  - **Role:** Cast & Characters / Location profile management dashboard.
+  - **Updates:**
+    - **Quick Action Overlay Buttons:** Added Edit Pencil (`Pencil`) and Delete Trash Can (`Trash2`) quick action overlays to each reference asset thumbnail card in the character media strip, matching the Shot Tab card design (`bg-black/60 hover:bg-black text-white rounded backdrop-blur shadow` and `hover:bg-red-500`).
+    - **Edit Asset Metadata Modal Integration:** Wired `AssetEditModal` into `CastSection`, activated by clicking the Edit Pencil icon on any reference asset card. Pre-populates all asset metadata (type, modifier, subject, description, and replacement image) and forwards updates via `onAssetUpdated(oldFilename, newAsset)`.
+    - **Full Project Synchronization & Persistence:** Wired `handleAssetUpdated` callback to update the asset in-place across the active scene project (`sceneProject.assets`), synchronizing changes across the character profile, gallery, and shot slots while triggering dirty-flag auto-save.
+    - **Asset Deletion Workflow:** Implemented `handleDeleteAsset` with confirmation prompt, unlinking the asset from the character, calling the backend DELETE endpoint (`/api/assets/:filename`), notifying `onAssetDeleted`, cleaning up active lightbox/editing state, and displaying toast feedback.
+    - **Lightbox Deletion Alignment:** Updated `AssetLightbox` deletion callback to utilize `handleDeleteAsset` for consistent confirmation and unlinking behavior.
+
+
 
 
 

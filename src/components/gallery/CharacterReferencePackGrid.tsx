@@ -1,19 +1,29 @@
 import React, { useRef, useState } from "react";
-import { Camera, User, Image as ImageIcon, X, Check, Loader2, AlertCircle, Sparkles, Shirt } from "lucide-react";
+import { Camera, User, Image as ImageIcon, X, Check, Loader2, AlertCircle, Sparkles, Shirt, Building2, MapPin, Compass, Sun } from "lucide-react";
 import {
   getModifierConfig,
   detectActiveModifier,
   updateDescriptionWithModifier
 } from "../../utils/assetModifiers";
 
-export type CharacterPackSlotId = "headshot_facing" | "headshot_3_4" | "body_primary" | "body_secondary";
+export type ReferencePackSlotId =
+  | "headshot_facing"
+  | "headshot_3_4"
+  | "body_primary"
+  | "body_secondary"
+  | "location_slot_1"
+  | "location_slot_2"
+  | "location_slot_3"
+  | "location_slot_4";
+
+export type CharacterPackSlotId = ReferencePackSlotId;
 
 export interface CharacterPackSlot {
-  id: CharacterPackSlotId;
+  id: ReferencePackSlotId;
   title: string;
   badge: string;
-  icon: "camera" | "user" | "sparkles" | "shirt";
-  assetType: "Headshot" | "Body Reference";
+  icon: "camera" | "user" | "sparkles" | "shirt" | "building" | "map-pin" | "compass" | "sun";
+  assetType: "Headshot" | "Body Reference" | "Scene Reference";
   file: File | null;
   previewUrl: string | null;
   description: string;
@@ -83,18 +93,79 @@ export const INITIAL_PACK_SLOTS: CharacterPackSlot[] = [
   }
 ];
 
+export const INITIAL_LOCATION_PACK_SLOTS: CharacterPackSlot[] = [
+  {
+    id: "location_slot_1",
+    title: "Location Reference (Wide / Establishing)",
+    badge: "Wide View",
+    icon: "building",
+    assetType: "Scene Reference",
+    file: null,
+    previewUrl: null,
+    description: "scene reference, ",
+    defaultDescription: "scene reference, ",
+    placeholder: "e.g. scene reference, wide establishing shot, daylight architecture",
+    status: "idle",
+    progress: 0
+  },
+  {
+    id: "location_slot_2",
+    title: "Location Reference (Medium / Alternate Angle)",
+    badge: "Angle 2",
+    icon: "camera",
+    assetType: "Scene Reference",
+    file: null,
+    previewUrl: null,
+    description: "scene reference, ",
+    defaultDescription: "scene reference, ",
+    placeholder: "e.g. scene reference, 45 degree angle, architectural details",
+    status: "idle",
+    progress: 0
+  },
+  {
+    id: "location_slot_3",
+    title: "Location Reference (Reverse / Depth View)",
+    badge: "Reverse Angle",
+    icon: "compass",
+    assetType: "Scene Reference",
+    file: null,
+    previewUrl: null,
+    description: "scene reference, ",
+    defaultDescription: "scene reference, ",
+    placeholder: "e.g. scene reference, reverse angle looking back, ambient light",
+    status: "idle",
+    progress: 0
+  },
+  {
+    id: "location_slot_4",
+    title: "Location Reference (Interior / Detail / Mood)",
+    badge: "Detail / Mood",
+    icon: "sun",
+    assetType: "Scene Reference",
+    file: null,
+    previewUrl: null,
+    description: "scene reference, ",
+    defaultDescription: "scene reference, ",
+    placeholder: "e.g. scene reference, atmospheric interior, texture and props",
+    status: "idle",
+    progress: 0
+  }
+];
+
 interface CharacterReferencePackGridProps {
   slots: CharacterPackSlot[];
-  onUpdateSlot: (slotId: CharacterPackSlotId, updater: Partial<CharacterPackSlot>) => void;
-  onClearSlot: (slotId: CharacterPackSlotId) => void;
+  onUpdateSlot: (slotId: ReferencePackSlotId, updater: Partial<CharacterPackSlot>) => void;
+  onClearSlot: (slotId: ReferencePackSlotId) => void;
   disabled?: boolean;
+  isLocationMode?: boolean;
 }
 
 export const CharacterReferencePackGrid: React.FC<CharacterReferencePackGridProps> = ({
   slots,
   onUpdateSlot,
   onClearSlot,
-  disabled = false
+  disabled = false,
+  isLocationMode = false
 }) => {
   const [dragActiveSlot, setDragActiveSlot] = useState<CharacterPackSlotId | null>(null);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -155,6 +226,14 @@ export const CharacterReferencePackGrid: React.FC<CharacterReferencePackGridProp
 
   const renderIcon = (type: CharacterPackSlot["icon"]) => {
     switch (type) {
+      case "building":
+        return <Building2 className="w-3.5 h-3.5 text-emerald-400" />;
+      case "map-pin":
+        return <MapPin className="w-3.5 h-3.5 text-emerald-400" />;
+      case "compass":
+        return <Compass className="w-3.5 h-3.5 text-cyan-400" />;
+      case "sun":
+        return <Sun className="w-3.5 h-3.5 text-amber-300" />;
       case "camera":
         return <Camera className="w-3.5 h-3.5 text-amber-400" />;
       case "sparkles":
@@ -171,13 +250,27 @@ export const CharacterReferencePackGrid: React.FC<CharacterReferencePackGridProp
     <div className="space-y-2.5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5" />
-            Character Reference Pack (4-Slot Grid)
-          </span>
-          <span className="text-[10px] text-zinc-400 bg-zinc-800/80 px-2 py-0.5 rounded-full border border-zinc-700/50">
-            Optional Quick Setup
-          </span>
+          {isLocationMode ? (
+            <>
+              <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5" />
+                Location Reference Slots (4-Slot Grid)
+              </span>
+              <span className="text-[10px] text-emerald-300 bg-emerald-950/70 border border-emerald-800/60 px-2 py-0.5 rounded-full">
+                Scene References
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5" />
+                Character Reference Pack (4-Slot Grid)
+              </span>
+              <span className="text-[10px] text-zinc-400 bg-zinc-800/80 px-2 py-0.5 rounded-full border border-zinc-700/50">
+                Optional Quick Setup
+              </span>
+            </>
+          )}
         </div>
         <span className="text-[11px] text-zinc-500">
           {slots.filter(s => s.file !== null).length} of 4 slots ready
@@ -194,7 +287,9 @@ export const CharacterReferencePackGrid: React.FC<CharacterReferencePackGridProp
               key={slot.id}
               className={`flex flex-col bg-zinc-950 border rounded-xl overflow-hidden transition-all duration-200 ${
                 isDragOver
-                  ? "border-amber-400 ring-2 ring-amber-500/30 bg-amber-950/20"
+                  ? isLocationMode
+                    ? "border-emerald-400 ring-2 ring-emerald-500/30 bg-emerald-950/20"
+                    : "border-amber-400 ring-2 ring-amber-500/30 bg-amber-950/20"
                   : isPopulated
                   ? "border-zinc-700/80 shadow-md bg-zinc-900/60"
                   : "border-zinc-800/90 hover:border-zinc-700 bg-zinc-950/80"
@@ -209,7 +304,9 @@ export const CharacterReferencePackGrid: React.FC<CharacterReferencePackGridProp
                   </span>
                 </div>
                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0 ${
-                  slot.assetType === "Headshot"
+                  slot.assetType === "Scene Reference"
+                    ? "bg-emerald-950/60 text-emerald-300 border border-emerald-800/50"
+                    : slot.assetType === "Headshot"
                     ? "bg-amber-950/60 text-amber-300 border border-amber-800/50"
                     : "bg-blue-950/60 text-blue-300 border border-blue-800/50"
                 }`}>
@@ -319,7 +416,9 @@ export const CharacterReferencePackGrid: React.FC<CharacterReferencePackGridProp
                           onUpdateSlot(slot.id, { description: newDesc });
                         }}
                         disabled={disabled || slot.status === "uploading"}
-                        className="bg-zinc-900 border border-zinc-800 text-[9px] text-amber-400 font-medium rounded px-1 py-0.5 outline-none"
+                        className={`bg-zinc-900 border border-zinc-800 text-[9px] font-medium rounded px-1 py-0.5 outline-none ${
+                          slot.assetType === "Scene Reference" ? "text-emerald-400" : "text-amber-400"
+                        }`}
                       >
                         <option value="">No modifier</option>
                         {modConfig.modifiers.map(m => (
