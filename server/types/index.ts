@@ -133,4 +133,23 @@ export interface ExecutionStepLog {
   detail: string;
 }
 
+export interface PromptDebugInfo {
+  system_prompt_sent: string;
+  user_prompt_sent: string;
+  raw_llm_output: string;
+  temperature_used: number;
+  max_tokens_used: number;
+  model_used: string;
+  provider: string;
+  latency_ms: number;
+  timestamp: string;
+}
+
+export interface ExpandPromptResult {
+  expanded_prompt: string;
+  provider: string;
+  description_only?: string;
+  debug?: PromptDebugInfo;
+}
+
 export const SCENE_REFERENCE_DIRECTIVE = "A scene reference image is provided. Please match the location, lighting, and general environment of the provided reference image.";

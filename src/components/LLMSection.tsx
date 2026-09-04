@@ -7,11 +7,14 @@ import {
   SCENE_REFERENCE_DIRECTIVE, 
   assembleFinalPrompt, 
   generatePromptPrefix,
-  computePrePromptContext
+  computePrePromptContext,
+  PromptDebugInfo,
+  AppConfig
 } from "../types";
 import { formatShotNumber } from "./ScenePlanningHeader";
 import { TakeSelector } from "./TakeSelector";
 import { TakeReviewModal } from "./TakeReviewModal";
+import { PromptDebugModal } from "./PromptDebugModal";
 import { copyToClipboard } from "../utils/clipboard";
 import { 
   Sparkles, 
@@ -48,6 +51,8 @@ interface LLMSectionProps {
   onSelectShot: (id: string | null) => void;
   sceneProject: import("../types").SceneProjectFile;
   onUpdateShot: (updater: (prev: import("../types").ShotItem) => import("../types").ShotItem) => void;
+  onUpdateSpecificShot?: (id: string, updater: (prev: import("../types").ShotItem) => import("../types").ShotItem) => void;
+  config?: AppConfig;
 }
 
 export const LLMSection: React.FC<LLMSectionProps> = ({
@@ -66,7 +71,9 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
   activeShotId,
   onSelectShot,
   sceneProject,
-  onUpdateShot
+  onUpdateShot,
+  onUpdateSpecificShot,
+  config
 }) => {
   const [internalProvider, setInternalProvider] = useState<LLMProvider>("lm_studio");
   const providerChoice = controlledProvider !== undefined ? controlledProvider : internalProvider;
@@ -81,6 +88,8 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [providerUsed, setProviderUsed] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [lastDebugInfo, setLastDebugInfo] = useState<PromptDebugInfo | null>(null);
+  const [showDebugModal, setShowDebugModal] = useState(false);
 
   const isSceneRefPresent = hasSceneReferencePhoto(assets);
 
@@ -162,6 +171,8 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
       return;
     }
 
+    const currentShotId = activeShotId;
+
     setGenerating(true);
     setError(null);
     setProviderUsed(null);
@@ -189,14 +200,23 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
           shot_number: activeShot ? activeShot.shot_number : planning?.shot_number,
           scene_name: sceneProject?.scene_name || planning?.scene_name,
           characters: sceneProject?.characters,
-          gemini_api_key: geminiApiKey
+          gemini_api_key: geminiApiKey,
+          custom_system_prompt: config?.llm_custom_system_prompt,
+          temperature: config?.llm_temperature,
+          max_tokens: config?.llm_max_tokens
         })
       });
 
       const data = await res.json();
       if (res.ok && data.expanded_prompt) {
-        onChangeExpandedPrompt(data.expanded_prompt);
+        if (currentShotId && onUpdateSpecificShot) {
+          onUpdateSpecificShot(currentShotId, prev => ({ ...prev, expanded_prompt: data.expanded_prompt, status: "unstaged" }));
+        } else {
+          onChangeExpandedPrompt(data.expanded_prompt);
+        }
+        
         if (data.provider) setProviderUsed(data.provider);
+        if (data.debug) setLastDebugInfo(data.debug);
         onShowToast?.("Prompt expanded and auto-compiled successfully!", "success");
       } else {
         setError(data.error || "Failed to generate prompt from LLM");
@@ -451,6 +471,18 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
               </div>
               
               <div className="flex items-center gap-2">
+                {lastDebugInfo && (
+                  <button
+                    type="button"
+                    onClick={() => setShowDebugModal(true)}
+                    className="px-2.5 py-1 text-xs font-medium rounded-lg border border-amber-600/40 bg-amber-950/40 hover:bg-amber-900/60 text-amber-300 hover:text-amber-100 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                    title="Inspect exact system directives, user payload, and raw model response"
+                  >
+                    <Eye className="w-3 h-3 text-amber-400" />
+                    <span>Inspect LLM Exchange ({lastDebugInfo.latency_ms}ms)</span>
+                  </button>
+                )}
+
                 {!isLivePreview && (
                   <button
                     type="button"
@@ -532,6 +564,14 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
           }}
         />
       )}
+
+      {/* LLM Exchange Inspector Modal */}
+      <PromptDebugModal
+        isOpen={showDebugModal}
+        onClose={() => setShowDebugModal(false)}
+        debugInfo={lastDebugInfo}
+        assembledPrompt={expandedPrompt}
+      />
     </div>
   );
 };

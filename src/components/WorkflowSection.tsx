@@ -243,9 +243,12 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
       <LiveWorkflowPreview 
         showRawJson={showRawJson}
         liveInjectedWorkflow={liveInjectedWorkflow}
-        parsedWorkflowRaw={parsedWorkflow?.raw_json}
+        parsedWorkflowRaw={rawWorkflowData}
         handleCopyJson={handleCopyJson}
         copiedJson={copiedJson}
+        activeShotNumber={activeShot ? formatShotNumber(activeShot.shot_number) : "01"}
+        isVisualWorkflow={Boolean(parsedWorkflow?.is_visual || Array.isArray(rawWorkflowData?.nodes))}
+        nodeCount={parsedWorkflow?.node_count || (Array.isArray(rawWorkflowData?.nodes) ? rawWorkflowData.nodes.length : (rawWorkflowData ? Object.keys(rawWorkflowData).length : 0))}
       />
     </div>
   );

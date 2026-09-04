@@ -1285,10 +1285,29 @@
     - Enhanced `generateLiveInjectedWorkflow` to support both ComfyUI Visual Canvas (`nodes: [...]`) and API Prompt dictionary (`{ [node_id]: { class_type, inputs } }`) graph formats.
     - Injects active shot's expanded prompt (with hero take resolution and fallbacks), generation parameter overrides (`steps`, `megapixels`, `frames`), dynamic `SaveVideo` filename prefix (`{scene_name}_Shot_{shot_num}_Take_{take_num}`), and mapped media loader slot filenames with placeholder bypass handling.
 - **`src/components/WorkflowSection.tsx`**
-  - **Role:** Workflow selection and node configuration panel.
+  - **Role:** Workflow selection, dynamic node mapping, and live workflow inspection panel.
   - **Updates:**
-    - Updated `liveInjectedWorkflow` memoization to consume `raw_json`, `workflow`, or `raw_workflow` from `parsedWorkflow`.
-    - Displays the complete live-injected workflow JSON in `LiveWorkflowPreview` when clicking "Show JSON".
+    - Integrated the collapsible Live Injected Workflow JSON viewer toggled via the "Show JSON" / "Hide JSON" button in `WorkflowFileSelector`.
+    - Computes `liveInjectedWorkflow` in real time using `generateLiveInjectedWorkflow` consuming `raw_json`, `workflow`, or `raw_workflow` from `parsedWorkflow`.
+    - Passes live injected data, fallback raw workflow data, active shot number, visual workflow flag, and node counts to `LiveWorkflowPreview`.
+- **`src/components/workflow/LiveWorkflowPreview.tsx`**
+  - **Role:** Container for the live injected workflow JSON preview with header toolbar and fallback states.
+  - **Updates:**
+    - Renders the interactive searchable JSON viewer (`JsonViewerWithSearch`) populated with live in-memory injected workflow JSON.
+    - Displays a clear fallback notice ("Select a ComfyUI workflow template above to preview live injected workflow JSON") when no workflow template is selected or parsed.
+    - Features a header "Copy JSON" button with visual "Copied!" checkmark feedback.
+- **`src/components/JsonViewerWithSearch.tsx`**
+  - **Role:** Interactive JSON viewer with real-time text search, match highlights, match navigation, and clipboard copy.
+  - **Updates:**
+    - Formats data with `JSON.stringify(data, null, 2)` inside a scrollable syntax container.
+    - Highlights matching substrings with distinct styles for active vs. inactive matches and provides a match count indicator.
+    - Provides Next / Previous match navigation buttons and keyboard shortcuts (Enter / Shift+Enter / Escape).
+    - Features a dedicated "Copy JSON" button with instant checkmark feedback.
+- **`src/utils/workflowInjection.ts`**
+  - **Role:** Client-side workflow injection and visualization generator (`generateLiveInjectedWorkflow`).
+  - **Updates:**
+    - Safely extracts raw graph data from visual canvas (`nodes: [...]`) and flat API prompt dictionary formats.
+    - Injects active shot's expanded prompt (with hero take resolution), generation parameter overrides (`steps`, `megapixels`, `frames`), dynamic `SaveVideo` filename prefix (`{scene_name}_Shot_{shot_number}_`), and mapped image/video/audio loader nodes with `empty.png` bypass.
 - **`src/components/ExecutionSection.tsx`**
   - **Role:** Master execution, staging, and live monitoring panel for shots and full scenes.
   - **Updates:**
@@ -1306,6 +1325,25 @@
     - Enhanced error handling to print `[Staging Error]` with exact details when workflow compilation fails for any shot.
     - In `execute_workflow_pipeline`: Saves the synthesized shot workflow JSON locally and performs remote SFTP synchronization for both media assets and the workflow JSON.
 
+## Strict Per-Shot Prompt Isolation & Context Hydration
+- **`src/hooks/useAppLogic.ts`**
+  - **Role:** Central state manager for the application.
+  - **Updates:**
+    - Introduced `updateShot(shotId, updater)` to allow mutating a specific target shot by its explicit ID regardless of which shot is currently active.
+    - Updated `updateActiveShot` to delegate to `updateShot(activeShotId, updater)`.
+    - Hardened the `useEffect` listening to `activeShotId` and `sceneProject.shots`: strictly defaults to `""` for `shot.basic_stub` and `shot.expanded_prompt` if undefined, thoroughly eliminating state leaks when switching to shots without prior prompts.
+- **`src/App.tsx`**
+  - **Updates:** Passed `updateShot` down to `SceneProjectHub` and `LLMSection` via the new `onUpdateSpecificShot` prop to ensure targeted shot updates upon async resolution.
+- **`src/components/LLMSection.tsx`**
+  - **Role:** LLM-driven prompt expansion panel.
+  - **Updates:**
+    - Captured `currentShotId = activeShotId` prior to executing the asynchronous expansion API call.
+    - Upon completion, strictly updates the `currentShotId` via `onUpdateSpecificShot(currentShotId, ...)`, rather than blindly invoking generic state setters. This prevents the newly generated prompt from leaking into a different shot if the user switches shots during generation.
+- **`src/components/SceneProjectHub.tsx`**
+  - **Role:** Top-level hub housing the prompt engineering panel.
+  - **Updates:**
+    - Captured `currentShotId` prior to invoking the `onExpandPrompt` API call.
+    - Invokes `onUpdateSpecificShot(currentShotId, ...)` upon successful prompt generation, maintaining rigorous per-shot prompt boundaries.
 
 
 
@@ -1317,3 +1355,14 @@
 
 
 
+
+
+## Execution & Upload Decoupling
+- **`src/components/ExecutionSection.tsx`**
+  - **Updates:** Removed mutual exclusion layout constraints that permanently hid the `SendShotPanel` and `SendScenePanel` when `monitorState.isExecuting` was true. The active execution monitor now renders concurrently above the operational staging panels, preventing UI lockouts while ComfyUI is rendering.
+- **`src/components/gallery/GalleryBulkUploadModal.tsx`**
+  - **Updates:** Refactored the `runUnifiedUpload` execution loop. Converted sequential `await fetch()` calls into a concurrent `Promise.all()` pipeline, allowing bulk character packs and arbitrary queue items to upload simultaneously rather than blocking on the network consecutively.
+- **`backend/utils/file_handlers.py`**
+  - **Updates:** Wrapped the synchronous PIL `generate_thumbnail` call inside `asyncio.to_thread`. This prevents the FastAPI asyncio event loop from stalling during heavy image processing, successfully decoupling media uploads from ComfyUI WebSocket pings and other incoming network traffic.
+- **`backend/services/asset_service.py`**
+  - **Updates:** Refactored `handle_chunk_upload` to delegate synchronous file IO (`open("ab")`, `shutil.copyfile`, and `os.remove`) to an executor thread via `asyncio.to_thread`. This eliminates event loop blocking during chunked multipart uploads.

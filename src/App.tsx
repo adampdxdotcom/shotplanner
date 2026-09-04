@@ -63,6 +63,7 @@ export default function App() {
     handleAssetDeleted,
     handleUpdateMapping,
     scrollToSection,
+    updateShot,
     updateActiveShot
   } = useAppLogic();
 
@@ -99,6 +100,7 @@ export default function App() {
               onTransferScene={handleSceneTransferAll}
               onExpandPrompt={handleSceneExpandPrompt}
               onAssetUploaded={handleAssetUploaded}
+              onUpdateSpecificShot={updateShot}
             />
           </div>
         )}
@@ -172,6 +174,8 @@ export default function App() {
             onSelectShot={setActiveShotId}
             sceneProject={sceneProject}
             onUpdateShot={updateActiveShot}
+            onUpdateSpecificShot={updateShot}
+            config={config}
           />
         )}
 

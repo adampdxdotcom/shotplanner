@@ -391,45 +391,50 @@ async def handle_chunk_upload(
     scene_name: str = "scene01"
 ) -> Dict[str, Any]:
     """Append chunk and finalize assembled file on the last chunk."""
-    temp_assembly_path = TMP_UPLOAD_DIR / upload_id
+    import asyncio
     
-    with open(temp_assembly_path, "ab") as f:
-        f.write(chunk_bytes)
+    def _process_chunk():
+        temp_assembly_path = TMP_UPLOAD_DIR / upload_id
         
-    if chunk_index == total_chunks - 1:
-        target_filename = generate_target_filename(asset_type, subject_name, original_name)
-        scene_dirs = get_scene_directories(scene_name)
-        
-        subfolder_key = f"{media_type}s"
-        target_dir = scene_dirs.get(subfolder_key, scene_dirs.get("images"))
-        target_dir.mkdir(parents=True, exist_ok=True)
-        destination_path = target_dir / target_filename
-        
-        shutil.copyfile(temp_assembly_path, destination_path)
-        size_bytes = os.path.getsize(temp_assembly_path)
-        os.remove(temp_assembly_path)
-        
-        if media_type == "image":
-            generate_thumbnail(destination_path)
-        
-        if not destination_path.exists():
-            raise HTTPException(status_code=500, detail="Assembled file missing after write.")
-        
-        return {
-            "success": True,
-            "asset": {
-                "id": target_filename,
-                "original_name": original_name,
-                "filename": target_filename,
-                "media_type": media_type,
-                "type": asset_type,
-                "subject_name": subject_name,
-                "description": description,
-                "size_bytes": size_bytes,
-                "scene_name": scene_name,
-                "path": str(destination_path),
-                "preview_url": f"/api/uploads/{target_filename}"
+        with open(temp_assembly_path, "ab") as f:
+            f.write(chunk_bytes)
+            
+        if chunk_index == total_chunks - 1:
+            target_filename = generate_target_filename(asset_type, subject_name, original_name)
+            scene_dirs = get_scene_directories(scene_name)
+            
+            subfolder_key = f"{media_type}s"
+            target_dir = scene_dirs.get(subfolder_key, scene_dirs.get("images"))
+            target_dir.mkdir(parents=True, exist_ok=True)
+            destination_path = target_dir / target_filename
+            
+            shutil.copyfile(temp_assembly_path, destination_path)
+            size_bytes = os.path.getsize(temp_assembly_path)
+            os.remove(temp_assembly_path)
+            
+            if media_type == "image":
+                generate_thumbnail(destination_path)
+            
+            if not destination_path.exists():
+                raise HTTPException(status_code=500, detail="Assembled file missing after write.")
+            
+            return {
+                "success": True,
+                "asset": {
+                    "id": target_filename,
+                    "original_name": original_name,
+                    "filename": target_filename,
+                    "media_type": media_type,
+                    "type": asset_type,
+                    "subject_name": subject_name,
+                    "description": description,
+                    "size_bytes": size_bytes,
+                    "scene_name": scene_name,
+                    "path": str(destination_path),
+                    "preview_url": f"/api/uploads/{target_filename}"
+                }
             }
-        }
+            
+        return {"success": True, "message": "chunk received"}
         
-    return {"success": True, "message": "chunk received"}
+    return await asyncio.to_thread(_process_chunk)

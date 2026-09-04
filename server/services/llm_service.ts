@@ -1,5 +1,5 @@
 import { SCENE_REFERENCE_DIRECTIVE } from "../config/constants";
-import { ScenePlanningDTO, ShotItem } from "../types";
+import { ExpandPromptResult, PromptDebugInfo, ScenePlanningDTO, ShotItem } from "../types";
 import {
   assembleFinalPrompt,
   buildMandatoryFooter,
@@ -29,6 +29,10 @@ export interface ExpandPromptOptions {
   ots_focus_subject?: string;
   ots_side?: "Left" | "Right";
   framing_directive?: string;
+  // Dynamic template and parameter overrides
+  custom_system_prompt?: string;
+  temperature?: number;
+  max_tokens?: number;
 }
 
 /**
@@ -76,9 +80,33 @@ export function buildSubjectDefinitionsHeader(assetList: any[]): string {
  * Programmatically constructs the Mandatory Header and Mandatory Footer,
  * queries the LLM only for the integrated description body, and stitches them together.
  */
+export function buildDefaultSystemPrompt(params?: {
+  lens?: string;
+  aspect_ratio?: string;
+  camera_constraint?: string;
+}): string {
+  const lens = params?.lens || "{{LENS}}";
+  const aspect = params?.aspect_ratio || "{{ASPECT_RATIO}}";
+  const cameraConstraint = params?.camera_constraint || "{{CAMERA_CONSTRAINT}}";
+
+  return `You are an expert AI Screenwriter and Prompt Engineer specializing in advanced multimodal video generation frameworks (MiniMax-H3 / Ref2VA pipelines).
+
+Your task is to generate ONLY the integrated_multimodal_description content. Do not generate headers, footers, or subject definitions. Use exact asset tags (<Picture N>, <Video N>) provided in the context.
+
+### Strict Output Constraints:
+- Spatial Initialization: Always define the subject's exact spatial position and initial posture at the very beginning (e.g., "[Shot 1] Live-action, cinematic... At the start of the shot, [Subject] is positioned at...").
+- Exact Tags: Differentiate between facial likeness and styling using the exact tags provided (e.g., "<Picture 1>"). Do NOT invent new tags or reference off-screen characters.
+- Cinematography & Optical Rendering: Reflect the visual characteristics of the selected lens (${lens}) and framing (${aspect}) in depth-of-field, perspective compression, and environmental sharpness, while strictly adhering to camera motion constraints.
+- Framing Directives: When a Framing Directive is provided in context, utilize the specific anchor and focus subject likenesses provided in the Global Subject Definitions to execute this framing.
+- Camera Motion Hard Constraint: ${cameraConstraint}
+- Dialogue: If dialogue is present, format as <d>[Language] Dialogue text</d> with speaker tags like (S1).
+- No Boilerplate: Output ONLY the narrative visual description. Do NOT output "Global Subject Definitions:", "overall_soundscape:", or "non_diegetic_music:".`;
+}
+
 export async function expandPrompt(
   options: ExpandPromptOptions
-): Promise<{ expanded_prompt: string; provider: string; description_only?: string }> {
+): Promise<ExpandPromptResult> {
+  const startTime = Date.now();
   const {
     basic_stub,
     assets = [],
@@ -98,7 +126,10 @@ export async function expandPrompt(
     ots_anchor_subject,
     ots_focus_subject,
     ots_side,
-    framing_directive
+    framing_directive,
+    custom_system_prompt,
+    temperature,
+    max_tokens
   } = options;
 
   if (!basic_stub) {
@@ -280,18 +311,22 @@ export async function expandPrompt(
   const mandatoryFooter = buildMandatoryFooter();
 
   // 5. Structured Request to LLM for Integrated Multimodal Description ONLY
-  const systemPrompt = `You are an expert AI Screenwriter and Prompt Engineer specializing in advanced multimodal video generation frameworks (MiniMax-H3 / Ref2VA pipelines).
+  const effectiveTemperature = typeof temperature === "number" ? temperature : 0.7;
+  const effectiveMaxTokens = typeof max_tokens === "number" && max_tokens > 0 ? max_tokens : 800;
 
-Your task is to generate ONLY the integrated_multimodal_description content. Do not generate headers, footers, or subject definitions. Use exact asset tags (<Picture N>, <Video N>) provided in the context.
-
-### Strict Output Constraints:
-- Spatial Initialization: Always define the subject's exact spatial position and initial posture at the very beginning (e.g., "[Shot 1] Live-action, cinematic... At the start of the shot, [Subject] is positioned at...").
-- Exact Tags: Differentiate between facial likeness and styling using the exact tags provided (e.g., "<Picture 1>"). Do NOT invent new tags or reference off-screen characters.
-- Cinematography & Optical Rendering: Reflect the visual characteristics of the selected lens (${effectiveLens || "standard"}) and framing (${effectiveAspectRatio || "16:9 widescreen"}) in depth-of-field, perspective compression, and environmental sharpness, while strictly adhering to camera motion constraints.
-- Framing Directives: When a Framing Directive is provided in context, utilize the specific anchor and focus subject likenesses provided in the Global Subject Definitions to execute this framing.
-- Camera Motion Hard Constraint: ${cameraConstraintInstruction}
-- Dialogue: If dialogue is present, format as <d>[Language] Dialogue text</d> with speaker tags like (S1).
-- No Boilerplate: Output ONLY the narrative visual description. Do NOT output "Global Subject Definitions:", "overall_soundscape:", or "non_diegetic_music:".`;
+  let systemPrompt = "";
+  if (custom_system_prompt && custom_system_prompt.trim()) {
+    systemPrompt = custom_system_prompt.trim()
+      .replace(/\{\{LENS\}\}/g, effectiveLens || "standard 50mm")
+      .replace(/\{\{ASPECT_RATIO\}\}/g, effectiveAspectRatio || "16:9 widescreen")
+      .replace(/\{\{CAMERA_CONSTRAINT\}\}/g, cameraConstraintInstruction);
+  } else {
+    systemPrompt = buildDefaultSystemPrompt({
+      lens: effectiveLens || "standard 50mm",
+      aspect_ratio: effectiveAspectRatio || "16:9 widescreen",
+      camera_constraint: cameraConstraintInstruction
+    });
+  }
 
   const cameraContextBlock = effectiveCameraMovement
     ? `\nCAMERA MOVEMENT DIRECTIVE:\n${isStatic ? "LOCKED OFF (STATIC) - The camera must remain completely stationary. Strictly FORBID any camera push-in, zoom, pan, tilt, or tracking." : `The camera movement is "${effectiveCameraMovement}". Execute ONLY this movement without introducing conflicting motions.`}\n`
@@ -314,6 +349,7 @@ Generate ONLY the integrated_multimodal_description paragraph incorporating the 
 
   let rawLlmDescription = "";
   let providerUsed = "Local LM Studio";
+  let modelUsedActual = model || "local-model";
   const storedGeminiKey = getStoredGeminiKey();
 
   // Route to requested LLM provider or try local with fallback
@@ -324,6 +360,7 @@ Generate ONLY the integrated_multimodal_description paragraph incorporating the 
     const fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
     const result = await generateWithGeminiAPI(storedGeminiKey, fullPrompt);
     rawLlmDescription = result.text;
+    modelUsedActual = result.modelUsed;
     providerUsed = `Gemini (${result.modelUsed})`;
   } else {
     // Try LM Studio endpoint
@@ -346,8 +383,8 @@ Generate ONLY the integrated_multimodal_description paragraph incorporating the 
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt }
           ],
-          temperature: 0.7,
-          max_tokens: 800
+          temperature: effectiveTemperature,
+          max_tokens: effectiveMaxTokens
         }),
         signal: controller.signal
       });
@@ -356,7 +393,8 @@ Generate ONLY the integrated_multimodal_description paragraph incorporating the 
       if (lmRes.ok) {
         const data = await lmRes.json();
         rawLlmDescription = data.choices?.[0]?.message?.content?.trim() || "";
-        providerUsed = "Local LM Studio";
+        modelUsedActual = data.model || model || "local-model";
+        providerUsed = `Local LM Studio (${modelUsedActual})`;
       }
     } catch (e) {
       // Local endpoint offline
@@ -368,6 +406,7 @@ Generate ONLY the integrated_multimodal_description paragraph incorporating the 
         const fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
         const result = await generateWithGeminiAPI(storedGeminiKey, fullPrompt);
         rawLlmDescription = result.text;
+        modelUsedActual = result.modelUsed;
         providerUsed = `Gemini (${result.modelUsed} Fallback)`;
       } catch (geminiErr) {}
     }
@@ -385,6 +424,7 @@ Generate ONLY the integrated_multimodal_description paragraph incorporating the 
     rawLlmDescription = `[Shot 1] Live-action, cinematic 4K sequence capturing ${basic_stub.trim()}. ${framingStub}Featuring ${
       tagsList || "<Picture 1>"
     } with authentic facial expressions, realistic skin texture, and seamless character identity preservation. ${cameraStub}`;
+    modelUsedActual = "Deterministic Rules Engine";
     providerUsed = "Smart Offline Generator";
   }
 
@@ -393,6 +433,11 @@ Generate ONLY the integrated_multimodal_description paragraph incorporating the 
   if (cleanDescription.startsWith("```")) {
     cleanDescription = cleanDescription.replace(/^```[a-z]*\n?/i, "").replace(/\n?```$/, "").trim();
   }
+  // Strip conversational preambles often outputted by local models
+  cleanDescription = cleanDescription
+    .replace(/^(?:here(?:'s| is) (?:the )?(?:integrated )?(?:multimodal )?description[^:\n]*:?\s*)/i, "")
+    .replace(/^(?:certainly!?|sure!?|here you go:?)\s*/i, "")
+    .trim();
 
   // 4. Assembly Line Concatenation: FinalPrompt = Header + LLM_Description + Footer
   const finalPrompt = assembleFinalPrompt({
@@ -401,9 +446,23 @@ Generate ONLY the integrated_multimodal_description paragraph incorporating the 
     footer: mandatoryFooter
   });
 
+  const latencyMs = Date.now() - startTime;
+  const debug: PromptDebugInfo = {
+    system_prompt_sent: systemPrompt,
+    user_prompt_sent: userPrompt,
+    raw_llm_output: rawLlmDescription,
+    temperature_used: effectiveTemperature,
+    max_tokens_used: effectiveMaxTokens,
+    model_used: modelUsedActual,
+    provider: providerUsed,
+    latency_ms: latencyMs,
+    timestamp: new Date().toISOString()
+  };
+
   return {
     expanded_prompt: finalPrompt,
     provider: providerUsed,
-    description_only: cleanDescription
+    description_only: cleanDescription,
+    debug
   };
 }

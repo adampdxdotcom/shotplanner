@@ -64,7 +64,7 @@ export const WorkflowFileSelector: React.FC<WorkflowFileSelectorProps> = ({
             <button
               onClick={() => setShowRawJson(!showRawJson)}
               className="px-2.5 py-1.5 text-xs text-zinc-400 hover:text-zinc-200 bg-zinc-950 border-2 border-zinc-700 rounded-lg transition-colors flex items-center gap-1"
-              title="Inspect flat dictionary JSON"
+              title="Inspect Live Injected Workflow JSON"
             >
               <Code className="w-3.5 h-3.5" />
               <span>{showRawJson ? "Hide JSON" : "Show JSON"}</span>

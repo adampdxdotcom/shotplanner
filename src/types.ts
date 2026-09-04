@@ -183,6 +183,28 @@ export interface AppConfig {
   huggingface_token?: string;
   llm_provider?: LLMProvider;
   default_llm_provider?: LLMProvider;
+  llm_custom_system_prompt?: string;
+  llm_temperature?: number;
+  llm_max_tokens?: number;
+}
+
+export interface PromptDebugInfo {
+  system_prompt_sent: string;
+  user_prompt_sent: string;
+  raw_llm_output: string;
+  temperature_used: number;
+  max_tokens_used: number;
+  model_used: string;
+  provider: string;
+  latency_ms: number;
+  timestamp: string;
+}
+
+export interface ExpandPromptResult {
+  expanded_prompt: string;
+  provider: string;
+  description_only?: string;
+  debug?: PromptDebugInfo;
 }
 
 export interface ModelCategoryPreset {

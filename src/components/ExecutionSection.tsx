@@ -336,30 +336,30 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
         onSelectShot={onSelectShot}
       />
 
-      {monitorState && (monitorState.isExecuting || monitorState.queueRemaining > 0) ? (
+      {monitorState && (monitorState.isExecuting || monitorState.queueRemaining > 0) && (
         <ExecutionMonitor monitorState={monitorState} />
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <SendShotPanel
-            activeShot={activeShot}
-            sanitizedSceneName={sanitizedSceneName}
-            activeShotAssets={activeShotAssets}
-            isTransferring={isTransferring && lastAction === "shot"}
-            isExecuting={isTransferring && lastAction === "execute_shot"}
-            lastAction={lastAction as "shot" | "scene" | "execute_shot" | null}
-            handleSendShot={handleSendShot}
-            handleExecuteShot={handleExecuteShot}
-          />
-          <SendScenePanel
-            sceneProject={sceneProject}
-            sanitizedSceneName={sanitizedSceneName}
-            allSceneAssets={allSceneAssets}
-            isTransferring={isTransferring}
-            lastAction={lastAction}
-            handleSendScene={handleSendScene}
-          />
-        </div>
       )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <SendShotPanel
+          activeShot={activeShot}
+          sanitizedSceneName={sanitizedSceneName}
+          activeShotAssets={activeShotAssets}
+          isTransferring={isTransferring && lastAction === "shot"}
+          isExecuting={isTransferring && lastAction === "execute_shot"}
+          lastAction={lastAction as "shot" | "scene" | "execute_shot" | null}
+          handleSendShot={handleSendShot}
+          handleExecuteShot={handleExecuteShot}
+        />
+        <SendScenePanel
+          sceneProject={sceneProject}
+          sanitizedSceneName={sanitizedSceneName}
+          allSceneAssets={allSceneAssets}
+          isTransferring={isTransferring}
+          lastAction={lastAction}
+          handleSendScene={handleSendScene}
+        />
+      </div>
 
       <ExecutionConsole
         transferState={transferState}

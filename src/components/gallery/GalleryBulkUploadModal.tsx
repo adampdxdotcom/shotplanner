@@ -247,8 +247,8 @@ export const GalleryBulkUploadModal: React.FC<GalleryBulkUploadModalProps> = ({
     let errorCount = 0;
 
     // 1. Upload Character Pack Slots
-    for (const slot of packSlots) {
-      if (!slot.file || slot.status === "success") continue;
+    const packUploadPromises = packSlots.map(async (slot) => {
+      if (!slot.file || slot.status === "success") return;
 
       handleUpdatePackSlot(slot.id, { status: "uploading", progress: 15, error: undefined });
 
@@ -300,11 +300,11 @@ export const GalleryBulkUploadModal: React.FC<GalleryBulkUploadModalProps> = ({
           error: err.message || "Upload failed"
         });
       }
-    }
+    });
 
     // 2. Upload General Bulk Queue Items
-    for (let i = 0; i < bulkQueue.length; i++) {
-      if (bulkQueue[i].status === "success") continue;
+    const queueUploadPromises = bulkQueue.map(async (item, i) => {
+      if (item.status === "success") return;
 
       setBulkQueue(prev => {
         const next = [...prev];
@@ -313,7 +313,7 @@ export const GalleryBulkUploadModal: React.FC<GalleryBulkUploadModalProps> = ({
       });
 
       const formData = new FormData();
-      formData.append("file", bulkQueue[i].file);
+      formData.append("file", item.file);
       if (sceneName) {
         formData.append("scene_name", sceneName);
       }
@@ -345,7 +345,7 @@ export const GalleryBulkUploadModal: React.FC<GalleryBulkUploadModalProps> = ({
           completedCount++;
         } else {
           const text = await res.text();
-          throw new Error(text || `Failed to upload ${bulkQueue[i].file.name}`);
+          throw new Error(text || `Failed to upload ${item.file.name}`);
         }
       } catch (err: any) {
         errorCount++;
@@ -355,7 +355,9 @@ export const GalleryBulkUploadModal: React.FC<GalleryBulkUploadModalProps> = ({
           return next;
         });
       }
-    }
+    });
+
+    await Promise.all([...packUploadPromises, ...queueUploadPromises]);
 
     setIsBulkUploading(false);
     setUploadSummary({

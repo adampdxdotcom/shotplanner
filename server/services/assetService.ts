@@ -614,7 +614,7 @@ class AssetService {
           writeStream.end();
           return;
         }
-        const cp = path.join(chunksTempDir, `${upload_id}_${i}.part`);
+        const cp = path.join(chunksTempDir, `${upload_id}_${i}`);
         if (fs.existsSync(cp)) {
           const rs = fs.createReadStream(cp);
           rs.pipe(writeStream, { end: false });

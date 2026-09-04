@@ -318,7 +318,8 @@ async def save_uploaded_file(file_bytes: bytes, target_filename: str, scene_name
         await f.write(file_bytes)
         
     if media_type == "image" or destination.name.lower().endswith(('.png', '.jpg', '.jpeg', '.webp', '.bmp', '.gif')):
-        generate_thumbnail(destination)
+        import asyncio
+        await asyncio.to_thread(generate_thumbnail, destination)
     
     # Also write into legacy uploads for flat fallback
     flat_dest = LEGACY_UPLOADS_DIR / destination.name

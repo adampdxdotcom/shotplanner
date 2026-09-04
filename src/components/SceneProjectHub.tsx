@@ -21,6 +21,7 @@ interface Props {
   onTransferScene: () => Promise<boolean>;
   onExpandPrompt: (shot: ShotItem) => Promise<string>;
   onAssetUploaded?: (asset: MediaAsset, targetSlotIndex?: number) => void;
+  onUpdateSpecificShot?: (id: string, updater: (prev: ShotItem) => ShotItem) => void;
 }
 
 export default function SceneProjectHub({
@@ -34,7 +35,8 @@ export default function SceneProjectHub({
   onTransfer,
   onTransferScene,
   onExpandPrompt,
-  onAssetUploaded
+  onAssetUploaded,
+  onUpdateSpecificShot
 }: Props) {
   const [isExpanding, setIsExpanding] = useState(false);
   const [isTransferring, setIsTransferring] = useState(false);
@@ -138,10 +140,15 @@ export default function SceneProjectHub({
 
   const handleExpandPrompt = async () => {
     if (!activeShot) return;
+    const currentShotId = activeShot.id;
     setIsExpanding(true);
     try {
       const prompt = await onExpandPrompt(activeShot);
-      updateActiveShot(prev => ({ ...prev, expanded_prompt: prompt }));
+      if (onUpdateSpecificShot) {
+        onUpdateSpecificShot(currentShotId, prev => ({ ...prev, expanded_prompt: prompt }));
+      } else {
+        updateActiveShot(prev => ({ ...prev, expanded_prompt: prompt }));
+      }
     } catch (e: any) {
       onShowToast(e.message || "Failed to expand prompt", "error");
     } finally {
