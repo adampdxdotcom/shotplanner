@@ -9,6 +9,14 @@ import {
 } from '../../types';
 import { getAssetMediaUrl } from '../../utils/assetUrl';
 import { normalizeProjectCastAndAssets } from '../../utils/subjectUtils';
+import { sanitizeProjectForPersistence } from '../../utils/recipeSanitizer';
+import { useDebouncedProjectAutosave } from './useDebouncedProjectAutosave';
+import { 
+  getLastProjectName, 
+  setLastProjectName, 
+  getLastActiveSection, 
+  getLastActiveShotId 
+} from '../../utils/workspaceSessionStore';
 
 export interface ShotOperationsDelegate {
   llmProvider: LLMProvider;
@@ -125,43 +133,21 @@ export function useScenePersistence({
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isDirty]);
 
-  // Auto-save sceneProject to disk
-  useEffect(() => {
-    if (isInitialLoad || !hasLoadedProject || !isDirty) return;
-    const saveSceneProject = async () => {
-      try {
-        const delegate = getShotOperationsDelegate?.();
-        const currentLlmProvider = delegate?.llmProvider || config.default_llm_provider || defaultLlmProvider;
-
-        const payload = {
-          name: sceneProject.scene_name.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_").replace(/_+/g, "_"),
-          data: {
-            ...sceneProject,
-            lm_studio_url: config.lm_studio_url,
-            config: {
-              ...(sceneProject.config || {}),
-              ...config,
-              lm_studio_url: config.lm_studio_url
-            },
-            llm_provider: currentLlmProvider,
-            parameter_node_mappings: parameterNodeMappings,
-            generation_params: generationParams
-          }
-        };
-        await fetch("/api/projects", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-        setIsDirty(false);
-      } catch (err) {
-        console.error("Auto-save failed:", err);
-      }
-    };
-    
-    const timer = setTimeout(saveSceneProject, 1000);
-    return () => clearTimeout(timer);
-  }, [sceneProject, isInitialLoad, hasLoadedProject, isDirty, parameterNodeMappings, generationParams, config, defaultLlmProvider, getShotOperationsDelegate]);
+  // Debounced auto-save sceneProject to backend storage with stripped data URLs
+  const { autosaveStatus, lastSavedAt, forceAutosave } = useDebouncedProjectAutosave({
+    sceneProject,
+    currentProjectName,
+    config,
+    parameterNodeMappings,
+    generationParams,
+    defaultLlmProvider,
+    getShotOperationsDelegate,
+    isInitialLoad,
+    hasLoadedProject,
+    isDirty,
+    setIsDirty,
+    debounceMs: 1200
+  });
 
   const fetchAssets = useCallback(async (sceneName?: string) => {
     try {
@@ -228,11 +214,13 @@ export function useScenePersistence({
       subjects: normalized.subjects,
       characters: normalized.characters
     };
+
+    const sanitizedPayload = sanitizeProjectForPersistence(payload);
     
     const res = await fetch("/api/projects", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filename, data: payload })
+      body: JSON.stringify({ filename, data: sanitizedPayload })
     });
     
     if (!res.ok) {
@@ -249,7 +237,7 @@ export function useScenePersistence({
     addToast(`Project "${cleanName}" saved successfully.`, "success");
   }, [sceneProject, config, parameterNodeMappings, generationParams, defaultLlmProvider, getShotOperationsDelegate, addToast]);
 
-  const handleLoadProject = useCallback(async (filename: string) => {
+  const handleLoadProject = useCallback(async (filename: string, options?: { isInitialRestore?: boolean }) => {
     const res = await fetch(`/api/projects/${filename}`);
     if (!res.ok) {
       const err = await res.json();
@@ -312,13 +300,29 @@ export function useScenePersistence({
         }));
       }
 
+      const cleanProject = filename.replace(/\.json$/i, "");
       setSceneProject(data);
-      setCurrentProjectName(filename.replace(/\.json$/i, ""));
+      setCurrentProjectName(cleanProject);
+      setLastProjectName(cleanProject);
+
+      // Active Shot Resolution:
+      const savedShotId = getLastActiveShotId(data.scene_name || cleanProject);
+      const targetShotId = (savedShotId && data.shots && data.shots.some((s: any) => s.id === savedShotId))
+        ? savedShotId
+        : (data.shots && data.shots.length > 0 ? data.shots[0].id : null);
+
       if (delegate?.setActiveShotId) {
-        delegate.setActiveShotId(data.shots && data.shots.length > 0 ? data.shots[0].id : null);
+        delegate.setActiveShotId(targetShotId);
       }
+
+      // Active Section Resolution:
       if (delegate?.setActiveSection) {
-        delegate.setActiveSection("scene");
+        if (options?.isInitialRestore) {
+          const savedSection = getLastActiveSection("scene");
+          delegate.setActiveSection(savedSection);
+        } else {
+          delegate.setActiveSection("scene");
+        }
       }
       setIsDirty(false);
       
@@ -471,17 +475,20 @@ export function useScenePersistence({
 
   useEffect(() => {
     fetchWorkflows();
-    const lastProject = localStorage.getItem('shotplanner_last_project');
+    const lastProject = getLastProjectName();
     if (lastProject) {
-      handleLoadProject(lastProject + ".json").catch(err => {
+      handleLoadProject(lastProject + ".json", { isInitialRestore: true }).catch(err => {
         console.error("Failed to restore last project:", err);
+        setHasLoadedProject(true);
       });
+    } else {
+      setHasLoadedProject(true);
     }
   }, []);
 
   useEffect(() => {
     if (currentProjectName && currentProjectName !== "untitled_scene") {
-      localStorage.setItem('shotplanner_last_project', currentProjectName);
+      setLastProjectName(currentProjectName);
     }
   }, [currentProjectName]);
 
@@ -513,6 +520,9 @@ export function useScenePersistence({
     handleSaveProject,
     handleLoadProject,
     handleCreateNewProject,
-    fetchAssets
+    fetchAssets,
+    autosaveStatus,
+    lastSavedAt,
+    forceAutosave
   };
 }

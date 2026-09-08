@@ -7,6 +7,7 @@ import { CastSection } from "./components/CastSection";
 import { GallerySection } from "./components/GallerySection";
 import { LLMSection } from "./components/LLMSection";
 import { ExecutionSection } from "./components/ExecutionSection";
+import { StagingSection } from "./components/StagingSection";
 import { AppModals } from "./components/AppModals";
 import SceneProjectHub from "./components/SceneProjectHub";
 import { useAppLogic } from "./hooks/useAppLogic";
@@ -64,7 +65,9 @@ export default function App() {
     handleUpdateMapping,
     scrollToSection,
     updateShot,
-    updateActiveShot
+    updateActiveShot,
+    autosaveStatus,
+    lastSavedAt
   } = useAppLogic();
 
   return (
@@ -101,6 +104,7 @@ export default function App() {
               onExpandPrompt={handleSceneExpandPrompt}
               onAssetUploaded={handleAssetUploaded}
               onUpdateSpecificShot={updateShot}
+              onNavigate={scrollToSection}
             />
           </div>
         )}
@@ -121,6 +125,24 @@ export default function App() {
             onAssetUploaded={handleAssetUploaded}
             onAssetDeleted={handleAssetDeleted}
             onAssetUpdated={handleAssetUpdated}
+          />
+        )}
+
+        {activeSection === "staging" && (
+          <StagingSection
+            sceneProject={sceneProject}
+            activeShotId={activeShotId}
+            onSelectShot={setActiveShotId}
+            assets={assets}
+            characters={sceneProject.characters || {}}
+            subjects={subjects}
+            activeSceneName={sceneProject.scene_name || currentProjectName || "Untitled_Scene"}
+            onUpdateProject={setSceneProject}
+            onUpdateShot={updateActiveShot}
+            onAssetUploaded={handleAssetUploaded}
+            addToast={addToast}
+            autosaveStatus={autosaveStatus}
+            lastSavedAt={lastSavedAt}
           />
         )}
 

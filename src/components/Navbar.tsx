@@ -13,7 +13,8 @@ import {
   Plus,
   Image,
   Film,
-  Users
+  Users,
+  Layers
 } from "lucide-react";
 
 interface NavbarProps {
@@ -128,8 +129,19 @@ export const Navbar: React.FC<NavbarProps> = ({
             <Film className="w-3.5 h-3.5" />
             Shots
           </button>
-        <button
-          onClick={() => onNavigate("workflow")}
+          <button
+            onClick={() => onNavigate("staging")}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
+              activeSection === "staging" 
+                ? "bg-zinc-800 text-zinc-100 shadow-xs" 
+                : "text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5 text-indigo-400" />
+            Staging
+          </button>
+          <button
+            onClick={() => onNavigate("workflow")}
           className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
             activeSection === "workflow" 
               ? "bg-zinc-800 text-zinc-100 shadow-xs" 

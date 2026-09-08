@@ -42,6 +42,7 @@ export function useActorMasking({
   // Canvas painting references
   const activeMaskCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const offscreenMaskCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const reusableScratchCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const originalImageRef = useRef<HTMLImageElement | null>(null);
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -71,11 +72,18 @@ export function useActorMasking({
 
     if ((!updatedCutout || !updatedMask) && maskCanvas && origImg) {
       try {
-        const commitCanvas = document.createElement("canvas");
-        commitCanvas.width = maskCanvas.width;
-        commitCanvas.height = maskCanvas.height;
+        if (!reusableScratchCanvasRef.current) {
+          reusableScratchCanvasRef.current = document.createElement("canvas");
+        }
+        const commitCanvas = reusableScratchCanvasRef.current;
+        if (commitCanvas.width !== maskCanvas.width || commitCanvas.height !== maskCanvas.height) {
+          commitCanvas.width = maskCanvas.width;
+          commitCanvas.height = maskCanvas.height;
+        }
         const cCtx = commitCanvas.getContext("2d");
         if (cCtx) {
+          cCtx.clearRect(0, 0, commitCanvas.width, commitCanvas.height);
+          cCtx.globalCompositeOperation = "source-over";
           cCtx.drawImage(origImg, 0, 0);
           cCtx.globalCompositeOperation = "destination-in";
           cCtx.drawImage(maskCanvas, 0, 0);
@@ -155,11 +163,17 @@ export function useActorMasking({
       offscreenMaskCanvasRef.current = maskCanvas;
 
       if (!actor.originalCutoutDataUrl) {
-        const offCanvas = document.createElement("canvas");
-        offCanvas.width = width;
-        offCanvas.height = height;
+        if (!reusableScratchCanvasRef.current) {
+          reusableScratchCanvasRef.current = document.createElement("canvas");
+        }
+        const offCanvas = reusableScratchCanvasRef.current;
+        if (offCanvas.width !== width || offCanvas.height !== height) {
+          offCanvas.width = width;
+          offCanvas.height = height;
+        }
         const offCtx = offCanvas.getContext("2d");
         if (offCtx) {
+          offCtx.clearRect(0, 0, width, height);
           offCtx.drawImage(img, 0, 0, width, height);
           const origDataUrl = offCanvas.toDataURL("image/png");
           onUpdateActor(actor.id, {

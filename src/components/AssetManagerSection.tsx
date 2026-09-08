@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { MediaAsset, SceneProjectFile, ShotItem, CharacterProfile } from "../types";
 import { 
   FileImage, 
@@ -15,6 +15,7 @@ import { AssetEditModal } from "./AssetEditModal";
 import { AssetLightbox } from "./AssetLightbox";
 import { AssetCard, EmptySlotCard } from "./AssetSlotGrid";
 import { toCanonicalSubjectName } from "../utils/subjectUtils";
+import { getLastAssetTab, setLastAssetTab } from "../utils/workspaceSessionStore";
 
 const MAX_IMAGES = 9;
 const MAX_VIDEOS = 3;
@@ -51,7 +52,11 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
   onAssetDeleted,
   onAssetUpdated
 }) => {
-  const [activeTab, setActiveTab] = useState<"image" | "audio" | "video">("image");
+  const [activeTab, setActiveTab] = useState<"image" | "audio" | "video">(() => getLastAssetTab("image"));
+
+  useEffect(() => {
+    setLastAssetTab(activeTab);
+  }, [activeTab]);
   
   const [uploadModalSlot, setUploadModalSlot] = useState<{ type: "image" | "audio" | "video", index: number } | null>(null);
   const [editingAsset, setEditingAsset] = useState<MediaAsset | null>(null);

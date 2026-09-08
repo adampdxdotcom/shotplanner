@@ -86,7 +86,10 @@ export function useAppLogic() {
     handleSaveProject,
     handleLoadProject,
     handleCreateNewProject,
-    fetchAssets
+    fetchAssets,
+    autosaveStatus,
+    lastSavedAt,
+    forceAutosave
   } = useScenePersistence({
     config,
     setConfig,
@@ -243,6 +246,9 @@ export function useAppLogic() {
     handleUpdateMapping,
     scrollToSection,
     updateShot,
-    updateActiveShot
+    updateActiveShot,
+    autosaveStatus,
+    lastSavedAt,
+    forceAutosave
   };
 }

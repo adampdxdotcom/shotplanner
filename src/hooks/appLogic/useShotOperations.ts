@@ -13,6 +13,12 @@ import {
 import { generatePromptPrefix } from '../../components/ScenePlanningHeader';
 import { useComfyMonitor } from '../useComfyMonitor';
 import { getDefaultLlmProvider } from './useAppConfig';
+import { 
+  getLastActiveSection, 
+  setLastActiveSection, 
+  getLastActiveShotId, 
+  setLastActiveShotId 
+} from '../../utils/workspaceSessionStore';
 
 interface UseShotOperationsParams {
   sceneProject: SceneProjectFile;
@@ -65,13 +71,36 @@ export function useShotOperations({
   const [expandedPrompt, setExpandedPrompt] = useState<string>("");
   const [llmProvider, setLlmProvider] = useState<LLMProvider>(getDefaultLlmProvider);
 
-  // UI Navigation
-  const [activeSection, setActiveSection] = useState<string>("scene");
-  const [activeShotId, setActiveShotId] = useState<string | null>(null);
+  // UI Navigation (persisted across page reloads & tab navigation)
+  const [activeSection, setActiveSection] = useState<string>(() => getLastActiveSection("scene"));
+  const [activeShotId, setActiveShotId] = useState<string | null>(() => getLastActiveShotId(sceneProject?.scene_name));
 
   const scrollToSection = useCallback((sectionId: string) => {
     setActiveSection(sectionId);
+    setLastActiveSection(sectionId);
   }, []);
+
+  // Synchronize active navigation section to session store
+  useEffect(() => {
+    if (activeSection) {
+      setLastActiveSection(activeSection);
+    }
+  }, [activeSection]);
+
+  // Synchronize active shot ID to session store for this project
+  useEffect(() => {
+    setLastActiveShotId(activeShotId, sceneProject?.scene_name);
+  }, [activeShotId, sceneProject?.scene_name]);
+
+  // If no shot is selected yet but project shots exist, attempt to restore saved shot or default to first
+  useEffect(() => {
+    if (!activeShotId && sceneProject?.shots && sceneProject.shots.length > 0) {
+      const saved = getLastActiveShotId(sceneProject.scene_name);
+      if (saved && sceneProject.shots.some(s => s.id === saved)) {
+        setActiveShotId(saved);
+      }
+    }
+  }, [sceneProject?.scene_name, sceneProject?.shots, activeShotId]);
 
   const updateShot = useCallback((shotId: string, updater: (prev: ShotItem) => ShotItem) => {
     setSceneProject(prev => {

@@ -31,7 +31,7 @@ export const AssetMatrixPanel: React.FC<AssetMatrixPanelProps> = ({
   };
 
   return (
-    <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-5 flex flex-col gap-4 overflow-y-auto">
+    <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-5 flex flex-col gap-4 overflow-y-auto h-full shadow-sm">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-base font-semibold text-white">Asset Matrix (Slots 1-9)</h2>

@@ -5,6 +5,7 @@ import {
   detectActiveModifier,
   updateDescriptionWithModifier
 } from "../../utils/assetModifiers";
+import { createManagedBlobUrl } from "../../utils/blobRegistry";
 
 export type ReferencePackSlotId =
   | "headshot_facing"
@@ -196,7 +197,7 @@ export const CharacterReferencePackGrid: React.FC<CharacterReferencePackGridProp
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const file = e.dataTransfer.files[0];
       if (file.type.startsWith("image/")) {
-        const previewUrl = URL.createObjectURL(file);
+        const previewUrl = createManagedBlobUrl(file, "character-pack");
         onUpdateSlot(slotId, {
           file,
           previewUrl,
@@ -211,7 +212,7 @@ export const CharacterReferencePackGrid: React.FC<CharacterReferencePackGridProp
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, slotId: CharacterPackSlotId) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
-      const previewUrl = URL.createObjectURL(file);
+      const previewUrl = createManagedBlobUrl(file, "character-pack");
       onUpdateSlot(slotId, {
         file,
         previewUrl,

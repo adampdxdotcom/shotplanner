@@ -2,11 +2,10 @@
 import React, { useState, useMemo } from "react";
 import { SceneProjectFile, ShotItem, MediaAsset, AppConfig } from "../types";
 import { TakeReviewModal } from "./TakeReviewModal";
-import { UploadCloud } from "lucide-react";
 import { ShotCarousel } from "./hub/ShotCarousel";
 import { ShotMetadataPanel } from "./hub/ShotMetadataPanel";
 import { AssetMatrixPanel } from "./hub/AssetMatrixPanel";
-import { PromptEngineeringPanel } from "./hub/PromptEngineeringPanel";
+import { PromptPreviewPanel } from "./hub/PromptPreviewPanel";
 import { AiReferenceStagingStudioModal } from "./cast/AiReferenceStagingStudioModal";
 
 interface Props {
@@ -17,11 +16,12 @@ interface Props {
   activeShotId: string | null;
   onSelectShot: (id: string | null) => void;
   onShowToast: (text: string, type?: "success" | "error" | "info") => void;
-  onTransfer: (shot: ShotItem) => Promise<boolean>;
-  onTransferScene: () => Promise<boolean>;
-  onExpandPrompt: (shot: ShotItem) => Promise<string>;
+  onTransfer?: (shot: ShotItem) => Promise<boolean>;
+  onTransferScene?: () => Promise<boolean>;
+  onExpandPrompt?: (shot: ShotItem) => Promise<string>;
   onAssetUploaded?: (asset: MediaAsset, targetSlotIndex?: number) => void;
   onUpdateSpecificShot?: (id: string, updater: (prev: ShotItem) => ShotItem) => void;
+  onNavigate?: (section: string) => void;
 }
 
 export default function SceneProjectHub({
@@ -36,12 +36,10 @@ export default function SceneProjectHub({
   onTransferScene,
   onExpandPrompt,
   onAssetUploaded,
-  onUpdateSpecificShot
+  onUpdateSpecificShot,
+  onNavigate
 }: Props) {
-  const [isExpanding, setIsExpanding] = useState(false);
-  const [isTransferring, setIsTransferring] = useState(false);
   const [reviewTakeId, setReviewTakeId] = useState<string | null>(null);
-  const [isTransferringScene, setIsTransferringScene] = useState(false);
   const [isStagingStudioOpen, setIsStagingStudioOpen] = useState(false);
   const [stagingStudioTab, setStagingStudioTab] = useState<"headshots" | "staging">("staging");
 
@@ -138,58 +136,6 @@ export default function SceneProjectHub({
     });
   };
 
-  const handleExpandPrompt = async () => {
-    if (!activeShot) return;
-    const currentShotId = activeShot.id;
-    setIsExpanding(true);
-    try {
-      const prompt = await onExpandPrompt(activeShot);
-      if (onUpdateSpecificShot) {
-        onUpdateSpecificShot(currentShotId, prev => ({ ...prev, expanded_prompt: prompt }));
-      } else {
-        updateActiveShot(prev => ({ ...prev, expanded_prompt: prompt }));
-      }
-    } catch (e: any) {
-      onShowToast(e.message || "Failed to expand prompt", "error");
-    } finally {
-      setIsExpanding(false);
-    }
-  };
-
-  const handleTransferSceneAction = async () => {
-    setIsTransferringScene(true);
-    try {
-      const success = await onTransferScene();
-      if (success) {
-        onUpdateProject(prev => {
-          const updatedShots = prev.shots.map(s => ({ ...s, status: "staged" as const }));
-          return { ...prev, shots: updatedShots };
-        });
-        onShowToast("Scene staged successfully!", "success");
-      }
-    } catch (e: any) {
-      onShowToast(e.message || "Scene transfer failed", "error");
-    } finally {
-      setIsTransferringScene(false);
-    }
-  };
-
-  const handleTransferShotAction = async () => {
-    if (!activeShot) return;
-    setIsTransferring(true);
-    try {
-      const success = await onTransfer(activeShot);
-      if (success) {
-        updateActiveShot(prev => ({ ...prev, status: "staged" as const }));
-        onShowToast("Shot staged successfully!", "success");
-      }
-    } catch (e: any) {
-      onShowToast(e.message || "Transfer failed", "error");
-    } finally {
-      setIsTransferring(false);
-    }
-  };
-
   const handleReorderShots = (newShots: ShotItem[]) => {
     onUpdateProject(prev => ({ ...prev, shots: newShots }));
   };
@@ -226,52 +172,34 @@ export default function SceneProjectHub({
             })}
             onReviewTake={setReviewTakeId}
             onOpenStagingStudio={() => {
-              setStagingStudioTab("staging");
-              setIsStagingStudioOpen(true);
+              if (onNavigate) {
+                onNavigate("staging");
+              } else {
+                setStagingStudioTab("staging");
+                setIsStagingStudioOpen(true);
+              }
             }}
           />
 
-          <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-0">
+          <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-0 items-stretch">
             <AssetMatrixPanel 
               activeShot={activeShot}
               assets={assets}
               onClearSlot={handleClearSlot}
             />
             
-            <PromptEngineeringPanel 
+            <PromptPreviewPanel 
               activeShot={activeShot}
-              projectShotsLength={project.shots.length}
-              isExpanding={isExpanding}
-              isTransferring={isTransferring}
-              isTransferringScene={isTransferringScene}
-              onUpdateStub={(stub) => updateActiveShot(prev => ({ ...prev, basic_stub: stub }))}
-              onUpdateExpandedPrompt={(prompt) => updateActiveShot(prev => ({ ...prev, expanded_prompt: prompt }))}
-              onExpandPrompt={handleExpandPrompt}
-              onTransferShot={handleTransferShotAction}
-              onTransferScene={handleTransferSceneAction}
-              onOpenStagingStudio={() => {
-                setStagingStudioTab("staging");
-                setIsStagingStudioOpen(true);
-              }}
+              addToast={onShowToast}
             />
           </div>
         </div>
       ) : (
         <div className="flex-1 flex flex-col items-center justify-center p-12 bg-zinc-900/40 border border-zinc-800 rounded-xl min-h-[400px]">
           <h2 className="text-xl font-semibold text-zinc-300 mb-2">No Shot Selected</h2>
-          <p className="text-sm text-zinc-500 mb-6 text-center max-w-md">
+          <p className="text-sm text-zinc-500 text-center max-w-md">
             Select an existing shot card from the top carousel, or click the + button to create a new shot and assign camera planning.
           </p>
-          {project.shots.length > 0 && (
-            <button
-              onClick={handleTransferSceneAction}
-              disabled={isTransferringScene}
-              className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-3 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 shadow"
-            >
-              <UploadCloud className="w-5 h-5" />
-              {isTransferringScene ? "Sending Scene..." : "Send Scene"}
-            </button>
-          )}
         </div>
       )}
 

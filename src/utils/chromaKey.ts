@@ -7,6 +7,38 @@
  * and despill suppression to eliminate halos and fringing.
  */
 
+import { createManagedBlobUrl } from "./blobRegistry";
+
+// Persistent offscreen canvas scratchpad to avoid frequent canvas allocation/deallocation during scrubbing
+let reusableOffscreenCanvas: HTMLCanvasElement | null = null;
+let reusableOffscreenCtx: CanvasRenderingContext2D | null = null;
+
+function getReusableCanvas(width: number, height: number): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } {
+  if (typeof document === "undefined") {
+    throw new Error("Canvas is only supported in browser DOM environment");
+  }
+
+  if (!reusableOffscreenCanvas) {
+    reusableOffscreenCanvas = document.createElement("canvas");
+    reusableOffscreenCtx = reusableOffscreenCanvas.getContext("2d", { willReadFrequently: true });
+  }
+
+  if (!reusableOffscreenCtx) {
+    throw new Error("Could not initialize 2D canvas rendering context");
+  }
+
+  // Adjust dimensions only when needed
+  if (reusableOffscreenCanvas.width !== width || reusableOffscreenCanvas.height !== height) {
+    reusableOffscreenCanvas.width = width;
+    reusableOffscreenCanvas.height = height;
+  } else {
+    // Clear previous scratchpad content
+    reusableOffscreenCtx.clearRect(0, 0, width, height);
+  }
+
+  return { canvas: reusableOffscreenCanvas, ctx: reusableOffscreenCtx };
+}
+
 export interface ChromaKeyOptions {
   source: HTMLImageElement | HTMLCanvasElement | string;
   keyColor?: string; // Hex e.g. "#00FF00" or rgb
@@ -18,7 +50,8 @@ export interface ChromaKeyOptions {
 }
 
 export interface ChromaKeyResult {
-  dataUrl: string; // Transparent PNG data:image/png;base64,...
+  dataUrl: string; // Transparent PNG data:image/png;base64,... or blob: URL
+  blobUrl?: string; // Efficient managed blob URL
   width: number;
   height: number;
   transparentPixelCount: number;
@@ -99,8 +132,6 @@ export function loadImage(src: string): Promise<HTMLImageElement> {
 export function autoDetectKeyColor(
   source: HTMLImageElement | HTMLCanvasElement | ImageData
 ): string {
-  let canvas: HTMLCanvasElement;
-  let ctx: CanvasRenderingContext2D | null;
   let width: number;
   let height: number;
   let imgData: ImageData;
@@ -112,11 +143,7 @@ export function autoDetectKeyColor(
   } else {
     width = source.width;
     height = source.height;
-    canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    ctx = canvas.getContext("2d", { willReadFrequently: true });
-    if (!ctx) return "#00FF00";
+    const { ctx } = getReusableCanvas(width, height);
     ctx.drawImage(source, 0, 0);
     imgData = ctx.getImageData(0, 0, width, height);
   }
@@ -223,13 +250,7 @@ export async function samplePixelColor(
     imgElement = source;
   }
 
-  const canvas = document.createElement("canvas");
-  canvas.width = imgElement.width;
-  canvas.height = imgElement.height;
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  if (!ctx) {
-    return { hex: "#00FF00", rgb: { r: 0, g: 255, b: 0 } };
-  }
+  const { ctx } = getReusableCanvas(imgElement.width, imgElement.height);
   ctx.drawImage(imgElement, 0, 0);
 
   const clampedX = Math.max(0, Math.min(imgElement.width - 1, Math.round(pixelX)));
@@ -279,13 +300,7 @@ export async function applyChromaKey(options: ChromaKeyOptions): Promise<ChromaK
     height = maxHeight;
   }
 
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  if (!ctx) {
-    throw new Error("Could not initialize 2D canvas rendering context for chroma keying");
-  }
+  const { canvas, ctx } = getReusableCanvas(width, height);
 
   ctx.drawImage(imgElement, 0, 0, width, height);
   const imgData = ctx.getImageData(0, 0, width, height);
@@ -367,11 +382,24 @@ export async function applyChromaKey(options: ChromaKeyOptions): Promise<ChromaK
   // Put processed keyed pixels back onto canvas
   ctx.putImageData(imgData, 0, 0);
 
-  const dataUrl = canvas.toDataURL("image/png");
   const transparentPercentage = totalPixels > 0 ? Math.round((transparentCount / totalPixels) * 100) : 0;
+
+  // Generate lightweight binary Blob URL in addition to dataUrl
+  let blobUrl: string | undefined;
+  if (typeof canvas.toBlob === "function") {
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, "image/png");
+    });
+    if (blob) {
+      blobUrl = createManagedBlobUrl(blob, "chroma-cutout");
+    }
+  }
+
+  const dataUrl = blobUrl || canvas.toDataURL("image/png");
 
   return {
     dataUrl,
+    blobUrl,
     width,
     height,
     transparentPixelCount: transparentCount,

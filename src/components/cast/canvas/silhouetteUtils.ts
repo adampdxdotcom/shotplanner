@@ -1,12 +1,28 @@
 /**
  * Helper: Create a stylized silhouette fallback if character has no image asset
+ * Uses a persistent offscreen scratchpad canvas and caches generated silhouettes by name
  */
+let silhouetteScratchCanvas: HTMLCanvasElement | null = null;
+const silhouetteCache = new Map<string, string>();
+
 export function createSilhouetteImage(name: string): HTMLImageElement {
-  const canvas = document.createElement("canvas");
-  canvas.width = 600;
-  canvas.height = 900;
+  const cachedDataUrl = silhouetteCache.get(name);
+  if (cachedDataUrl) {
+    const img = new Image();
+    img.src = cachedDataUrl;
+    return img;
+  }
+
+  if (!silhouetteScratchCanvas) {
+    silhouetteScratchCanvas = document.createElement("canvas");
+    silhouetteScratchCanvas.width = 600;
+    silhouetteScratchCanvas.height = 900;
+  }
+
+  const canvas = silhouetteScratchCanvas;
   const ctx = canvas.getContext("2d");
   if (ctx) {
+    ctx.clearRect(0, 0, 600, 900);
     const grad = ctx.createLinearGradient(0, 0, 0, 900);
     grad.addColorStop(0, "#4f46e5");
     grad.addColorStop(1, "#1e1b4b");
@@ -32,7 +48,11 @@ export function createSilhouetteImage(name: string): HTMLImageElement {
     ctx.textAlign = "center";
     ctx.fillText(name, 300, 520);
   }
+
+  const dataUrl = canvas.toDataURL("image/png");
+  silhouetteCache.set(name, dataUrl);
+
   const img = new Image();
-  img.src = canvas.toDataURL("image/png");
+  img.src = dataUrl;
   return img;
 }

@@ -1,5 +1,5 @@
 import React from "react";
-import { Sliders, Plus, UserPlus, X, Eraser, Trash2, Compass, User } from "lucide-react";
+import { Sliders, Plus, UserPlus, X, Eraser, Trash2, Compass, User, FlipHorizontal } from "lucide-react";
 import { StagedActor } from "./AiReferenceStagingStudioModal";
 
 export interface StagingActorInspectorProps {
@@ -209,41 +209,109 @@ export const StagingActorInspector: React.FC<StagingActorInspectorProps> = ({
             </div>
           </div>
 
-          {/* Col 2: Scale Factor */}
+          {/* Col 2: Scale, Flip, Posture & Facing */}
           <div className="space-y-3 bg-zinc-950/50 border border-zinc-800/80 rounded-xl p-3.5 flex flex-col justify-between h-full">
-            <div>
-              <div className="flex items-center justify-between text-[11px] font-medium text-zinc-400 mb-1">
-                <span>Scale</span>
-                <span className="font-mono text-zinc-200 font-semibold">
-                  {Math.round((stagedActors[selectedActorIndex].scale || 1.0) * 100)}% ({((stagedActors[selectedActorIndex].scale || 1.0)).toFixed(2)}x)
-                </span>
+            <div className="space-y-3">
+              {/* Scale Control */}
+              <div>
+                <div className="flex items-center justify-between text-[11px] font-medium text-zinc-400 mb-1">
+                  <span>Scale Factor</span>
+                  <span className="font-mono text-zinc-200 font-semibold">
+                    {Math.round((stagedActors[selectedActorIndex].scale || 1.0) * 100)}% ({((stagedActors[selectedActorIndex].scale || 1.0)).toFixed(2)}x)
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0.20"
+                  max="3.50"
+                  step="0.05"
+                  value={stagedActors[selectedActorIndex].scale || 1.0}
+                  onChange={(e) => updateSelectedActor({ scale: Number(e.target.value) })}
+                  className="w-full accent-indigo-500 cursor-pointer"
+                />
+                <div className="flex justify-between gap-1 text-[9px] text-zinc-500 font-mono mt-1">
+                  {[
+                    { label: "50%", scale: 0.5 },
+                    { label: "100%", scale: 1.0 },
+                    { label: "150%", scale: 1.5 },
+                    { label: "225%", scale: 2.25 },
+                    { label: "350%", scale: 3.5 }
+                  ].map((preset) => (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => updateSelectedActor({ scale: preset.scale })}
+                      className="px-1.5 py-0.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800 rounded transition-colors"
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <input
-                type="range"
-                min="0.20"
-                max="3.50"
-                step="0.05"
-                value={stagedActors[selectedActorIndex].scale || 1.0}
-                onChange={(e) => updateSelectedActor({ scale: Number(e.target.value) })}
-                className="w-full accent-indigo-500 cursor-pointer"
-              />
-              <div className="flex justify-between gap-1 text-[9px] text-zinc-500 font-mono mt-1">
-                {[
-                  { label: "50%", scale: 0.5 },
-                  { label: "100%", scale: 1.0 },
-                  { label: "150%", scale: 1.5 },
-                  { label: "225%", scale: 2.25 },
-                  { label: "350%", scale: 3.5 }
-                ].map((preset) => (
-                  <button
-                    key={preset.label}
-                    type="button"
-                    onClick={() => updateSelectedActor({ scale: preset.scale })}
-                    className="px-1.5 py-0.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800 rounded transition-colors"
+
+              {/* Posture & Facing Selectors */}
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-800/80">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-medium text-zinc-400">Posture</label>
+                  <select
+                    value={stagedActors[selectedActorIndex].posture || "Standing Heroic"}
+                    onChange={(e) => updateSelectedActor({ posture: e.target.value })}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1 text-xs text-zinc-200 outline-none focus:border-indigo-500/60 cursor-pointer"
                   >
-                    {preset.label}
-                  </button>
-                ))}
+                    <option value="Standing Heroic">Standing Heroic</option>
+                    <option value="Walking Forward">Walking Forward</option>
+                    <option value="Sitting">Sitting</option>
+                    <option value="Dramatic Turn">Dramatic Turn</option>
+                    <option value="Crouching / Stealth">Crouching / Stealth</option>
+                    <option value="Leaning">Leaning</option>
+                    <option value="Action Stance">Action Stance</option>
+                    <option value="Arms Crossed">Arms Crossed</option>
+                    <option value="Looking at Screen / Tablet">Looking at Tablet</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-medium text-zinc-400">Facing Direction</label>
+                  <select
+                    value={stagedActors[selectedActorIndex].facing || "facing_camera"}
+                    onChange={(e) => updateSelectedActor({ facing: e.target.value as any })}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1 text-xs text-zinc-200 outline-none focus:border-indigo-500/60 cursor-pointer"
+                  >
+                    <option value="facing_camera">Facing Camera</option>
+                    <option value="turn_left">Turn Left (3/4)</option>
+                    <option value="turn_right">Turn Right (3/4)</option>
+                    <option value="profile_left">Profile Left</option>
+                    <option value="profile_right">Profile Right</option>
+                    <option value="back_camera">Back to Camera</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Horizontal Flip & Plane Toggle */}
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => updateSelectedActor({ isFlipped: !stagedActors[selectedActorIndex].isFlipped })}
+                  className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer border ${
+                    stagedActors[selectedActorIndex].isFlipped
+                      ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                      : "bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-800"
+                  }`}
+                >
+                  <FlipHorizontal className="w-3.5 h-3.5" />
+                  <span>{stagedActors[selectedActorIndex].isFlipped ? "Flipped" : "Flip Horizontal"}</span>
+                </button>
+
+                <select
+                  value={stagedActors[selectedActorIndex].plane || "midground"}
+                  onChange={(e) => updateSelectedActor({ plane: e.target.value as any })}
+                  className="bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1.5 text-xs text-zinc-300 outline-none focus:border-indigo-500/60 cursor-pointer"
+                  title="Depth plane layer"
+                >
+                  <option value="background">Background</option>
+                  <option value="midground">Midground</option>
+                  <option value="foreground">Foreground</option>
+                </select>
               </div>
             </div>
 
@@ -252,7 +320,7 @@ export const StagingActorInspector: React.FC<StagingActorInspectorProps> = ({
               <button
                 type="button"
                 onClick={() => handleRemoveActorFromStage(selectedActorIndex)}
-                className="w-full py-1.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-950/30 border border-red-900/40 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer mt-1"
+                className="w-full py-1.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-950/30 border border-red-900/40 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer mt-2"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>Remove {stagedActors[selectedActorIndex].characterName}</span>

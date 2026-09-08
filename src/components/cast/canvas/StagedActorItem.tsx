@@ -10,6 +10,7 @@ import {
   Trash2 
 } from "lucide-react";
 import { StagedActorCanvasItem } from "./types";
+import { getAssetMediaUrl } from "../../../utils/assetUrl";
 
 export interface StagedActorItemProps {
   actor: StagedActorCanvasItem;
@@ -141,36 +142,43 @@ export const StagedActorItem: React.FC<StagedActorItemProps> = ({
           }}
         >
           {/* Cutout Image or Silhouette Fallback: ALWAYS in the DOM to anchor layout dimensions */}
-          {actor.cutoutDataUrl || actor.originalCutoutDataUrl ? (
-            <img
-              ref={(el) => registerImgRef(actor.id, el)}
-              src={lastCommittedCutout || actor.cutoutDataUrl || actor.originalCutoutDataUrl}
-              alt={actor.characterName}
-              draggable={false}
-              style={{
-                opacity: isCurrentMasking ? 0 : 1
-              }}
-              className="h-full w-auto max-w-none shrink-0 object-contain select-none filter drop-shadow-[0_8px_16px_rgba(0,0,0,0.7)] pointer-events-none"
-            />
-          ) : (
-            // Fallback Avatar Token
-            <div
-              style={{
-                height: "100%",
-                aspectRatio: "2/3",
-                opacity: isCurrentMasking ? 0 : 1
-              }}
-              className="bg-gradient-to-t from-indigo-950 to-zinc-900 border-2 border-indigo-500/60 rounded-t-full flex flex-col items-center justify-center p-2 text-center shadow-lg pointer-events-none max-w-none shrink-0"
-            >
-              <User className="w-8 h-8 text-indigo-300 mb-1" />
-              <span className="text-[11px] font-bold text-white truncate max-w-full">
-                {actor.characterName}
-              </span>
-              <span className="text-[9px] text-zinc-400 font-mono">
-                {actor.posture || "Posed"}
-              </span>
-            </div>
-          )}
+          {(() => {
+            const actorImgSrc = lastCommittedCutout 
+              || actor.cutoutDataUrl 
+              || actor.originalCutoutDataUrl 
+              || (actor.referenceAssetFilename ? getAssetMediaUrl(actor.referenceAssetFilename) : undefined);
+
+            return actorImgSrc ? (
+              <img
+                ref={(el) => registerImgRef(actor.id, el)}
+                src={actorImgSrc}
+                alt={actor.characterName}
+                draggable={false}
+                style={{
+                  opacity: isCurrentMasking ? 0 : 1
+                }}
+                className="h-full w-auto max-w-none shrink-0 object-contain select-none filter drop-shadow-[0_8px_16px_rgba(0,0,0,0.7)] pointer-events-none"
+              />
+            ) : (
+              // Fallback Avatar Token
+              <div
+                style={{
+                  height: "100%",
+                  aspectRatio: "2/3",
+                  opacity: isCurrentMasking ? 0 : 1
+                }}
+                className="bg-gradient-to-t from-indigo-950 to-zinc-900 border-2 border-indigo-500/60 rounded-t-full flex flex-col items-center justify-center p-2 text-center shadow-lg pointer-events-none max-w-none shrink-0"
+              >
+                <User className="w-8 h-8 text-indigo-300 mb-1" />
+                <span className="text-[11px] font-bold text-white truncate max-w-full">
+                  {actor.characterName}
+                </span>
+                <span className="text-[9px] text-zinc-400 font-mono">
+                  {actor.posture || "Posed"}
+                </span>
+              </div>
+            );
+          })()}
 
           {/* Masking Layer Canvas: Pixel-locked absolute overlay directly matching figure dimensions */}
           {isCurrentMasking && (
