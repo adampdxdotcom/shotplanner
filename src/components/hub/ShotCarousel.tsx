@@ -71,7 +71,12 @@ export const ShotCarousel: React.FC<ShotCarouselProps> = ({
 
   return (
     <div className="relative bg-zinc-900/50 p-4 rounded-xl border border-zinc-800 flex items-center">
-      <button onClick={() => scrollCarousel("left")} className="p-2 text-zinc-400 hover:text-white shrink-0">
+      <button 
+        onClick={() => scrollCarousel("left")} 
+        className="carousel-nav-btn p-2 text-zinc-400 hover:text-white rounded-lg transition-colors shrink-0"
+        title="Scroll Left"
+        aria-label="Scroll Carousel Left"
+      >
         <ChevronLeft className="w-6 h-6" />
       </button>
       
@@ -100,22 +105,22 @@ export const ShotCarousel: React.FC<ShotCarouselProps> = ({
                 <img src={thumbnailUrl} className="absolute inset-0 w-full h-full object-cover opacity-60" alt="" />
               ) : (
                 <div className="absolute inset-0 bg-zinc-800 flex items-center justify-center">
-                  <span className="text-zinc-600 text-sm">No Location</span>
+                  <span className="text-zinc-400 dark:text-zinc-600 text-sm font-medium">No Location</span>
                 </div>
               )}
               
               <div className="absolute top-2 left-2 flex flex-col items-start gap-1 z-10 max-w-[calc(100%-4rem)]">
                 <span 
-                  className="px-2 py-0.5 bg-black/80 backdrop-blur text-white text-xs font-semibold rounded shadow truncate max-w-full"
+                  className="shot-name-badge px-2 py-0.5 bg-black/80 backdrop-blur text-white text-xs font-semibold rounded shadow truncate max-w-full"
                   title={`Shot ${shotNumberDisplay} - ${currentSceneName}`}
                 >
                   Shot {shotNumberDisplay} - {currentSceneName}
                 </span>
-                <span className={`px-2 py-0.5 text-[10px] font-bold rounded shadow uppercase tracking-wider ${
-                  shot.status === "rendered" ? "bg-purple-500/90 text-white" :
-                  shot.status === "rendering" ? "bg-indigo-500/90 text-white animate-pulse" :
-                  shot.status === "staged" ? "bg-emerald-500/90 text-white" :
-                  "bg-orange-500/90 text-white"
+                <span className={`px-2 py-0.5 text-[10px] font-bold rounded shadow uppercase tracking-wider text-white ${
+                  shot.status === "rendered" ? "bg-purple-500/90" :
+                  shot.status === "rendering" ? "bg-indigo-500/90 animate-pulse" :
+                  shot.status === "staged" ? "bg-emerald-500/90" :
+                  "bg-orange-500/90"
                 }`}>
                   {shot.status === "rendered" ? "✓ Rendered" :
                    shot.status === "rendering" ? "⟳ Rendering" :
@@ -127,15 +132,17 @@ export const ShotCarousel: React.FC<ShotCarouselProps> = ({
               <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                 <button
                   onClick={(e) => onDuplicateShot(shot, e)}
-                  className="p-1.5 bg-black/60 hover:bg-black text-white rounded backdrop-blur shadow"
+                  className="shot-action-btn p-1.5 bg-black/60 hover:bg-black text-white rounded backdrop-blur shadow transition-colors"
                   title="Duplicate Shot"
+                  aria-label="Duplicate Shot"
                 >
                   <Copy className="w-3.5 h-3.5" />
                 </button>
                 <button
                   onClick={(e) => onDeleteShot(shot.id, e)}
-                  className="p-1.5 bg-black/60 hover:bg-red-500 text-white rounded backdrop-blur shadow"
+                  className="shot-action-btn btn-delete p-1.5 bg-black/60 hover:bg-red-500 text-white rounded backdrop-blur shadow transition-colors"
                   title="Delete Shot"
+                  aria-label="Delete Shot"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
@@ -146,7 +153,7 @@ export const ShotCarousel: React.FC<ShotCarouselProps> = ({
 
         <button
           onClick={onAddBlankShot}
-          className="snap-start shrink-0 w-64 aspect-video rounded-xl border-2 border-dashed border-zinc-700 hover:border-zinc-500 bg-zinc-900 hover:bg-zinc-800 flex flex-col items-center justify-center gap-2 transition-all group"
+          className="shot-add-btn snap-start shrink-0 w-64 aspect-video rounded-xl border-2 border-dashed border-zinc-700 hover:border-zinc-500 bg-zinc-900 hover:bg-zinc-800 flex flex-col items-center justify-center gap-2 transition-all group cursor-pointer"
         >
           <div className="p-3 bg-zinc-800 group-hover:bg-zinc-700 rounded-full text-zinc-400 group-hover:text-white transition-colors">
             <Plus className="w-6 h-6" />
@@ -155,7 +162,12 @@ export const ShotCarousel: React.FC<ShotCarouselProps> = ({
         </button>
       </div>
 
-      <button onClick={() => scrollCarousel("right")} className="p-2 text-zinc-400 hover:text-white shrink-0">
+      <button 
+        onClick={() => scrollCarousel("right")} 
+        className="carousel-nav-btn p-2 text-zinc-400 hover:text-white rounded-lg transition-colors shrink-0"
+        title="Scroll Right"
+        aria-label="Scroll Carousel Right"
+      >
         <ChevronRight className="w-6 h-6" />
       </button>
     </div>

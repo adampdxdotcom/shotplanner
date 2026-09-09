@@ -126,7 +126,7 @@ export const CastSection: React.FC<CastSectionProps> = ({
   const renderedSubjects = Array.from(deduplicatedSubjectsMap.values());
 
   return (
-    <div className="flex flex-col h-full bg-zinc-950">
+    <div className="flex flex-col h-full bg-transparent">
       {/* Header */}
       <div className="bg-zinc-900 border-b border-zinc-800 p-4 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -193,7 +193,7 @@ export const CastSection: React.FC<CastSectionProps> = ({
                    charAssets.find(a => a.media_type === "image"));
                                  
               return (
-                <div key={subject} className="bg-zinc-900/50 border border-zinc-800/80 rounded-2xl overflow-hidden flex flex-col md:flex-row shadow-lg">
+                <div key={subject} className="cast-entity-card bg-zinc-900/50 border border-zinc-800/80 rounded-2xl overflow-hidden flex flex-col md:flex-row shadow-lg">
                   <div className="w-full md:w-72 lg:w-80 bg-zinc-900 p-6 border-b md:border-b-0 md:border-r border-zinc-800 flex flex-col shrink-0">
                     <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
                       <div className="flex items-center gap-3 min-w-0">

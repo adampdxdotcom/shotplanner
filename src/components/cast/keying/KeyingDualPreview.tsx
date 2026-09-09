@@ -85,7 +85,7 @@ export const KeyingDualPreview: React.FC<KeyingDualPreviewProps> = ({
       {/* LEFT: SOURCE IMAGE WITH EYEDROPPER */}
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
-          <label className="text-xs font-semibold text-zinc-400 flex items-center gap-1.5">
+          <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-400 flex items-center gap-1.5">
             <span>Source Image</span>
             <span className="text-[10px] font-normal text-zinc-500">(Click to sample key color)</span>
           </label>
@@ -96,7 +96,7 @@ export const KeyingDualPreview: React.FC<KeyingDualPreviewProps> = ({
             className={`px-2 py-0.5 rounded text-xs font-medium flex items-center gap-1 transition-colors cursor-pointer ${
               isEyedropperActive
                 ? "bg-amber-500 text-black font-bold"
-                : "bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700"
+                : "bg-white text-zinc-700 hover:text-zinc-900 border border-zinc-300 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:text-white dark:border-zinc-700 shadow-2xs"
             }`}
           >
             <Pipette className="w-3 h-3" />
@@ -104,7 +104,7 @@ export const KeyingDualPreview: React.FC<KeyingDualPreviewProps> = ({
           </button>
         </div>
 
-        <div className="relative aspect-square max-h-80 w-full rounded-xl overflow-hidden border border-zinc-800 bg-zinc-950 flex items-center justify-center">
+        <div className="relative aspect-square max-h-80 w-full rounded-xl overflow-hidden border border-zinc-300 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-950 flex items-center justify-center shadow-inner">
           {activeImageSource ? (
             <>
               <img
@@ -120,7 +120,7 @@ export const KeyingDualPreview: React.FC<KeyingDualPreviewProps> = ({
               />
               {/* Floating Eyedropper Magnifier Badge */}
               {isEyedropperActive && hoveredColor && (
-                <div className="absolute top-2 left-2 pointer-events-none bg-black/85 backdrop-blur border border-zinc-700 px-2 py-1 rounded-md text-[10px] font-mono flex items-center gap-2 shadow-lg">
+                <div className="absolute top-2 left-2 pointer-events-none bg-black/85 backdrop-blur border border-zinc-700 px-2 py-1 rounded-md text-[10px] font-mono flex items-center gap-2 shadow-lg text-white">
                   <div
                     className="w-3.5 h-3.5 rounded-full border border-white/40 shadow-inner"
                     style={{ backgroundColor: hoveredColor }}
@@ -138,23 +138,23 @@ export const KeyingDualPreview: React.FC<KeyingDualPreviewProps> = ({
       {/* RIGHT: TRANSPARENT CUTOUT OVER CHECKERBOARD */}
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
-          <label className="text-xs font-semibold text-zinc-400 flex items-center gap-1.5">
+          <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-400 flex items-center gap-1.5">
             <span>Transparent Cutout</span>
-            <span className="text-[10px] font-normal text-emerald-400">
+            <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
               {cutoutResult ? `${cutoutResult.transparentPercentage}% removed` : ""}
             </span>
           </label>
 
-          <div className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400">
+          <div className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-500 dark:text-zinc-400">
             <span>PNG Alpha</span>
           </div>
         </div>
 
         {/* HIGH CONTRAST CHECKERBOARD TRANSPARENCY CONTAINER */}
         <div 
-          className="relative aspect-square max-h-80 w-full rounded-xl overflow-hidden border border-zinc-800 flex items-center justify-center shadow-inner"
+          className="relative aspect-square max-h-80 w-full rounded-xl overflow-hidden border border-zinc-300 dark:border-zinc-800 flex items-center justify-center shadow-inner"
           style={{
-            backgroundImage: `conic-gradient(#27272a 90deg, #18181b 90deg 180deg, #27272a 180deg 270deg, #18181b 270deg)`,
+            backgroundImage: `conic-gradient(#cbd5e1 90deg, #f1f5f9 90deg 180deg, #cbd5e1 180deg 270deg, #f1f5f9 270deg)`,
             backgroundSize: "16px 16px"
           }}
         >

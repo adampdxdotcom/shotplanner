@@ -68,11 +68,12 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
         className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-3 sm:p-6"
       >
         <motion.div
+          id="staging-studio-modal-card"
           initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.96 }}
           transition={{ duration: 0.15 }}
-          className="relative w-full max-w-6xl max-h-[92vh] flex flex-col bg-zinc-950 border-2 border-zinc-700/80 rounded-2xl shadow-2xl overflow-hidden"
+          className="modal-dialog-surface relative w-full max-w-6xl max-h-[92vh] flex flex-col bg-zinc-950 border-2 border-zinc-700/80 rounded-2xl shadow-2xl overflow-hidden"
         >
           {/* Modal Header Close Button */}
           <div className="absolute top-4 right-4 z-20">

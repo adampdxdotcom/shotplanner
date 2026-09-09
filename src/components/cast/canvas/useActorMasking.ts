@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import { StagedActorCanvasItem } from "./types";
 import { getAssetMediaUrl } from "../../../utils/assetUrl";
 import { createSilhouetteImage } from "./silhouetteUtils";
+import { rgbToYCbCr, getYCbCrDistance } from "../../../utils/chromaKey";
 
 interface UseActorMaskingParams {
   containerRef: React.RefObject<HTMLDivElement | null>;
@@ -10,6 +11,7 @@ interface UseActorMaskingParams {
   onSetMaskingActorId?: (id: string | null) => void;
   onSelectActor: (id: string | null) => void;
   onUpdateActor: (id: string, updates: Partial<StagedActorCanvasItem>) => void;
+  onRecordCheckpoint?: () => void;
 }
 
 export function useActorMasking({
@@ -18,7 +20,8 @@ export function useActorMasking({
   activeMaskingActorId,
   onSetMaskingActorId,
   onSelectActor,
-  onUpdateActor
+  onUpdateActor,
+  onRecordCheckpoint
 }: UseActorMaskingParams) {
   const [internalMaskingActorId, setInternalMaskingActorId] = useState<string | null>(null);
   const maskingActorId = activeMaskingActorId !== undefined ? activeMaskingActorId : internalMaskingActorId;
@@ -34,7 +37,7 @@ export function useActorMasking({
   const isMaskingMode = Boolean(maskingActorId);
   const maskingActor = useMemo(() => actors.find((a) => a.id === maskingActorId) || null, [actors, maskingActorId]);
 
-  const [maskMode, setMaskMode] = useState<"erase" | "restore">("erase");
+  const [maskMode, setMaskMode] = useState<"erase" | "restore" | "refine">("erase");
   const [brushSize, setBrushSize] = useState<number>(30); // 5px to 100px
   const [brushCursor, setBrushCursor] = useState<{ x: number; y: number; visible: boolean }>({ x: 0, y: 0, visible: false });
   const [isPainting, setIsPainting] = useState<boolean>(false);
@@ -261,7 +264,7 @@ export function useActorMasking({
     y: number,
     prevX: number | null,
     prevY: number | null,
-    mode: "erase" | "restore",
+    mode: "erase" | "restore" | "refine",
     size: number
   ) => {
     const maskCanvas = offscreenMaskCanvasRef.current;
@@ -276,29 +279,98 @@ export function useActorMasking({
     const scaleRatio = canvas.width / Math.max(rect.width, 1);
     const radius = (size / 2) * scaleRatio;
 
-    maskCtx.save();
-    if (mode === "erase") {
-      maskCtx.globalCompositeOperation = "destination-out";
-    } else {
-      maskCtx.globalCompositeOperation = "source-over";
-      maskCtx.fillStyle = "#ffffff";
-      maskCtx.strokeStyle = "#ffffff";
-    }
+    if (mode === "refine") {
+      // Fine Edge Refinement Brush:
+      // Reads the original image pixels under the brush stroke.
+      // Analyzes color difference vs chroma screen in YCbCr color space.
+      // If the pixel is dark hair / foreground (lower luma, or lower chroma saturation than pure screen),
+      // restores alpha on the mask without restoring the green/blue backdrop.
+      const brushMinX = Math.max(0, Math.floor(x - radius));
+      const brushMinY = Math.max(0, Math.floor(y - radius));
+      const brushW = Math.min(maskCanvas.width - brushMinX, Math.ceil(radius * 2));
+      const brushH = Math.min(maskCanvas.height - brushMinY, Math.ceil(radius * 2));
 
-    if (prevX !== null && prevY !== null) {
-      maskCtx.lineWidth = radius * 2;
-      maskCtx.lineCap = "round";
-      maskCtx.lineJoin = "round";
-      maskCtx.beginPath();
-      maskCtx.moveTo(prevX, prevY);
-      maskCtx.lineTo(x, y);
-      maskCtx.stroke();
+      if (brushW > 0 && brushH > 0) {
+        if (!reusableScratchCanvasRef.current) {
+          reusableScratchCanvasRef.current = document.createElement("canvas");
+        }
+        const scratch = reusableScratchCanvasRef.current;
+        if (scratch.width !== maskCanvas.width || scratch.height !== maskCanvas.height) {
+          scratch.width = maskCanvas.width;
+          scratch.height = maskCanvas.height;
+        }
+        const sCtx = scratch.getContext("2d", { willReadFrequently: true });
+        if (sCtx) {
+          sCtx.clearRect(brushMinX, brushMinY, brushW, brushH);
+          sCtx.drawImage(origImg, brushMinX, brushMinY, brushW, brushH, brushMinX, brushMinY, brushW, brushH);
+          const origPixels = sCtx.getImageData(brushMinX, brushMinY, brushW, brushH);
+          const maskPixels = maskCtx.getImageData(brushMinX, brushMinY, brushW, brushH);
+
+          const oData = origPixels.data;
+          const mData = maskPixels.data;
+          const rSq = radius * radius;
+
+          for (let py = 0; py < brushH; py++) {
+            const worldY = brushMinY + py;
+            const dy = worldY - y;
+            for (let px = 0; px < brushW; px++) {
+              const worldX = brushMinX + px;
+              const dx = worldX - x;
+              const distSq = dx * dx + dy * dy;
+              if (distSq <= rSq) {
+                const pIdx = (py * brushW + px) * 4;
+                const r = oData[pIdx];
+                const g = oData[pIdx + 1];
+                const b = oData[pIdx + 2];
+
+                // Detect if pixel is pure green/blue screen
+                const isGreenScreen = g > r * 1.25 && g > b * 1.25 && g > 70;
+                const isBlueScreen = b > r * 1.25 && b > g * 1.25 && b > 70;
+
+                if (!isGreenScreen && !isBlueScreen) {
+                  // Falloff factor from center of brush
+                  const falloff = 1.0 - Math.sqrt(distSq) / radius;
+                  // Compute luminance: darker strands or non-chroma details get restored
+                  const ycbcr = rgbToYCbCr(r, g, b);
+                  const hairStrength = Math.min(1.0, (180 - Math.min(180, ycbcr.y * 0.5)) / 120 + 0.3);
+                  const currentAlpha = mData[pIdx + 3];
+                  const targetAlpha = Math.min(255, currentAlpha + Math.round(255 * falloff * hairStrength * 0.45));
+                  mData[pIdx] = 255;
+                  mData[pIdx + 1] = 255;
+                  mData[pIdx + 2] = 255;
+                  mData[pIdx + 3] = targetAlpha;
+                }
+              }
+            }
+          }
+          maskCtx.putImageData(maskPixels, brushMinX, brushMinY);
+        }
+      }
     } else {
-      maskCtx.beginPath();
-      maskCtx.arc(x, y, radius, 0, Math.PI * 2);
-      maskCtx.fill();
+      maskCtx.save();
+      if (mode === "erase") {
+        maskCtx.globalCompositeOperation = "destination-out";
+      } else {
+        maskCtx.globalCompositeOperation = "source-over";
+        maskCtx.fillStyle = "#ffffff";
+        maskCtx.strokeStyle = "#ffffff";
+      }
+
+      if (prevX !== null && prevY !== null) {
+        maskCtx.lineWidth = radius * 2;
+        maskCtx.lineCap = "round";
+        maskCtx.lineJoin = "round";
+        maskCtx.beginPath();
+        maskCtx.moveTo(prevX, prevY);
+        maskCtx.lineTo(x, y);
+        maskCtx.stroke();
+      } else {
+        maskCtx.beginPath();
+        maskCtx.arc(x, y, radius, 0, Math.PI * 2);
+        maskCtx.fill();
+      }
+      maskCtx.restore();
     }
-    maskCtx.restore();
 
     displayCtx.save();
     displayCtx.clearRect(0, 0, canvas.width, canvas.height);
@@ -379,7 +451,10 @@ export function useActorMasking({
       cutoutDataUrl: origUrl,
       maskDataUrl: undefined
     });
-  }, [maskingActor, onUpdateActor]);
+    if (onRecordCheckpoint) {
+      setTimeout(() => onRecordCheckpoint(), 15);
+    }
+  }, [maskingActor, onUpdateActor, onRecordCheckpoint]);
 
   // Mask Pointer Handlers
   const handleMaskPointerDown = useCallback((e: React.PointerEvent, actor: StagedActorCanvasItem) => {
@@ -437,11 +512,14 @@ export function useActorMasking({
           cutoutDataUrl: updatedCutout,
           maskDataUrl: updatedMask
         });
+        if (onRecordCheckpoint) {
+          setTimeout(() => onRecordCheckpoint(), 20);
+        }
       } catch (err) {
         console.warn("Failed to capture stroke mask:", err);
       }
     }
-  }, [isPainting, onUpdateActor]);
+  }, [isPainting, onUpdateActor, onRecordCheckpoint]);
 
   // Keyboard shortcut listener during masking
   useEffect(() => {
@@ -453,6 +531,8 @@ export function useActorMasking({
         setMaskMode("erase");
       } else if (e.key === "r" || e.key === "R") {
         setMaskMode("restore");
+      } else if (e.key === "f" || e.key === "F") {
+        setMaskMode("refine");
       } else if (e.key === "[") {
         setBrushSize((prev) => Math.max(5, prev - 5));
       } else if (e.key === "]") {

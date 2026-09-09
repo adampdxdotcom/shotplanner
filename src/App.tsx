@@ -32,7 +32,6 @@ export default function App() {
     defaultLlmProvider, setDefaultLlmProvider,
     activeSection, setActiveSection,
     activeShotId, setActiveShotId,
-    isCodeModalOpen, setIsCodeModalOpen,
     isDirty, setIsDirty,
     hasLoadedProject, setHasLoadedProject,
     isInitialLoad, setIsInitialLoad,
@@ -71,7 +70,7 @@ export default function App() {
   } = useAppLogic();
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans selection:bg-indigo-500 selection:text-white flex flex-col">
+    <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] font-sans selection:bg-indigo-500 selection:text-white flex flex-col transition-colors duration-200">
       {/* Top Navbar */}
       <Navbar 
         projectName={sceneProject.scene_name}
@@ -286,14 +285,12 @@ export default function App() {
               setIsDirty(true);
             }}
             onShowToast={addToast}
-            onOpenCodeViewer={() => setIsCodeModalOpen(true)}
           />
         )}
 
       </main>
 
       <AppModals 
-        isCodeModalOpen={isCodeModalOpen} setIsCodeModalOpen={setIsCodeModalOpen}
         isSaveModalOpen={isSaveModalOpen} setIsSaveModalOpen={setIsSaveModalOpen}
         handleSaveProject={handleSaveProject} currentProjectName={currentProjectName}
         isLoadModalOpen={isLoadModalOpen} setIsLoadModalOpen={setIsLoadModalOpen}

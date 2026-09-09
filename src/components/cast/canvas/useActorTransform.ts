@@ -8,6 +8,7 @@ interface UseActorTransformParams {
   isMaskingMode: boolean;
   onSelectActor: (id: string | null) => void;
   onUpdateActor: (id: string, updates: Partial<StagedActorCanvasItem>) => void;
+  onRecordCheckpoint?: () => void;
 }
 
 export function useActorTransform({
@@ -16,12 +17,14 @@ export function useActorTransform({
   selectedActorId,
   isMaskingMode,
   onSelectActor,
-  onUpdateActor
+  onUpdateActor,
+  onRecordCheckpoint
 }: UseActorTransformParams) {
   const [isDraggingActor, setIsDraggingActor] = useState<boolean>(false);
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isResizingActor, setIsResizingActor] = useState<boolean>(false);
   const resizeInitialStateRef = useRef<{ initialY: number; initialScale: number; corner: "top" | "bottom" } | null>(null);
+  const hadTransformChangeRef = useRef<boolean>(false);
 
   // Handle Dragging Actor across Canvas
   const handleActorPointerDown = useCallback((e: React.PointerEvent, actor: StagedActorCanvasItem) => {
@@ -66,7 +69,10 @@ export function useActorTransform({
     const delta = -Math.sign(e.deltaY) * 0.05;
     const nextScale = Math.max(0.20, Math.min(4.50, Math.round((currentScale + delta) * 100) / 100));
     onUpdateActor(actor.id, { scale: nextScale });
-  }, [isMaskingMode, onUpdateActor]);
+    if (onRecordCheckpoint) {
+      setTimeout(() => onRecordCheckpoint(), 10);
+    }
+  }, [isMaskingMode, onUpdateActor, onRecordCheckpoint]);
 
   // Flip Actor Horizontally
   const handleToggleFlip = useCallback((actor: StagedActorCanvasItem) => {
@@ -81,7 +87,10 @@ export function useActorTransform({
       isFlipped: nextFlipped,
       facing: nextFacing
     });
-  }, [onUpdateActor]);
+    if (onRecordCheckpoint) {
+      setTimeout(() => onRecordCheckpoint(), 10);
+    }
+  }, [onUpdateActor, onRecordCheckpoint]);
 
   // Layer Stacking (Bring Forward / Send Backward)
   const handleBringForward = useCallback((actor: StagedActorCanvasItem) => {
@@ -95,7 +104,10 @@ export function useActorTransform({
     } else {
       onUpdateActor(actor.id, { zIndex: actor.zIndex + 1 });
     }
-  }, [actors, onUpdateActor]);
+    if (onRecordCheckpoint) {
+      setTimeout(() => onRecordCheckpoint(), 10);
+    }
+  }, [actors, onUpdateActor, onRecordCheckpoint]);
 
   const handleSendBackward = useCallback((actor: StagedActorCanvasItem) => {
     const sorted = [...actors].sort((a, b) => a.zIndex - b.zIndex);
@@ -108,7 +120,10 @@ export function useActorTransform({
     } else if (actor.zIndex > 1) {
       onUpdateActor(actor.id, { zIndex: Math.max(1, actor.zIndex - 1) });
     }
-  }, [actors, onUpdateActor]);
+    if (onRecordCheckpoint) {
+      setTimeout(() => onRecordCheckpoint(), 10);
+    }
+  }, [actors, onUpdateActor, onRecordCheckpoint]);
 
   // Global Pointer Move and Up Listeners during Drag / Resize
   useEffect(() => {
@@ -117,6 +132,7 @@ export function useActorTransform({
       const rect = containerRef.current.getBoundingClientRect();
 
       if (isDraggingActor && selectedActorId) {
+        hadTransformChangeRef.current = true;
         const mouseX = ((e.clientX - rect.left) / rect.width) * 100;
         const mouseY = ((e.clientY - rect.top) / rect.height) * 100;
 
@@ -133,6 +149,7 @@ export function useActorTransform({
           plane: derivedPlane
         });
       } else if (isResizingActor && selectedActorId && resizeInitialStateRef.current) {
+        hadTransformChangeRef.current = true;
         const { initialY, initialScale, corner } = resizeInitialStateRef.current;
         const deltaY = corner === "bottom" ? (e.clientY - initialY) : (initialY - e.clientY);
         const scaleChange = deltaY / 120;
@@ -148,6 +165,12 @@ export function useActorTransform({
         setIsResizingActor(false);
         resizeInitialStateRef.current = null;
       }
+      if (hadTransformChangeRef.current) {
+        hadTransformChangeRef.current = false;
+        if (onRecordCheckpoint) {
+          setTimeout(() => onRecordCheckpoint(), 10);
+        }
+      }
     };
 
     if (isDraggingActor || isResizingActor) {
@@ -159,7 +182,7 @@ export function useActorTransform({
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
     };
-  }, [isDraggingActor, isResizingActor, selectedActorId, dragOffset, onUpdateActor, containerRef]);
+  }, [isDraggingActor, isResizingActor, selectedActorId, dragOffset, onUpdateActor, onRecordCheckpoint, containerRef]);
 
   return {
     isDraggingActor,

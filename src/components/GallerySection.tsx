@@ -121,7 +121,7 @@ export const GallerySection: React.FC<GallerySectionProps> = ({
   }, [filteredAssets, sortBy]);
 
   return (
-    <div className="flex flex-col h-full bg-zinc-950">
+    <div className="flex flex-col h-full bg-transparent">
       {/* Top Controls Bar */}
       <div className="bg-zinc-900 border-b border-zinc-800 p-4 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">

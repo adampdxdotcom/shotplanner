@@ -18,7 +18,7 @@ export const AssetLightbox: React.FC<AssetLightboxProps> = ({ asset, onClose, on
 
   return (
     <div 
-      className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-4 cursor-zoom-out"
+      className="asset-lightbox-backdrop dark-viewport fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-4 cursor-zoom-out"
       onClick={onClose}
     >
       <div className="absolute top-4 right-4 flex items-center gap-3">

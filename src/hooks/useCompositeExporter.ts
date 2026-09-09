@@ -3,7 +3,7 @@ import { MediaAsset, ShotItem, SceneProjectFile, StagingLayerRecipe } from "../t
 import { StagedActorCanvasItem } from "../components/cast/StagingInteractiveCanvas";
 import { getAssetMediaUrl } from "../utils/assetUrl";
 import { sanitizeSlug } from "../types";
-import { renderCompositeToBlob } from "../utils/compositeCanvasExport";
+import { renderCompositeToBlob, downloadCompositeBlob } from "../utils/compositeCanvasExport";
 import { StagedActor } from "../components/cast/AiReferenceStagingStudioModal";
 
 export interface UseCompositeExporterProps {
@@ -164,8 +164,60 @@ export function useCompositeExporter({
     }
   };
 
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownloadComposite = async () => {
+    try {
+      setIsDownloading(true);
+
+      const effectiveBgUrl = customBackgroundUrl || (activeLocationAsset ? getAssetMediaUrl(activeLocationAsset.filename, true) : undefined);
+
+      const exportActors = stagedActors.map(actor => ({
+        id: actor.id,
+        characterName: actor.characterName,
+        cutoutDataUrl: actor.cutoutDataUrl,
+        originalCutoutDataUrl: actor.originalCutoutDataUrl,
+        maskDataUrl: actor.maskDataUrl,
+        fallbackUrl: actor.referenceAssetFilename ? getAssetMediaUrl(actor.referenceAssetFilename, true) : undefined,
+        xPercent: actor.xPercent,
+        yPercent: actor.yPercent,
+        scale: actor.scale,
+        isFlipped: actor.isFlipped,
+        zIndex: actor.zIndex
+      }));
+
+      // Flatten composite canvas asynchronously directly to Blob (avoids synchronous toDataURL freeze)
+      const blob = await renderCompositeToBlob({
+        backgroundUrl: effectiveBgUrl,
+        actors: exportActors,
+        aspectRatio: viewportRatio
+      });
+
+      const effectiveRefName = (compositeRefName && compositeRefName.trim()) || defaultEnvironmentName || "Location Reference";
+      const cleanRefName = sanitizeSlug(effectiveRefName) || "location_ref";
+      const timeStamp = Math.floor(Date.now() / 1000);
+      const filename = `staging_composite_${cleanRefName}_${timeStamp}.png`;
+
+      // Trigger asynchronous browser download via ephemeral Object URL without main-thread blocking
+      downloadCompositeBlob(blob, filename);
+
+      if (addToast) {
+        addToast("Composite image downloaded successfully.", "success");
+      }
+    } catch (err: any) {
+      if (addToast) {
+        addToast(err.message || "Failed to download composite", "error");
+      }
+      console.error("Composite download error", err);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   return {
     isExportingComposite,
-    handleSaveCompositeReference
+    isDownloading,
+    handleSaveCompositeReference,
+    handleDownloadComposite
   };
 }

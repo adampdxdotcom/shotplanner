@@ -1,1 +1,523 @@
 @import "tailwindcss";
+
+/* -------------------------------------------------------------
+ * Global Theme Variables & Palette Tokens
+ * ------------------------------------------------------------- */
+:root {
+  /* Default Light Mode Palette Tokens */
+  --bg-app: #f8fafc;           /* Slate 50 */
+  --bg-header: rgba(255, 255, 255, 0.92);
+  --bg-panel: #ffffff;         /* Pure white cards */
+  --bg-panel-elevated: #f1f5f9;/* Slate 100 */
+  --bg-panel-subtle: #f8fafc;  /* Slate 50 */
+  --bg-input: #ffffff;
+  --border-subtle: #e2e8f0;    /* Slate 200 */
+  --border-strong: #cbd5e1;    /* Slate 300 */
+  --text-primary: #0f172a;     /* Slate 900 */
+  --text-secondary: #475569;   /* Slate 600 */
+  --text-muted: #64748b;       /* Slate 500 */
+  --text-subtle: #94a3b8;      /* Slate 400 */
+  color-scheme: light;
+}
+
+html.dark,
+:root.dark {
+  /* Dark Mode Palette Tokens */
+  --bg-app: #09090b;           /* Zinc 950 */
+  --bg-header: rgba(24, 24, 27, 0.92); /* Zinc 900 */
+  --bg-panel: #18181b;         /* Zinc 900 */
+  --bg-panel-elevated: #27272a;/* Zinc 800 */
+  --bg-panel-subtle: #141416;
+  --bg-input: #18181b;
+  --border-subtle: #27272a;    /* Zinc 800 */
+  --border-strong: #3f3f46;    /* Zinc 700 */
+  --text-primary: #f4f4f5;     /* Zinc 100 */
+  --text-secondary: #d4d4d8;   /* Zinc 300 */
+  --text-muted: #a1a1aa;       /* Zinc 400 */
+  --text-subtle: #71717a;      /* Zinc 500 */
+  color-scheme: dark;
+}
+
+/* Light mode overrides for structural elements while preserving dark studio viewports */
+html.light body {
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+}
+
+/* Header & Navbar in Light Mode */
+html.light header {
+  background-color: var(--bg-header);
+  border-color: var(--border-subtle);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+html.light header h1 {
+  color: var(--text-primary);
+}
+
+html.light header nav {
+  background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+}
+
+html.light header nav button {
+  color: #475569;
+}
+
+html.light header nav button:hover {
+  color: #0f172a;
+  background-color: #e2e8f0;
+}
+
+html.light header nav button.bg-zinc-800 {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* Navbar Action Controls (Theme, Config, New, Load, Save) in Light Mode */
+html.light .navbar-action-btn {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #334155 !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+html.light .navbar-action-btn:hover {
+  background-color: #f1f5f9 !important;
+  border-color: #94a3b8 !important;
+  color: #0f172a !important;
+}
+
+html.light .navbar-action-btn.active {
+  background-color: #e2e8f0 !important;
+  border-color: #94a3b8 !important;
+  color: #0f172a !important;
+  font-weight: 600;
+}
+
+html.light .navbar-save-btn {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  color: #ffffff !important;
+}
+
+html.light .navbar-save-btn svg {
+  color: #ffffff !important;
+}
+
+html.light .navbar-save-btn:not(.is-dirty) {
+  background-color: #059669 !important;
+  border-color: #047857 !important;
+  color: #ffffff !important;
+}
+
+html.light .navbar-save-btn:not(.is-dirty):hover {
+  background-color: #047857 !important;
+}
+
+html.light .navbar-save-btn.is-dirty {
+  background-color: #d97706 !important;
+  border-color: #b45309 !important;
+  color: #ffffff !important;
+}
+
+html.light .navbar-save-btn.is-dirty:hover {
+  background-color: #b45309 !important;
+}
+
+/* Navbar Toast Notifications in Light Mode */
+html.light .navbar-toast {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
+}
+
+html.light .navbar-toast p.navbar-toast-text {
+  color: #0f172a !important;
+  font-weight: 500;
+}
+
+html.light .navbar-toast button.navbar-toast-close {
+  color: #64748b !important;
+}
+
+html.light .navbar-toast button.navbar-toast-close:hover {
+  color: #0f172a !important;
+  background-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+/* Global Panels, Sections & Containers in Light Mode */
+html.light section,
+html.light .bg-zinc-900\/60,
+html.light .bg-zinc-900\/50,
+html.light .bg-zinc-900\/40,
+html.light .bg-zinc-900 {
+  background-color: var(--bg-panel);
+  border-color: var(--border-subtle);
+}
+
+html.light .bg-zinc-950,
+html.light .bg-zinc-950\/80,
+html.light .bg-zinc-950\/70,
+html.light .bg-zinc-950\/60,
+html.light .bg-zinc-950\/50 {
+  background-color: #f8fafc;
+  border-color: var(--border-subtle);
+}
+
+/* Typography Headings & Secondary text */
+html.light h1,
+html.light h2,
+html.light h3,
+html.light h4,
+html.light .text-zinc-100,
+html.light .text-zinc-200 {
+  color: var(--text-primary);
+}
+
+html.light p,
+html.light .text-zinc-400 {
+  color: var(--text-secondary);
+}
+
+html.light .text-zinc-500 {
+  color: var(--text-muted);
+}
+
+/* Form inputs & select dropdowns */
+html.light input:not([type="checkbox"]):not([type="radio"]),
+html.light textarea,
+html.light select {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+html.light input::placeholder,
+html.light textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+html.light input:focus,
+html.light textarea:focus,
+html.light select:focus {
+  border-color: #6366f1 !important;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15) !important;
+}
+
+/* Config Tab Bar & General Settings */
+html.light #config-tab-bar {
+  background-color: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+html.light #config-tab-bar button {
+  color: #64748b;
+}
+
+html.light #config-tab-bar button:hover {
+  color: #0f172a;
+  background-color: #f8fafc;
+}
+
+html.light #config-tab-bar button.bg-zinc-800 {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+html.light #general-settings-tab > div {
+  background-color: #ffffff;
+  border-color: #e2e8f0;
+}
+
+html.light #general-settings-tab h2,
+html.light #general-settings-tab h3 {
+  color: #0f172a;
+}
+
+html.light #general-settings-tab p {
+  color: #475569;
+}
+
+/* Shot Carousel & Hub styling */
+html.light .border-zinc-800,
+html.light .border-zinc-700 {
+  border-color: var(--border-subtle);
+}
+
+html.light #assets-section > div,
+html.light #execution-section > div,
+html.light #workflow-section > div {
+  border-color: var(--border-subtle);
+}
+
+/* Status Badges & Pills in Light Mode */
+html.light .bg-zinc-800 {
+  background-color: #e2e8f0;
+  color: #334155;
+}
+
+html.light .bg-zinc-850 {
+  background-color: #f1f5f9;
+  color: #334155;
+}
+
+/* Preserve media canvas, preview monitors, and terminal log windows dark for video/calibration accuracy */
+.dark-viewport,
+.canvas-viewport,
+pre,
+code,
+[data-terminal="true"] {
+  color-scheme: dark;
+}
+
+/* -------------------------------------------------------------
+ * Phase 3: Canvas Viewport Protection, Floating HUDs & Modals
+ * ------------------------------------------------------------- */
+
+/* 1. Protected Canvas Viewport & Keying Matting Stages */
+/* In Light Mode, keep the actual stage background deep neutral dark so cutouts & masks remain calibrated */
+html.light .canvas-viewport,
+html.light [data-canvas-stage="true"] {
+  background-color: #09090b !important;
+  border-color: #3f3f46 !important;
+  color-scheme: dark;
+}
+
+/* 2. Floating Canvas Header Controls & Masking HUD */
+html.light .canvas-header-bar {
+  background-color: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+html.light .canvas-header-bar button {
+  color: #475569;
+}
+
+html.light .canvas-header-bar button:hover {
+  color: #0f172a;
+  background-color: #f1f5f9;
+}
+
+/* Floating HUD above the dark canvas maintains a dark/semi-translucent frosted glass aesthetic with clear contrast */
+.masking-hud-floating {
+  background-color: rgba(9, 9, 11, 0.94) !important;
+  border-color: rgba(99, 102, 241, 0.8) !important;
+  color: #ffffff !important;
+  color-scheme: dark;
+}
+
+.masking-hud-floating button {
+  color-scheme: dark;
+}
+
+/* 3. Staging Inspector Panels & Character Cards in Light Mode */
+html.light #staging-actor-inspector,
+html.light .staging-inspector-panel,
+html.light .composite-save-panel {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+}
+
+html.light #staging-actor-inspector .actor-card-inner {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+}
+
+html.light .character-asset-card,
+html.light .cast-entity-card {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+html.light .character-asset-card:hover,
+html.light .cast-entity-card:hover {
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.07);
+}
+
+html.light .empty-slot-card {
+  background-color: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+  color: #475569 !important;
+}
+
+html.light .empty-slot-card:hover {
+  background-color: #eef2ff !important;
+  border-color: #818cf8 !important;
+}
+
+html.light .assembled-prefix-banner {
+  background-color: #eef2ff !important;
+  border-color: #c7d2fe !important;
+}
+
+html.light .output-prefix-banner {
+  background-color: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* 4. Modals & Dialog Cards in Light Mode */
+html.light #staging-studio-modal-card,
+html.light .modal-dialog-surface {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+}
+
+html.light .modal-dialog-header {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+}
+
+html.light .modal-dialog-footer {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* Lightbox overlay remains high-focus dark */
+.asset-lightbox-backdrop {
+  background-color: rgba(0, 0, 0, 0.94) !important;
+  color-scheme: dark;
+}
+
+/* 5. Shot Carousel, Badges & Action Buttons in Light Mode */
+html.light .shot-name-badge {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  color: #0f172a !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
+}
+
+html.light .shot-action-btn {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  color: #475569 !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
+}
+
+html.light .shot-action-btn:hover {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #94a3b8 !important;
+}
+
+html.light .shot-action-btn.btn-delete:hover {
+  background-color: #fee2e2 !important;
+  color: #dc2626 !important;
+  border-color: #fca5a5 !important;
+}
+
+html.light .shot-add-btn {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+}
+
+html.light .shot-add-btn:hover {
+  background-color: #f8fafc !important;
+  border-color: #94a3b8 !important;
+}
+
+html.light .shot-add-btn > div {
+  background-color: #f1f5f9 !important;
+  color: #475569 !important;
+}
+
+html.light .shot-add-btn:hover > div {
+  background-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+html.light .shot-add-btn > span {
+  color: #64748b !important;
+}
+
+html.light .shot-add-btn:hover > span {
+  color: #0f172a !important;
+}
+
+html.light .carousel-nav-btn {
+  color: #64748b !important;
+}
+
+html.light .carousel-nav-btn:hover {
+  color: #0f172a !important;
+  background-color: #e2e8f0 !important;
+}
+
+/* 6. Prompt Preview Panel & Copy Prompt Controls in Light Mode */
+html.light .copy-prompt-btn:not(.is-copied) {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #334155 !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+html.light .copy-prompt-btn:not(.is-copied):hover {
+  background-color: #f1f5f9 !important;
+  border-color: #94a3b8 !important;
+  color: #0f172a !important;
+}
+
+html.light .copy-prompt-btn:not(.is-copied) svg {
+  color: #64748b !important;
+}
+
+html.light .copy-prompt-btn:not(.is-copied):hover svg {
+  color: #0f172a !important;
+}
+
+html.light .prompt-badge-pre {
+  background-color: #fef3c7 !important;
+  color: #92400e !important;
+  border-color: #fcd34d !important;
+}
+
+html.light .prompt-badge-expanded {
+  background-color: #d1fae5 !important;
+  color: #065f46 !important;
+  border-color: #6ee7b7 !important;
+}
+
+/* 7. Upload Section: Send Shot & Send Scene Panels in Light Mode */
+html.light .send-shot-box {
+  background-color: #ffffff !important;
+  border-color: #a5b4fc !important;
+  box-shadow: 0 4px 12px -2px rgba(99, 102, 241, 0.08) !important;
+}
+
+html.light .send-shot-box h2 {
+  color: #0f172a !important;
+}
+
+html.light .send-scene-box {
+  background-color: #ffffff !important;
+  border-color: #fcd34d !important;
+  box-shadow: 0 4px 12px -2px rgba(245, 158, 11, 0.08) !important;
+}
+
+html.light .send-scene-box h2 {
+  color: #0f172a !important;
+}
+
+/* 8. LLM Connection & Provider Setup in Light Mode */
+html.light #panel-llm-setup {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+html.light #panel-llm-setup h2 {
+  color: #0f172a !important;
+}
+
+html.light #panel-llm-setup p {
+  color: #475569 !important;
+}
+
+
+

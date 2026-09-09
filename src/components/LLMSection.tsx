@@ -505,9 +505,9 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
                   type="button"
                   onClick={handleCopy}
                   disabled={!displayedPrompt || !displayedPrompt.trim()}
-                  className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition-all flex items-center gap-1.5 shadow-xs ${
+                  className={`copy-prompt-btn px-2.5 py-1 text-xs font-semibold rounded-lg border transition-all flex items-center gap-1.5 shadow-xs ${
                     copied
-                      ? "bg-emerald-600 border-emerald-500 text-white shadow-emerald-900/30 cursor-default"
+                      ? "is-copied bg-emerald-600 border-emerald-500 text-white shadow-emerald-900/30 cursor-default"
                       : displayedPrompt && displayedPrompt.trim()
                       ? "bg-zinc-800 hover:bg-zinc-700 text-amber-300 hover:text-amber-200 border-zinc-700 hover:border-amber-500/50 cursor-pointer"
                       : "bg-zinc-900 text-zinc-600 border-zinc-800 cursor-not-allowed"

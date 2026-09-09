@@ -24,6 +24,7 @@ export interface StagingInteractiveCanvasProps {
   onUpdateActor: (id: string, updates: Partial<StagedActorCanvasItem>) => void;
   onRemoveActor: (id: string) => void;
   onReorderActors: (actors: StagedActorCanvasItem[]) => void;
+  onApplyActors?: (actors: StagedActorCanvasItem[]) => void;
   
   // Environment / Background
   activeLocationAsset?: MediaAsset;

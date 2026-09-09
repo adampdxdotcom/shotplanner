@@ -49,8 +49,8 @@ export const RemoteGPUConfig: React.FC<RemoteGPUConfigProps> = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* Remote GPU IP */}
         <div className="space-y-1.5 sm:col-span-2 lg:col-span-1">
-          <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
-            <Terminal className="w-3.5 h-3.5 text-zinc-400" />
+          <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+            <Terminal className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
             Remote GPU Host / IP
           </label>
           <input
@@ -58,57 +58,57 @@ export const RemoteGPUConfig: React.FC<RemoteGPUConfigProps> = ({
             placeholder="194.26.196.xxx"
             value={config.remote_host || ""}
             onChange={(e) => handleInputChange("remote_host", e.target.value)}
-            className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
+            className="w-full bg-white dark:bg-zinc-950 border-2 border-zinc-200 dark:border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-600 outline-none transition-colors shadow-2xs"
           />
         </div>
 
         {/* SSH Port */}
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-zinc-300">SSH Port</label>
+          <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">SSH Port</label>
           <input
             type="number"
             placeholder="22"
             value={config.ssh_port || ""}
             onChange={(e) => handleInputChange("ssh_port", parseInt(e.target.value) || 22)}
-            className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
+            className="w-full bg-white dark:bg-zinc-950 border-2 border-zinc-200 dark:border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-600 outline-none transition-colors shadow-2xs"
           />
         </div>
 
         {/* Username */}
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-zinc-300">Username</label>
+          <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Username</label>
           <input
             type="text"
             placeholder="root"
             value={config.ssh_username || ""}
             onChange={(e) => handleInputChange("ssh_username", e.target.value)}
-            className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
+            className="w-full bg-white dark:bg-zinc-950 border-2 border-zinc-200 dark:border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-600 outline-none transition-colors shadow-2xs"
           />
         </div>
 
         {/* Password / Passphrase */}
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-zinc-300">Password / Passphrase</label>
+          <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Password / Passphrase</label>
           <input
             type="password"
             placeholder="Optional root / key pass"
             value={config.ssh_password || ""}
             onChange={(e) => handleInputChange("ssh_password", e.target.value)}
-            className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
+            className="w-full bg-white dark:bg-zinc-950 border-2 border-zinc-200 dark:border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-600 outline-none transition-colors shadow-2xs"
           />
         </div>
       </div>
 
       {/* SSH Private Key Block on a new line below */}
-      <div className="bg-zinc-950/70 border-2 border-zinc-750 p-3.5 rounded-xl space-y-3">
+      <div className="bg-white dark:bg-zinc-950/70 border-2 border-zinc-200 dark:border-zinc-800 p-3.5 rounded-xl space-y-3 shadow-xs">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
-            <label className="text-xs font-semibold text-zinc-200 flex items-center gap-1.5">
-              <Key className="w-3.5 h-3.5 text-amber-400" />
+            <label className="text-xs font-semibold text-zinc-900 dark:text-zinc-200 flex items-center gap-1.5">
+              <Key className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
               <span>SSH Private Key (Remote GPU Required)</span>
             </label>
             {config.ssh_private_key ? (
-              <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/60 font-mono">
+              <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800/60 font-mono font-medium">
                 {config.ssh_private_key.includes("ED25519") ? "Ed25519 Key Loaded" : config.ssh_private_key.includes("RSA") ? "RSA Key Loaded" : config.ssh_private_key.includes("ECDSA") ? "ECDSA Key Loaded" : "Key Loaded"}
               </span>
             ) : null}
@@ -129,7 +129,7 @@ export const RemoteGPUConfig: React.FC<RemoteGPUConfigProps> = ({
               <button
                 type="button"
                 onClick={() => handleInputChange("ssh_private_key", "")}
-                className="px-2.5 py-1 text-[10px] font-medium bg-zinc-800 hover:bg-red-900/50 hover:text-red-400 text-zinc-400 rounded transition-colors cursor-pointer"
+                className="px-2.5 py-1 text-[10px] font-medium bg-zinc-100 hover:bg-red-50 text-zinc-600 hover:text-red-600 border border-zinc-200 dark:bg-zinc-800 dark:hover:bg-red-900/50 dark:text-zinc-400 dark:hover:text-red-400 dark:border-transparent rounded transition-colors cursor-pointer"
               >
                 Clear key
               </button>
@@ -140,7 +140,7 @@ export const RemoteGPUConfig: React.FC<RemoteGPUConfigProps> = ({
         {/* Private Key Textarea Input */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] text-zinc-400">
+            <span className="text-[11px] text-zinc-600 dark:text-zinc-400">
               Paste your OpenSSH or PEM private key below, or click Generate to create a fresh Ed25519 keypair:
             </span>
             {config.ssh_private_key && (
@@ -154,15 +154,15 @@ export const RemoteGPUConfig: React.FC<RemoteGPUConfigProps> = ({
             placeholder="-----BEGIN OPENSSH PRIVATE KEY-----&#10;...&#10;-----END OPENSSH PRIVATE KEY-----"
             value={config.ssh_private_key || ""}
             onChange={(e) => handleInputChange("ssh_private_key", e.target.value)}
-            className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-amber-500 rounded-lg p-2.5 text-xs font-mono text-zinc-200 placeholder-zinc-600 outline-none transition-colors resize-y leading-relaxed"
+            className="w-full bg-zinc-50 dark:bg-zinc-950 border-2 border-zinc-200 dark:border-zinc-750 focus:border-amber-500 rounded-lg p-2.5 text-xs font-mono text-zinc-900 dark:text-zinc-200 placeholder-zinc-400 dark:placeholder-zinc-600 outline-none transition-colors resize-y leading-relaxed"
             spellCheck={false}
           />
         </div>
 
         {/* Public Key on a new line */}
-        <div className="pt-2 border-t border-zinc-800/80 space-y-1.5">
+        <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/80 space-y-1.5">
           <div className="flex items-center justify-between">
-            <label className="text-[11px] font-medium text-zinc-400">Public Key</label>
+            <label className="text-[11px] font-medium text-zinc-700 dark:text-zinc-400">Public Key</label>
           </div>
           <div className="flex items-center gap-2">
             <input
@@ -170,7 +170,7 @@ export const RemoteGPUConfig: React.FC<RemoteGPUConfigProps> = ({
               readOnly
               placeholder="Public key will appear here after clicking Generate..."
               value={effectivePublicKey}
-              className="flex-1 bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-emerald-400 placeholder-zinc-600 outline-none select-all"
+              className="flex-1 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-emerald-700 dark:text-emerald-400 placeholder-zinc-400 dark:placeholder-zinc-600 outline-none select-all"
             />
             <button
               type="button"
@@ -191,20 +191,20 @@ export const RemoteGPUConfig: React.FC<RemoteGPUConfigProps> = ({
       </div>
 
       {/* Pod Web Terminal command block (Duplicated directly under private key generator) */}
-      <div className="bg-zinc-950/70 border-2 border-amber-900/40 rounded-xl p-3.5 space-y-2">
+      <div className="bg-amber-50/70 dark:bg-zinc-950/70 border-2 border-amber-200 dark:border-amber-900/40 rounded-xl p-3.5 space-y-2 shadow-xs">
         {effectivePublicKey && (
           <div className="flex justify-end">
-            <span className="text-[10px] text-emerald-400 bg-emerald-950/80 border border-emerald-800/60 px-2 py-0.5 rounded-full font-mono">
+            <span className="text-[10px] text-emerald-800 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-800/60 px-2 py-0.5 rounded-full font-mono font-medium">
               ✓ Public Key Filled In
             </span>
           </div>
         )}
-        <p className="text-xs text-zinc-400">
+        <p className="text-xs text-zinc-700 dark:text-zinc-400">
           In your pod's <strong>Web Terminal</strong> (via the browser connect button on the Pod card), paste:
         </p>
         <div className="space-y-2">
-          <div className="relative group bg-zinc-950 border border-zinc-800 rounded-lg overflow-hidden my-1.5">
-            <div className="flex items-center justify-between px-3 py-1 bg-zinc-900/80 border-b border-zinc-800/80 text-[10px] font-mono text-zinc-400">
+          <div className="relative group bg-zinc-900 dark:bg-zinc-950 border border-zinc-800 rounded-lg overflow-hidden my-1.5">
+            <div className="flex items-center justify-between px-3 py-1 bg-zinc-950/80 dark:bg-zinc-900/80 border-b border-zinc-800/80 text-[10px] font-mono text-zinc-400">
               <span>Pod Web Terminal (One-liner)</span>
               <button
                 type="button"
@@ -225,11 +225,11 @@ export const RemoteGPUConfig: React.FC<RemoteGPUConfigProps> = ({
             </pre>
           </div>
           {!effectivePublicKey ? (
-            <p className="text-[11px] text-zinc-400 italic">
-              Replace <code className="text-amber-300 bg-zinc-800 px-1 py-0.5 rounded">YOUR_PUBLIC_KEY</code> with your single-line <code className="text-emerald-400">ssh-ed25519 AAAAC3...</code> string, or click <strong>Generate</strong> above.
+            <p className="text-[11px] text-zinc-600 dark:text-zinc-400 italic">
+              Replace <code className="text-amber-800 bg-amber-100 dark:text-amber-300 dark:bg-zinc-800 px-1 py-0.5 rounded font-mono">YOUR_PUBLIC_KEY</code> with your single-line <code className="text-emerald-700 dark:text-emerald-400 font-mono">ssh-ed25519 AAAAC3...</code> string, or click <strong>Generate</strong> above.
             </p>
           ) : (
-            <p className="text-[11px] text-emerald-400/90 font-medium">
+            <p className="text-[11px] text-emerald-700 dark:text-emerald-400/90 font-medium">
               Your generated public key has been inserted into this command for easy one-click copying.
             </p>
           )}

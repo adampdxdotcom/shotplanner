@@ -200,6 +200,10 @@ export async function renderCompositeToBlob(options: CompositeExportOptions): Pr
   return new Promise((resolve, reject) => {
     canvas.toBlob(
       (blob) => {
+        // Free GPU texture memory immediately
+        canvas.width = 1;
+        canvas.height = 1;
+
         if (blob) {
           resolve(blob);
         } else {
@@ -248,4 +252,21 @@ function renderDefaultStudioBackdrop(ctx: CanvasRenderingContext2D, width: numbe
   ctx.moveTo(0, floorY);
   ctx.lineTo(width, floorY);
   ctx.stroke();
+}
+
+/**
+ * Triggers an asynchronous, main-thread-free direct file download for a composite Blob.
+ * Cleans up the generated object URL immediately after download dispatch.
+ */
+export function downloadCompositeBlob(blob: Blob, filename: string): void {
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = objectUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => {
+    URL.revokeObjectURL(objectUrl);
+  }, 1000);
 }

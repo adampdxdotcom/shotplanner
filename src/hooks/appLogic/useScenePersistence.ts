@@ -15,7 +15,8 @@ import {
   getLastProjectName, 
   setLastProjectName, 
   getLastActiveSection, 
-  getLastActiveShotId 
+  getLastActiveShotId,
+  clearDemoProjectSession
 } from '../../utils/workspaceSessionStore';
 
 export interface ShotOperationsDelegate {
@@ -93,7 +94,6 @@ export function useScenePersistence({
     }]
   });
 
-  const [activeCodeModalOpen, setIsCodeModalOpen] = useState<boolean>(false);
   const [isDirty, setIsDirty] = useState(false);
   const [hasLoadedProject, setHasLoadedProject] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -238,9 +238,23 @@ export function useScenePersistence({
   }, [sceneProject, config, parameterNodeMappings, generationParams, defaultLlmProvider, getShotOperationsDelegate, addToast]);
 
   const handleLoadProject = useCallback(async (filename: string, options?: { isInitialRestore?: boolean }) => {
+    // If a demo project file is ever referenced, abort safely without error
+    if (filename.toLowerCase().includes("demo")) {
+      clearDemoProjectSession();
+      setHasLoadedProject(true);
+      setIsDirty(false);
+      return;
+    }
+
     const res = await fetch(`/api/projects/${filename}`);
     if (!res.ok) {
-      const err = await res.json();
+      if (options?.isInitialRestore) {
+        clearDemoProjectSession();
+        setHasLoadedProject(true);
+        setIsDirty(false);
+        return;
+      }
+      const err = await res.json().catch(() => ({}));
       throw new Error(err.error || "Failed to load project.");
     }
     const rawData = await res.json();
@@ -475,16 +489,12 @@ export function useScenePersistence({
 
   useEffect(() => {
     fetchWorkflows();
-    const lastProject = getLastProjectName();
-    if (lastProject) {
-      handleLoadProject(lastProject + ".json", { isInitialRestore: true }).catch(err => {
-        console.error("Failed to restore last project:", err);
-        setHasLoadedProject(true);
-      });
-    } else {
-      setHasLoadedProject(true);
-    }
-  }, []);
+    // Clear any stale demo project references from storage
+    clearDemoProjectSession();
+    // Load directly to a clean blank project on launch
+    setHasLoadedProject(true);
+    setIsDirty(false);
+  }, [fetchWorkflows]);
 
   useEffect(() => {
     if (currentProjectName && currentProjectName !== "untitled_scene") {
@@ -499,8 +509,6 @@ export function useScenePersistence({
   return {
     sceneProject,
     setSceneProject,
-    isCodeModalOpen: activeCodeModalOpen,
-    setIsCodeModalOpen,
     isDirty,
     setIsDirty,
     hasLoadedProject,

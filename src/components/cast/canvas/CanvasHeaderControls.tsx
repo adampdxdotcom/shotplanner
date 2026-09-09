@@ -8,7 +8,9 @@ import {
   FlipHorizontal, 
   ArrowUp, 
   ArrowDown, 
-  Eraser 
+  Eraser,
+  Undo2,
+  Redo2
 } from "lucide-react";
 import { MediaAsset } from "../../../types";
 import { getAssetMediaUrl } from "../../../utils/assetUrl";
@@ -30,6 +32,10 @@ export interface CanvasHeaderControlsProps {
   maskingActorId: string | null;
   onEnterMaskingMode: (actor: StagedActorCanvasItem) => void;
   onExitMaskingMode: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  onUndo?: () => void;
+  onRedo?: () => void;
 }
 
 export const CanvasHeaderControls: React.FC<CanvasHeaderControlsProps> = ({
@@ -47,13 +53,50 @@ export const CanvasHeaderControls: React.FC<CanvasHeaderControlsProps> = ({
   isMaskingMode,
   maskingActorId,
   onEnterMaskingMode,
-  onExitMaskingMode
+  onExitMaskingMode,
+  canUndo = false,
+  canRedo = false,
+  onUndo,
+  onRedo
 }) => {
   const [isLocationPickerOpen, setIsLocationPickerOpen] = useState<boolean>(false);
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs">
+    <div className="canvas-header-bar flex flex-wrap items-center justify-between gap-2 px-1 text-xs">
       <div className="flex items-center gap-2">
+        {/* Undo / Redo History Controls */}
+        <div className="flex items-center bg-zinc-900 border border-zinc-700/80 rounded-lg p-0.5 shadow-sm">
+          <button
+            type="button"
+            onClick={onUndo}
+            disabled={!canUndo}
+            className={`p-1.5 rounded transition-colors flex items-center gap-1 ${
+              canUndo
+                ? "text-zinc-200 hover:text-white hover:bg-zinc-800 cursor-pointer"
+                : "text-zinc-600 cursor-not-allowed opacity-50"
+            }`}
+            title="Undo stage transform or mask stroke (Ctrl+Z / ⌘Z)"
+          >
+            <Undo2 className="w-3.5 h-3.5" />
+            <span className="hidden md:inline text-[11px] font-medium pr-0.5">Undo</span>
+          </button>
+          <div className="w-px h-3.5 bg-zinc-700 mx-0.5" />
+          <button
+            type="button"
+            onClick={onRedo}
+            disabled={!canRedo}
+            className={`p-1.5 rounded transition-colors flex items-center gap-1 ${
+              canRedo
+                ? "text-zinc-200 hover:text-white hover:bg-zinc-800 cursor-pointer"
+                : "text-zinc-600 cursor-not-allowed opacity-50"
+            }`}
+            title="Redo stage transform or mask stroke (Ctrl+Y / ⌘Shift+Z)"
+          >
+            <Redo2 className="w-3.5 h-3.5" />
+            <span className="hidden md:inline text-[11px] font-medium pr-0.5">Redo</span>
+          </button>
+        </div>
+
         {/* Location Selector Dropdown */}
         <div className="relative">
           <button

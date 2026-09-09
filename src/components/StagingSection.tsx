@@ -88,7 +88,9 @@ export const StagingSection: React.FC<StagingSectionProps> = ({
     setTargetSlotIndex,
     defaultEnvironmentName,
     isExportingComposite,
+    isDownloading,
     handleSaveCompositeReference,
+    handleDownloadComposite,
     isPoseKeyingOpen,
     setIsPoseKeyingOpen,
     keyingTargetSubject,
@@ -100,6 +102,7 @@ export const StagingSection: React.FC<StagingSectionProps> = ({
     handleRemoveActor,
     handleRemoveActorFromStage,
     handleReorderActors,
+    handleApplyActors,
     handleUploadCustomBackground,
     handleClearBackground,
     stagingSaveStatus
@@ -179,6 +182,7 @@ export const StagingSection: React.FC<StagingSectionProps> = ({
               onUpdateActor={handleUpdateActor}
               onRemoveActor={handleRemoveActor}
               onReorderActors={handleReorderActors}
+              onApplyActors={handleApplyActors}
               activeLocationAsset={activeLocationAsset}
               locationAssets={locationAssets}
               customBackgroundUrl={customBackgroundUrl}
@@ -223,6 +227,8 @@ export const StagingSection: React.FC<StagingSectionProps> = ({
               activeShot={activeShot}
               handleSaveCompositeReference={handleSaveCompositeReference}
               isExportingComposite={isExportingComposite}
+              handleDownloadComposite={handleDownloadComposite}
+              isDownloading={isDownloading}
             />
           </div>
         )}

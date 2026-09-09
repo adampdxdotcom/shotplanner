@@ -85,8 +85,8 @@ export const PromptPreviewPanel: React.FC<PromptPreviewPanelProps> = ({
               <h2 className="text-base font-semibold text-white">Prompt Preview</h2>
               <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
                 isExpanded 
-                  ? "bg-emerald-950/80 text-emerald-300 border-emerald-800/60" 
-                  : "bg-amber-950/80 text-amber-300 border-amber-800/60"
+                  ? "prompt-badge-expanded bg-emerald-950/80 text-emerald-300 border-emerald-800/60" 
+                  : "prompt-badge-pre bg-amber-950/80 text-amber-300 border-amber-800/60"
               }`}>
                 {isExpanded ? "Expanded Prompt" : "Pre-Prompt Context"}
               </span>
@@ -103,9 +103,9 @@ export const PromptPreviewPanel: React.FC<PromptPreviewPanelProps> = ({
         <button
           type="button"
           onClick={handleCopy}
-          className={`px-3 py-1.5 text-xs font-semibold rounded-lg border flex items-center gap-1.5 transition-all cursor-pointer shadow-sm ${
+          className={`copy-prompt-btn px-3 py-1.5 text-xs font-semibold rounded-lg border flex items-center gap-1.5 transition-all cursor-pointer shadow-sm ${
             copied
-              ? "bg-emerald-600 text-white border-emerald-500 shadow-emerald-900/40"
+              ? "is-copied bg-emerald-600 text-white border-emerald-500 shadow-emerald-900/40"
               : "bg-zinc-800/90 hover:bg-zinc-700/90 text-zinc-200 hover:text-white border-zinc-700"
           }`}
           title="Copy prompt to clipboard"

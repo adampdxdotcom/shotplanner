@@ -11,3 +11,4 @@ export * from "./SSHKeypairModal";
 export * from "./LLMPromptSettingsCard";
 export * from "./CivitaiConfig";
 export * from "./CivitaiFavoritesTray";
+export * from "./GeneralSettingsTab";

@@ -73,13 +73,31 @@ function cleanProjectKey(name?: string): string {
 // 1. Last Project Name
 export function getLastProjectName(): string | null {
   const val = safeStorage.getItem(STORAGE_KEYS.LAST_PROJECT);
-  return val ? cleanProjectKey(val) : null;
+  if (!val) return null;
+  const clean = cleanProjectKey(val);
+  // Never restore or look for demo files/projects
+  if (!clean || clean.includes("demo") || clean === "demo_project") {
+    safeStorage.removeItem(STORAGE_KEYS.LAST_PROJECT);
+    return null;
+  }
+  return clean;
 }
 
 export function setLastProjectName(name: string): void {
   const clean = cleanProjectKey(name);
-  if (clean && clean !== "untitled_scene") {
+  if (clean && clean !== "untitled_scene" && !clean.includes("demo")) {
     safeStorage.setItem(STORAGE_KEYS.LAST_PROJECT, clean);
+  }
+}
+
+export function clearLastProjectName(): void {
+  safeStorage.removeItem(STORAGE_KEYS.LAST_PROJECT);
+}
+
+export function clearDemoProjectSession(): void {
+  const val = safeStorage.getItem(STORAGE_KEYS.LAST_PROJECT);
+  if (val && (val.toLowerCase().includes("demo") || val === "demo_project")) {
+    safeStorage.removeItem(STORAGE_KEYS.LAST_PROJECT);
   }
 }
 

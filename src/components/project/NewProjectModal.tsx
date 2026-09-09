@@ -40,8 +40,8 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClos
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-zinc-900 border-2 border-zinc-700 rounded-xl w-full max-w-md shadow-2xl overflow-hidden">
-        <div className="flex items-center justify-between p-4 border-b border-zinc-800 bg-zinc-950/50">
+      <div className="modal-dialog-surface bg-zinc-900 border-2 border-zinc-700 rounded-xl w-full max-w-md shadow-2xl overflow-hidden">
+        <div className="modal-dialog-header flex items-center justify-between p-4 border-b border-zinc-800 bg-zinc-950/50">
           <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
             <Plus className="w-4 h-4 text-amber-500" />
             New Scene

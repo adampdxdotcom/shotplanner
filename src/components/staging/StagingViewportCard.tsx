@@ -13,6 +13,7 @@ export interface StagingViewportCardProps {
   onUpdateActor: (id: string, updates: Partial<StagedActor>) => void;
   onRemoveActor: (id: string) => void;
   onReorderActors: (reordered: StagedActorCanvasItem[]) => void;
+  onApplyActors?: (actors: StagedActorCanvasItem[]) => void;
   activeLocationAsset?: MediaAsset;
   locationAssets: MediaAsset[];
   customBackgroundUrl?: string;
@@ -34,6 +35,7 @@ export const StagingViewportCard: React.FC<StagingViewportCardProps> = ({
   onUpdateActor,
   onRemoveActor,
   onReorderActors,
+  onApplyActors,
   activeLocationAsset,
   locationAssets,
   customBackgroundUrl,
@@ -74,6 +76,7 @@ export const StagingViewportCard: React.FC<StagingViewportCardProps> = ({
         onUpdateActor={onUpdateActor}
         onRemoveActor={onRemoveActor}
         onReorderActors={onReorderActors}
+        onApplyActors={onApplyActors}
         activeLocationAsset={activeLocationAsset}
         locationAssets={locationAssets}
         customBackgroundUrl={customBackgroundUrl}

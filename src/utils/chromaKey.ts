@@ -45,6 +45,8 @@ export interface ChromaKeyOptions {
   tolerance?: number; // 0 to 100 (range sensitivity)
   softness?: number; // 0 to 100 (edge feathering transition)
   despill?: boolean; // suppress key color spill on semi-transparent edges
+  keyingMode?: "standard" | "ycbcr"; // "standard" (RGB Euclidean) or "ycbcr" (Broadcast Luma/Chroma separation for fine hair & translucent fabrics)
+  edgeDetail?: number; // 0 to 100 (Fine hair & transparent fabric edge recovery, preserving wispy details)
   maxWidth?: number; // optional constraint for preview performance
   maxHeight?: number;
 }
@@ -106,6 +108,41 @@ export function getColorDistance(
   b2: number
 ): number {
   return Math.hypot(r1 - r2, g1 - g2, b1 - b2);
+}
+
+export interface YCbCrColor {
+  y: number;  // Luma (brightness) 0 to 255
+  cb: number; // Blue-difference chroma -128 to 127
+  cr: number; // Red-difference chroma -128 to 127
+}
+
+/**
+ * Converts standard sRGB (0-255) to ITU-R BT.601 YCbCr color space.
+ * By decoupling Luma (Y) from Chrominance (Cb, Cr), green/blue screens can be
+ * keyed purely on color difference while completely preserving fine dark hair strands,
+ * soft shadows, and translucent glasses/fabrics.
+ */
+export function rgbToYCbCr(r: number, g: number, b: number): YCbCrColor {
+  const y = 0.299 * r + 0.587 * g + 0.114 * b;
+  const cb = -0.168736 * r - 0.331264 * g + 0.5 * b;
+  const cr = 0.5 * r - 0.418688 * g - 0.081312 * b;
+  return { y, cb, cr };
+}
+
+/**
+ * Calculates weighted chroma distance in Cb-Cr space with optional luma penalty.
+ * Focusing primarily on chromatic difference allows semi-transparent dark edges
+ * (e.g. hair flyaways) to stay intact without retaining screen tint.
+ */
+export function getYCbCrDistance(
+  color: YCbCrColor,
+  key: YCbCrColor,
+  lumaWeight: number = 0.15
+): number {
+  const dCb = color.cb - key.cb;
+  const dCr = color.cr - key.cr;
+  const dY = (color.y - key.y) * lumaWeight;
+  return Math.hypot(dCb, dCr, dY);
 }
 
 /**
@@ -276,6 +313,8 @@ export async function applyChromaKey(options: ChromaKeyOptions): Promise<ChromaK
     tolerance = 35, // 0 to 100
     softness = 15, // 0 to 100
     despill = true,
+    keyingMode = "standard",
+    edgeDetail = 20,
     maxWidth,
     maxHeight,
   } = options;
@@ -311,19 +350,24 @@ export async function applyChromaKey(options: ChromaKeyOptions): Promise<ChromaK
   const kg = keyRGB.g;
   const kb = keyRGB.b;
 
-  // Maximum Euclidean distance in RGB is sqrt(255^2 * 3) ~= 441.67
-  const maxDistance = 441.67;
+  const isGreenKey = kg > kr * 1.15 && kg > kb * 1.15;
+  const isBlueKey = kb > kr * 1.15 && kb > kg * 1.15;
 
-  // Tolerance maps 0-100 to distance threshold (0 to 300)
-  // At tolerance 35, threshold is ~105
-  const threshold = (Math.max(1, tolerance) / 100) * 300;
+  const isYCbCr = keyingMode === "ycbcr";
+  const keyYCbCr = isYCbCr ? rgbToYCbCr(kr, kg, kb) : { y: 0, cb: 0, cr: 0 };
 
-  // Softness maps 0-100 to feathering band (0 to 120)
-  const featherBand = (Math.max(0, softness) / 100) * 120;
+  // Calculate thresholds based on mode
+  // In YCbCr space, maximum chromatic distance is ~150-180. In RGB space, ~300.
+  const threshold = isYCbCr
+    ? (Math.max(1, tolerance) / 100) * 140
+    : (Math.max(1, tolerance) / 100) * 300;
 
-  // Detect which channel is dominant in key color for despill
-  const isGreenKey = kg > kr * 1.2 && kg > kb * 1.2;
-  const isBlueKey = kb > kr * 1.2 && kb > kg * 1.2;
+  const featherBand = isYCbCr
+    ? (Math.max(0, softness) / 100) * 65
+    : (Math.max(0, softness) / 100) * 120;
+
+  // Edge detail boost (0.0 to 0.45) protects fine hair strands / transparent glasses
+  const detailBoost = (Math.max(0, Math.min(100, edgeDetail)) / 100) * 0.45;
 
   let transparentCount = 0;
   const totalPixels = width * height;
@@ -340,16 +384,35 @@ export async function applyChromaKey(options: ChromaKeyOptions): Promise<ChromaK
       continue;
     }
 
-    // Euclidean distance in RGB space
-    const dist = Math.hypot(r - kr, g - kg, b - kb);
+    let dist: number;
+    let lumaRatio = 1.0;
 
-    if (dist <= threshold) {
+    if (isYCbCr) {
+      const pixYCbCr = rgbToYCbCr(r, g, b);
+      dist = getYCbCrDistance(pixYCbCr, keyYCbCr, 0.18);
+      // Dark strands (e.g. hair against bright green/blue) have low Luma relative to key
+      if (keyYCbCr.y > 30) {
+        lumaRatio = Math.max(0, Math.min(1.2, pixYCbCr.y / keyYCbCr.y));
+      }
+    } else {
+      dist = Math.hypot(r - kr, g - kg, b - kb);
+    }
+
+    // Effective threshold adjusted if pixel is significantly darker than screen (hair strands)
+    const hairProtection = detailBoost > 0 && lumaRatio < 0.75 ? (1 - lumaRatio) * detailBoost * threshold : 0;
+    const effectiveThreshold = Math.max(0.5, threshold - hairProtection);
+
+    if (dist <= effectiveThreshold) {
       // Fully within key tolerance -> make completely transparent
       data[i + 3] = 0;
       transparentCount++;
-    } else if (featherBand > 0 && dist < threshold + featherBand) {
+    } else if (featherBand > 0 && dist < effectiveThreshold + featherBand) {
       // Within the feathering / softness band -> gradual alpha interpolation
-      const factor = (dist - threshold) / featherBand; // 0.0 to 1.0
+      let factor = (dist - effectiveThreshold) / featherBand; // 0.0 to 1.0
+      if (detailBoost > 0 && lumaRatio < 0.85) {
+        // Boost alpha for darker fine details in the edge transition
+        factor = Math.min(1.0, factor + detailBoost * (1.0 - lumaRatio));
+      }
       const newAlpha = Math.round(a * factor);
       data[i + 3] = newAlpha;
 
@@ -369,7 +432,7 @@ export async function applyChromaKey(options: ChromaKeyOptions): Promise<ChromaK
           }
         }
       }
-    } else if (despill && dist < threshold + featherBand + 30) {
+    } else if (despill && dist < effectiveThreshold + featherBand + 35) {
       // Subtle despill on edge pixels just outside the softness band
       if (isGreenKey && g > Math.max(r, b)) {
         data[i + 1] = Math.max(r, b);

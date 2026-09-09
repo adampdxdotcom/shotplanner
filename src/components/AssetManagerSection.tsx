@@ -179,13 +179,13 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
     <div id="assets-section" className="space-y-5 flex flex-col min-h-0">
       
       {/* Assets Screen Header Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-zinc-900/60 p-4 rounded-xl border border-zinc-800 shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900/60 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-xs">
         <div className="flex items-center gap-3">
-          <label className="text-sm font-medium text-zinc-300">Shot Context:</label>
+          <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Shot Context:</label>
           <select 
             value={activeShotId || ""}
             onChange={(e) => onSelectShot(e.target.value || null)}
-            className="bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none min-w-[250px]"
+            className="bg-white dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-white focus:border-indigo-500 focus:outline-hidden min-w-[250px] shadow-xs cursor-pointer"
           >
             <option key="empty" value="">-- Select a Shot --</option>
             {sceneProject.shots.map(s => (
@@ -197,18 +197,18 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
         </div>
         <button
           onClick={handleAddBlankShot}
-          className="px-4 py-2 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 rounded-lg text-sm font-medium transition-colors"
+          className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 dark:bg-indigo-600/20 dark:hover:bg-indigo-600/30 dark:text-indigo-300 dark:border-indigo-500/30 rounded-lg text-sm font-medium transition-colors shadow-xs cursor-pointer"
         >
           + New Shot
         </button>
       </div>
 
       {!activeShotId ? (
-        <div className="flex flex-col items-center justify-center p-12 bg-zinc-900/40 border-2 border-dashed border-zinc-800 rounded-xl">
-          <FileImage className="w-12 h-12 text-zinc-600 mb-4" />
-          <h2 className="text-xl font-semibold text-zinc-300 mb-2">No Shot Selected</h2>
-          <p className="text-sm text-zinc-500 text-center max-w-md">
-            Choose an existing shot from the dropdown above or click <strong className="text-indigo-400">"+ New Shot"</strong> to stage a new camera setup and assign media assets.
+        <div className="flex flex-col items-center justify-center p-12 bg-white dark:bg-zinc-900/40 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xs">
+          <FileImage className="w-12 h-12 text-zinc-400 dark:text-zinc-600 mb-4" />
+          <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-300 mb-2">No Shot Selected</h2>
+          <p className="text-sm text-zinc-600 dark:text-zinc-500 text-center max-w-md">
+            Choose an existing shot from the dropdown above or click <strong className="text-indigo-600 dark:text-indigo-400 font-semibold">"+ New Shot"</strong> to stage a new camera setup and assign media assets.
           </p>
         </div>
       ) : (
@@ -246,7 +246,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
             />
 
             {activeShot.takes && activeShot.takes.length > 0 && (
-              <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-3 shadow-sm -mt-2">
+              <div className="bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 shadow-xs -mt-2">
                 <TakeSelector 
                   shot={activeShot} 
                   onSetHeroTake={(tid) => onUpdateProject(prev => {
@@ -267,42 +267,63 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
             )}
             
             {/* Slot Types Tab Bar */}
-            <div className="flex items-center gap-2 border-b border-zinc-800 pb-px">
+            <div className="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-px">
               <button
+                type="button"
                 onClick={() => setActiveTab("image")}
-                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
                   activeTab === "image" 
-                    ? "border-indigo-400 text-indigo-300 bg-indigo-950/20" 
-                    : "border-transparent text-zinc-500 hover:text-zinc-300 hover:border-zinc-700"
+                    ? "border-indigo-600 text-indigo-700 bg-indigo-50/80 dark:border-indigo-400 dark:text-indigo-300 dark:bg-indigo-950/20 font-semibold" 
+                    : "border-transparent text-zinc-600 hover:text-zinc-900 hover:border-zinc-300 dark:text-zinc-500 dark:hover:text-zinc-300 dark:hover:border-zinc-700"
                 }`}
               >
                 <ImageIcon className="w-4 h-4" />
                 Image Slots
-                <span className="ml-1 text-[10px] bg-zinc-800 px-1.5 py-0.5 rounded-full">{MAX_IMAGES}</span>
+                <span className={`ml-1 text-[10px] px-1.5 py-0.5 rounded-full font-semibold transition-colors ${
+                  activeTab === "image"
+                    ? "bg-indigo-100 text-indigo-800 dark:bg-zinc-800 dark:text-zinc-300"
+                    : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+                }`}>
+                  {MAX_IMAGES}
+                </span>
               </button>
               <button
+                type="button"
                 onClick={() => setActiveTab("video")}
-                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
                   activeTab === "video" 
-                    ? "border-indigo-400 text-indigo-300 bg-indigo-950/20" 
-                    : "border-transparent text-zinc-500 hover:text-zinc-300 hover:border-zinc-700"
+                    ? "border-indigo-600 text-indigo-700 bg-indigo-50/80 dark:border-indigo-400 dark:text-indigo-300 dark:bg-indigo-950/20 font-semibold" 
+                    : "border-transparent text-zinc-600 hover:text-zinc-900 hover:border-zinc-300 dark:text-zinc-500 dark:hover:text-zinc-300 dark:hover:border-zinc-700"
                 }`}
               >
                 <VideoIcon className="w-4 h-4" />
                 Video Slots
-                <span className="ml-1 text-[10px] bg-zinc-800 px-1.5 py-0.5 rounded-full">{MAX_VIDEOS}</span>
+                <span className={`ml-1 text-[10px] px-1.5 py-0.5 rounded-full font-semibold transition-colors ${
+                  activeTab === "video"
+                    ? "bg-indigo-100 text-indigo-800 dark:bg-zinc-800 dark:text-zinc-300"
+                    : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+                }`}>
+                  {MAX_VIDEOS}
+                </span>
               </button>
               <button
+                type="button"
                 onClick={() => setActiveTab("audio")}
-                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
                   activeTab === "audio" 
-                    ? "border-indigo-400 text-indigo-300 bg-indigo-950/20" 
-                    : "border-transparent text-zinc-500 hover:text-zinc-300 hover:border-zinc-700"
+                    ? "border-indigo-600 text-indigo-700 bg-indigo-50/80 dark:border-indigo-400 dark:text-indigo-300 dark:bg-indigo-950/20 font-semibold" 
+                    : "border-transparent text-zinc-600 hover:text-zinc-900 hover:border-zinc-300 dark:text-zinc-500 dark:hover:text-zinc-300 dark:hover:border-zinc-700"
                 }`}
               >
                 <Music className="w-4 h-4" />
                 Audio Slots
-                <span className="ml-1 text-[10px] bg-zinc-800 px-1.5 py-0.5 rounded-full">{MAX_AUDIOS}</span>
+                <span className={`ml-1 text-[10px] px-1.5 py-0.5 rounded-full font-semibold transition-colors ${
+                  activeTab === "audio"
+                    ? "bg-indigo-100 text-indigo-800 dark:bg-zinc-800 dark:text-zinc-300"
+                    : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+                }`}>
+                  {MAX_AUDIOS}
+                </span>
               </button>
             </div>
             

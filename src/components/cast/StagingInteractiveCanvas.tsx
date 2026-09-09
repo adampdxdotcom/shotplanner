@@ -3,6 +3,7 @@ import { getAssetMediaUrl } from "../../utils/assetUrl";
 import { StagedActorCanvasItem, StagingInteractiveCanvasProps } from "./canvas/types";
 import { useActorTransform } from "./canvas/useActorTransform";
 import { useActorMasking } from "./canvas/useActorMasking";
+import { useStageHistory } from "./canvas/useStageHistory";
 import { CanvasHeaderControls } from "./canvas/CanvasHeaderControls";
 import { CanvasEnvironmentBackdrop } from "./canvas/CanvasEnvironmentBackdrop";
 import { CanvasMaskingHud } from "./canvas/CanvasMaskingHud";
@@ -18,6 +19,7 @@ export const StagingInteractiveCanvas: React.FC<StagingInteractiveCanvasProps> =
   onUpdateActor,
   onRemoveActor,
   onReorderActors,
+  onApplyActors,
   activeLocationAsset,
   locationAssets,
   customBackgroundUrl,
@@ -33,6 +35,26 @@ export const StagingInteractiveCanvas: React.FC<StagingInteractiveCanvasProps> =
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isCanvasDragOver, setIsCanvasDragOver] = useState<boolean>(false);
+
+  // Undo / Redo History Hook for Stage Transforms & Mask Painting
+  const handleApplyHistoryState = useCallback((restoredActors: StagedActorCanvasItem[]) => {
+    if (onApplyActors) {
+      onApplyActors(restoredActors);
+    } else {
+      onReorderActors(restoredActors);
+    }
+  }, [onApplyActors, onReorderActors]);
+
+  const {
+    canUndo,
+    canRedo,
+    undo,
+    redo,
+    recordSnapshot
+  } = useStageHistory({
+    actors,
+    onApplyActors: handleApplyHistoryState
+  });
 
   // Masking & Eraser Hook
   const {
@@ -61,7 +83,8 @@ export const StagingInteractiveCanvas: React.FC<StagingInteractiveCanvasProps> =
     activeMaskingActorId,
     onSetMaskingActorId,
     onSelectActor,
-    onUpdateActor
+    onUpdateActor,
+    onRecordCheckpoint: recordSnapshot
   });
 
   // Actor Drag & Resize Transform Hook
@@ -78,7 +101,8 @@ export const StagingInteractiveCanvas: React.FC<StagingInteractiveCanvasProps> =
     selectedActorId,
     isMaskingMode,
     onSelectActor,
-    onUpdateActor
+    onUpdateActor,
+    onRecordCheckpoint: recordSnapshot
   });
 
   // Selected actor memo
@@ -158,6 +182,10 @@ export const StagingInteractiveCanvas: React.FC<StagingInteractiveCanvasProps> =
         maskingActorId={maskingActorId}
         onEnterMaskingMode={handleEnterMaskingMode}
         onExitMaskingMode={handleExitMaskingMode}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        onUndo={undo}
+        onRedo={redo}
       />
 
       {/* MAIN INTERACTIVE 2D CANVAS CONTAINER */}
@@ -175,7 +203,7 @@ export const StagingInteractiveCanvas: React.FC<StagingInteractiveCanvasProps> =
         onDragOver={handleCanvasDragOver}
         onDragLeave={handleCanvasDragLeave}
         onDrop={handleCanvasDrop}
-        className={`relative w-full rounded-2xl overflow-hidden border-2 bg-zinc-950 shadow-2xl transition-all ${
+        className={`canvas-viewport relative w-full rounded-2xl overflow-hidden border-2 bg-zinc-950 shadow-2xl transition-all ${
           isMaskingMode ? "cursor-none" : ""
         } ${
           isCanvasDragOver
@@ -212,6 +240,10 @@ export const StagingInteractiveCanvas: React.FC<StagingInteractiveCanvasProps> =
             setBrushSize={setBrushSize}
             onResetMask={handleResetMask}
             onExitMaskingMode={handleExitMaskingMode}
+            canUndo={canUndo}
+            canRedo={canRedo}
+            onUndo={undo}
+            onRedo={redo}
           />
         )}
 

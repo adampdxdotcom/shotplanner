@@ -328,7 +328,7 @@ export function useStagingStage({
     return "Living Room";
   }, [customLocationName, activeLocationAsset]);
 
-  const { isExportingComposite, handleSaveCompositeReference } = useCompositeExporter({
+  const { isExportingComposite, isDownloading, handleSaveCompositeReference, handleDownloadComposite } = useCompositeExporter({
     stagedActors,
     customBackgroundUrl,
     activeLocationAsset,
@@ -478,6 +478,19 @@ export function useStagingStage({
     });
   };
 
+  const handleApplyActors = (newActors: StagedActorCanvasItem[]) => {
+    setStagedActors(prev => {
+      return newActors.map(item => {
+        const existing = prev.find(p => p.id === item.id);
+        return {
+          ...(existing || {}),
+          ...item,
+          horizontalPercent: Math.round(item.xPercent)
+        } as StagedActor;
+      });
+    });
+  };
+
   const handleUploadCustomBackground = async (file: File) => {
     try {
       const formData = new FormData();
@@ -570,7 +583,9 @@ export function useStagingStage({
     setTargetSlotIndex,
     defaultEnvironmentName,
     isExportingComposite,
+    isDownloading,
     handleSaveCompositeReference,
+    handleDownloadComposite,
     isPoseKeyingOpen,
     setIsPoseKeyingOpen,
     keyingTargetSubject,
@@ -582,6 +597,7 @@ export function useStagingStage({
     handleRemoveActor,
     handleRemoveActorFromStage,
     handleReorderActors,
+    handleApplyActors,
     handleUploadCustomBackground,
     handleClearBackground,
     stagingSaveStatus

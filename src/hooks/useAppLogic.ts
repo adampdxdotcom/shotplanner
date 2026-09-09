@@ -65,8 +65,6 @@ export function useAppLogic() {
   const {
     sceneProject,
     setSceneProject,
-    isCodeModalOpen,
-    setIsCodeModalOpen,
     isDirty,
     setIsDirty,
     hasLoadedProject,
@@ -213,7 +211,6 @@ export function useAppLogic() {
     defaultLlmProvider, setDefaultLlmProvider,
     activeSection, setActiveSection,
     activeShotId, setActiveShotId,
-    isCodeModalOpen, setIsCodeModalOpen,
     isDirty, setIsDirty,
     hasLoadedProject, setHasLoadedProject,
     isInitialLoad, setIsInitialLoad,

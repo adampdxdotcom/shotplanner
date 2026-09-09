@@ -58,18 +58,18 @@ export const ComfyUIConfig: React.FC<ComfyUIConfigProps> = ({ config, handleInpu
   };
 
   return (
-    <div className="space-y-4 pt-2 border-t border-zinc-800">
+    <div className="space-y-4 pt-2 border-t border-zinc-200 dark:border-zinc-800">
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
           Remote ComfyUI Paths &amp; Endpoints
         </h3>
         <button
           type="button"
           onClick={handleTestComfyUI}
           disabled={testingComfyUI}
-          className="px-3 py-1.5 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700 hover:border-zinc-600 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+          className="px-3 py-1.5 text-xs font-medium bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-300 dark:hover:text-white border dark:border-zinc-700 dark:hover:border-zinc-600 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-2xs"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${testingComfyUI ? "animate-spin text-indigo-400" : "text-zinc-400"}`} />
+          <RefreshCw className={`w-3.5 h-3.5 ${testingComfyUI ? "animate-spin text-indigo-600 dark:text-indigo-400" : "text-zinc-500 dark:text-zinc-400"}`} />
           <span>{testingComfyUI ? "Testing..." : "Test ComfyUI"}</span>
         </button>
       </div>
@@ -77,15 +77,15 @@ export const ComfyUIConfig: React.FC<ComfyUIConfigProps> = ({ config, handleInpu
       {comfyTestResult && (
         <div className={`p-3 rounded-lg border text-xs flex items-start gap-2.5 ${
           comfyTestResult.success 
-            ? "bg-emerald-950/30 border-emerald-800/40 text-emerald-300" 
-            : "bg-red-950/30 border-red-800/40 text-red-300"
+            ? "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-800/40 text-emerald-900 dark:text-emerald-300" 
+            : "bg-red-50 dark:bg-red-950/30 border-red-300 dark:border-red-800/40 text-red-900 dark:text-red-300"
         }`}>
-          {comfyTestResult.success ? <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" /> : <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />}
+          {comfyTestResult.success ? <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" /> : <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />}
           <div className="flex flex-col gap-0.5">
             <span className="font-semibold">{comfyTestResult.success ? "Connected" : "Unreachable"}</span>
             <span className="opacity-90">{comfyTestResult.message}</span>
             {comfyTestResult.systemInfo && (
-              <span className="text-[10px] text-emerald-400/80 mt-1">{comfyTestResult.systemInfo}</span>
+              <span className="text-[10px] text-emerald-700 dark:text-emerald-400/80 mt-1">{comfyTestResult.systemInfo}</span>
             )}
           </div>
         </div>
@@ -94,8 +94,8 @@ export const ComfyUIConfig: React.FC<ComfyUIConfigProps> = ({ config, handleInpu
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Remote ComfyUI Root Path */}
         <div className="space-y-1.5 md:col-span-2">
-          <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
-            <Server className="w-3.5 h-3.5 text-indigo-400" />
+          <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+            <Server className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
             Remote ComfyUI Root Path
           </label>
           <input
@@ -103,15 +103,15 @@ export const ComfyUIConfig: React.FC<ComfyUIConfigProps> = ({ config, handleInpu
             placeholder="/workspace/remote-slim/ComfyUI"
             value={config.remote_comfyui_root || "/workspace/remote-slim/ComfyUI"}
             onChange={(e) => handleInputChange("remote_comfyui_root", e.target.value)}
-            className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
+            className="w-full bg-white dark:bg-zinc-950 border-2 border-zinc-200 dark:border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-600 outline-none transition-colors shadow-2xs"
           />
           <p className="text-[10px] text-zinc-500">The absolute directory path where ComfyUI is installed on the remote instance.</p>
         </div>
 
         {/* Remote ComfyUI Input Directory */}
         <div className="space-y-1.5 md:col-span-2">
-          <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
-            <FolderOpen className="w-3.5 h-3.5 text-amber-400" />
+          <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+            <FolderOpen className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
             Remote ComfyUI Input Directory
           </label>
           <input
@@ -123,15 +123,15 @@ export const ComfyUIConfig: React.FC<ComfyUIConfigProps> = ({ config, handleInpu
               const rootPath = val.replace(/\/input\/?$/, "");
               handleInputChange("remote_comfyui_root", rootPath);
             }}
-            className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-amber-500 rounded-lg px-3 py-2 text-xs font-mono text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
+            className="w-full bg-white dark:bg-zinc-950 border-2 border-zinc-200 dark:border-zinc-700 focus:border-amber-500 rounded-lg px-3 py-2 text-xs font-mono text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-600 outline-none transition-colors shadow-2xs"
           />
           <p className="text-[10px] text-zinc-500">Target input folder on remote server used for Paramiko SCP asset transfers.</p>
         </div>
 
         {/* Remote ComfyUI API URL */}
         <div className="space-y-1.5 md:col-span-2">
-          <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
-            <Server className="w-3.5 h-3.5 text-emerald-400" />
+          <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+            <Server className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
             Remote ComfyUI API URL
           </label>
           <input
@@ -139,14 +139,14 @@ export const ComfyUIConfig: React.FC<ComfyUIConfigProps> = ({ config, handleInpu
             placeholder="http://127.0.0.1:8188 or https://pod-8188.proxy.remote.net"
             value={config.comfyui_api_url || ""}
             onChange={(e) => handleInputChange("comfyui_api_url", e.target.value)}
-            className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-emerald-500 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
+            className="w-full bg-white dark:bg-zinc-950 border-2 border-zinc-200 dark:border-zinc-700 focus:border-emerald-500 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-600 outline-none transition-colors shadow-2xs"
           />
         </div>
 
         {/* Remote API Token (Optional Proxy Auth Header) */}
         <div className="space-y-1.5 md:col-span-2">
-          <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
-            <ShieldCheck className="w-3.5 h-3.5 text-zinc-400" />
+          <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+            <ShieldCheck className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
             Remote API Token (Optional Proxy Auth Header)
           </label>
           <input
@@ -154,7 +154,7 @@ export const ComfyUIConfig: React.FC<ComfyUIConfigProps> = ({ config, handleInpu
             placeholder="Bearer token if using Remote GPU proxy endpoint"
             value={config.remote_api_token || ""}
             onChange={(e) => handleInputChange("remote_api_token", e.target.value)}
-            className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none transition-colors"
+            className="w-full bg-white dark:bg-zinc-950 border-2 border-zinc-200 dark:border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-600 outline-none transition-colors shadow-2xs"
           />
         </div>
       </div>

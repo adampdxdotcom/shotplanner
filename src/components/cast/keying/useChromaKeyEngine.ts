@@ -12,6 +12,8 @@ export function useChromaKeyEngine({ activeImageSource }: UseChromaKeyEngineProp
   const [tolerance, setTolerance] = useState<number>(35); // 0 to 100
   const [softness, setSoftness] = useState<number>(15); // 0 to 100
   const [despill, setDespill] = useState<boolean>(true);
+  const [keyingMode, setKeyingMode] = useState<"standard" | "ycbcr">("standard");
+  const [edgeDetail, setEdgeDetail] = useState<number>(20); // 0 to 100 (Fine hair & transparent fabric preservation)
 
   const [cutoutResult, setCutoutResult] = useState<KeyingCutoutResult | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
@@ -57,6 +59,8 @@ export function useChromaKeyEngine({ activeImageSource }: UseChromaKeyEngineProp
           tolerance,
           softness,
           despill,
+          keyingMode,
+          edgeDetail,
           maxWidth: 1200,
         });
         if (!isCancelled) {
@@ -83,7 +87,7 @@ export function useChromaKeyEngine({ activeImageSource }: UseChromaKeyEngineProp
       isCancelled = true;
       clearTimeout(timer);
     };
-  }, [activeImageSource, keyColor, tolerance, softness, despill]);
+  }, [activeImageSource, keyColor, tolerance, softness, despill, keyingMode, edgeDetail]);
 
   // Clean up active cutout blob URL on unmount
   useEffect(() => {
@@ -99,6 +103,8 @@ export function useChromaKeyEngine({ activeImageSource }: UseChromaKeyEngineProp
     setTolerance(35);
     setSoftness(15);
     setDespill(true);
+    setKeyingMode("standard");
+    setEdgeDetail(20);
     setKeyColor("#00FF00");
   }, []);
 
@@ -111,6 +117,10 @@ export function useChromaKeyEngine({ activeImageSource }: UseChromaKeyEngineProp
     setSoftness,
     despill,
     setDespill,
+    keyingMode,
+    setKeyingMode,
+    edgeDetail,
+    setEdgeDetail,
     cutoutResult,
     isProcessing,
     handleAutoDetectColor,

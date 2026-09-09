@@ -8,7 +8,8 @@ import {
   LLMSetupTab,
   RemoteServerTab,
   ModelHubConfig,
-  SSHKeypairModal
+  SSHKeypairModal,
+  GeneralSettingsTab
 } from "./config";
 
 export { probeLMStudioConnection };
@@ -22,7 +23,6 @@ export interface ConfigSectionProps {
   onChangeProvider?: (provider: LLMProvider) => void;
   onSetDefaultProvider?: (provider: LLMProvider) => void;
   onShowToast?: (text: string, type: "success" | "error" | "info") => void;
-  onOpenCodeViewer?: () => void;
 }
 
 export const ConfigSection: React.FC<ConfigSectionProps> = ({ 
@@ -32,8 +32,7 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({
   defaultLlmProvider,
   onChangeProvider,
   onSetDefaultProvider,
-  onShowToast,
-  onOpenCodeViewer 
+  onShowToast
 }) => {
   const {
     activeTab,
@@ -109,7 +108,6 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({
         <RemoteServerTab
           config={config}
           handleInputChange={handleInputChange}
-          onOpenCodeViewer={onOpenCodeViewer}
           handleTestSSH={handleTestSSH}
           testingSSH={testingSSH}
           testResult={testResult}
@@ -128,6 +126,13 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({
             onChange={onChange} 
             onShowToast={onShowToast} 
           />
+        </section>
+      )}
+
+      {/* Tab 4: General Preferences & Appearance */}
+      {activeTab === "general" && (
+        <section id="panel-general-settings" className="w-full">
+          <GeneralSettingsTab />
         </section>
       )}
 

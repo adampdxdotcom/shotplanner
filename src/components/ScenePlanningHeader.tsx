@@ -113,21 +113,21 @@ export const ScenePlanningHeader: React.FC<ScenePlanningHeaderProps> = ({
   };
 
   return (
-    <div className="bg-zinc-950/80 border-2 border-indigo-500/40 hover:border-indigo-500/60 rounded-xl p-4 shadow-md space-y-3.5 transition-all">
+    <div className="scene-planning-card bg-white dark:bg-zinc-950/80 border-2 border-indigo-200 dark:border-indigo-500/40 hover:border-indigo-300 dark:hover:border-indigo-500/60 rounded-xl p-4 shadow-xs space-y-3.5 transition-all">
       {/* Header & Badges */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800/80 pb-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-200 dark:border-zinc-800/80 pb-2.5">
         <div className="flex items-center gap-2.5">
-          <div className="p-1.5 rounded-lg bg-indigo-600/20 text-indigo-400 border border-indigo-500/30">
+          <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-200 dark:bg-indigo-600/20 dark:text-indigo-400 dark:border-indigo-500/30">
             <Clapperboard className="w-4 h-4" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
+            <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
               Scene &amp; Camera Planning
-              <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-indigo-950/60 text-indigo-300 border border-indigo-800/60">
+              <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-800/60">
                 Prompt Prefix Generator
               </span>
             </h2>
-            <p className="text-[11px] text-zinc-400">
+            <p className="text-[11px] text-zinc-600 dark:text-zinc-400">
               Configure cinematic shot details. Assembles into a standardized prompt prefix automatically baked into ComfyUI prompt node.
             </p>
           </div>
@@ -135,8 +135,8 @@ export const ScenePlanningHeader: React.FC<ScenePlanningHeaderProps> = ({
 
         {/* Current Shot Badge */}
         <div className="flex items-center gap-2">
-          <span className="text-xs font-mono font-semibold px-2.5 py-1 rounded-md bg-zinc-900 text-indigo-300 border border-indigo-500/30 flex items-center gap-1.5">
-            <Film className="w-3.5 h-3.5 text-indigo-400" />
+          <span className="text-xs font-mono font-semibold px-2.5 py-1 rounded-md bg-zinc-100 text-indigo-700 border border-indigo-200 dark:bg-zinc-900 dark:text-indigo-300 dark:border-indigo-500/30 flex items-center gap-1.5 shadow-xs">
+            <Film className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
             Shot {formattedShot}
           </span>
         </div>
@@ -146,8 +146,8 @@ export const ScenePlanningHeader: React.FC<ScenePlanningHeaderProps> = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         {/* 1. Shot Name */}
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
-            <Layers className="w-3.5 h-3.5 text-indigo-400" />
+          <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+            <Layers className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
             <span>Shot Name</span>
           </label>
           <input
@@ -155,18 +155,18 @@ export const ScenePlanningHeader: React.FC<ScenePlanningHeaderProps> = ({
             value={planning.scene_name}
             onChange={handleSceneNameChange}
             placeholder="e.g. Hero Close-up"
-            className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-indigo-500 focus:outline-hidden text-zinc-100 text-xs px-3 py-2 rounded-lg transition-colors placeholder:text-zinc-500"
+            className="w-full bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-700 focus:border-indigo-500 focus:outline-hidden text-zinc-900 dark:text-zinc-100 text-xs px-3 py-2 rounded-lg transition-colors placeholder:text-zinc-400 dark:placeholder:text-zinc-500 shadow-xs"
           />
         </div>
 
         {/* 2. Shot # */}
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-zinc-300 flex items-center justify-between">
+          <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300 flex items-center justify-between">
             <span className="flex items-center gap-1.5">
-              <Hash className="w-3.5 h-3.5 text-indigo-400" />
+              <Hash className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
               <span>Shot #</span>
             </span>
-            <span className="text-[10px] font-mono text-zinc-400">Padded: {formattedShot}</span>
+            <span className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400">Padded: {formattedShot}</span>
           </label>
           <div className="relative">
             <input
@@ -174,21 +174,21 @@ export const ScenePlanningHeader: React.FC<ScenePlanningHeaderProps> = ({
               value={planning.shot_number}
               onChange={handleShotNumberChange}
               placeholder="e.g. 12"
-              className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-indigo-500 focus:outline-hidden text-zinc-100 font-mono text-xs px-3 py-2 rounded-lg transition-colors placeholder:text-zinc-500"
+              className="w-full bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-700 focus:border-indigo-500 focus:outline-hidden text-zinc-900 dark:text-zinc-100 font-mono text-xs px-3 py-2 rounded-lg transition-colors placeholder:text-zinc-400 dark:placeholder:text-zinc-500 shadow-xs"
             />
           </div>
         </div>
 
         {/* 3. Shot Type */}
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
-            <Camera className="w-3.5 h-3.5 text-indigo-400" />
+          <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+            <Camera className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
             <span>Shot Type</span>
           </label>
           <select
             value={planning.shot_type === "Over-the-Shoulder" ? "Over-the-shoulder (OTS)" : planning.shot_type || "Medium Shot"}
             onChange={handleShotTypeChange}
-            className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-indigo-500 focus:outline-hidden text-zinc-100 text-xs px-3 py-2 rounded-lg transition-colors cursor-pointer"
+            className="w-full bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-700 focus:border-indigo-500 focus:outline-hidden text-zinc-900 dark:text-zinc-100 text-xs px-3 py-2 rounded-lg transition-colors cursor-pointer shadow-xs"
           >
             {SHOT_TYPES.map((st) => (
               <option key={st.value} value={st.value}>
@@ -200,14 +200,14 @@ export const ScenePlanningHeader: React.FC<ScenePlanningHeaderProps> = ({
 
         {/* 4. Camera Movement */}
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
-            <Move className="w-3.5 h-3.5 text-indigo-400" />
+          <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+            <Move className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
             <span>Camera Movement</span>
           </label>
           <select
             value={planning.camera_movement || "Locked Off"}
             onChange={handleCameraMovementChange}
-            className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-indigo-500 focus:outline-hidden text-zinc-100 text-xs px-3 py-2 rounded-lg transition-colors cursor-pointer"
+            className="w-full bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-700 focus:border-indigo-500 focus:outline-hidden text-zinc-900 dark:text-zinc-100 text-xs px-3 py-2 rounded-lg transition-colors cursor-pointer shadow-xs"
           >
             {CAMERA_MOVEMENTS.map((cm) => (
               <option key={cm.value} value={cm.value}>
@@ -219,14 +219,14 @@ export const ScenePlanningHeader: React.FC<ScenePlanningHeaderProps> = ({
 
         {/* 5. Lens / Focal Length */}
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
-            <Aperture className="w-3.5 h-3.5 text-indigo-400" />
+          <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+            <Aperture className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
             <span>Lens / Focal Length</span>
           </label>
           <select
             value={planning.lens_focal_length || "50mm Standard Prime"}
             onChange={handleLensChange}
-            className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-indigo-500 focus:outline-hidden text-zinc-100 text-xs px-3 py-2 rounded-lg transition-colors cursor-pointer"
+            className="w-full bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-700 focus:border-indigo-500 focus:outline-hidden text-zinc-900 dark:text-zinc-100 text-xs px-3 py-2 rounded-lg transition-colors cursor-pointer shadow-xs"
           >
             {LENS_PRESETS.map((lp) => (
               <option key={lp.value} value={lp.value}>
@@ -238,14 +238,14 @@ export const ScenePlanningHeader: React.FC<ScenePlanningHeaderProps> = ({
 
         {/* 6. Aspect Ratio */}
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
-            <RectangleHorizontal className="w-3.5 h-3.5 text-indigo-400" />
+          <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+            <RectangleHorizontal className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
             <span>Aspect Ratio</span>
           </label>
           <select
             value={planning.aspect_ratio || "16:9 Widescreen"}
             onChange={handleAspectRatioChange}
-            className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-indigo-500 focus:outline-hidden text-zinc-100 text-xs px-3 py-2 rounded-lg transition-colors cursor-pointer"
+            className="w-full bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-700 focus:border-indigo-500 focus:outline-hidden text-zinc-900 dark:text-zinc-100 text-xs px-3 py-2 rounded-lg transition-colors cursor-pointer shadow-xs"
           >
             {ASPECT_RATIO_PRESETS.map((ar) => (
               <option key={ar.value} value={ar.value}>
@@ -258,30 +258,30 @@ export const ScenePlanningHeader: React.FC<ScenePlanningHeaderProps> = ({
 
       {/* Dynamic Prefix Live Preview Banner & SaveVideo Output Preview */}
       <div className="space-y-2">
-        <div className="bg-zinc-900/90 border border-indigo-950/80 rounded-lg p-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+        <div className="assembled-prefix-banner bg-indigo-50/80 dark:bg-zinc-900/90 border border-indigo-200 dark:border-indigo-950/80 rounded-lg p-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs shadow-xs">
           <div className="flex items-center gap-2 overflow-hidden min-w-0">
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-indigo-400 px-2 py-0.5 rounded bg-indigo-950/60 border border-indigo-800/40 shrink-0 flex items-center gap-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-indigo-700 dark:text-indigo-400 px-2 py-0.5 rounded bg-indigo-100/90 dark:bg-indigo-950/60 border border-indigo-300 dark:border-indigo-800/40 shrink-0 flex items-center gap-1 shadow-xs">
               <Sparkles className="w-3 h-3" />
               Assembled Prefix
             </span>
-            <code className="text-indigo-200 font-mono text-xs font-medium truncate select-all">
+            <code className="text-indigo-950 dark:text-indigo-200 font-mono text-xs font-medium truncate select-all">
               {prefix || "Scene & Shot details will appear here..."}
             </code>
           </div>
           <button
             type="button"
             onClick={handleCopy}
-            className="px-2.5 py-1 text-[11px] font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 rounded-md transition-colors shrink-0 flex items-center gap-1 self-end sm:self-auto"
+            className="px-2.5 py-1 text-[11px] font-medium bg-white hover:bg-zinc-50 text-zinc-700 border border-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-200 dark:border-zinc-700 rounded-md transition-colors shrink-0 flex items-center gap-1 self-end sm:self-auto shadow-xs cursor-pointer"
             title="Copy prefix to clipboard"
           >
             {copied ? (
               <>
-                <Check className="w-3 h-3 text-emerald-400" />
-                <span className="text-emerald-400 font-semibold">Copied</span>
+                <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                <span className="text-emerald-700 dark:text-emerald-400 font-semibold">Copied</span>
               </>
             ) : (
               <>
-                <Copy className="w-3 h-3 text-zinc-400" />
+                <Copy className="w-3 h-3 text-zinc-500 dark:text-zinc-400" />
                 <span>Copy Prefix</span>
               </>
             )}
@@ -289,13 +289,13 @@ export const ScenePlanningHeader: React.FC<ScenePlanningHeaderProps> = ({
         </div>
 
         {/* Subtle Read-only Output Prefix Indicator */}
-        <div className="bg-zinc-950/80 border border-zinc-800/80 rounded-md px-3 py-1.5 flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div className="output-prefix-banner bg-zinc-100/80 dark:bg-zinc-950/80 border border-zinc-200 dark:border-zinc-800/80 rounded-md px-3 py-1.5 flex flex-wrap items-center justify-between gap-2 text-xs shadow-xs">
           <div className="flex items-center gap-2 font-mono text-[11px] min-w-0">
-            <span className="text-zinc-400 font-medium shrink-0 flex items-center gap-1.5">
-              <Video className="w-3.5 h-3.5 text-indigo-400" />
+            <span className="text-zinc-600 dark:text-zinc-400 font-medium shrink-0 flex items-center gap-1.5">
+              <Video className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
               Output Prefix:
             </span>
-            <code className="text-emerald-400 font-semibold truncate select-all">
+            <code className="text-emerald-700 dark:text-emerald-400 font-semibold truncate select-all">
               {generateSaveVideoPrefix(planning.scene_name, planning.shot_number) 
                 ? `${generateSaveVideoPrefix(planning.scene_name, planning.shot_number)}#####.mp4`
                 : "video/MiniMax_Output_#####.mp4"}
