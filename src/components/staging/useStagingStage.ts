@@ -25,7 +25,7 @@ export interface UseStagingStageProps {
   onUpdateShot?: (updater: (prev: ShotItem) => ShotItem) => void;
   onAssetUploaded?: (asset: MediaAsset, targetSlotIndex?: number) => void;
   addToast?: (msg: string, type?: "success" | "error" | "info") => void;
-  initialTab?: "headshots" | "staging";
+  initialTab?: "headshots" | "staging" | "sheets";
   initialSubject?: string;
 }
 
@@ -41,11 +41,11 @@ export function useStagingStage({
   onUpdateShot,
   onAssetUploaded,
   addToast,
-  initialTab = "staging" as "headshots" | "staging",
+  initialTab = "staging" as "headshots" | "staging" | "sheets",
   initialSubject = ""
 }: UseStagingStageProps) {
   // Studio Active Tab state (persisted across reloads)
-  const [activeTab, setActiveTab] = useState<"headshots" | "staging">(() => {
+  const [activeTab, setActiveTab] = useState<"headshots" | "staging" | "sheets">(() => {
     return getLastStagingTab(initialTab);
   });
 

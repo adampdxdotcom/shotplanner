@@ -1,5 +1,5 @@
 import React from "react";
-import { Layers, Film, Zap, Sparkles, Check } from "lucide-react";
+import { Layers, Film, Zap, Sparkles, Check, LayoutGrid } from "lucide-react";
 import { SceneProjectFile } from "../../types";
 
 export interface StagingStudioHeaderProps {
@@ -9,8 +9,8 @@ export interface StagingStudioHeaderProps {
   activeSubject: string;
   setActiveSubject: (subject: string) => void;
   availableCharacters: string[];
-  activeTab: "headshots" | "staging";
-  setActiveTab: (tab: "headshots" | "staging") => void;
+  activeTab: "headshots" | "staging" | "sheets";
+  setActiveTab: (tab: "headshots" | "staging" | "sheets") => void;
   saveStatus?: "saved" | "saving" | "unsaved" | "error";
   lastSavedAt?: Date | null;
 }
@@ -37,10 +37,10 @@ export const StagingStudioHeader: React.FC<StagingStudioHeaderProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
-                Staging Studio
+                Asset Creation
               </h1>
               <span className="text-[10px] font-semibold text-indigo-300 bg-indigo-950/80 border border-indigo-800/60 px-2 py-0.5 rounded-full">
-                Director's 2D Stage
+                Director's Workbench
               </span>
 
               {/* Subtle Autosave Status Indicator */}
@@ -87,7 +87,7 @@ export const StagingStudioHeader: React.FC<StagingStudioHeaderProps> = ({
               )}
             </div>
             <p className="text-xs text-zinc-400 mt-0.5">
-              Block character spatial placement, composite multi-actor references, and stage shots
+              Stage multi-actor blocking, generate AI character headshots, and assemble multi-panel reference sheets
             </p>
           </div>
         </div>
@@ -134,14 +134,14 @@ export const StagingStudioHeader: React.FC<StagingStudioHeaderProps> = ({
 
       {/* WORKSPACE SUB-TABS */}
       <div className="flex items-center justify-between border-t border-zinc-800/80 pt-3">
-        <div className="flex items-center gap-1 bg-zinc-950/60 p-1 rounded-lg border border-zinc-800">
+        <div className="flex flex-wrap items-center gap-1 bg-zinc-950/60 p-1 rounded-lg border border-zinc-800">
           <button
             type="button"
             onClick={() => setActiveTab("staging")}
             className={`px-3.5 py-1.5 text-xs font-semibold rounded-md flex items-center gap-2 transition-all cursor-pointer ${
               activeTab === "staging"
                 ? "bg-indigo-600 text-white shadow-xs"
-                : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:text-zinc-200 dark:hover:bg-zinc-900/60"
+                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60"
             }`}
           >
             <Layers className="w-3.5 h-3.5" />
@@ -157,7 +157,7 @@ export const StagingStudioHeader: React.FC<StagingStudioHeaderProps> = ({
             className={`px-3.5 py-1.5 text-xs font-semibold rounded-md flex items-center gap-2 transition-all cursor-pointer ${
               activeTab === "headshots"
                 ? "bg-amber-600 text-white shadow-xs"
-                : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:text-zinc-200 dark:hover:bg-zinc-900/60"
+                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60"
             }`}
           >
             <Zap className="w-3.5 h-3.5" />
@@ -166,18 +166,39 @@ export const StagingStudioHeader: React.FC<StagingStudioHeaderProps> = ({
               Gemini
             </span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("sheets")}
+            className={`px-3.5 py-1.5 text-xs font-semibold rounded-md flex items-center gap-2 transition-all cursor-pointer ${
+              activeTab === "sheets"
+                ? "bg-emerald-600 text-white shadow-xs"
+                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60"
+            }`}
+          >
+            <LayoutGrid className="w-3.5 h-3.5" />
+            <span>Reference Sheets</span>
+            <span className="text-[10px] px-1.5 py-0.2 bg-black/10 dark:bg-white/10 rounded font-mono">
+              Panels
+            </span>
+          </button>
         </div>
 
-        <div className="hidden md:flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
+        <div className="hidden md:flex items-center gap-2 text-xs text-zinc-400">
           {activeTab === "staging" ? (
             <span className="flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+              <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
               Director's 2D Blocking Stage • Multi-Actor Spatial Layout &amp; Slot Assignment
+            </span>
+          ) : activeTab === "headshots" ? (
+            <span className="flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              Gemini 3.1 Flash Image • Photorealistic Multi-Angle Headshot Generation
             </span>
           ) : (
             <span className="flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-              Gemini 3.1 Flash Image • Photorealistic Multi-Angle Headshot Generation
+              <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+              Multi-Panel Character Reference Sheets • 16:9 &amp; 1:1 Contact Collages
             </span>
           )}
         </div>

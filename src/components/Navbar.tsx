@@ -144,7 +144,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             }`}
           >
             <Layers className="w-3.5 h-3.5 text-indigo-400" />
-            Staging
+            Assets
           </button>
           <button
             onClick={() => onNavigate("workflow")}

@@ -1,6 +1,7 @@
 import React from "react";
 import { MediaAsset, CharacterProfile, SceneProjectFile, ShotItem } from "../types";
 import { HeadshotGeneratorTab } from "./cast/HeadshotGeneratorTab";
+import { ReferenceSheetsTab } from "./cast/ReferenceSheetsTab";
 import { StagingEnvironmentControls } from "./cast/StagingEnvironmentControls";
 import { StagingActorInspector } from "./cast/StagingActorInspector";
 import { StagingCompositeSavePanel } from "./cast/StagingCompositeSavePanel";
@@ -26,7 +27,7 @@ export interface StagingSectionProps {
   onUpdateShot?: (updater: (prev: ShotItem) => ShotItem) => void;
   onAssetUploaded?: (asset: MediaAsset, targetSlotIndex?: number) => void;
   addToast?: (msg: string, type?: "success" | "error" | "info") => void;
-  initialTab?: "headshots" | "staging";
+  initialTab?: "headshots" | "staging" | "sheets";
   initialSubject?: string;
   autosaveStatus?: "saved" | "saving" | "unsaved" | "error";
   lastSavedAt?: Date | null;
@@ -44,7 +45,7 @@ export const StagingSection: React.FC<StagingSectionProps> = ({
   onUpdateShot,
   onAssetUploaded,
   addToast,
-  initialTab = "staging" as "headshots" | "staging",
+  initialTab = "staging" as "headshots" | "staging" | "sheets",
   initialSubject = "",
   autosaveStatus,
   lastSavedAt
@@ -240,6 +241,20 @@ export const StagingSection: React.FC<StagingSectionProps> = ({
               activeSubject={activeSubject}
               activeScene={activeScene}
               currentCharacterAssets={currentCharacterAssets}
+              onAssetSaved={onAssetUploaded}
+              addToast={addToast}
+            />
+          </div>
+        )}
+
+        {/* TAB 3: REFERENCE SHEETS WORKSPACE */}
+        {activeTab === "sheets" && (
+          <div className="p-5">
+            <ReferenceSheetsTab
+              activeSubject={activeSubject}
+              activeScene={activeScene}
+              currentCharacterAssets={currentCharacterAssets}
+              allAssets={assets}
               onAssetSaved={onAssetUploaded}
               addToast={addToast}
             />

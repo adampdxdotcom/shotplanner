@@ -69,6 +69,12 @@ export default function App() {
     lastSavedAt
   } = useAppLogic();
 
+  // Keep browser tab title synchronized with active scene or project name
+  React.useEffect(() => {
+    const displayName = sceneProject.scene_name?.trim() || currentProjectName?.trim() || "Untitled Project";
+    document.title = `Shot Planner: ${displayName}`;
+  }, [sceneProject.scene_name, currentProjectName]);
+
   return (
     <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] font-sans selection:bg-indigo-500 selection:text-white flex flex-col transition-colors duration-200">
       {/* Top Navbar */}
@@ -300,8 +306,8 @@ export default function App() {
       />
 
       {/* Footer */}
-      <footer className="border-t border-zinc-800/80 py-6 mt-12 text-center text-xs text-zinc-500">
-        <p>ComfyUI Bridge &amp; Remote Orchestrator • Dockerized Local Bridge Architecture</p>
+      <footer className="border-t border-zinc-200 dark:border-zinc-800/80 py-6 mt-12 text-center text-xs text-zinc-500">
+        <p>Shot Planner version 1.0</p>
       </footer>
     </div>
   );

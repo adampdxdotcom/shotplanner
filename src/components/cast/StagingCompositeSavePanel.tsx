@@ -38,9 +38,9 @@ export const StagingCompositeSavePanel: React.FC<StagingCompositeSavePanelProps>
   isDownloading = false
 }) => {
   return (
-    <div className="composite-save-panel bg-white dark:bg-gradient-to-br dark:from-zinc-900/90 dark:via-zinc-900/60 dark:to-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 space-y-4 shadow-xs">
+    <div className="composite-save-panel bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 space-y-4 shadow-xs">
       {/* Header with contextual location info */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 dark:border-zinc-800/80 pb-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 dark:border-zinc-800 pb-3">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/30 flex items-center justify-center shrink-0">
             <MapPin className="w-4 h-4" />
@@ -56,8 +56,8 @@ export const StagingCompositeSavePanel: React.FC<StagingCompositeSavePanelProps>
         </div>
 
         {/* Active background environment badge */}
-        <div className="flex items-center gap-2 text-xs bg-slate-50 text-zinc-700 border border-zinc-200 dark:bg-zinc-950/80 dark:border-zinc-800 px-2.5 py-1 rounded-lg">
-          <span className="text-zinc-500 dark:text-zinc-500">Stage Background:</span>
+        <div className="flex items-center gap-2 text-xs bg-slate-50 text-zinc-700 border border-zinc-200 dark:bg-zinc-950 dark:border-zinc-800 px-2.5 py-1 rounded-lg">
+          <span className="text-zinc-500 dark:text-zinc-400">Stage Background:</span>
           <span className="font-semibold text-zinc-900 dark:text-zinc-200 truncate max-w-[200px]" title={defaultEnvironmentName}>
             {defaultEnvironmentName}
           </span>
@@ -78,16 +78,16 @@ export const StagingCompositeSavePanel: React.FC<StagingCompositeSavePanelProps>
               setCompositeRefName(e.target.value);
             }}
             placeholder="e.g. Couch 3/4 or Living Room"
-            className="w-full bg-white dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-hidden focus:border-amber-500 shadow-2xs transition-colors"
+            className="w-full bg-white dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 focus:dark:border-amber-500 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-hidden focus:border-amber-500 shadow-2xs transition-colors"
           />
-          <span className="block mt-1 text-[11px] text-zinc-500 dark:text-zinc-500">
+          <span className="block mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">
             Asset subject identifier for gallery organization (avoids phantom characters)
           </span>
         </div>
       </div>
 
       {/* Bottom Action Bar: Optional Slot Assignment & Save Action Button */}
-      <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-zinc-200 dark:border-zinc-800/60">
+      <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-zinc-200 dark:border-zinc-800">
         <div className="flex flex-wrap items-center gap-3">
           <label className="flex items-center gap-2 cursor-pointer select-none group">
             <input
@@ -108,11 +108,11 @@ export const StagingCompositeSavePanel: React.FC<StagingCompositeSavePanelProps>
 
           {assignToShotSlot && (
             <div className="flex items-center gap-2">
-              <span className="text-xs text-zinc-600 dark:text-zinc-500 font-medium">Slot:</span>
+              <span className="text-xs text-zinc-600 dark:text-zinc-400 font-medium">Slot:</span>
               <select
                 value={targetSlotIndex}
                 onChange={(e) => setTargetSlotIndex(Number(e.target.value))}
-                className="bg-white dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-800 rounded-lg px-2.5 py-1 text-xs text-amber-700 dark:text-amber-400 font-semibold focus:outline-hidden focus:border-amber-500 cursor-pointer shadow-2xs"
+                className="bg-white dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded-lg px-2.5 py-1 text-xs text-amber-700 dark:text-amber-400 font-semibold focus:outline-hidden focus:border-amber-500 cursor-pointer shadow-2xs"
               >
                 <option value={8}>Slot 9 (Location / Staging Ref) - Default</option>
                 <option value={0}>Slot 1 (Subject / Primary Ref)</option>
