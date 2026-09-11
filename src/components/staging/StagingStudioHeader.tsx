@@ -1,5 +1,5 @@
 import React from "react";
-import { Layers, Film, Zap, Sparkles, Check, LayoutGrid } from "lucide-react";
+import { Layers, Film, Zap, LayoutGrid } from "lucide-react";
 import { SceneProjectFile } from "../../types";
 
 export interface StagingStudioHeaderProps {
@@ -42,49 +42,6 @@ export const StagingStudioHeader: React.FC<StagingStudioHeaderProps> = ({
               <span className="text-[10px] font-semibold text-indigo-300 bg-indigo-950/80 border border-indigo-800/60 px-2 py-0.5 rounded-full">
                 Director's Workbench
               </span>
-
-              {/* Subtle Autosave Status Indicator */}
-              {saveStatus && (
-                <div 
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium transition-all ${
-                    saveStatus === "saving"
-                      ? "bg-amber-500/10 border border-amber-500/30 text-amber-300"
-                      : saveStatus === "saved"
-                      ? "bg-emerald-500/10 border border-emerald-500/25 text-emerald-400"
-                      : saveStatus === "error"
-                      ? "bg-red-500/10 border border-red-500/25 text-red-400"
-                      : "bg-zinc-800/80 border border-zinc-700/60 text-zinc-400"
-                  }`}
-                  title={lastSavedAt ? `Last autosaved at ${lastSavedAt.toLocaleTimeString()}` : undefined}
-                >
-                  {saveStatus === "saving" ? (
-                    <>
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping shrink-0" />
-                      <span className="tracking-tight">● Saving draft...</span>
-                    </>
-                  ) : saveStatus === "saved" ? (
-                    <>
-                      <Check className="w-3 h-3 text-emerald-400 shrink-0" />
-                      <span className="tracking-tight">✓ Saved</span>
-                      {lastSavedAt && (
-                        <span className="hidden sm:inline text-[9px] text-zinc-500 font-mono">
-                          {lastSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-                        </span>
-                      )}
-                    </>
-                  ) : saveStatus === "error" ? (
-                    <>
-                      <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
-                      <span>Save error</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="w-1.5 h-1.5 rounded-full bg-zinc-500 shrink-0" />
-                      <span>Drafting</span>
-                    </>
-                  )}
-                </div>
-              )}
             </div>
             <p className="text-xs text-zinc-400 mt-0.5">
               Stage multi-actor blocking, generate AI character headshots, and assemble multi-panel reference sheets
@@ -133,74 +90,58 @@ export const StagingStudioHeader: React.FC<StagingStudioHeaderProps> = ({
       </div>
 
       {/* WORKSPACE SUB-TABS */}
-      <div className="flex items-center justify-between border-t border-zinc-800/80 pt-3">
-        <div className="flex flex-wrap items-center gap-1 bg-zinc-950/60 p-1 rounded-lg border border-zinc-800">
+      <div className="border-t border-zinc-800/80 pt-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 bg-zinc-950/60 p-1 rounded-lg border border-zinc-800 w-full">
           <button
+            id="tab-staging"
             type="button"
             onClick={() => setActiveTab("staging")}
-            className={`px-3.5 py-1.5 text-xs font-semibold rounded-md flex items-center gap-2 transition-all cursor-pointer ${
+            className={`w-full justify-center px-3.5 py-2 text-xs font-semibold rounded-md flex items-center gap-2 transition-all cursor-pointer ${
               activeTab === "staging"
                 ? "bg-indigo-600 text-white shadow-xs"
                 : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60"
             }`}
           >
-            <Layers className="w-3.5 h-3.5" />
+            <Layers className="w-3.5 h-3.5 shrink-0" />
             <span>Scene Staging &amp; Blocking</span>
-            <span className="text-[10px] px-1.5 py-0.2 bg-black/10 dark:bg-white/10 rounded font-mono">
+            <span className="text-[10px] px-1.5 py-0.5 bg-black/20 dark:bg-white/10 rounded font-mono shrink-0">
               Stage
             </span>
           </button>
 
           <button
+            id="tab-headshots"
             type="button"
             onClick={() => setActiveTab("headshots")}
-            className={`px-3.5 py-1.5 text-xs font-semibold rounded-md flex items-center gap-2 transition-all cursor-pointer ${
+            className={`w-full justify-center px-3.5 py-2 text-xs font-semibold rounded-md flex items-center gap-2 transition-all cursor-pointer ${
               activeTab === "headshots"
                 ? "bg-amber-600 text-white shadow-xs"
                 : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60"
             }`}
           >
-            <Zap className="w-3.5 h-3.5" />
+            <Zap className="w-3.5 h-3.5 shrink-0" />
             <span>AI Headshots &amp; Variations</span>
-            <span className="text-[10px] px-1.5 py-0.2 bg-black/10 dark:bg-white/10 rounded font-mono">
+            <span className="text-[10px] px-1.5 py-0.5 bg-black/20 dark:bg-white/10 rounded font-mono shrink-0">
               Gemini
             </span>
           </button>
 
           <button
+            id="tab-sheets"
             type="button"
             onClick={() => setActiveTab("sheets")}
-            className={`px-3.5 py-1.5 text-xs font-semibold rounded-md flex items-center gap-2 transition-all cursor-pointer ${
+            className={`w-full justify-center px-3.5 py-2 text-xs font-semibold rounded-md flex items-center gap-2 transition-all cursor-pointer ${
               activeTab === "sheets"
                 ? "bg-emerald-600 text-white shadow-xs"
                 : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60"
             }`}
           >
-            <LayoutGrid className="w-3.5 h-3.5" />
+            <LayoutGrid className="w-3.5 h-3.5 shrink-0" />
             <span>Reference Sheets</span>
-            <span className="text-[10px] px-1.5 py-0.2 bg-black/10 dark:bg-white/10 rounded font-mono">
+            <span className="text-[10px] px-1.5 py-0.5 bg-black/20 dark:bg-white/10 rounded font-mono shrink-0">
               Panels
             </span>
           </button>
-        </div>
-
-        <div className="hidden md:flex items-center gap-2 text-xs text-zinc-400">
-          {activeTab === "staging" ? (
-            <span className="flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-              Director's 2D Blocking Stage • Multi-Actor Spatial Layout &amp; Slot Assignment
-            </span>
-          ) : activeTab === "headshots" ? (
-            <span className="flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              Gemini 3.1 Flash Image • Photorealistic Multi-Angle Headshot Generation
-            </span>
-          ) : (
-            <span className="flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-              Multi-Panel Character Reference Sheets • 16:9 &amp; 1:1 Contact Collages
-            </span>
-          )}
         </div>
       </div>
     </div>
