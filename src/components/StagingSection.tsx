@@ -255,6 +255,8 @@ export const StagingSection: React.FC<StagingSectionProps> = ({
               activeScene={activeScene}
               currentCharacterAssets={currentCharacterAssets}
               allAssets={assets}
+              characters={characters}
+              subjects={availableCharacters}
               onAssetSaved={onAssetUploaded}
               addToast={addToast}
             />

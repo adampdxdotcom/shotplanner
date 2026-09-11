@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { 
   LayoutGrid, Columns3, Grid2X2, Grid3X3, Image as ImageIcon, 
   Sparkles, User, Trash2, Wand2, Download, RefreshCw, Layers, 
@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { MediaAsset } from "../../types";
 import { getAssetMediaUrl } from "../../utils/assetUrl";
-import { ReferenceSheetSlotPickerModal } from "./ReferenceSheetSlotPickerModal";
+import { AssetUploadModal } from "../AssetUploadModal";
 import { ReferenceSheetPreviewModal } from "./ReferenceSheetPreviewModal";
 import { 
   renderReferenceSheetToBlob, 
@@ -20,6 +20,8 @@ export interface ReferenceSheetsTabProps {
   activeScene?: string;
   currentCharacterAssets: MediaAsset[];
   allAssets?: MediaAsset[];
+  characters?: Record<string, any>;
+  subjects?: string[];
   onAssetSaved?: (asset: MediaAsset) => void;
   addToast?: (message: string, type?: "success" | "error" | "info") => void;
 }
@@ -94,6 +96,8 @@ export const ReferenceSheetsTab: React.FC<ReferenceSheetsTabProps> = ({
   activeScene,
   currentCharacterAssets,
   allAssets = [],
+  characters = {},
+  subjects = [],
   onAssetSaved,
   addToast
 }) => {
@@ -101,6 +105,14 @@ export const ReferenceSheetsTab: React.FC<ReferenceSheetsTabProps> = ({
   const [sheetName, setSheetName] = useState<string>(
     activeSubject ? `${activeSubject} Reference Sheet` : "Character Reference Sheet"
   );
+
+  const effectiveSubjects = useMemo(() => {
+    const list = subjects.length > 0 ? [...subjects] : [];
+    if (activeSubject && !list.includes(activeSubject)) {
+      list.push(activeSubject);
+    }
+    return list;
+  }, [subjects, activeSubject]);
 
   // Styling and composition options
   const [theme, setTheme] = useState<"studio-dark" | "neutral-charcoal" | "slate-navy" | "studio-white">("studio-dark");
@@ -530,17 +542,23 @@ export const ReferenceSheetsTab: React.FC<ReferenceSheetsTabProps> = ({
         </div>
       </div>
 
-      {/* SLOT ASSET PICKER MODAL */}
-      <ReferenceSheetSlotPickerModal
+      {/* SLOT ASSET PICKER / UPLOAD MODAL */}
+      <AssetUploadModal
         isOpen={pickerSlotIndex !== null}
-        slotIndex={pickerSlotIndex}
-        slotInfo={pickerSlotIndex !== null ? activeConfig.slots[pickerSlotIndex] : null}
-        activeSubject={activeSubject}
-        currentCharacterAssets={currentCharacterAssets}
-        allAssets={allAssets}
-        onSelectAsset={handleAssignAsset}
-        onSelectCustomImage={handleAssignCustomImage}
+        activeTab="image"
+        uploadModalSlot={pickerSlotIndex !== null ? { type: "image", index: pickerSlotIndex } : null}
+        libraryAssets={allAssets.length > 0 ? allAssets : currentCharacterAssets}
+        subjects={effectiveSubjects}
+        characters={characters}
+        sceneName={activeScene}
         onClose={() => setPickerSlotIndex(null)}
+        onAssetUploaded={(asset, slotIdx) => {
+          handleAssignAsset(slotIdx, asset);
+          if (onAssetSaved) {
+            onAssetSaved(asset);
+          }
+          setPickerSlotIndex(null);
+        }}
       />
 
       {/* RENDERED COMPOSITE PREVIEW & EXPORT MODAL */}
