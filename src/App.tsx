@@ -189,7 +189,8 @@ export default function App() {
               setExpandedPrompt(val);
               if (activeShotId) updateActiveShot(prev => ({ ...prev, expanded_prompt: val, status: "unstaged" }));
             }}
-            providerChoice={llmProvider}
+            defaultProvider={defaultLlmProvider || config.default_llm_provider}
+            providerChoice={defaultLlmProvider || config.default_llm_provider || llmProvider}
             onChangeProviderChoice={setLlmProvider}
             promptPrefix={promptPrefix}
             planning={scenePlanning}

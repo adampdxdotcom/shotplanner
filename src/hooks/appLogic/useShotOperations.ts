@@ -69,7 +69,14 @@ export function useShotOperations({
   const promptPrefix = useMemo(() => generatePromptPrefix(scenePlanning), [scenePlanning]);
   const [basicStub, setBasicStub] = useState<string>("");
   const [expandedPrompt, setExpandedPrompt] = useState<string>("");
-  const [llmProvider, setLlmProvider] = useState<LLMProvider>(getDefaultLlmProvider);
+  const [llmProvider, setLlmProvider] = useState<LLMProvider>(() => config?.default_llm_provider || getDefaultLlmProvider());
+
+  // Keep llmProvider synchronized with default configured in settings
+  useEffect(() => {
+    if (config?.default_llm_provider) {
+      setLlmProvider(config.default_llm_provider);
+    }
+  }, [config?.default_llm_provider]);
 
   // UI Navigation (persisted across page reloads & tab navigation)
   const [activeSection, setActiveSection] = useState<string>(() => getLastActiveSection("scene"));

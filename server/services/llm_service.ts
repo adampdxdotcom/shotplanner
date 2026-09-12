@@ -379,7 +379,8 @@ Generate ONLY the integrated_multimodal_description paragraph incorporating the 
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 12000);
+      // 60-second timeout allows local models sufficient time for prompt ingestion, KV evaluation, and token generation
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
 
       const lmRes = await fetch(endpoint, {
         method: "POST",
@@ -412,7 +413,7 @@ Generate ONLY the integrated_multimodal_description paragraph incorporating the 
       providerUsed = `Local LM Studio (${modelUsedActual})`;
     } catch (e: any) {
       const msg = e.name === "AbortError" 
-        ? "Request timed out after 12 seconds" 
+        ? "Request timed out after 60 seconds" 
         : e.message || "Connection refused";
       throw new Error(`LM Studio service error: ${msg}. Verify LM Studio is running at ${lm_studio_url}`);
     }
