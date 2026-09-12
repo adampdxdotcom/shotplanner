@@ -21,6 +21,9 @@ export function serveAssetFile(req: Request, res: Response) {
     const foundPath = assetService.getAssetFilePath(rawFilename);
 
     if (foundPath && fs.existsSync(foundPath)) {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+      res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
       res.setHeader("Cache-Control", "public, max-age=3600");
       return res.sendFile(foundPath);
     }
@@ -44,6 +47,9 @@ export function serveThumbnailFile(req: Request, res: Response) {
       const thumbPath = path.join(parentDir, "thumbnails", path.basename(foundPath));
       
       const fileToServe = fs.existsSync(thumbPath) ? thumbPath : foundPath;
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+      res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
       res.setHeader("Cache-Control", "public, max-age=31536000");
       return res.sendFile(fileToServe);
     }

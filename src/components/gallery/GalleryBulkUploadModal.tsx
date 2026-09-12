@@ -62,16 +62,16 @@ export const GalleryBulkUploadModal: React.FC<GalleryBulkUploadModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
-      <div className="bg-zinc-900 border-2 border-zinc-700/90 rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 dark:bg-black/75 backdrop-blur-sm p-4">
+      <div className="bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-700/90 rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
         {/* Modal Header */}
-        <div className="flex items-center justify-between p-4 border-b border-zinc-800 bg-zinc-950/70 shrink-0">
+        <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/70 shrink-0">
           <div className="flex items-center gap-2.5">
             <div
               className={`p-1.5 rounded-lg border ${
                 entityMode === "location"
-                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
-                  : "bg-amber-500/10 border-amber-500/30 text-amber-400"
+                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+                  : "bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400"
               }`}
             >
               {entityMode === "location" ? (
@@ -81,12 +81,12 @@ export const GalleryBulkUploadModal: React.FC<GalleryBulkUploadModalProps> = ({
               )}
             </div>
             <div>
-              <h3 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
+              <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                 {entityMode === "location"
                   ? "Library Bulk Upload & Location Reference Slots"
                   : "Library Bulk Upload & Character Reference Pack"}
               </h3>
-              <p className="text-[11px] text-zinc-400">
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
                 {entityMode === "location"
                   ? "Quickly populate location reference slots or batch upload assets to your library"
                   : "Quickly populate character reference slots or batch upload assets to your library"}
@@ -96,7 +96,7 @@ export const GalleryBulkUploadModal: React.FC<GalleryBulkUploadModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="text-zinc-400 hover:text-white p-1 rounded-lg hover:bg-zinc-800 transition-colors cursor-pointer"
+            className="text-zinc-400 hover:text-zinc-700 dark:hover:text-white p-1 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
             disabled={isBulkUploading}
           >
             <X className="w-4 h-4" />
@@ -117,7 +117,7 @@ export const GalleryBulkUploadModal: React.FC<GalleryBulkUploadModalProps> = ({
           />
 
           {/* 4-Slot Reference Pack Panel */}
-          <div className="bg-zinc-900/60 p-4 rounded-xl border border-zinc-800/90">
+          <div className="bg-zinc-50 dark:bg-zinc-900/60 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800/90">
             <CharacterReferencePackGrid
               slots={packSlots}
               onUpdateSlot={handleUpdatePackSlot}

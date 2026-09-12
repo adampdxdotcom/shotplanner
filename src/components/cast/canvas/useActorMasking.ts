@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { StagedActorCanvasItem } from "./types";
 import { getAssetMediaUrl } from "../../../utils/assetUrl";
-import { createSilhouetteImage } from "./silhouetteUtils";
 import { rgbToYCbCr, getYCbCrDistance } from "../../../utils/chromaKey";
 
 interface UseActorMaskingParams {
@@ -133,17 +132,21 @@ export function useActorMasking({
 
     let isCancelled = false;
     const domImg = actorImgRefs.current[actor.id];
+    const canonicalPhotoUrl = actor.referenceAssetFilename
+      ? getAssetMediaUrl(actor.referenceAssetFilename, false)
+      : undefined;
     const rawSrc =
       actor.originalCutoutDataUrl ||
       actor.cutoutDataUrl ||
-      (actor.referenceAssetFilename ? getAssetMediaUrl(actor.referenceAssetFilename, true) : null);
+      canonicalPhotoUrl ||
+      null;
 
     const initCanvasWithImage = (img: HTMLImageElement) => {
       if (isCancelled) return;
       originalImageRef.current = img;
 
-      const width = img.naturalWidth || 600;
-      const height = img.naturalHeight || 900;
+      const width = img.naturalWidth || img.width || 600;
+      const height = img.naturalHeight || img.height || 900;
 
       const maskCanvas = document.createElement("canvas");
       maskCanvas.width = width;
@@ -165,25 +168,11 @@ export function useActorMasking({
       }
       offscreenMaskCanvasRef.current = maskCanvas;
 
-      if (!actor.originalCutoutDataUrl) {
-        if (!reusableScratchCanvasRef.current) {
-          reusableScratchCanvasRef.current = document.createElement("canvas");
-        }
-        const offCanvas = reusableScratchCanvasRef.current;
-        if (offCanvas.width !== width || offCanvas.height !== height) {
-          offCanvas.width = width;
-          offCanvas.height = height;
-        }
-        const offCtx = offCanvas.getContext("2d");
-        if (offCtx) {
-          offCtx.clearRect(0, 0, width, height);
-          offCtx.drawImage(img, 0, 0, width, height);
-          const origDataUrl = offCanvas.toDataURL("image/png");
-          onUpdateActor(actor.id, {
-            originalCutoutDataUrl: origDataUrl,
-            cutoutDataUrl: actor.cutoutDataUrl || origDataUrl
-          });
-        }
+      if (!actor.originalCutoutDataUrl && (canonicalPhotoUrl || actor.cutoutDataUrl)) {
+        onUpdateActor(actor.id, {
+          originalCutoutDataUrl: canonicalPhotoUrl || actor.cutoutDataUrl,
+          cutoutDataUrl: actor.cutoutDataUrl || canonicalPhotoUrl
+        });
       }
 
       renderDisplayCanvas();
@@ -208,20 +197,21 @@ export function useActorMasking({
       displayCtx.globalCompositeOperation = "source-over";
     };
 
-    if (domImg && domImg.complete && domImg.naturalWidth > 0 && !actor.originalCutoutDataUrl) {
+    if (domImg && domImg.complete && domImg.naturalWidth > 0) {
       initCanvasWithImage(domImg);
     } else if (rawSrc) {
       const img = new Image();
       img.crossOrigin = "anonymous";
       img.onload = () => initCanvasWithImage(img);
       img.onerror = () => {
-        const fallbackImg = createSilhouetteImage(actor.characterName);
-        fallbackImg.onload = () => initCanvasWithImage(fallbackImg);
+        // If anonymous crossOrigin request encounters an issue, fallback to domImg or direct src
+        if (domImg && domImg.complete && domImg.naturalWidth > 0) {
+          initCanvasWithImage(domImg);
+        } else {
+          console.warn("Could not load actor image into masking canvas:", rawSrc);
+        }
       };
       img.src = rawSrc;
-    } else {
-      const fallbackImg = createSilhouetteImage(actor.characterName);
-      fallbackImg.onload = () => initCanvasWithImage(fallbackImg);
     }
 
     return () => {
@@ -403,7 +393,9 @@ export function useActorMasking({
     onSelectActor(actor.id);
     setMaskingActorId(actor.id);
 
-    const origUrl = actor.originalCutoutDataUrl || actor.cutoutDataUrl || (actor.referenceAssetFilename ? getAssetMediaUrl(actor.referenceAssetFilename, true) : undefined);
+    const origUrl = (actor.referenceAssetFilename ? getAssetMediaUrl(actor.referenceAssetFilename, false) : undefined)
+      || actor.originalCutoutDataUrl
+      || actor.cutoutDataUrl;
     if (origUrl && !actor.originalCutoutDataUrl) {
       onUpdateActor(actor.id, { originalCutoutDataUrl: origUrl });
     }
@@ -443,12 +435,15 @@ export function useActorMasking({
       }
     }
 
-    const origUrl = maskingActor.originalCutoutDataUrl || maskingActor.cutoutDataUrl;
-    if (origUrl) {
-      lastCommittedCutoutRef.current[maskingActor.id] = origUrl;
+    const cleanOrigUrl = (maskingActor.referenceAssetFilename ? getAssetMediaUrl(maskingActor.referenceAssetFilename, false) : undefined)
+      || maskingActor.originalCutoutDataUrl
+      || maskingActor.cutoutDataUrl;
+
+    if (cleanOrigUrl) {
+      lastCommittedCutoutRef.current[maskingActor.id] = cleanOrigUrl;
     }
     onUpdateActor(maskingActor.id, {
-      cutoutDataUrl: origUrl,
+      cutoutDataUrl: cleanOrigUrl,
       maskDataUrl: undefined
     });
     if (onRecordCheckpoint) {

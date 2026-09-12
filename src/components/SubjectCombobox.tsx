@@ -172,7 +172,7 @@ export const SubjectCombobox: React.FC<SubjectComboboxProps> = ({
             setHighlightedIndex(-1);
           }}
           onKeyDown={handleKeyDown}
-          className="w-full bg-zinc-950 border-2 border-zinc-700 focus:border-amber-500 rounded-lg pl-8 pr-16 py-1.5 text-xs text-zinc-200 placeholder-zinc-600 outline-none transition-colors"
+          className="w-full bg-white dark:bg-zinc-950 border-2 border-zinc-300 dark:border-zinc-700 focus:border-amber-500 rounded-lg pl-8 pr-16 py-1.5 text-xs text-zinc-900 dark:text-zinc-200 placeholder-zinc-400 dark:placeholder-zinc-600 outline-none transition-colors shadow-sm"
         />
 
         {/* Right actions: clear + dropdown toggle */}
@@ -184,7 +184,7 @@ export const SubjectCombobox: React.FC<SubjectComboboxProps> = ({
                 onChange("");
                 inputRef.current?.focus();
               }}
-              className="p-1 text-zinc-500 hover:text-zinc-300 rounded hover:bg-zinc-800 transition-colors"
+              className="p-1 text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-300 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
               title="Clear text"
             >
               <X className="w-3 h-3" />
@@ -197,7 +197,7 @@ export const SubjectCombobox: React.FC<SubjectComboboxProps> = ({
               setIsOpen(!isOpen);
               inputRef.current?.focus();
             }}
-            className="p-1 text-zinc-400 hover:text-zinc-200 rounded hover:bg-zinc-800 transition-colors"
+            className="p-1 text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
             title="Toggle existing subjects"
           >
             <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
@@ -208,8 +208,8 @@ export const SubjectCombobox: React.FC<SubjectComboboxProps> = ({
       {/* Suggested quick chips (if project already has established subjects) */}
       {allKnownSubjects.length > 0 && !isOpen && (
         <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-          <span className="text-[10px] text-zinc-400 font-medium flex items-center gap-1">
-            <Tag className="w-2.5 h-2.5 text-indigo-400" />
+          <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-medium flex items-center gap-1">
+            <Tag className="w-2.5 h-2.5 text-indigo-500 dark:text-indigo-400" />
             Suggested:
           </span>
           {allKnownSubjects.slice(0, 5).map((subj) => {
@@ -219,10 +219,10 @@ export const SubjectCombobox: React.FC<SubjectComboboxProps> = ({
                 key={`quick-chip-${subj}`}
                 type="button"
                 onClick={() => handleSelectSubject(subj)}
-                className={`text-[10px] px-2 py-0.5 rounded-md font-medium border transition-all ${
+                className={`text-[10px] px-2 py-0.5 rounded-md font-medium border transition-all cursor-pointer ${
                   isSelected
-                    ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
-                    : "bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-700 hover:border-zinc-600"
+                    ? "bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/40"
+                    : "bg-white hover:bg-zinc-50 text-zinc-700 border-zinc-200 shadow-sm dark:bg-zinc-900 dark:hover:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700 dark:hover:border-zinc-600"
                 }`}
               >
                 {subj}
@@ -234,11 +234,11 @@ export const SubjectCombobox: React.FC<SubjectComboboxProps> = ({
 
       {/* Dropdown menu */}
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-zinc-900 border-2 border-zinc-700 rounded-lg shadow-xl overflow-hidden max-h-56 overflow-y-auto">
+        <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white dark:bg-zinc-900 border-2 border-zinc-300 dark:border-zinc-700 rounded-lg shadow-xl overflow-hidden max-h-56 overflow-y-auto">
           {/* Header info */}
-          <div className="px-3 py-1.5 bg-zinc-950/80 border-b border-zinc-800 flex items-center justify-between text-[10px] text-zinc-400">
+          <div className="px-3 py-1.5 bg-zinc-50 dark:bg-zinc-950/80 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between text-[10px] text-zinc-500 dark:text-zinc-400">
             <span>Project Subjects Registry</span>
-            <span className="font-mono text-indigo-400">{allKnownSubjects.length} established</span>
+            <span className="font-mono text-indigo-600 dark:text-indigo-400 font-semibold">{allKnownSubjects.length} established</span>
           </div>
 
           {/* List of existing subjects */}
@@ -255,32 +255,32 @@ export const SubjectCombobox: React.FC<SubjectComboboxProps> = ({
                     type="button"
                     onClick={() => handleSelectSubject(subj)}
                     onMouseEnter={() => setHighlightedIndex(index)}
-                    className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs flex items-center justify-between transition-colors ${
+                    className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs flex items-center justify-between transition-colors cursor-pointer ${
                       isHighlighted
-                        ? "bg-zinc-800 text-white"
+                        ? "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-white"
                         : isSelected
-                        ? "bg-amber-500/10 text-amber-300"
-                        : "text-zinc-300 hover:bg-zinc-800/60"
+                        ? "bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300"
+                        : "text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/60"
                     }`}
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <User className={`w-3.5 h-3.5 shrink-0 ${isSelected ? "text-amber-400" : "text-indigo-400"}`} />
+                      <User className={`w-3.5 h-3.5 shrink-0 ${isSelected ? "text-amber-600 dark:text-amber-400" : "text-indigo-600 dark:text-indigo-400"}`} />
                       <span className="font-medium truncate">{subj}</span>
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">
                       {meta.types.length > 0 && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700 font-mono">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-600 border border-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700 font-mono">
                           {meta.types.join(", ")}
                         </span>
                       )}
-                      {isSelected && <Check className="w-3.5 h-3.5 text-amber-400" />}
+                      {isSelected && <Check className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />}
                     </div>
                   </button>
                 );
               })
             ) : !showCreateOption ? (
-              <div className="px-3 py-3 text-center text-xs text-zinc-400">
+              <div className="px-3 py-3 text-center text-xs text-zinc-500 dark:text-zinc-400">
                 No registered subjects yet. Type a name to create one.
               </div>
             ) : null}
@@ -291,18 +291,18 @@ export const SubjectCombobox: React.FC<SubjectComboboxProps> = ({
                 type="button"
                 onClick={handleCreateNew}
                 onMouseEnter={() => setHighlightedIndex(filteredSubjects.length)}
-                className={`w-full text-left px-2.5 py-2 rounded-md text-xs flex items-center gap-2 border-t border-zinc-800 transition-colors ${
+                className={`w-full text-left px-2.5 py-2 rounded-md text-xs flex items-center gap-2 border-t border-zinc-200 dark:border-zinc-800 transition-colors cursor-pointer ${
                   highlightedIndex === filteredSubjects.length
-                    ? "bg-emerald-950/50 text-emerald-200 border-emerald-800/50"
-                    : "text-emerald-400 bg-emerald-950/20 hover:bg-emerald-950/40"
+                    ? "bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-950/50 dark:text-emerald-200 dark:border-emerald-800/50"
+                    : "text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-950/20 dark:hover:bg-emerald-950/40"
                 }`}
               >
-                <Plus className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
+                <Plus className="w-3.5 h-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
                 <div className="flex-1 truncate">
                   <span>Create new subject </span>
-                  <span className="font-bold text-emerald-300">"{value.trim()}"</span>
+                  <span className="font-bold text-emerald-800 dark:text-emerald-300">"{value.trim()}"</span>
                 </div>
-                <span className="text-[10px] text-emerald-500 font-mono">Press Enter ↵</span>
+                <span className="text-[10px] text-emerald-600 dark:text-emerald-500 font-mono">Press Enter ↵</span>
               </button>
             )}
           </div>

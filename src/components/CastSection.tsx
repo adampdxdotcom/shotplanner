@@ -243,20 +243,34 @@ export const CastSection: React.FC<CastSectionProps> = ({
                         <button
                           type="button"
                           onClick={() => {
+                            setBulkModalSubject(subject);
+                            setBulkModalIsLocation(isLoc);
+                            setIsBulkModalOpen(true);
+                          }}
+                          className="bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border-zinc-300 dark:bg-zinc-800/90 dark:hover:bg-zinc-700/90 dark:text-zinc-200 dark:border-zinc-700/80 border px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer shadow-sm"
+                          title={isLoc ? `Upload references for ${subject}` : `Upload reference photos for ${subject}`}
+                        >
+                          <Plus className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-300" />
+                          <span>Add Asset</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
                             setStudioInitialTab(isLoc ? "staging" : "headshots");
                             setHeadshotModalSubject(subject);
                           }}
-                          className="bg-indigo-950/60 hover:bg-indigo-900/80 text-indigo-300 border border-indigo-800/60 px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer shadow-sm"
+                          className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/80 dark:text-indigo-300 dark:border-indigo-800/60 border px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer shadow-sm"
                           title={isLoc ? "Generate AI Location Reference & Scene Staging" : "Generate AI Assets, Headshots & Scene Staging"}
                         >
-                          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                          <Sparkles className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
                           <span>Asset Generation</span>
                         </button>
 
                         <button
                           type="button"
                           onClick={() => setCharacterToDelete(subject)}
-                          className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-red-950/40 rounded-lg transition-colors shrink-0"
+                          className="p-1.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:text-zinc-500 dark:hover:text-red-400 dark:hover:bg-red-950/40 rounded-lg transition-colors shrink-0"
                           title={`Delete ${subject} profile`}
                           aria-label={`Delete ${subject} profile`}
                         >

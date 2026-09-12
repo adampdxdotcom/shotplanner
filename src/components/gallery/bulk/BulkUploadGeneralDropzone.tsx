@@ -58,10 +58,10 @@ export const BulkUploadGeneralDropzone: React.FC<BulkUploadGeneralDropzoneProps>
   };
 
   return (
-    <div className="bg-zinc-950/90 p-4 rounded-xl border border-zinc-800 space-y-4">
+    <div className="bg-zinc-50 dark:bg-zinc-950/90 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 space-y-4">
       <div className="flex items-center justify-between">
-        <h4 className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
-          <SlidersHorizontal className="w-3.5 h-3.5 text-zinc-400" />
+        <h4 className="text-xs font-bold text-zinc-800 dark:text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
+          <SlidersHorizontal className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
           Additional Media & General Batch Dropzone
         </h4>
         <span className="text-[10px] text-zinc-500">
@@ -72,13 +72,13 @@ export const BulkUploadGeneralDropzone: React.FC<BulkUploadGeneralDropzoneProps>
       {/* Batch Defaults */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label className="block text-[11px] font-medium text-zinc-400 mb-1">
+          <label className="block text-[11px] font-medium text-zinc-600 dark:text-zinc-400 mb-1">
             Default Semantic Type
           </label>
           <select
             value={bulkAssetType}
             onChange={(e) => setBulkAssetType(e.target.value)}
-            className="w-full bg-zinc-900 border border-zinc-800 focus:border-amber-500 rounded-lg px-2.5 py-2 text-xs text-zinc-200 outline-none"
+            className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 focus:border-amber-500 rounded-lg px-2.5 py-2 text-xs text-zinc-900 dark:text-zinc-200 outline-none shadow-sm"
             disabled={disabled}
           >
             <option value="Headshot">Headshot</option>
@@ -95,13 +95,13 @@ export const BulkUploadGeneralDropzone: React.FC<BulkUploadGeneralDropzoneProps>
 
         {modifierConfig ? (
           <div>
-            <label className="block text-[11px] font-medium text-zinc-400 mb-1">
+            <label className="block text-[11px] font-medium text-zinc-600 dark:text-zinc-400 mb-1">
               Companion Modifier
             </label>
             <select
               value={bulkModifier}
               onChange={(e) => handleModifierChange(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-800 focus:border-amber-500 rounded-lg px-2.5 py-2 text-xs text-zinc-200 outline-none"
+              className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 focus:border-amber-500 rounded-lg px-2.5 py-2 text-xs text-zinc-900 dark:text-zinc-200 outline-none shadow-sm"
               disabled={disabled}
             >
               <option value="">None (Standard)</option>
@@ -114,10 +114,10 @@ export const BulkUploadGeneralDropzone: React.FC<BulkUploadGeneralDropzoneProps>
           </div>
         ) : (
           <div>
-            <label className="block text-[11px] font-medium text-zinc-500 mb-1">
+            <label className="block text-[11px] font-medium text-zinc-400 dark:text-zinc-500 mb-1">
               Companion Modifier
             </label>
-            <div className="w-full bg-zinc-900/40 border border-zinc-800 rounded-lg px-2.5 py-2 text-xs text-zinc-500 cursor-not-allowed">
+            <div className="w-full bg-zinc-100 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-2 text-xs text-zinc-400 dark:text-zinc-500 cursor-not-allowed">
               Only active for Headshot, Body & Scene Reference
             </div>
           </div>
@@ -125,7 +125,7 @@ export const BulkUploadGeneralDropzone: React.FC<BulkUploadGeneralDropzoneProps>
       </div>
 
       <div>
-        <label className="block text-[11px] font-medium text-zinc-400 mb-1">
+        <label className="block text-[11px] font-medium text-zinc-600 dark:text-zinc-400 mb-1">
           Default Prompt Description
         </label>
         <textarea
@@ -137,7 +137,7 @@ export const BulkUploadGeneralDropzone: React.FC<BulkUploadGeneralDropzoneProps>
               : "Brief prompt description applied to batch files (e.g. moody tavern lighting, 8k portrait, cinematic outfit)..."
           }
           rows={2}
-          className="w-full bg-zinc-900 border border-zinc-800 focus:border-amber-500 rounded-lg px-3 py-2 text-xs text-zinc-200 outline-none resize-none placeholder-zinc-600"
+          className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 focus:border-amber-500 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-zinc-200 outline-none resize-none placeholder-zinc-400 dark:placeholder-zinc-600 shadow-sm"
           disabled={disabled}
         />
       </div>
@@ -147,7 +147,7 @@ export const BulkUploadGeneralDropzone: React.FC<BulkUploadGeneralDropzoneProps>
         className={`relative border-2 border-dashed rounded-xl p-6 flex flex-col items-center justify-center text-center transition-all ${
           dragActive
             ? "border-amber-500 bg-amber-500/10"
-            : "border-zinc-800 bg-zinc-900/40 hover:bg-zinc-900/70 hover:border-zinc-700"
+            : "border-zinc-300 dark:border-zinc-800 bg-zinc-100/60 dark:bg-zinc-900/40 hover:bg-zinc-200/50 dark:hover:bg-zinc-900/70 hover:border-zinc-400 dark:hover:border-zinc-700"
         }`}
         onDragEnter={handleDrag}
         onDragLeave={handleDrag}
@@ -155,11 +155,11 @@ export const BulkUploadGeneralDropzone: React.FC<BulkUploadGeneralDropzoneProps>
         onDrop={handleDrop}
       >
         <div className="relative z-10 flex flex-col items-center space-y-2.5">
-          <div className="p-2.5 bg-zinc-800/80 rounded-full border border-zinc-700/60">
-            <UploadCloud className="w-5 h-5 text-zinc-400" />
+          <div className="p-2.5 bg-white dark:bg-zinc-800/80 rounded-full border border-zinc-200 dark:border-zinc-700/60 shadow-sm">
+            <UploadCloud className="w-5 h-5 text-zinc-500 dark:text-zinc-400" />
           </div>
           <div>
-            <p className="text-xs font-semibold text-zinc-200">
+            <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">
               Drag and drop general batch files here
             </p>
             <p className="text-[11px] text-zinc-500">
@@ -167,7 +167,7 @@ export const BulkUploadGeneralDropzone: React.FC<BulkUploadGeneralDropzoneProps>
             </p>
           </div>
           <div>
-            <label className="cursor-pointer inline-flex items-center justify-center px-3.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-zinc-200 rounded-lg transition-colors border border-zinc-700 shadow-sm">
+            <label className="cursor-pointer inline-flex items-center justify-center px-3.5 py-1.5 bg-white hover:bg-zinc-50 text-xs font-semibold text-zinc-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-200 rounded-lg transition-colors border border-zinc-300 dark:border-zinc-700 shadow-sm">
               <span>Browse Files</span>
               <input
                 type="file"

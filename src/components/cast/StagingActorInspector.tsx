@@ -1,6 +1,7 @@
 import React from "react";
 import { Sliders, Plus, UserPlus, X, Eraser, Trash2, Compass, User, FlipHorizontal } from "lucide-react";
 import { StagedActor } from "./AiReferenceStagingStudioModal";
+import { getAssetMediaUrl } from "../../utils/assetUrl";
 
 export interface StagingActorInspectorProps {
   stagedActors: StagedActor[];
@@ -193,14 +194,16 @@ export const StagingActorInspector: React.FC<StagingActorInspectorProps> = ({
                     type="button"
                     onClick={() => {
                       const currActor = stagedActors[selectedActorIndex];
-                      const orig = currActor.originalCutoutDataUrl || currActor.cutoutDataUrl;
+                      const orig = (currActor.referenceAssetFilename ? getAssetMediaUrl(currActor.referenceAssetFilename, false) : undefined)
+                        || currActor.originalCutoutDataUrl
+                        || currActor.cutoutDataUrl;
                       updateSelectedActor({
                         cutoutDataUrl: orig,
                         maskDataUrl: undefined
                       });
                     }}
                     className="py-1.5 px-2.5 rounded-lg text-xs font-medium text-zinc-700 hover:text-zinc-900 bg-white hover:bg-zinc-100 border border-zinc-300 dark:text-zinc-400 dark:hover:text-white dark:bg-zinc-900 dark:hover:bg-zinc-800 dark:border-zinc-700 transition-colors cursor-pointer shadow-xs"
-                    title="Reset all mask modifications and restore the complete actor cutout"
+                    title="Reset all mask modifications and restore the complete actor photo cutout"
                   >
                     Reset
                   </button>

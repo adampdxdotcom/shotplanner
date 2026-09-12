@@ -22,15 +22,15 @@ export const BulkUploadFooter: React.FC<BulkUploadFooterProps> = ({
   onUpload
 }) => {
   return (
-    <div className="p-4 border-t border-zinc-800 bg-zinc-950/70 flex items-center justify-between gap-3 shrink-0">
-      <div className="text-[11px] text-zinc-400">
+    <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/70 flex items-center justify-between gap-3 shrink-0">
+      <div className="text-[11px] text-zinc-600 dark:text-zinc-400">
         {uploadSummary && uploadSummary.completed > 0 && (
-          <span className="text-emerald-400 font-medium">
+          <span className="text-emerald-700 dark:text-emerald-400 font-medium">
             Successfully uploaded {uploadSummary.completed} asset{uploadSummary.completed > 1 ? "s" : ""}!
           </span>
         )}
         {uploadSummary && uploadSummary.errors > 0 && (
-          <span className="text-red-400 font-medium ml-2">
+          <span className="text-red-600 dark:text-red-400 font-medium ml-2">
             ({uploadSummary.errors} failed)
           </span>
         )}
@@ -44,7 +44,7 @@ export const BulkUploadFooter: React.FC<BulkUploadFooterProps> = ({
       <div className="flex items-center gap-3">
         <button
           onClick={onClose}
-          className="px-4 py-2 text-xs font-medium text-zinc-400 hover:text-white transition-colors cursor-pointer"
+          className="px-4 py-2 text-xs font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors cursor-pointer"
           disabled={isBulkUploading}
         >
           Cancel

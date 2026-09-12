@@ -253,21 +253,21 @@ export const CharacterReferencePackGrid: React.FC<CharacterReferencePackGridProp
         <div className="flex items-center gap-2">
           {isLocationMode ? (
             <>
-              <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+              <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
                 <MapPin className="w-3.5 h-3.5" />
                 Location Reference Slots (4-Slot Grid)
               </span>
-              <span className="text-[10px] text-emerald-300 bg-emerald-950/70 border border-emerald-800/60 px-2 py-0.5 rounded-full">
+              <span className="text-[10px] text-emerald-800 bg-emerald-100 border border-emerald-300 dark:text-emerald-300 dark:bg-emerald-950/70 dark:border-emerald-800/60 px-2 py-0.5 rounded-full">
                 Scene References
               </span>
             </>
           ) : (
             <>
-              <span className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+              <span className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5" />
                 Character Reference Pack (4-Slot Grid)
               </span>
-              <span className="text-[10px] text-zinc-400 bg-zinc-800/80 px-2 py-0.5 rounded-full border border-zinc-700/50">
+              <span className="text-[10px] text-zinc-600 bg-zinc-100 border border-zinc-300 dark:text-zinc-400 dark:bg-zinc-800/80 dark:border-zinc-700/50 px-2 py-0.5 rounded-full">
                 Optional Quick Setup
               </span>
             </>
@@ -286,30 +286,30 @@ export const CharacterReferencePackGrid: React.FC<CharacterReferencePackGridProp
           return (
             <div
               key={slot.id}
-              className={`flex flex-col bg-zinc-950 border rounded-xl overflow-hidden transition-all duration-200 ${
+              className={`flex flex-col bg-white dark:bg-zinc-950 border rounded-xl overflow-hidden transition-all duration-200 ${
                 isDragOver
                   ? isLocationMode
-                    ? "border-emerald-400 ring-2 ring-emerald-500/30 bg-emerald-950/20"
-                    : "border-amber-400 ring-2 ring-amber-500/30 bg-amber-950/20"
+                    ? "border-emerald-400 ring-2 ring-emerald-500/30 bg-emerald-50 dark:bg-emerald-950/20"
+                    : "border-amber-400 ring-2 ring-amber-500/30 bg-amber-50 dark:bg-amber-950/20"
                   : isPopulated
-                  ? "border-zinc-700/80 shadow-md bg-zinc-900/60"
-                  : "border-zinc-800/90 hover:border-zinc-700 bg-zinc-950/80"
+                  ? "border-zinc-300 dark:border-zinc-700/80 shadow-md bg-white dark:bg-zinc-900/60"
+                  : "border-zinc-200 dark:border-zinc-800/90 hover:border-zinc-300 dark:hover:border-zinc-700 bg-white dark:bg-zinc-950/80"
               }`}
             >
               {/* Slot Header Banner */}
-              <div className="px-2.5 py-1.5 bg-zinc-900/90 border-b border-zinc-800/70 flex items-center justify-between gap-1">
+              <div className="px-2.5 py-1.5 bg-zinc-50 dark:bg-zinc-900/90 border-b border-zinc-200 dark:border-zinc-800/70 flex items-center justify-between gap-1">
                 <div className="flex items-center gap-1.5 min-w-0">
                   {renderIcon(slot.icon)}
-                  <span className="text-[11px] font-semibold text-zinc-200 truncate" title={slot.title}>
+                  <span className="text-[11px] font-semibold text-zinc-800 dark:text-zinc-200 truncate" title={slot.title}>
                     {slot.title}
                   </span>
                 </div>
                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0 ${
                   slot.assetType === "Scene Reference"
-                    ? "bg-emerald-950/60 text-emerald-300 border border-emerald-800/50"
+                    ? "bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800/50"
                     : slot.assetType === "Headshot"
-                    ? "bg-amber-950/60 text-amber-300 border border-amber-800/50"
-                    : "bg-blue-950/60 text-blue-300 border border-blue-800/50"
+                    ? "bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800/50"
+                    : "bg-blue-100 text-blue-800 border border-blue-300 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800/50"
                 }`}>
                   {slot.badge}
                 </span>
@@ -317,7 +317,7 @@ export const CharacterReferencePackGrid: React.FC<CharacterReferencePackGridProp
 
               {/* Upload Drop Container / Preview Container */}
               <div
-                className="relative aspect-[4/3] bg-zinc-950/90 flex items-center justify-center p-2 group"
+                className="relative aspect-[4/3] bg-zinc-100/70 dark:bg-zinc-950/90 flex items-center justify-center p-2 group"
                 onDragOver={(e) => handleDragOver(e, slot.id)}
                 onDragLeave={(e) => handleDragLeave(e, slot.id)}
                 onDrop={(e) => handleDrop(e, slot.id)}
@@ -332,7 +332,7 @@ export const CharacterReferencePackGrid: React.FC<CharacterReferencePackGridProp
                 />
 
                 {isPopulated ? (
-                  <div className="relative w-full h-full rounded-lg overflow-hidden border border-zinc-800 bg-black flex items-center justify-center">
+                  <div className="relative w-full h-full rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-black flex items-center justify-center">
                     <img
                       src={slot.previewUrl!}
                       alt={slot.title}
@@ -345,7 +345,7 @@ export const CharacterReferencePackGrid: React.FC<CharacterReferencePackGridProp
                         type="button"
                         onClick={() => fileInputRefs.current[slot.id]?.click()}
                         disabled={disabled || slot.status === "uploading"}
-                        className="px-2 py-1 bg-zinc-800/90 hover:bg-zinc-700 text-white text-[10px] font-medium rounded shadow transition-colors"
+                        className="px-2 py-1 bg-zinc-800/90 hover:bg-zinc-700 text-white text-[10px] font-medium rounded shadow transition-colors cursor-pointer"
                       >
                         Change
                       </button>
@@ -353,7 +353,7 @@ export const CharacterReferencePackGrid: React.FC<CharacterReferencePackGridProp
                         type="button"
                         onClick={() => onClearSlot(slot.id)}
                         disabled={disabled || slot.status === "uploading"}
-                        className="p-1 bg-red-900/80 hover:bg-red-700 text-white rounded shadow transition-colors"
+                        className="p-1 bg-red-900/80 hover:bg-red-700 text-white rounded shadow transition-colors cursor-pointer"
                         title="Remove image"
                       >
                         <X className="w-3.5 h-3.5" />
@@ -384,25 +384,25 @@ export const CharacterReferencePackGrid: React.FC<CharacterReferencePackGridProp
                     onClick={() => !disabled && fileInputRefs.current[slot.id]?.click()}
                     className={`w-full h-full rounded-lg border-2 border-dashed flex flex-col items-center justify-center text-center p-2 cursor-pointer transition-colors ${
                       isDragOver
-                        ? "border-amber-400 bg-amber-500/10 text-amber-300"
-                        : "border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/40 text-zinc-500 hover:text-zinc-400"
+                        ? "border-amber-500 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                        : "border-zinc-300 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-700 bg-white/60 dark:bg-zinc-900/40 text-zinc-500 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-400"
                     }`}
                   >
-                    <div className="p-1.5 bg-zinc-900 rounded-full mb-1 border border-zinc-800">
+                    <div className="p-1.5 bg-zinc-100 dark:bg-zinc-900 rounded-full mb-1 border border-zinc-200 dark:border-zinc-800 shadow-sm">
                       <ImageIcon className="w-4 h-4 text-zinc-400" />
                     </div>
-                    <span className="text-[10px] font-medium text-zinc-300">
+                    <span className="text-[10px] font-medium text-zinc-700 dark:text-zinc-300">
                       {isDragOver ? "Drop image here" : "Click or drop image"}
                     </span>
-                    <span className="text-[8px] text-zinc-500 mt-0.5">JPG, PNG, WEBP</span>
+                    <span className="text-[8px] text-zinc-400 dark:text-zinc-500 mt-0.5">JPG, PNG, WEBP</span>
                   </div>
                 )}
               </div>
 
               {/* Inline Description Editor */}
-              <div className="p-2 bg-zinc-950/95 border-t border-zinc-850 flex flex-col gap-1">
+              <div className="p-2 bg-zinc-50 dark:bg-zinc-950/95 border-t border-zinc-200 dark:border-zinc-850 flex flex-col gap-1">
                 <div className="flex items-center justify-between">
-                  <label className="text-[9px] font-semibold text-zinc-400 uppercase tracking-wider">
+                  <label className="text-[9px] font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">
                     Prompt Description
                   </label>
                   {(() => {
@@ -417,8 +417,8 @@ export const CharacterReferencePackGrid: React.FC<CharacterReferencePackGridProp
                           onUpdateSlot(slot.id, { description: newDesc });
                         }}
                         disabled={disabled || slot.status === "uploading"}
-                        className={`bg-zinc-900 border border-zinc-800 text-[9px] font-medium rounded px-1 py-0.5 outline-none ${
-                          slot.assetType === "Scene Reference" ? "text-emerald-400" : "text-amber-400"
+                        className={`bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 text-[9px] font-medium rounded px-1 py-0.5 outline-none shadow-sm ${
+                          slot.assetType === "Scene Reference" ? "text-emerald-700 dark:text-emerald-400" : "text-amber-700 dark:text-amber-400"
                         }`}
                       >
                         <option value="">No modifier</option>
@@ -437,7 +437,7 @@ export const CharacterReferencePackGrid: React.FC<CharacterReferencePackGridProp
                   onChange={(e) => onUpdateSlot(slot.id, { description: e.target.value })}
                   placeholder={slot.placeholder}
                   disabled={disabled || slot.status === "uploading"}
-                  className="w-full bg-zinc-900 border border-zinc-800 focus:border-amber-500 rounded px-2 py-1 text-[11px] text-zinc-200 placeholder-zinc-600 outline-none transition-colors"
+                  className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 focus:border-amber-500 rounded px-2 py-1 text-[11px] text-zinc-900 dark:text-zinc-200 placeholder-zinc-400 dark:placeholder-zinc-600 outline-none transition-colors shadow-sm"
                 />
               </div>
             </div>
