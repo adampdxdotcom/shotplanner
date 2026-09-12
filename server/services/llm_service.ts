@@ -382,18 +382,20 @@ Generate ONLY the integrated_multimodal_description paragraph incorporating the 
       // 60-second timeout allows local models sufficient time for prompt ingestion, KV evaluation, and token generation
       const timeoutId = setTimeout(() => controller.abort(), 60000);
 
+      // Omit max_tokens so LM Studio preset/model configurations control the token budget and reasoning models are not truncated
+      const requestPayload: Record<string, any> = {
+        model: model || "local-model",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        temperature: effectiveTemperature
+      };
+
       const lmRes = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: model || "local-model",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt }
-          ],
-          temperature: effectiveTemperature,
-          max_tokens: effectiveMaxTokens
-        }),
+        body: JSON.stringify(requestPayload),
         signal: controller.signal
       });
       clearTimeout(timeoutId);
@@ -404,7 +406,14 @@ Generate ONLY the integrated_multimodal_description paragraph incorporating the 
       }
 
       const data = await lmRes.json();
-      const content = data.choices?.[0]?.message?.content?.trim();
+      const choice = data.choices?.[0];
+      let content = (choice?.message?.content || choice?.text || "").trim();
+      
+      // Fallback for reasoning models if final content is empty but reasoning_content exists
+      if (!content && choice?.message?.reasoning_content) {
+        content = choice.message.reasoning_content.trim();
+      }
+
       if (!content) {
         throw new Error("LM Studio returned an empty response.");
       }
