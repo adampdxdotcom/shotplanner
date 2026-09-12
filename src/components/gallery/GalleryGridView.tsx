@@ -1,6 +1,6 @@
 import React from "react";
 import { MediaAsset } from "../../types";
-import { Image as ImageIcon, Video as VideoIcon, Music, Edit3, Trash2, Play, Pause, FileText, ChevronRight } from "lucide-react";
+import { Video as VideoIcon, Music, Edit3, Trash2, Play, Pause, Download } from "lucide-react";
 import { formatSize } from "../../utils/formatters";
 import { getAssetMediaUrl } from "../../utils/assetUrl";
 
@@ -56,40 +56,47 @@ export const GalleryGridView: React.FC<GalleryGridViewProps> = ({
                 </div>
               )}
 
-              {/* Badges Overlay */}
-              <div className="absolute top-2 left-2 flex gap-1.5 flex-wrap pointer-events-none">
-                {asset.media_type === "image" || (!asset.media_type && !isVideoOrAudio) ? (
-                  <span className="bg-black/60 backdrop-blur-md text-amber-500 p-1.5 rounded shadow-sm border border-black/50">
-                    <ImageIcon className="w-3.5 h-3.5" />
-                  </span>
-                ) : isAudio ? (
-                  <span className="bg-black/60 backdrop-blur-md text-emerald-400 p-1.5 rounded shadow-sm border border-black/50">
+              {/* Badges Overlay - only shown on hover */}
+              <div className="absolute top-2 left-2 flex gap-1.5 flex-wrap pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-10">
+                {isAudio ? (
+                  <span className="bg-black/70 backdrop-blur-md text-emerald-400 p-1.5 rounded shadow-sm border border-black/50">
                     <Music className="w-3.5 h-3.5" />
                   </span>
-                ) : (
-                  <span className="bg-black/60 backdrop-blur-md text-indigo-400 p-1.5 rounded shadow-sm border border-black/50">
+                ) : (!asset.media_type && isVideoOrAudio) ? (
+                  <span className="bg-black/70 backdrop-blur-md text-indigo-400 p-1.5 rounded shadow-sm border border-black/50">
                     <VideoIcon className="w-3.5 h-3.5" />
                   </span>
-                )}
+                ) : null}
                 {asset.type && (
-                  <span className="bg-black/60 backdrop-blur-md text-zinc-300 text-[10px] font-bold px-2 py-1 rounded shadow-sm border border-black/50">
+                  <span className="bg-black/70 backdrop-blur-md text-zinc-100 text-[10px] font-bold px-2 py-1 rounded shadow-sm border border-black/50">
                     {asset.type}
                   </span>
                 )}
               </div>
 
               {/* Action Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                 <div className="absolute top-2 right-2 flex gap-1">
+                  <a
+                    href={mediaUrl}
+                    download={asset.original_name || asset.filename}
+                    onClick={(e) => e.stopPropagation()}
+                    className="p-1.5 bg-black/60 hover:bg-black/80 text-white rounded backdrop-blur-md transition-colors inline-flex items-center justify-center"
+                    title="Download full size"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                  </a>
                   <button
                     onClick={(e) => { e.stopPropagation(); setEditingAsset(asset); }}
                     className="p-1.5 bg-black/60 hover:bg-black/80 text-white rounded backdrop-blur-md transition-colors"
+                    title="Edit asset details"
                   >
                     <Edit3 className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); handleDeleteAsset(asset); }}
                     className="p-1.5 bg-black/60 hover:bg-red-900/80 text-red-400 rounded backdrop-blur-md transition-colors"
+                    title="Delete asset"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>

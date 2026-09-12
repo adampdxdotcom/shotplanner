@@ -1,6 +1,6 @@
 import React from "react";
 import { MediaAsset } from "../../types";
-import { Image as ImageIcon, Video as VideoIcon, Music, Edit3, Trash2, Play, Pause, Eye } from "lucide-react";
+import { Image as ImageIcon, Video as VideoIcon, Music, Edit3, Trash2, Play, Pause, Eye, Download } from "lucide-react";
 import { formatSize } from "../../utils/formatters";
 import { getAssetMediaUrl } from "../../utils/assetUrl";
 
@@ -81,6 +81,15 @@ export const GalleryListView: React.FC<GalleryListViewProps> = ({
                 </td>
                 <td className="p-4 text-zinc-400 text-xs">{formatSize(asset.size_bytes || 0)}</td>
                 <td className="p-4 text-right space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <a
+                    href={mediaUrl}
+                    download={asset.original_name || asset.filename}
+                    onClick={(e) => e.stopPropagation()}
+                    className="inline-flex items-center justify-center p-1.5 bg-zinc-800 text-zinc-400 hover:text-white rounded-md transition-colors"
+                    title="Download Full Size"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                  </a>
                   <button onClick={() => setLightboxAsset(asset)} className="p-1.5 bg-zinc-800 text-zinc-400 hover:text-white rounded-md transition-colors" title="View Full Asset">
                     <Eye className="w-3.5 h-3.5" />
                   </button>
