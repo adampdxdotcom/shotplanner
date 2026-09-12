@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { getStoredGeminiKey, saveGeminiKey, generateWithGeminiAPI } from "../services/geminiService";
+import { getStoredGeminiKey, saveGeminiKey, removeGeminiKey, generateWithGeminiAPI } from "../services/geminiService";
 import { getStoredCivitaiKey, saveCivitaiKey } from "../services/civitaiService";
 import { getStoredHuggingFaceToken, saveHuggingFaceToken } from "../services/huggingfaceService";
 
@@ -13,8 +13,17 @@ router.get("/gemini", (req: Request, res: Response) => {
 
 router.post("/gemini", (req: Request, res: Response) => {
   const { api_key } = req.body;
-  saveGeminiKey(api_key);
+  if (!api_key || typeof api_key !== "string" || !api_key.trim()) {
+    removeGeminiKey();
+  } else {
+    saveGeminiKey(api_key.trim());
+  }
   res.json({ success: true });
+});
+
+router.delete("/gemini", (req: Request, res: Response) => {
+  removeGeminiKey();
+  res.json({ success: true, message: "Gemini API key removed and deactivated successfully." });
 });
 
 /**

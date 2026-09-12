@@ -140,6 +140,24 @@ export function useConfigSectionState({
     }
   };
 
+  const handleDeactivateGemini = () => {
+    setIsGeminiConnected(false);
+    wasConnectedRef.current.gemini = false;
+    // If Gemini was the active provider or default provider, fall back to LM Studio safely
+    if (activeProvider === "gemini" && onChangeProvider) {
+      onChangeProvider("lm_studio");
+    }
+    if (effectiveDefault === "gemini" && onSetDefaultProvider) {
+      onSetDefaultProvider("lm_studio");
+    }
+    onChange({
+      ...config,
+      gemini_api_key: "",
+      llm_provider: activeProvider === "gemini" ? "lm_studio" : config.llm_provider,
+      default_llm_provider: effectiveDefault === "gemini" ? "lm_studio" : config.default_llm_provider
+    });
+  };
+
   const handleTestLMStudio = async () => {
     setTestingLM(true);
     setLmTestResult(null);
@@ -286,6 +304,7 @@ export function useConfigSectionState({
     lmTestResult,
     handleInputChange,
     handleProviderSelect,
+    handleDeactivateGemini,
     handleTestLMStudio,
     handleSetDefaultLMStudio
   };

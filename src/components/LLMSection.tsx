@@ -34,7 +34,8 @@ import {
   Eye,
   Loader2,
   Square,
-  XSquare
+  XSquare,
+  History
 } from "lucide-react";
 
 interface LLMSectionProps {
@@ -90,6 +91,8 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
   const abortControllerRef = useRef<AbortController | null>(null);
   const [reviewTakeId, setReviewTakeId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [presentedFallbackNotice, setPresentedFallbackNotice] = useState<string | null>(null);
+  const lastGeneratedPromptRef = useRef<string>(expandedPrompt || "");
   const [providerUsed, setProviderUsed] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [lastDebugInfo, setLastDebugInfo] = useState<PromptDebugInfo | null>(null);
@@ -169,6 +172,15 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
   const isLivePreview = !expandedPrompt || !expandedPrompt.trim();
   const displayedPrompt = isLivePreview ? livePrePromptContext : expandedPrompt;
 
+  // Track the most recent successfully generated or loaded prompt
+  useEffect(() => {
+    if (expandedPrompt && expandedPrompt.trim()) {
+      lastGeneratedPromptRef.current = expandedPrompt;
+    } else if (activeShot?.expanded_prompt && activeShot.expanded_prompt.trim()) {
+      lastGeneratedPromptRef.current = activeShot.expanded_prompt;
+    }
+  }, [expandedPrompt, activeShot?.expanded_prompt]);
+
   const handleCancelGeneration = () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -192,12 +204,16 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
 
     const currentShotId = activeShotId;
 
+    // Snapshot last generated prompt to present if default fails
+    const priorPrompt = expandedPrompt?.trim() || activeShot?.expanded_prompt?.trim() || lastGeneratedPromptRef.current || "";
+
     // Create and attach new AbortController
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
     setGenerating(true);
     setError(null);
+    setPresentedFallbackNotice(null);
     setProviderUsed(null);
 
     try {
@@ -233,6 +249,8 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
 
       const data = await res.json();
       if (res.ok && data.expanded_prompt) {
+        lastGeneratedPromptRef.current = data.expanded_prompt;
+        setPresentedFallbackNotice(null);
         if (currentShotId && onUpdateSpecificShot) {
           onUpdateSpecificShot(currentShotId, prev => ({ ...prev, expanded_prompt: data.expanded_prompt, status: "unstaged" }));
         } else {
@@ -243,14 +261,44 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
         if (data.debug) setLastDebugInfo(data.debug);
         onShowToast?.("Prompt expanded and auto-compiled successfully!", "success");
       } else {
-        setError(data.error || "Failed to generate prompt from LLM");
+        const errorMsg = data.error || `Failed to generate prompt with ${providerChoice === "gemini" ? "Google Gemini" : "LM Studio"}`;
+        setError(errorMsg);
+        onShowToast?.(`LLM generation failed: ${errorMsg}`, "error");
+
+        // Present the last generated prompt as requested
+        if (priorPrompt) {
+          if (currentShotId && onUpdateSpecificShot) {
+            onUpdateSpecificShot(currentShotId, prev => ({ ...prev, expanded_prompt: priorPrompt }));
+          } else {
+            onChangeExpandedPrompt(priorPrompt);
+          }
+          setPresentedFallbackNotice(`Default LLM service failed (${providerChoice === "gemini" ? "Google Gemini" : "LM Studio"}). Presenting last generated prompt.`);
+          onShowToast?.("Presenting last generated prompt.", "info");
+        } else {
+          setPresentedFallbackNotice(`Default LLM service failed (${providerChoice === "gemini" ? "Google Gemini" : "LM Studio"}). No previous prompt available.`);
+        }
       }
     } catch (err: any) {
       if (err.name === "AbortError") {
         // User aborted the request - do not show error
         return;
       }
-      setError(err.message);
+      const errorMsg = err.message || `Failed to connect to ${providerChoice === "gemini" ? "Google Gemini" : "LM Studio"}`;
+      setError(errorMsg);
+      onShowToast?.(`LLM generation failed: ${errorMsg}`, "error");
+
+      // Present the last generated prompt as requested
+      if (priorPrompt) {
+        if (currentShotId && onUpdateSpecificShot) {
+          onUpdateSpecificShot(currentShotId, prev => ({ ...prev, expanded_prompt: priorPrompt }));
+        } else {
+          onChangeExpandedPrompt(priorPrompt);
+        }
+        setPresentedFallbackNotice(`Default LLM service failed (${providerChoice === "gemini" ? "Google Gemini" : "LM Studio"}). Presenting last generated prompt.`);
+        onShowToast?.("Presenting last generated prompt.", "info");
+      } else {
+        setPresentedFallbackNotice(`Default LLM service failed (${providerChoice === "gemini" ? "Google Gemini" : "LM Studio"}). No previous prompt available.`);
+      }
     } finally {
       abortControllerRef.current = null;
       setGenerating(false);
@@ -376,9 +424,20 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
           </div>
 
           {error && (
-            <div className="p-3 rounded-lg bg-red-950/30 border border-red-800/40 text-xs text-red-300 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
-              <span>{error}</span>
+            <div className="p-3.5 rounded-lg bg-red-950/40 border border-red-800/60 text-xs text-red-200 space-y-1.5 shadow-sm">
+              <div className="flex items-center gap-2 font-medium text-red-300">
+                <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                <span>LLM Generation Failed ({providerChoice === "gemini" ? "Google Gemini" : "LM Studio"})</span>
+              </div>
+              <p className="text-[11px] text-red-300/90 pl-6 leading-relaxed">
+                {error}
+              </p>
+              {presentedFallbackNotice && (
+                <div className="mt-1 pt-1.5 border-t border-red-900/60 pl-6 flex items-center gap-1.5 text-[11px] text-amber-300">
+                  <History className="w-3.5 h-3.5 shrink-0" />
+                  <span>{presentedFallbackNotice}</span>
+                </div>
+              )}
             </div>
           )}
 
@@ -501,7 +560,12 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
                   <Sparkles className="w-3.5 h-3.5 text-amber-400" />
                   Preview / Edit Expanded Prompt
                 </label>
-                {isLivePreview ? (
+                {presentedFallbackNotice ? (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-amber-500/15 text-amber-300 border border-amber-500/40 flex items-center gap-1">
+                    <History className="w-3 h-3 text-amber-400" />
+                    Last Generated Prompt
+                  </span>
+                ) : isLivePreview ? (
                   <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
                     Live Pre-Prompt Context

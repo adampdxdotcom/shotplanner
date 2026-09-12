@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { AppConfig } from "../../types";
-import { Sparkles, Save, CheckCircle2, AlertCircle, RefreshCw, Star } from "lucide-react";
+import { Sparkles, Save, CheckCircle2, AlertCircle, RefreshCw, Star, Trash2 } from "lucide-react";
 
 export interface GeminiConfigProps {
   config: AppConfig;
   onChange: (newConfig: AppConfig) => void;
   isDefault?: boolean;
   onSetDefault?: () => void;
+  onDeactivateGemini?: () => void;
   onConnectionStatusChange?: (connected: boolean) => void;
   onShowToast?: (text: string, type: "success" | "error" | "info") => void;
 }
@@ -35,6 +36,7 @@ export const GeminiConfig: React.FC<GeminiConfigProps> = ({
   onChange, 
   isDefault, 
   onSetDefault, 
+  onDeactivateGemini,
   onConnectionStatusChange,
   onShowToast 
 }) => {
@@ -43,6 +45,7 @@ export const GeminiConfig: React.FC<GeminiConfigProps> = ({
   const [maskedGeminiKey, setMaskedGeminiKey] = useState("");
   const [savingGemini, setSavingGemini] = useState(false);
   const [testingGemini, setTestingGemini] = useState(false);
+  const [deactivatingGemini, setDeactivatingGemini] = useState(false);
   const [geminiFeedback, setGeminiFeedback] = useState<{ success?: boolean; message?: string } | null>(null);
 
   useEffect(() => {
@@ -54,6 +57,8 @@ export const GeminiConfig: React.FC<GeminiConfigProps> = ({
           setMaskedGeminiKey(data.masked_key || (data.api_key ? `${data.api_key}...` : "Configured"));
           if (onConnectionStatusChange) onConnectionStatusChange(true);
         } else {
+          setIsGeminiConfigured(false);
+          setMaskedGeminiKey("");
           if (onConnectionStatusChange) onConnectionStatusChange(false);
         }
       })
@@ -96,6 +101,41 @@ export const GeminiConfig: React.FC<GeminiConfigProps> = ({
       if (onConnectionStatusChange) onConnectionStatusChange(false);
     } finally {
       setSavingGemini(false);
+    }
+  };
+
+  const handleRemoveGeminiKey = async () => {
+    setDeactivatingGemini(true);
+    setGeminiFeedback(null);
+
+    try {
+      // Call DELETE to clear persistent key storage
+      const res = await fetch("/api/settings/gemini", {
+        method: "DELETE"
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok && data.success) {
+        setIsGeminiConfigured(false);
+        setMaskedGeminiKey("");
+        setGeminiKeyInput("");
+        setGeminiFeedback({ success: true, message: "Gemini API key removed and deactivated." });
+        
+        // Clear from active state and notify parent
+        onChange({ ...config, gemini_api_key: "" });
+        if (onConnectionStatusChange) onConnectionStatusChange(false);
+        if (onDeactivateGemini) onDeactivateGemini();
+
+        if (onShowToast) {
+          onShowToast("Gemini API key removed and deactivated", "info");
+        }
+      } else {
+        setGeminiFeedback({ success: false, message: data.error || data.detail || "Failed to remove API key." });
+      }
+    } catch (e: any) {
+      setGeminiFeedback({ success: false, message: e.message || "Failed to contact settings service." });
+    } finally {
+      setDeactivatingGemini(false);
     }
   };
 
@@ -223,6 +263,20 @@ export const GeminiConfig: React.FC<GeminiConfigProps> = ({
             <Save className={`w-3.5 h-3.5 ${savingGemini ? "animate-spin" : ""}`} />
             <span>{savingGemini ? "Saving..." : "Save Config"}</span>
           </button>
+
+          {(isGeminiConfigured || config.gemini_api_key) && (
+            <button
+              id="btn-remove-gemini-key"
+              type="button"
+              onClick={handleRemoveGeminiKey}
+              disabled={deactivatingGemini || savingGemini}
+              title="Remove and deactivate Gemini API key"
+              className="px-3 py-2 text-xs font-semibold bg-zinc-100 hover:bg-red-50 text-zinc-700 hover:text-red-700 border border-zinc-300 hover:border-red-300 dark:bg-zinc-800 dark:hover:bg-red-950/40 dark:text-zinc-300 dark:hover:text-red-300 dark:border-zinc-700 dark:hover:border-red-700/60 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer shrink-0 disabled:opacity-50 shadow-xs"
+            >
+              <Trash2 className={`w-3.5 h-3.5 ${deactivatingGemini ? "animate-spin text-red-500" : "text-red-500"}`} />
+              <span>{deactivatingGemini ? "Deactivating..." : "Deactivate & Remove"}</span>
+            </button>
+          )}
         </div>
       </div>
 

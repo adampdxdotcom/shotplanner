@@ -112,7 +112,7 @@ export async function expandPrompt(
     assets = [],
     lm_studio_url = "http://localhost:1234/v1",
     model,
-    provider = "auto",
+    provider = "lm_studio",
     prompt_prefix = "",
     scene_planning,
     planning,
@@ -352,27 +352,34 @@ Generate ONLY the integrated_multimodal_description paragraph incorporating the 
   let modelUsedActual = model || "local-model";
   const storedGeminiKey = getStoredGeminiKey();
 
-  // Route to requested LLM provider or try local with fallback
+  // Strict execution of requested/default LLM provider without secondary service fallbacks
   if (provider === "gemini") {
     if (!storedGeminiKey) {
-      throw new Error("Gemini API key is not configured. Please save your API key in Settings.");
+      throw new Error("Google Gemini API key is not configured. Please save your API key in Settings.");
     }
-    const fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
-    const result = await generateWithGeminiAPI(storedGeminiKey, fullPrompt);
-    rawLlmDescription = result.text;
-    modelUsedActual = result.modelUsed;
-    providerUsed = `Gemini (${result.modelUsed})`;
-  } else {
-    // Try LM Studio endpoint
     try {
-      let endpoint = lm_studio_url.trim().replace(/\/$/, "");
-      if (!endpoint.endsWith("/chat/completions")) {
-        if (!endpoint.endsWith("/v1")) endpoint = `${endpoint}/v1`;
-        endpoint = `${endpoint}/chat/completions`;
+      const fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
+      const result = await generateWithGeminiAPI(storedGeminiKey, fullPrompt);
+      if (!result.text || !result.text.trim()) {
+        throw new Error("Gemini returned an empty response.");
       }
+      rawLlmDescription = result.text;
+      modelUsedActual = result.modelUsed;
+      providerUsed = `Gemini (${result.modelUsed})`;
+    } catch (err: any) {
+      throw new Error(`Google Gemini service error: ${err.message || "Failed to generate prompt"}`);
+    }
+  } else {
+    // Try LM Studio endpoint (strictly no secondary fallback)
+    let endpoint = lm_studio_url.trim().replace(/\/$/, "");
+    if (!endpoint.endsWith("/chat/completions")) {
+      if (!endpoint.endsWith("/v1")) endpoint = `${endpoint}/v1`;
+      endpoint = `${endpoint}/chat/completions`;
+    }
 
+    try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
 
       const lmRes = await fetch(endpoint, {
         method: "POST",
@@ -390,42 +397,29 @@ Generate ONLY the integrated_multimodal_description paragraph incorporating the 
       });
       clearTimeout(timeoutId);
 
-      if (lmRes.ok) {
-        const data = await lmRes.json();
-        rawLlmDescription = data.choices?.[0]?.message?.content?.trim() || "";
-        modelUsedActual = data.model || model || "local-model";
-        providerUsed = `Local LM Studio (${modelUsedActual})`;
+      if (!lmRes.ok) {
+        const errText = await lmRes.text().catch(() => "");
+        throw new Error(`HTTP ${lmRes.status}: ${errText || lmRes.statusText}`);
       }
-    } catch (e) {
-      // Local endpoint offline
-    }
 
-    // Fallback to Gemini if LM Studio is unreachable
-    if (!rawLlmDescription && storedGeminiKey) {
-      try {
-        const fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
-        const result = await generateWithGeminiAPI(storedGeminiKey, fullPrompt);
-        rawLlmDescription = result.text;
-        modelUsedActual = result.modelUsed;
-        providerUsed = `Gemini (${result.modelUsed} Fallback)`;
-      } catch (geminiErr) {}
+      const data = await lmRes.json();
+      const content = data.choices?.[0]?.message?.content?.trim();
+      if (!content) {
+        throw new Error("LM Studio returned an empty response.");
+      }
+      rawLlmDescription = content;
+      modelUsedActual = data.model || model || "local-model";
+      providerUsed = `Local LM Studio (${modelUsedActual})`;
+    } catch (e: any) {
+      const msg = e.name === "AbortError" 
+        ? "Request timed out after 12 seconds" 
+        : e.message || "Connection refused";
+      throw new Error(`LM Studio service error: ${msg}. Verify LM Studio is running at ${lm_studio_url}`);
     }
   }
 
-  // Fallback if both LLM endpoints are unreachable
   if (!rawLlmDescription) {
-    const tagsList = assets.map((_: any, i: number) => `<Picture ${i + 1}>`).slice(0, 3).join(" and ");
-    const framingStub = resolvedFramingDirective ? `Framed with ${resolvedFramingDirective.replace(/^Framing:\s*/i, "")} ` : "";
-    const cameraStub = isStatic
-      ? "The camera remains completely locked off and static on a tripod."
-      : effectiveCameraMovement
-      ? `The camera executes a smooth ${effectiveCameraMovement.toLowerCase()} with subtle amplitude at slow speed.`
-      : "The camera pushes in with small amplitude at slow speed.";
-    rawLlmDescription = `[Shot 1] Live-action, cinematic 4K sequence capturing ${basic_stub.trim()}. ${framingStub}Featuring ${
-      tagsList || "<Picture 1>"
-    } with authentic facial expressions, realistic skin texture, and seamless character identity preservation. ${cameraStub}`;
-    modelUsedActual = "Deterministic Rules Engine";
-    providerUsed = "Smart Offline Generator";
+    throw new Error("Selected LLM service failed to generate a response.");
   }
 
   // Clean raw LLM response (strip any surrounding markdown code ticks if returned)

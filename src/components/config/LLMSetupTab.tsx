@@ -19,6 +19,7 @@ interface LLMSetupTabProps {
   testingLM: boolean;
   lmTestResult: { success?: boolean; message?: string } | null;
   onSetDefaultProvider?: (provider: LLMProvider) => void;
+  onDeactivateGemini?: () => void;
   onShowToast?: (text: string, type: "success" | "error" | "info") => void;
 }
 
@@ -37,6 +38,7 @@ export const LLMSetupTab: React.FC<LLMSetupTabProps> = ({
   testingLM,
   lmTestResult,
   onSetDefaultProvider,
+  onDeactivateGemini,
   onShowToast
 }) => {
   return (
@@ -178,6 +180,7 @@ export const LLMSetupTab: React.FC<LLMSetupTabProps> = ({
             onChange={onChange}
             isDefault={effectiveDefault === "gemini"}
             onSetDefault={() => onSetDefaultProvider && onSetDefaultProvider("gemini")}
+            onDeactivateGemini={onDeactivateGemini}
             onConnectionStatusChange={setIsGeminiConnected}
             onShowToast={onShowToast}
           />

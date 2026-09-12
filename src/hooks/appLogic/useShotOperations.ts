@@ -268,7 +268,15 @@ export function useShotOperations({
       }),
     });
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Expansion failed");
+    if (!response.ok) {
+      const errorMsg = data.error || "LLM prompt generation failed";
+      addToast(`LLM prompt expansion failed: ${errorMsg}`, "error");
+      if (shot.expanded_prompt && shot.expanded_prompt.trim()) {
+        addToast(`Presenting last generated prompt for Shot ${shot.shot_number}.`, "info");
+        return shot.expanded_prompt;
+      }
+      throw new Error(errorMsg);
+    }
     return data.expanded_prompt;
   }, [assets, sceneProject, llmProvider, config]);
 

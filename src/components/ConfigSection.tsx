@@ -57,6 +57,7 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({
     lmTestResult,
     handleInputChange,
     handleProviderSelect,
+    handleDeactivateGemini,
     handleTestLMStudio,
     handleSetDefaultLMStudio
   } = useConfigSectionState({
@@ -99,6 +100,7 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({
           testingLM={testingLM}
           lmTestResult={lmTestResult}
           onSetDefaultProvider={onSetDefaultProvider}
+          onDeactivateGemini={handleDeactivateGemini}
           onShowToast={onShowToast}
         />
       )}

@@ -16,6 +16,16 @@ export function saveGeminiKey(apiKey: string): void {
   fs.writeFileSync(GEMINI_CONFIG_FILE, JSON.stringify({ api_key: apiKey }, null, 2));
 }
 
+export function removeGeminiKey(): void {
+  if (fs.existsSync(GEMINI_CONFIG_FILE)) {
+    try {
+      fs.unlinkSync(GEMINI_CONFIG_FILE);
+    } catch (e) {
+      fs.writeFileSync(GEMINI_CONFIG_FILE, JSON.stringify({ api_key: "" }, null, 2));
+    }
+  }
+}
+
 export async function generateWithGeminiAPI(apiKey: string, promptText: string) {
   const genAI = new GoogleGenAI({
     apiKey,
