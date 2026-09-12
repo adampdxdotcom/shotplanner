@@ -31,7 +31,10 @@ import {
   Layers,
   MapPin,
   RotateCcw,
-  Eye
+  Eye,
+  Loader2,
+  Square,
+  XSquare
 } from "lucide-react";
 
 interface LLMSectionProps {
@@ -84,6 +87,7 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
   };
 
   const [generating, setGenerating] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const [reviewTakeId, setReviewTakeId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [providerUsed, setProviderUsed] = useState<string | null>(null);
@@ -165,13 +169,32 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
   const isLivePreview = !expandedPrompt || !expandedPrompt.trim();
   const displayedPrompt = isLivePreview ? livePrePromptContext : expandedPrompt;
 
+  const handleCancelGeneration = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setGenerating(false);
+    onShowToast?.("LLM prompt expansion cancelled.", "info");
+  };
+
   const handleGeneratePrompt = async () => {
+    // If already generating, act as Cancel button (double duty)
+    if (generating) {
+      handleCancelGeneration();
+      return;
+    }
+
     if (!basicStub.trim()) {
       setError("Please provide a basic prompt stub first.");
       return;
     }
 
     const currentShotId = activeShotId;
+
+    // Create and attach new AbortController
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     setGenerating(true);
     setError(null);
@@ -181,6 +204,7 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
       const res = await fetch("/api/generate-prompt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           basic_stub: basicStub,
           assets: relevantAssets,
@@ -222,8 +246,13 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
         setError(data.error || "Failed to generate prompt from LLM");
       }
     } catch (err: any) {
+      if (err.name === "AbortError") {
+        // User aborted the request - do not show error
+        return;
+      }
       setError(err.message);
     } finally {
+      abortControllerRef.current = null;
       setGenerating(false);
     }
   };
@@ -423,28 +452,43 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
 
           <button
             onClick={handleGeneratePrompt}
-            disabled={generating || !basicStub.trim() || assets.length === 0}
-            title={assets.length === 0 ? "You must upload at least one asset to generate a prompt." : ""}
+            disabled={!generating && (!basicStub.trim() || assets.length === 0)}
+            title={
+              generating 
+                ? "Click to cancel prompt expansion" 
+                : assets.length === 0 
+                ? "You must upload at least one asset to generate a prompt." 
+                : ""
+            }
             className={`w-full mt-3 py-2.5 px-4 font-semibold rounded-lg text-xs transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer ${
-              assets.length === 0 
+              generating
+                ? "bg-red-500/15 hover:bg-red-500/25 text-red-300 border border-red-500/40 hover:border-red-500/60 shadow-red-950/20 active:scale-[0.99]"
+                : assets.length === 0 
                 ? "bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-700" 
                 : providerChoice === "gemini"
                 ? "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white disabled:opacity-50"
                 : "bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-zinc-950 disabled:opacity-50"
             }`}
           >
-            {providerChoice === "gemini" ? (
-              <Sparkles className={`w-4 h-4 ${generating ? "animate-spin" : ""}`} />
+            {generating ? (
+              <>
+                <Square className="w-3.5 h-3.5 fill-current text-red-400" />
+                <span>Cancel Prompt Expansion</span>
+              </>
             ) : (
-              <Bot className={`w-4 h-4 ${generating ? "animate-spin" : ""}`} />
+              <>
+                {providerChoice === "gemini" ? (
+                  <Sparkles className="w-4 h-4" />
+                ) : (
+                  <Bot className="w-4 h-4" />
+                )}
+                <span>
+                  {expandedPrompt && expandedPrompt.trim()
+                    ? `Regenerate Prompt with ${providerChoice === "gemini" ? "Gemini 3.7 Flash" : "LM Studio"}`
+                    : `Generate Prompt with ${providerChoice === "gemini" ? "Gemini 3.7 Flash" : "LM Studio"}`}
+                </span>
+              </>
             )}
-            <span>
-              {generating 
-                ? `Synthesizing with ${providerChoice === "gemini" ? "Gemini 3.7 Flash..." : "LM Studio..."}` 
-                : expandedPrompt && expandedPrompt.trim()
-                ? `Regenerate Prompt with ${providerChoice === "gemini" ? "Gemini 3.7 Flash" : "LM Studio"}`
-                : `Generate Prompt with ${providerChoice === "gemini" ? "Gemini 3.7 Flash" : "LM Studio"}`}
-            </span>
           </button>
         </div>
 
@@ -520,17 +564,58 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
               </div>
             </div>
 
-            <textarea
-              rows={18}
-              placeholder="The dynamic pre-prompt context or expanded prompt will appear here ready for editing before execution..."
-              value={displayedPrompt}
-              onChange={(e) => onChangeExpandedPrompt(e.target.value)}
-              className={`w-full bg-zinc-900 border-2 rounded-lg p-3 text-xs text-zinc-100 placeholder-zinc-600 outline-none resize-none leading-relaxed font-mono ${
-                isLivePreview 
-                  ? "border-amber-500/40 focus:border-amber-500" 
-                  : "border-zinc-700 focus:border-amber-500"
-              }`}
-            />
+            <div className="relative overflow-hidden rounded-lg">
+              <textarea
+                rows={18}
+                placeholder="The dynamic pre-prompt context or expanded prompt will appear here ready for editing before execution..."
+                value={displayedPrompt}
+                onChange={(e) => onChangeExpandedPrompt(e.target.value)}
+                disabled={generating}
+                className={`w-full bg-zinc-900 border-2 rounded-lg p-3 text-xs text-zinc-100 placeholder-zinc-600 outline-none resize-none leading-relaxed font-mono transition-opacity duration-300 ${
+                  generating ? "opacity-40 cursor-not-allowed select-none" : ""
+                } ${
+                  isLivePreview 
+                    ? "border-amber-500/40 focus:border-amber-500" 
+                    : "border-zinc-700 focus:border-amber-500"
+                }`}
+              />
+
+              {/* Smooth Fade Loading Overlay with Spinner & Abort/Cancel */}
+              <div 
+                className={`prompt-generating-overlay absolute inset-0 z-20 flex flex-col items-center justify-center p-6 text-center transition-all duration-300 pointer-events-none rounded-lg ${
+                  generating 
+                    ? "opacity-100 backdrop-blur-xs bg-zinc-950/70 pointer-events-auto" 
+                    : "opacity-0 pointer-events-none"
+                }`}
+              >
+                {/* Glowing Spinner Centerpiece */}
+                <div className="relative mb-3 flex items-center justify-center">
+                  <div className="absolute inset-0 w-12 h-12 rounded-full bg-amber-500/20 blur-md animate-pulse" />
+                  <Loader2 className="w-9 h-9 text-amber-400 animate-spin relative z-10" />
+                </div>
+
+                {/* Status Badges & Text */}
+                <div className="space-y-1 max-w-xs">
+                  <p className="text-xs font-semibold text-zinc-100 flex items-center justify-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                    <span>Expanding Prompt with {providerChoice === "gemini" ? "Gemini 3.7 Flash" : "LM Studio"}...</span>
+                  </p>
+                  <p className="text-[11px] text-zinc-400 leading-snug">
+                    Synthesizing cinematographic details and slot references.
+                  </p>
+                </div>
+
+                {/* Embedded Cancel Action */}
+                <button
+                  type="button"
+                  onClick={handleCancelGeneration}
+                  className="mt-4 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-300 hover:text-white bg-zinc-800/90 hover:bg-zinc-700/90 border border-zinc-600/80 hover:border-zinc-500 shadow-md transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                >
+                  <Square className="w-3 h-3 fill-current text-red-400" />
+                  <span>Cancel Generation</span>
+                </button>
+              </div>
+            </div>
           </div>
 
           <div className="text-[11px] text-zinc-400 bg-zinc-900/60 p-2 rounded-lg border-2 border-zinc-700/60 flex items-center justify-between">

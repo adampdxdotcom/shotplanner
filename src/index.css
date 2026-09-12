@@ -697,5 +697,29 @@ html.dark .prompt-variable-pill .pill-label {
   color: #a1a1aa !important;
 }
 
+/* Prompt Generation Loading Overlay Light-Mode Adaptation */
+html.light .prompt-generating-overlay {
+  background-color: rgba(255, 255, 255, 0.85) !important;
+}
+
+html.light .prompt-generating-overlay p:first-of-type {
+  color: #0f172a !important;
+}
+
+html.light .prompt-generating-overlay p:last-of-type {
+  color: #64748b !important;
+}
+
+html.light .prompt-generating-overlay button {
+  background-color: #f1f5f9 !important;
+  color: #334155 !important;
+  border-color: #cbd5e1 !important;
+}
+
+html.light .prompt-generating-overlay button:hover {
+  background-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
 
 
