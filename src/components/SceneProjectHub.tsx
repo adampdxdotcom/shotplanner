@@ -171,14 +171,6 @@ export default function SceneProjectHub({
               return { ...prev, shots };
             })}
             onReviewTake={setReviewTakeId}
-            onOpenStagingStudio={() => {
-              if (onNavigate) {
-                onNavigate("staging");
-              } else {
-                setStagingStudioTab("staging");
-                setIsStagingStudioOpen(true);
-              }
-            }}
           />
 
           <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-0 items-stretch">

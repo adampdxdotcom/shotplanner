@@ -1,13 +1,12 @@
-import React from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { ToastMessage } from "../types";
-import { CheckCircle2, AlertCircle, Info, X, Sun, Moon } from "lucide-react";
+import { CheckCircle2, AlertCircle, Info, X, Sun, Moon, ChevronDown } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useTheme } from "../context/ThemeContext";
 import { 
   Server, 
   Workflow, 
   Cpu, 
-  HardDrive,
   Sparkles,
   Save,
   FolderOpen,
@@ -42,7 +41,33 @@ export const Navbar: React.FC<NavbarProps> = ({
   onDismissToast 
 }) => {
   const activeToast = toasts && toasts.length > 0 ? toasts[0] : null;
-  const { theme, resolvedTheme, toggleTheme } = useTheme();
+  const { resolvedTheme, toggleTheme } = useTheme();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on click outside or escape key
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsMenuOpen(false);
+      }
+    };
+
+    if (isMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("keydown", handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isMenuOpen]);
 
   return (
     <header className="sticky top-0 z-40 bg-zinc-900/90 backdrop-blur-md border-b border-zinc-800 px-4 lg:px-8 py-3.5 flex items-center justify-between shadow-sm">
@@ -56,7 +81,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             {isDirty && <span className="text-xs text-amber-600 dark:text-amber-400 font-normal opacity-90">(Unsaved)</span>}
           </h1>
           
-          {/* Toast / Status Area Below Project Name - Single active toast with smooth transition */}
+          {/* Toast / Status Area Below Project Name */}
           <div className="relative min-h-[20px] flex items-center mt-0.5 pointer-events-auto max-w-sm sm:max-w-md">
             <AnimatePresence mode="wait">
               {!activeToast ? (
@@ -122,7 +147,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             }`}
           >
             <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-            Scene Hub
+            Scenes
           </button>
           <button
             onClick={() => onNavigate("assets")}
@@ -136,6 +161,50 @@ export const Navbar: React.FC<NavbarProps> = ({
             Shots
           </button>
           <button
+            onClick={() => onNavigate("workflow")}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
+              activeSection === "workflow" 
+                ? "bg-zinc-800 text-zinc-100 shadow-xs" 
+                : "text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            <Workflow className="w-3.5 h-3.5" />
+            Workflow
+          </button>
+          <button
+            onClick={() => onNavigate("llm")}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
+              activeSection === "llm" 
+                ? "bg-zinc-800 text-zinc-100 shadow-xs" 
+                : "text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            Prompt
+          </button>
+          <button
+            onClick={() => onNavigate("execute")}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
+              activeSection === "execute" 
+                ? "bg-zinc-800 text-zinc-100 shadow-xs" 
+                : "text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            <Cpu className="w-3.5 h-3.5 text-indigo-400" />
+            Upload
+          </button>
+          <button
+            onClick={() => onNavigate("gallery")}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
+              activeSection === "gallery" 
+                ? "bg-zinc-800 text-zinc-100 shadow-xs border border-zinc-700" 
+                : "text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            <Image className="w-3.5 h-3.5 text-amber-400" />
+            Gallery
+          </button>
+          <button
             onClick={() => onNavigate("staging")}
             className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
               activeSection === "staging" 
@@ -147,128 +216,148 @@ export const Navbar: React.FC<NavbarProps> = ({
             Assets
           </button>
           <button
-            onClick={() => onNavigate("workflow")}
-          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
-            activeSection === "workflow" 
-              ? "bg-zinc-800 text-zinc-100 shadow-xs" 
-              : "text-zinc-400 hover:text-zinc-200"
-          }`}
-        >
-          <Workflow className="w-3.5 h-3.5" />
-          Workflow
-        </button>
-        <button
-          onClick={() => onNavigate("llm")}
-          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
-            activeSection === "llm" 
-              ? "bg-zinc-800 text-zinc-100 shadow-xs" 
-              : "text-zinc-400 hover:text-zinc-200"
-          }`}
-        >
-          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-          Prompt
-        </button>
-        <button
-          onClick={() => onNavigate("execute")}
-          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
-            activeSection === "execute" 
-              ? "bg-zinc-800 text-zinc-100 shadow-xs" 
-              : "text-zinc-400 hover:text-zinc-200"
-          }`}
-        >
-          <Cpu className="w-3.5 h-3.5 text-indigo-400" />
-          Upload
-        </button>
-        <button
-          onClick={() => onNavigate("gallery")}
-          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
-            activeSection === "gallery" 
-              ? "bg-zinc-800 text-zinc-100 shadow-xs border border-zinc-700" 
-              : "text-zinc-400 hover:text-zinc-200"
-          }`}
-        >
-          <Image className="w-3.5 h-3.5 text-amber-400" />
-          Gallery
-        </button>
-        <button
-          onClick={() => onNavigate("cast")}
-          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
-            activeSection === "cast" 
-              ? "bg-zinc-800 text-zinc-100 shadow-xs" 
-              : "text-zinc-400 hover:text-zinc-200"
-          }`}
-        >
-          <Users className="w-3.5 h-3.5 text-indigo-400" />
-          Cast
-        </button>
-      </nav>
-
-      <div className="flex flex-col items-end gap-2">
-        <div className="flex items-center gap-2">
-          {/* Quick Theme Toggle */}
-          <button
-            id="navbar-theme-toggle-btn"
-            type="button"
-            onClick={toggleTheme}
-            className="navbar-action-btn p-1.5 text-xs font-medium text-zinc-300 bg-zinc-850 hover:bg-zinc-700 hover:text-white rounded-lg border border-zinc-700/80 transition-all flex items-center justify-center shadow-xs cursor-pointer"
-            title={`Current mode: ${resolvedTheme === "dark" ? "Dark" : "Light"}${theme === "system" ? " (System)" : ""}. Click to toggle.`}
-            aria-label="Toggle light or dark theme"
-          >
-            {resolvedTheme === "dark" ? (
-              <Sun className="w-3.5 h-3.5 text-amber-400" />
-            ) : (
-              <Moon className="w-3.5 h-3.5 text-indigo-400" />
-            )}
-          </button>
-
-          <button
-            id="navbar-config-btn"
-            onClick={() => onNavigate("config")}
-            className={`navbar-action-btn px-3 py-1.5 text-xs font-medium rounded-lg border transition-all flex items-center gap-1.5 shadow-xs cursor-pointer ${
-              activeSection === "config" 
-                ? "active bg-zinc-800 border-zinc-600 text-white font-semibold" 
-                : "bg-zinc-800/80 border-zinc-700/80 text-zinc-300 hover:bg-zinc-700 hover:text-white"
+            onClick={() => onNavigate("cast")}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
+              activeSection === "cast" 
+                ? "bg-zinc-800 text-zinc-100 shadow-xs" 
+                : "text-zinc-400 hover:text-zinc-200"
             }`}
-            title="Server Configuration"
           >
-            <Server className="w-3.5 h-3.5" />
-            <span>Config</span>
+            <Users className="w-3.5 h-3.5 text-indigo-400" />
+            Cast
           </button>
-          {onNewProject && (
-            <button
-              id="navbar-new-btn"
-              onClick={onNewProject}
-              className="navbar-action-btn px-3 py-1.5 text-xs font-medium text-zinc-300 bg-zinc-800/80 hover:bg-zinc-700 hover:text-white rounded-lg border border-zinc-700/80 transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
-              title="New Scene"
-            >
-              <Plus className="w-3.5 h-3.5 text-amber-500" />
-              <span>New</span>
-            </button>
-          )}
+        </nav>
+
+        {/* Unified Project Dropdown Menu */}
+        <div className="relative" ref={menuRef}>
           <button
-            id="navbar-load-btn"
-            onClick={onLoadProject}
-            className="navbar-action-btn px-3 py-1.5 text-xs font-medium text-zinc-300 bg-zinc-800/80 hover:bg-zinc-700 hover:text-white rounded-lg border border-zinc-700/80 transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
-            title="Load Project"
-          >
-            <FolderOpen className="w-3.5 h-3.5" />
-            <span>Load</span>
-          </button>
-          <button
-            id="navbar-save-btn"
-            onClick={onSaveProject}
-            className={`navbar-save-btn px-3 py-1.5 text-xs font-semibold rounded-lg shadow-xs transition-all flex items-center gap-1.5 border cursor-pointer ${
+            id="navbar-project-menu-btn"
+            type="button"
+            onClick={() => setIsMenuOpen(prev => !prev)}
+            className={`navbar-project-btn px-3 py-1.5 text-xs font-semibold rounded-lg shadow-xs transition-all flex items-center gap-2 border cursor-pointer ${
               isDirty
                 ? "is-dirty bg-amber-600 hover:bg-amber-500 text-white border-amber-500/80 shadow-amber-950/30"
                 : "bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500/80 shadow-emerald-950/30"
             }`}
-            title={isDirty ? "Unsaved changes — Click to Save" : "All changes saved — Up to date"}
+            title={isDirty ? "Project Menu — Unsaved changes (Yellow)" : "Project Menu — All changes saved (Green)"}
+            aria-expanded={isMenuOpen}
+            aria-haspopup="true"
           >
-            <Save className="w-3.5 h-3.5 text-white" />
-            <span className="text-white">Save</span>
+            <div className="flex items-center gap-1.5">
+              <FolderOpen className="w-3.5 h-3.5 text-white" />
+              <span className="text-white font-semibold">Project</span>
+              {isDirty && (
+                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0" />
+              )}
+            </div>
+            <ChevronDown className={`w-3.5 h-3.5 text-white/90 transition-transform duration-150 ${isMenuOpen ? "rotate-180" : ""}`} />
           </button>
+
+          <AnimatePresence>
+            {isMenuOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 4, scale: 0.98 }}
+                transition={{ duration: 0.12, ease: "easeOut" }}
+                className="navbar-project-dropdown absolute right-0 mt-2 w-56 bg-white/98 text-slate-900 border border-slate-200 rounded-xl shadow-xl py-1.5 z-50 overflow-hidden backdrop-blur-md dark:bg-zinc-900/98 dark:text-zinc-100 dark:border-zinc-700/90"
+              >
+                {/* File / Project Actions */}
+                <div className="dropdown-section-title px-3 py-1 text-[10px] font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">
+                  Scene File
+                </div>
+
+                {onNewProject && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      onNewProject();
+                    }}
+                    className="dropdown-item-btn w-full px-3 py-2 text-xs font-medium text-slate-700 hover:text-slate-950 hover:bg-slate-100 dark:text-zinc-200 dark:hover:text-white dark:hover:bg-zinc-800/80 flex items-center gap-2.5 transition-colors text-left cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 shrink-0" />
+                    <span>New Scene</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    onLoadProject();
+                  }}
+                  className="dropdown-item-btn w-full px-3 py-2 text-xs font-medium text-slate-700 hover:text-slate-950 hover:bg-slate-100 dark:text-zinc-200 dark:hover:text-white dark:hover:bg-zinc-800/80 flex items-center gap-2.5 transition-colors text-left cursor-pointer"
+                >
+                  <FolderOpen className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                  <span>Load Scene...</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    onSaveProject();
+                  }}
+                  className="dropdown-item-btn w-full px-3 py-2 text-xs font-medium text-slate-700 hover:text-slate-950 hover:bg-slate-100 dark:text-zinc-200 dark:hover:text-white dark:hover:bg-zinc-800/80 flex items-center justify-between transition-colors text-left cursor-pointer"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Save className={`w-3.5 h-3.5 shrink-0 ${isDirty ? "text-amber-500 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`} />
+                    <span>Save Scene</span>
+                  </div>
+                  {isDirty && (
+                    <span className="text-[10px] font-medium text-amber-700 bg-amber-50 border border-amber-200 dark:text-amber-400 dark:bg-amber-950/60 dark:border-amber-800/60 px-1.5 py-0.5 rounded">
+                      Unsaved
+                    </span>
+                  )}
+                </button>
+
+                {/* Workspace / Settings Divider */}
+                <div className="dropdown-divider h-px bg-slate-200 dark:bg-zinc-800 my-1.5 mx-2" />
+
+                <div className="dropdown-section-title px-3 py-1 text-[10px] font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">
+                  Workspace
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    onNavigate("config");
+                  }}
+                  className={`dropdown-item-btn w-full px-3 py-2 text-xs font-medium flex items-center gap-2.5 transition-colors text-left cursor-pointer ${
+                    activeSection === "config"
+                      ? "bg-slate-200/90 text-slate-950 dark:bg-zinc-800 dark:text-white font-semibold"
+                      : "text-slate-700 hover:text-slate-950 hover:bg-slate-100 dark:text-zinc-200 dark:hover:text-white dark:hover:bg-zinc-800/80"
+                  }`}
+                >
+                  <Server className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                  <span>Server Configuration</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    toggleTheme();
+                  }}
+                  className="dropdown-item-btn w-full px-3 py-2 text-xs font-medium text-slate-700 hover:text-slate-950 hover:bg-slate-100 dark:text-zinc-200 dark:hover:text-white dark:hover:bg-zinc-800/80 flex items-center justify-between transition-colors text-left cursor-pointer"
+                >
+                  <div className="flex items-center gap-2.5">
+                    {resolvedTheme === "dark" ? (
+                      <Sun className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 shrink-0" />
+                    ) : (
+                      <Moon className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                    )}
+                    <span>Appearance</span>
+                  </div>
+                  <span className="text-[10px] font-medium text-slate-600 dark:text-zinc-300 capitalize bg-slate-100 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700/60 px-1.5 py-0.5 rounded">
+                    {resolvedTheme}
+                  </span>
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
-      </div>
       </div>
     </header>
   );

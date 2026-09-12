@@ -193,13 +193,13 @@ export const LLMPromptSettingsCard: React.FC<LLMPromptSettingsCardProps> = ({
       {/* Section Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
         <div className="flex items-center gap-2.5">
-          <div className="p-1.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20 shrink-0">
+          <div className="p-1.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 shrink-0">
             <Sliders className="w-4 h-4" />
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-sm font-semibold text-zinc-100">LLM Prompt Engineering &amp; Directives</h2>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-950/60 text-amber-300 border border-amber-700/50">
+              <span className="prompt-active-badge px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-900 border border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-700/50">
                 Active for all LLMs
               </span>
             </div>
@@ -214,10 +214,10 @@ export const LLMPromptSettingsCard: React.FC<LLMPromptSettingsCardProps> = ({
           <button
             type="button"
             onClick={handleApplyQwenPreset}
-            className="px-2.5 py-1.5 text-xs font-medium bg-amber-950/40 hover:bg-amber-900/60 text-amber-300 hover:text-amber-100 border border-amber-700/60 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+            className="prompt-preset-qwen-btn px-2.5 py-1.5 text-xs font-medium bg-amber-100 hover:bg-amber-200/90 text-amber-900 hover:text-amber-950 border border-amber-300 hover:border-amber-400 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs dark:bg-amber-950/40 dark:hover:bg-amber-900/60 dark:text-amber-300 dark:hover:text-amber-100 dark:border-amber-700/60"
             title="Load optimized prompt for Qwen 3.6 (anti-preamble rules + T=0.45)"
           >
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <Sparkles className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
             <span>Qwen 3.6 Preset</span>
           </button>
 
@@ -245,8 +245,8 @@ export const LLMPromptSettingsCard: React.FC<LLMPromptSettingsCardProps> = ({
       {/* Dynamic Placeholder Insertion Chips */}
       <div className="space-y-1.5">
         <div className="flex items-center justify-between text-xs text-zinc-400">
-          <span className="font-medium flex items-center gap-1.5">
-            <Code className="w-3.5 h-3.5 text-amber-400" />
+          <span className="font-medium flex items-center gap-1.5 text-zinc-700 dark:text-zinc-300">
+            <Code className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
             Dynamic Template Variables:
           </span>
           <span className="text-[11px] text-zinc-500">Click any tag below to insert into prompt at cursor</span>
@@ -257,11 +257,11 @@ export const LLMPromptSettingsCard: React.FC<LLMPromptSettingsCardProps> = ({
               key={v.tag}
               type="button"
               onClick={() => handleInsertVariable(v.tag)}
-              className="px-2.5 py-1 rounded-lg text-xs font-mono bg-zinc-950 hover:bg-zinc-800 text-amber-300 hover:text-amber-200 border border-zinc-700 hover:border-amber-600/60 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+              className="prompt-variable-pill px-2.5 py-1 rounded-lg text-xs font-mono transition-all flex items-center gap-1.5 cursor-pointer shadow-xs bg-amber-50 hover:bg-amber-100/90 text-amber-900 border border-amber-200 hover:border-amber-300 dark:bg-zinc-950 dark:hover:bg-zinc-800 dark:text-amber-300 dark:hover:text-amber-200 dark:border-zinc-700 dark:hover:border-amber-600/60"
               title={v.desc}
             >
-              <span>{v.tag}</span>
-              <span className="text-[10px] text-zinc-400 font-sans">({v.label})</span>
+              <span className="pill-tag font-semibold text-amber-800 dark:text-amber-300">{v.tag}</span>
+              <span className="pill-label text-[10px] text-zinc-600 dark:text-zinc-400 font-sans">({v.label})</span>
             </button>
           ))}
         </div>
@@ -273,7 +273,7 @@ export const LLMPromptSettingsCard: React.FC<LLMPromptSettingsCardProps> = ({
           <label className="font-medium text-zinc-300 flex items-center gap-1.5">
             System Prompt Template
             {activePrompt !== DEFAULT_SYSTEM_PROMPT && (
-              <span className="text-[10px] text-amber-400 bg-amber-950/50 border border-amber-800/60 px-1.5 py-0.2 rounded font-normal">
+              <span className="text-[10px] font-medium text-amber-800 bg-amber-100 border border-amber-300 dark:text-amber-400 dark:bg-amber-950/50 dark:border-amber-800/60 px-1.5 py-0.2 rounded">
                 Modified
               </span>
             )}
@@ -303,7 +303,7 @@ export const LLMPromptSettingsCard: React.FC<LLMPromptSettingsCardProps> = ({
           <div className="flex items-center justify-between">
             <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
               <span>Sampling Temperature</span>
-              <span className="font-mono text-xs text-amber-400 font-semibold bg-amber-950/50 px-2 py-0.5 rounded-md border border-amber-800/40">
+              <span className="font-mono text-xs text-amber-800 bg-amber-100 border-amber-300 dark:text-amber-400 dark:bg-amber-950/50 dark:border-amber-800/40 font-semibold px-2 py-0.5 rounded-md border">
                 {activeTemperature.toFixed(2)}
               </span>
             </label>
@@ -315,8 +315,8 @@ export const LLMPromptSettingsCard: React.FC<LLMPromptSettingsCardProps> = ({
                 onClick={() => handleUpdateConfig({ llm_temperature: 0.2 })}
                 className={`px-1.5 py-0.5 rounded cursor-pointer border ${
                   activeTemperature === 0.2 
-                    ? "bg-amber-500/20 text-amber-300 border-amber-600/50" 
-                    : "text-zinc-400 hover:text-zinc-200 border-transparent hover:bg-zinc-800"
+                    ? "bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-600/50" 
+                    : "text-zinc-600 hover:text-zinc-900 hover:bg-slate-100 dark:text-zinc-400 dark:hover:text-zinc-200 border-transparent dark:hover:bg-zinc-800"
                 }`}
               >
                 Strict (0.2)
@@ -326,8 +326,8 @@ export const LLMPromptSettingsCard: React.FC<LLMPromptSettingsCardProps> = ({
                 onClick={() => handleUpdateConfig({ llm_temperature: 0.45 })}
                 className={`px-1.5 py-0.5 rounded cursor-pointer border ${
                   activeTemperature === 0.45 
-                    ? "bg-amber-500/20 text-amber-300 border-amber-600/50" 
-                    : "text-zinc-400 hover:text-zinc-200 border-transparent hover:bg-zinc-800"
+                    ? "bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-600/50" 
+                    : "text-zinc-600 hover:text-zinc-900 hover:bg-slate-100 dark:text-zinc-400 dark:hover:text-zinc-200 border-transparent dark:hover:bg-zinc-800"
                 }`}
               >
                 Qwen (0.45)
@@ -337,8 +337,8 @@ export const LLMPromptSettingsCard: React.FC<LLMPromptSettingsCardProps> = ({
                 onClick={() => handleUpdateConfig({ llm_temperature: 0.7 })}
                 className={`px-1.5 py-0.5 rounded cursor-pointer border ${
                   activeTemperature === 0.7 
-                    ? "bg-amber-500/20 text-amber-300 border-amber-600/50" 
-                    : "text-zinc-400 hover:text-zinc-200 border-transparent hover:bg-zinc-800"
+                    ? "bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-600/50" 
+                    : "text-zinc-600 hover:text-zinc-900 hover:bg-slate-100 dark:text-zinc-400 dark:hover:text-zinc-200 border-transparent dark:hover:bg-zinc-800"
                 }`}
               >
                 Creative (0.7)
