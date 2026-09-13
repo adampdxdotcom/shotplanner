@@ -5,6 +5,141 @@ import { ParsedWorkflowData, WorkflowNodeInfo } from "../types";
 import { assembleFinalPrompt, hasSceneReferencePhoto } from "../utils/formatters";
 import { assetService } from "./assetService";
 
+// Helper to accurately identify true image loader nodes
+export function isExactImageLoader(classType: string, title?: string): boolean {
+  const ct = (classType || "").trim();
+  const t = (title || "").trim().toLowerCase();
+
+  // Exclude latent generators, scalers, previews, saves, blends, crops, upscalers, converters
+  if (/latent|save|preview|scale|crop|blend|upscale|filter|transform|convert|composite/i.test(ct)) {
+    return false;
+  }
+
+  // Known ComfyUI image loader nodes
+  if ([
+    "LoadImage",
+    "LoadImageMask",
+    "LoadImageFromUrl",
+    "LoadImageBase64",
+    "LoadImageOutput",
+    "CR Load Image",
+    "LoadImagePath"
+  ].includes(ct)) {
+    return true;
+  }
+
+  if (/^LoadImage/i.test(ct) || /^ImageLoader/i.test(ct)) {
+    return true;
+  }
+
+  if (t === "load image" || t.startsWith("load image")) {
+    return true;
+  }
+
+  return false;
+}
+
+// Helper to accurately identify true video loader nodes
+export function isExactVideoLoader(classType: string, title?: string): boolean {
+  const ct = (classType || "").trim();
+  const t = (title || "").trim().toLowerCase();
+
+  if (/save|combine|preview|linear|cfg|encode|decode/i.test(ct)) {
+    return false;
+  }
+
+  if ([
+    "LoadVideo",
+    "VHS_LoadVideo",
+    "VHS_LoadVideoPath",
+    "VHS_LoadVideoFFmpeg",
+    "LoadVideoPath"
+  ].includes(ct)) {
+    return true;
+  }
+
+  if (/^LoadVideo/i.test(ct) || /^VideoLoader/i.test(ct) || /^VHS_LoadVideo/i.test(ct)) {
+    return true;
+  }
+
+  if (t === "load video" || t.startsWith("load video")) {
+    return true;
+  }
+
+  return false;
+}
+
+// Helper to accurately identify true audio loader nodes
+export function isExactAudioLoader(classType: string, title?: string): boolean {
+  const ct = (classType || "").trim();
+  const t = (title || "").trim().toLowerCase();
+
+  // Exclude loaders of models like AudioVAELoader, AudioModelLoader, SaveAudio
+  if (/vae|model|save|preview|combine|filter/i.test(ct)) {
+    return false;
+  }
+
+  if ([
+    "LoadAudio",
+    "VHS_LoadAudio",
+    "LoadAudioPath"
+  ].includes(ct)) {
+    return true;
+  }
+
+  if (/^LoadAudio/i.test(ct) || /^AudioLoader/i.test(ct) || /^VHS_LoadAudio/i.test(ct)) {
+    return true;
+  }
+
+  if (t === "load audio" || t.startsWith("load audio")) {
+    return true;
+  }
+
+  return false;
+}
+
+// Helper to accurately identify positive prompt nodes
+export function isExactPromptNode(classType: string, title?: string): boolean {
+  const ct = (classType || "").trim();
+  const t = (title || "").trim().toLowerCase();
+
+  // Never treat negative prompt nodes as positive prompt
+  if (t.includes("negative") || t.includes("neg prompt")) {
+    return false;
+  }
+
+  if ([
+    "PrimitiveStringMultiline",
+    "CLIPTextEncode",
+    "CLIPTextEncodeFlux",
+    "CLIPTextEncodeSDXL",
+    "StringLiteral",
+    "ShowText"
+  ].includes(ct)) {
+    return true;
+  }
+
+  if (t === "prompt" || t.includes("positive prompt") || t.includes("input text (prompt)") || t === "input prompt") {
+    return true;
+  }
+
+  return false;
+}
+
+// Helper to accurately identify save video output nodes
+export function isSaveVideoNode(classType: string, title?: string): boolean {
+  const ct = (classType || "").trim();
+  const t = (title || "").trim().toLowerCase();
+
+  if (ct === "SaveVideo" || ct === "VHS_VideoCombine") {
+    return true;
+  }
+  if (t === "save video" || t.includes("save generated video") || t === "savevideo") {
+    return true;
+  }
+  return false;
+}
+
 export function parseWorkflowData(workflow: any): ParsedWorkflowData {
   const promptNodes: WorkflowNodeInfo[] = [];
   const imageLoaderNodes: WorkflowNodeInfo[] = [];
@@ -41,20 +176,12 @@ export function parseWorkflowData(workflow: any): ParsedWorkflowData {
       };
 
       // Check for Prompt Nodes
-      if (
-        ["PrimitiveStringMultiline", "CLIPTextEncode", "StringLiteral", "ShowText"].includes(classType) ||
-        metaTitle.toLowerCase().includes("prompt")
-      ) {
+      if (isExactPromptNode(classType, metaTitle)) {
         const currentVal = widgetsValues.length > 0 ? widgetsValues[0] : "";
         promptNodes.push({ ...nodeInfo, current_value: typeof currentVal === "string" ? currentVal : "" });
       }
       // Check for Image Loader Nodes
-      else if (
-        ["LoadImage", "LoadImageMask", "LoadImageFromUrl", "LoadImageBase64"].includes(classType) ||
-        (classType.toLowerCase().includes("image") &&
-          !classType.toLowerCase().includes("save") &&
-          !classType.toLowerCase().includes("preview"))
-      ) {
+      else if (isExactImageLoader(classType, metaTitle)) {
         let currentFile = "example.png";
         if (widgetsValues.length > 0 && typeof widgetsValues[0] === "string") {
           currentFile = widgetsValues[0];
@@ -63,66 +190,48 @@ export function parseWorkflowData(workflow: any): ParsedWorkflowData {
         }
         imageLoaderNodes.push({ ...nodeInfo, current_file: currentFile });
       }
-      // Check for Video Nodes
-      else if (
-        ["LoadVideo", "VHS_LoadVideo", "VHS_LoadVideoPath"].includes(classType) ||
-        classType.toLowerCase().includes("video")
-      ) {
+      // Check for Video Loader Nodes
+      else if (isExactVideoLoader(classType, metaTitle)) {
         const currentFile = widgetsValues.length > 0 && typeof widgetsValues[0] === "string" ? widgetsValues[0] : "";
         videoLoaderNodes.push({ ...nodeInfo, current_file: currentFile });
       }
-      // Check for Audio Nodes
-      else if (
-        ["LoadAudio", "VHS_LoadAudio"].includes(classType) ||
-        classType.toLowerCase().includes("audio")
-      ) {
+      // Check for Audio Loader Nodes
+      else if (isExactAudioLoader(classType, metaTitle)) {
         const currentFile = widgetsValues.length > 0 && typeof widgetsValues[0] === "string" ? widgetsValues[0] : "";
         audioLoaderNodes.push({ ...nodeInfo, current_file: currentFile });
       } else {
         otherNodes.push(nodeInfo);
       }
 
-      // Auto-detect dynamic parameter nodes
+      // Explicit, safe parameter detection (only if specifically a steps/length/megapixels node)
+      const titleLower = metaTitle.toLowerCase();
       if (
         detectedNodes.steps === null &&
-        (classType.toLowerCase().includes("step") ||
-          classType.toLowerCase().includes("sampler") ||
-          classType.toLowerCase().includes("videolength"))
+        (titleLower === "steps" || titleLower.includes("step count") || (node.widgets_values_named && "steps" in node.widgets_values_named))
       ) {
         detectedNodes.steps = nodeId;
-        if (widgetsValues.length > 0) detectedValues.steps = widgetsValues[0];
+        if (node.widgets_values_named && typeof node.widgets_values_named.steps === "number") {
+          detectedValues.steps = node.widgets_values_named.steps;
+        }
       }
       if (
         detectedNodes.megapixels === null &&
-        (classType.toLowerCase().includes("megapixel") || classType.toLowerCase().includes("resolution"))
+        (titleLower.includes("megapixel") || (node.widgets_values_named && "megapixels" in node.widgets_values_named))
       ) {
         detectedNodes.megapixels = nodeId;
-        if (widgetsValues.length > 0) detectedValues.megapixels = widgetsValues[0];
+        if (node.widgets_values_named && typeof node.widgets_values_named.megapixels === "number") {
+          detectedValues.megapixels = node.widgets_values_named.megapixels;
+        }
       }
-
-      // Broad duration/frame pattern matching
-      const durationKeywords = ["frame", "length", "duration", "videolength", "emptylatent", "latentvideo", "vhs", "minimax"];
-      const isDurationCandidate = durationKeywords.some(
-        (kw) => classType.toLowerCase().includes(kw) || metaTitle.toLowerCase().includes(kw)
-      );
-
-      if (detectedNodes.frames === null && isDurationCandidate) {
+      if (
+        detectedNodes.frames === null &&
+        (classType === "VideoLengthConfig" || titleLower.includes("video length") || titleLower.includes("frame count") || (node.widgets_values_named && ("frames" in node.widgets_values_named || "length" in node.widgets_values_named)))
+      ) {
         detectedNodes.frames = nodeId;
-        let foundVal: any = null;
-        if (node.widgets_values_named && typeof node.widgets_values_named === "object") {
-          for (const k of ["frames", "length", "num_frames", "duration", "frame_count", "video_length", "videolength", "latentvideo", "emptylatent", "vhs", "minimax", "value", "int", "count", "amount"]) {
-            if (k in node.widgets_values_named && typeof node.widgets_values_named[k] === "number") {
-              foundVal = node.widgets_values_named[k];
-              break;
-            }
-          }
-        }
-        if (foundVal === null) {
-          if (widgetsValues.length > 1 && typeof widgetsValues[1] === "number") foundVal = widgetsValues[1];
-          else if (widgetsValues.length > 0 && typeof widgetsValues[0] === "number") foundVal = widgetsValues[0];
-        }
-        if (foundVal !== null) {
-          detectedValues.frames = foundVal;
+        if (node.widgets_values_named) {
+          detectedValues.frames = node.widgets_values_named.frames ?? node.widgets_values_named.length;
+        } else if (classType === "VideoLengthConfig" && widgetsValues.length > 1) {
+          detectedValues.frames = widgetsValues[1];
         }
       }
     }
@@ -148,13 +257,13 @@ export function parseWorkflowData(workflow: any): ParsedWorkflowData {
     const inputs = nodeData.inputs || {};
     const nodeInfo: WorkflowNodeInfo = { id: String(nodeId), class_type: classType, title, inputs };
 
-    if (["PrimitiveStringMultiline", "CLIPTextEncode", "StringLiteral", "ShowText"].includes(classType)) {
+    if (isExactPromptNode(classType, title)) {
       promptNodes.push({ ...nodeInfo, current_value: inputs.value ?? inputs.text ?? "" });
-    } else if (["LoadImage", "LoadImageMask", "LoadImageFromUrl", "LoadImageBase64"].includes(classType)) {
+    } else if (isExactImageLoader(classType, title)) {
       imageLoaderNodes.push({ ...nodeInfo, current_file: inputs.image || "example.png" });
-    } else if (["LoadVideo", "VHS_LoadVideo", "VHS_LoadVideoPath"].includes(classType)) {
+    } else if (isExactVideoLoader(classType, title)) {
       videoLoaderNodes.push({ ...nodeInfo, current_file: inputs.video || "" });
-    } else if (["LoadAudio", "VHS_LoadAudio"].includes(classType)) {
+    } else if (isExactAudioLoader(classType, title)) {
       audioLoaderNodes.push({ ...nodeInfo, current_file: inputs.audio || "" });
     } else {
       otherNodes.push(nodeInfo);
@@ -168,31 +277,13 @@ export function parseWorkflowData(workflow: any): ParsedWorkflowData {
       detectedNodes.megapixels = String(nodeId);
       detectedValues.megapixels = inputs.megapixels;
     }
-    const durationKeywords = ["frame", "length", "duration", "videolength", "emptylatent", "latentvideo", "vhs", "minimax"];
-    const isDurationCandidate = durationKeywords.some(
-      (kw) => classType.toLowerCase().includes(kw) || title.toLowerCase().includes(kw)
-    );
-
     if (detectedNodes.frames === null && inputs && typeof inputs === "object") {
-      let matchedKey: string | null = null;
-      for (const frameKey of ["frames", "length", "num_frames", "duration", "frame_count", "video_length", "videolength", "latentvideo", "emptylatent", "vhs", "minimax", "value", "int"]) {
-        if (frameKey in inputs) {
-          matchedKey = frameKey;
-          break;
-        }
-      }
-      if (matchedKey || isDurationCandidate) {
+      if ("frames" in inputs) {
         detectedNodes.frames = String(nodeId);
-        if (matchedKey && typeof inputs[matchedKey] === "number") {
-          detectedValues.frames = inputs[matchedKey];
-        } else {
-          for (const [k, v] of Object.entries(inputs)) {
-            if (typeof v === "number") {
-              detectedValues.frames = v;
-              break;
-            }
-          }
-        }
+        detectedValues.frames = inputs.frames;
+      } else if (classType === "VideoLengthConfig" && "length" in inputs) {
+        detectedNodes.frames = String(nodeId);
+        detectedValues.frames = inputs.length;
       }
     }
   }
@@ -233,36 +324,42 @@ export function injectAndPrepareWorkflowData(
 
   // Case 1: Visual Canvas Format ({"nodes": [...], "links": [...]})
   if (modifiedWf && typeof modifiedWf === "object" && Array.isArray(modifiedWf.nodes)) {
+    // 1. Identify specific prompt target node upfront
+    let targetPromptId: string | null = null;
+    if (promptNodeId) {
+      targetPromptId = String(promptNodeId);
+    } else {
+      const pNode = modifiedWf.nodes.find((n: any) => n && isExactPromptNode(String(n.type ?? ""), String(n.title ?? "")));
+      if (pNode) targetPromptId = String(pNode.id ?? "");
+    }
+
     for (const node of modifiedWf.nodes) {
       if (!node || typeof node !== "object") continue;
       const strId = String(node.id ?? "");
       const classType = String(node.type ?? "");
+      const metaTitle = String(node.title ?? "");
 
-      // Prompt Node
-      if (
-        (promptNodeId && strId === String(promptNodeId)) ||
-        (!promptNodeId && (["PrimitiveStringMultiline", "CLIPTextEncode", "StringLiteral", "ShowText"].includes(classType) || String(node.title || "").toLowerCase().includes("prompt")))
-      ) {
-        if (finalPrompt) {
-          if (Array.isArray(node.widgets_values) && node.widgets_values.length > 0) {
-            node.widgets_values[0] = finalPrompt;
-          } else {
-            node.widgets_values = [finalPrompt];
-          }
-          if (node.widgets_values_named && typeof node.widgets_values_named === "object") {
-            node.widgets_values_named.value = finalPrompt;
-            node.widgets_values_named.text = finalPrompt;
-          }
+      // Designated Prompt Node Injection
+      if (targetPromptId && strId === targetPromptId && finalPrompt) {
+        if (Array.isArray(node.widgets_values) && node.widgets_values.length > 0) {
+          node.widgets_values[0] = finalPrompt;
+        } else {
+          node.widgets_values = [finalPrompt];
+        }
+        if (node.widgets_values_named && typeof node.widgets_values_named === "object") {
+          node.widgets_values_named.value = finalPrompt;
+          node.widgets_values_named.text = finalPrompt;
         }
       }
 
-      // Image Loaders
-      if (
-        ["LoadImage", "LoadImageMask", "LoadImageFromUrl", "LoadImageBase64"].includes(classType) ||
-        classType.toLowerCase().includes("image") ||
-        strId in nodeMappings
-      ) {
-        if (nodeMappings[strId] && String(nodeMappings[strId]).trim()) {
+      const isImgLoader = isExactImageLoader(classType, metaTitle);
+      const isVidLoader = isExactVideoLoader(classType, metaTitle);
+      const isAudLoader = isExactAudioLoader(classType, metaTitle);
+      const hasExplicitMapping = Boolean(nodeMappings && strId in nodeMappings && nodeMappings[strId] && String(nodeMappings[strId]).trim());
+
+      // Image Loaders & Explicitly mapped image nodes
+      if (isImgLoader || (hasExplicitMapping && !isVidLoader && !isAudLoader)) {
+        if (hasExplicitMapping) {
           const assigned = String(nodeMappings[strId]).trim();
           if (Array.isArray(node.widgets_values) && node.widgets_values.length > 0) {
             node.widgets_values[0] = assigned;
@@ -275,26 +372,24 @@ export function injectAndPrepareWorkflowData(
           if (node.mode === 2 || node.mode === 4) {
             node.mode = 0;
           }
-        } else {
-          // Unassigned slot -> bypass with empty.png
-          if (bypassMissing) {
-            if (Array.isArray(node.widgets_values) && node.widgets_values.length > 0) {
-              if (!node.widgets_values[0] || node.widgets_values[0] === "example.png") {
-                node.widgets_values[0] = placeholder;
-              }
-            } else {
-              node.widgets_values = [placeholder, "image"];
+        } else if (isImgLoader && bypassMissing) {
+          // Only bypass true unassigned image loaders
+          if (Array.isArray(node.widgets_values) && node.widgets_values.length > 0) {
+            if (!node.widgets_values[0] || node.widgets_values[0] === "example.png") {
+              node.widgets_values[0] = placeholder;
             }
-            if (node.widgets_values_named && typeof node.widgets_values_named === "object") {
-              node.widgets_values_named.image = placeholder;
-            }
+          } else {
+            node.widgets_values = [placeholder, "image"];
+          }
+          if (node.widgets_values_named && typeof node.widgets_values_named === "object") {
+            node.widgets_values_named.image = placeholder;
           }
         }
       }
 
       // Video Loaders
-      else if (["LoadVideo", "VHS_LoadVideo", "VHS_LoadVideoPath"].includes(classType)) {
-        if (nodeMappings[strId] && String(nodeMappings[strId]).trim()) {
+      else if (isVidLoader) {
+        if (hasExplicitMapping) {
           const assigned = String(nodeMappings[strId]).trim();
           if (Array.isArray(node.widgets_values) && node.widgets_values.length > 0) {
             node.widgets_values[0] = assigned;
@@ -313,8 +408,8 @@ export function injectAndPrepareWorkflowData(
       }
 
       // Audio Loaders
-      else if (["LoadAudio", "VHS_LoadAudio"].includes(classType)) {
-        if (nodeMappings[strId] && String(nodeMappings[strId]).trim()) {
+      else if (isAudLoader) {
+        if (hasExplicitMapping) {
           const assigned = String(nodeMappings[strId]).trim();
           if (Array.isArray(node.widgets_values) && node.widgets_values.length > 0) {
             node.widgets_values[0] = assigned;
@@ -332,62 +427,57 @@ export function injectAndPrepareWorkflowData(
         }
       }
 
-      // Generation Parameter Overrides (Visual Canvas)
+      // Generation Parameter Overrides: ONLY if this specific node ID was explicitly mapped
       if (parameterOverrides && parameterNodeMappings) {
-        if (parameterNodeMappings.steps === strId && parameterOverrides.steps !== undefined) {
+        if (parameterNodeMappings.steps && String(parameterNodeMappings.steps) === strId && parameterOverrides.steps !== undefined && parameterOverrides.steps !== null) {
           const val = parseInt(String(parameterOverrides.steps), 10);
           if (!isNaN(val)) {
-            if (Array.isArray(node.widgets_values) && node.widgets_values.length > 0) {
-              node.widgets_values[0] = val;
-            } else {
-              node.widgets_values = [val];
-            }
-            if (node.widgets_values_named && typeof node.widgets_values_named === "object") {
+            if (node.widgets_values_named && typeof node.widgets_values_named === "object" && "steps" in node.widgets_values_named) {
               node.widgets_values_named.steps = val;
+            } else if (classType === "KSampler" || classType === "KSamplerAdvanced") {
+              if (Array.isArray(node.widgets_values) && node.widgets_values.length > 2) {
+                node.widgets_values[2] = val;
+              }
+            } else if (Array.isArray(node.widgets_values) && node.widgets_values.length === 1) {
+              node.widgets_values[0] = val;
             }
           }
         }
-        if (parameterNodeMappings.megapixels === strId && parameterOverrides.megapixels !== undefined) {
+        if (parameterNodeMappings.megapixels && String(parameterNodeMappings.megapixels) === strId && parameterOverrides.megapixels !== undefined && parameterOverrides.megapixels !== null) {
           const val = parseFloat(String(parameterOverrides.megapixels));
           if (!isNaN(val)) {
-            if (Array.isArray(node.widgets_values) && node.widgets_values.length > 0) {
-              node.widgets_values[0] = val;
-            } else {
-              node.widgets_values = [val];
-            }
-            if (node.widgets_values_named && typeof node.widgets_values_named === "object") {
+            if (node.widgets_values_named && typeof node.widgets_values_named === "object" && "megapixels" in node.widgets_values_named) {
               node.widgets_values_named.megapixels = val;
+            } else if (Array.isArray(node.widgets_values) && node.widgets_values.length === 1) {
+              node.widgets_values[0] = val;
             }
           }
         }
-        if (parameterNodeMappings.frames === strId && parameterOverrides.frames !== undefined) {
+        if (parameterNodeMappings.frames && String(parameterNodeMappings.frames) === strId && parameterOverrides.frames !== undefined && parameterOverrides.frames !== null) {
           const val = parseInt(String(parameterOverrides.frames), 10);
           if (!isNaN(val)) {
-            if (Array.isArray(node.widgets_values)) {
-              if (node.widgets_values.length > 1) node.widgets_values[1] = val;
-              else if (node.widgets_values.length > 0) node.widgets_values[0] = val;
-              else node.widgets_values = [val];
-            }
             if (node.widgets_values_named && typeof node.widgets_values_named === "object") {
-              for (const k of ["frames", "length", "num_frames", "duration", "frame_count"]) {
+              for (const k of ["frames", "length", "num_frames", "duration", "frame_count", "video_length"]) {
                 if (k in node.widgets_values_named) {
                   node.widgets_values_named[k] = val;
                   break;
                 }
               }
+            } else if (classType === "VideoLengthConfig") {
+              if (Array.isArray(node.widgets_values) && node.widgets_values.length > 1) {
+                node.widgets_values[1] = val;
+              } else if (Array.isArray(node.widgets_values) && node.widgets_values.length === 1) {
+                node.widgets_values[0] = val;
+              }
+            } else if (Array.isArray(node.widgets_values) && node.widgets_values.length === 1) {
+              node.widgets_values[0] = val;
             }
           }
         }
       }
 
       // SaveVideo Node Target Detection & Filename Prefix Injection
-      const isSaveVideoNode =
-        classType === "SaveVideo" ||
-        node.type === "SaveVideo" ||
-        strId === "92" ||
-        (node.title && String(node.title).toLowerCase().includes("save video"));
-
-      if (isSaveVideoNode && saveVideoPrefix && saveVideoPrefix.trim()) {
+      if (isSaveVideoNode(classType, metaTitle) && saveVideoPrefix && saveVideoPrefix.trim()) {
         const cleanSavePrefix = saveVideoPrefix.trim();
         if (Array.isArray(node.widgets_values) && node.widgets_values.length > 0) {
           node.widgets_values[0] = cleanSavePrefix;
@@ -404,8 +494,20 @@ export function injectAndPrepareWorkflowData(
   }
 
   // Case 2: Flat API Dictionary format
+  let targetPromptId: string | null = null;
   if (promptNodeId && modifiedWf[promptNodeId]) {
-    const pNode = modifiedWf[promptNodeId];
+    targetPromptId = String(promptNodeId);
+  } else {
+    for (const [nId, nData] of Object.entries<any>(modifiedWf)) {
+      if (nData && isExactPromptNode(nData.class_type || "", nData._meta?.title || "")) {
+        targetPromptId = String(nId);
+        break;
+      }
+    }
+  }
+
+  if (targetPromptId && modifiedWf[targetPromptId] && finalPrompt) {
+    const pNode = modifiedWf[targetPromptId];
     pNode.inputs = pNode.inputs || {};
     if ("value" in pNode.inputs || pNode.class_type === "PrimitiveStringMultiline") {
       pNode.inputs.value = finalPrompt;
@@ -419,34 +521,36 @@ export function injectAndPrepareWorkflowData(
   for (const [nodeId, nodeData] of Object.entries<any>(modifiedWf)) {
     if (!nodeData || typeof nodeData !== "object") continue;
     const classType = nodeData.class_type || "";
+    const metaTitle = nodeData._meta?.title || "";
     nodeData.inputs = nodeData.inputs || {};
 
-    if (["LoadImage", "LoadImageMask", "LoadImageFromUrl", "LoadImageBase64"].includes(classType)) {
-      if (nodeMappings[nodeId] && String(nodeMappings[nodeId]).trim()) {
+    const isImg = isExactImageLoader(classType, metaTitle);
+    const isVid = isExactVideoLoader(classType, metaTitle);
+    const isAud = isExactAudioLoader(classType, metaTitle);
+    const hasExplicitMapping = Boolean(nodeMappings && nodeId in nodeMappings && nodeMappings[nodeId] && String(nodeMappings[nodeId]).trim());
+
+    if (isImg || (hasExplicitMapping && !isVid && !isAud)) {
+      if (hasExplicitMapping) {
         nodeData.inputs.image = String(nodeMappings[nodeId]).trim();
-      } else {
+      } else if (isImg && bypassMissing) {
         const currentImg = nodeData.inputs.image;
-        if (!currentImg || currentImg === "example.png" || bypassMissing) {
+        if (!currentImg || currentImg === "example.png") {
           nodeData.inputs.image = placeholder;
         }
       }
-    } else if (["LoadVideo", "VHS_LoadVideo", "VHS_LoadVideoPath"].includes(classType)) {
-      if (nodeMappings[nodeId] && String(nodeMappings[nodeId]).trim()) {
+    } else if (isVid) {
+      if (hasExplicitMapping) {
         nodeData.inputs.video = String(nodeMappings[nodeId]).trim();
       } else if (bypassMissing && (!nodeData.inputs.video || String(nodeData.inputs.video).includes("default"))) {
         nodeData.inputs.video = placeholder;
       }
-    } else if (["LoadAudio", "VHS_LoadAudio"].includes(classType)) {
-      if (nodeMappings[nodeId] && String(nodeMappings[nodeId]).trim()) {
+    } else if (isAud) {
+      if (hasExplicitMapping) {
         nodeData.inputs.audio = String(nodeMappings[nodeId]).trim();
       } else if (bypassMissing && (!nodeData.inputs.audio || String(nodeData.inputs.audio).includes("default"))) {
         nodeData.inputs.audio = placeholder;
       }
-    } else if (
-      classType === "SaveVideo" ||
-      nodeId === "92" ||
-      (nodeData._meta && String(nodeData._meta.title).toLowerCase().includes("save video"))
-    ) {
+    } else if (isSaveVideoNode(classType, metaTitle)) {
       if (saveVideoPrefix && saveVideoPrefix.trim()) {
         nodeData.inputs.filename_prefix = saveVideoPrefix.trim();
       }
@@ -454,27 +558,42 @@ export function injectAndPrepareWorkflowData(
   }
 
   if (parameterOverrides && parameterNodeMappings) {
-    if (parameterNodeMappings.steps && modifiedWf[parameterNodeMappings.steps] && parameterOverrides.steps !== undefined) {
+    if (parameterNodeMappings.steps && modifiedWf[parameterNodeMappings.steps] && parameterOverrides.steps !== undefined && parameterOverrides.steps !== null) {
       const sNode = modifiedWf[parameterNodeMappings.steps];
       sNode.inputs = sNode.inputs || {};
-      sNode.inputs.steps = Number(parameterOverrides.steps);
+      const val = parseInt(String(parameterOverrides.steps), 10);
+      if (!isNaN(val)) {
+        if ("steps" in sNode.inputs) sNode.inputs.steps = val;
+        else if ("value" in sNode.inputs) sNode.inputs.value = val;
+      }
     }
-    if (parameterNodeMappings.megapixels && modifiedWf[parameterNodeMappings.megapixels] && parameterOverrides.megapixels !== undefined) {
+    if (parameterNodeMappings.megapixels && modifiedWf[parameterNodeMappings.megapixels] && parameterOverrides.megapixels !== undefined && parameterOverrides.megapixels !== null) {
       const mNode = modifiedWf[parameterNodeMappings.megapixels];
       mNode.inputs = mNode.inputs || {};
-      mNode.inputs.megapixels = Number(parameterOverrides.megapixels);
+      const val = parseFloat(String(parameterOverrides.megapixels));
+      if (!isNaN(val)) {
+        if ("megapixels" in mNode.inputs) mNode.inputs.megapixels = val;
+        else if ("value" in mNode.inputs) mNode.inputs.value = val;
+      }
     }
-    if (parameterNodeMappings.frames && modifiedWf[parameterNodeMappings.frames] && parameterOverrides.frames !== undefined) {
+    if (parameterNodeMappings.frames && modifiedWf[parameterNodeMappings.frames] && parameterOverrides.frames !== undefined && parameterOverrides.frames !== null) {
       const fNode = modifiedWf[parameterNodeMappings.frames];
       fNode.inputs = fNode.inputs || {};
-      let matchedKey = "frames";
-      for (const k of ["frames", "length", "num_frames", "duration", "frame_count", "video_length", "videolength", "latentvideo", "emptylatent", "vhs", "minimax", "value", "int"]) {
-        if (k in fNode.inputs) {
-          matchedKey = k;
-          break;
+      const val = parseInt(String(parameterOverrides.frames), 10);
+      if (!isNaN(val)) {
+        let matchedKey: string | null = null;
+        for (const k of ["frames", "length", "num_frames", "duration", "frame_count", "video_length"]) {
+          if (k in fNode.inputs) {
+            matchedKey = k;
+            break;
+          }
+        }
+        if (matchedKey) {
+          fNode.inputs[matchedKey] = val;
+        } else if ("value" in fNode.inputs) {
+          fNode.inputs.value = val;
         }
       }
-      fNode.inputs[matchedKey] = Number(parameterOverrides.frames);
     }
   }
 
@@ -669,15 +788,10 @@ export function buildShotWorkflow(
     projectData.generation_parameters ||
     projectData.generation_params ||
     projectData.generationParams ||
-    projectData.parameter_overrides ||
-    { steps: 30, megapixels: 0.5, frames: 81 };
+    projectData.parameter_overrides;
 
-  const effectiveParams: Record<string, any> = { steps: 30, megapixels: 0.5, frames: 81 };
-  const effectiveParamNodes: Record<string, string> = {
-    steps: detectedNodes.steps || "",
-    megapixels: detectedNodes.megapixels || "",
-    frames: detectedNodes.frames || ""
-  };
+  const effectiveParams: Record<string, any> = {};
+  const effectiveParamNodes: Record<string, string> = {};
 
   const explicitParamNodes =
     shot.parameter_node_mappings ||
@@ -688,6 +802,10 @@ export function buildShotWorkflow(
     Object.entries(explicitParamNodes).forEach(([pk, pn]) => {
       if (pn) effectiveParamNodes[pk] = String(pn);
     });
+  } else if (detectedNodes) {
+    if (detectedNodes.steps) effectiveParamNodes.steps = detectedNodes.steps;
+    if (detectedNodes.megapixels) effectiveParamNodes.megapixels = detectedNodes.megapixels;
+    if (detectedNodes.frames) effectiveParamNodes.frames = detectedNodes.frames;
   }
 
   if (rawParams && typeof rawParams === "object") {

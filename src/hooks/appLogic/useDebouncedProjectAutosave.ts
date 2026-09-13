@@ -100,10 +100,14 @@ export function useDebouncedProjectAutosave({
       const rawPayload: SceneProjectFile = {
         ...project,
         lm_studio_url: latestConfigRef.current.lm_studio_url,
+        vision_enabled: Boolean(latestConfigRef.current.vision_enabled),
+        auto_caption_enabled: Boolean(latestConfigRef.current.auto_caption_enabled),
         config: {
           ...(project.config || {}),
           ...latestConfigRef.current,
           lm_studio_url: latestConfigRef.current.lm_studio_url,
+          vision_enabled: Boolean(latestConfigRef.current.vision_enabled),
+          auto_caption_enabled: Boolean(latestConfigRef.current.auto_caption_enabled),
           gemini_api_key: "",
           civitai_api_key: "",
           huggingface_token: ""

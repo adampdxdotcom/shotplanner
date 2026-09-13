@@ -13,6 +13,7 @@ import {
 } from "../config/constants";
 import { AssetRecord } from "../types";
 import { sanitizeSlug } from "../utils/formatters";
+import { generateThumbnailFile } from "./thumbnailService";
 
 const COMPOUND_REFERENCE_TYPES = [
   "scene_location_reference",
@@ -427,7 +428,7 @@ class AssetService {
     };
   }
   
-  public handleSingleFileUpload(
+  public async handleSingleFileUpload(
     file: Express.Multer.File,
     meta: {
       media_type?: string;
@@ -439,7 +440,7 @@ class AssetService {
       slot_index?: string | number;
       scene_name?: string;
     }
-  ): AssetRecord {
+  ): Promise<AssetRecord> {
     const mediaType = (meta.media_type || "image") as "image" | "audio" | "video";
     const rawType = (meta.type || meta.asset_type || (meta as any).assetType || "").trim();
     let assetType = "Headshot";
@@ -488,6 +489,12 @@ class AssetService {
     try {
       fs.unlinkSync(file.path);
     } catch (e) {}
+
+    // Early thumbnail generation for instant UI feedback and vision captioning
+    let thumbPath: string | undefined = undefined;
+    if (mediaType === "image" || ext.match(/\.(png|jpg|jpeg|webp|gif|bmp)$/i)) {
+      thumbPath = await generateThumbnailFile(destinationPath, undefined, 384);
+    }
     
     const parsedSlotIndex =
       meta.slot_index !== undefined &&
@@ -508,6 +515,8 @@ class AssetService {
       size_bytes: file.size,
       created_at: Date.now(),
       preview_url: `/api/uploads/${targetFilename}`,
+      thumbnail_url: `/api/assets/thumb/${targetFilename}`,
+      thumbnail_path: thumbPath,
       slot_index: parsedSlotIndex,
       scene_name: sceneName,
       path: destinationPath
@@ -630,7 +639,7 @@ class AssetService {
       
       appendNext(0);
       
-      writeStream.on("finish", () => {
+      writeStream.on("finish", async () => {
         if (this.uploadChunks) {
             this.uploadChunks.delete(upload_id);
         }
@@ -652,6 +661,11 @@ class AssetService {
             try { fs.unlinkSync(oldPath); } catch (e) {}
           }
         }
+
+        let thumbPath: string | undefined = undefined;
+        if (mType === "image" || ext.match(/\.(png|jpg|jpeg|webp|gif|bmp)$/i)) {
+          thumbPath = await generateThumbnailFile(finalPath, undefined, 384);
+        }
             
         resolve({
           complete: true,
@@ -666,6 +680,8 @@ class AssetService {
             size_bytes: stats.size,
             created_at: Date.now(),
             preview_url: `/api/uploads/${targetFilename}`,
+            thumbnail_url: `/api/assets/thumb/${targetFilename}`,
+            thumbnail_path: thumbPath,
             slot_index: parsedSlotIndex,
             scene_name: resolvedSceneName,
             path: finalPath

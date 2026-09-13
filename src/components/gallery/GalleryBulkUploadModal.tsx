@@ -120,6 +120,7 @@ export const GalleryBulkUploadModal: React.FC<GalleryBulkUploadModalProps> = ({
           <div className="bg-zinc-50 dark:bg-zinc-900/60 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800/90">
             <CharacterReferencePackGrid
               slots={packSlots}
+              subjectName={bulkSubject}
               onUpdateSlot={handleUpdatePackSlot}
               onClearSlot={handleClearPackSlot}
               disabled={isBulkUploading}

@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { upload } from "../config/constants";
 import { assetService } from "../services/assetService";
+import { generateThumbnailFile } from "../services/thumbnailService";
 
 const router = Router();
 
@@ -71,13 +72,16 @@ router.delete("/:filename", (req: Request, res: Response) => {
 });
 
 // Update asset metadata
-router.put("/update", upload.single("file"), (req: Request, res: Response) => {
+router.put("/update", upload.single("file"), async (req: Request, res: Response) => {
   try {
     const filename = req.body.original_filename || req.body.filename;
     if (req.file && filename) {
       const existingPath = assetService.getAssetFilePath(filename);
       if (existingPath && fs.existsSync(existingPath)) {
-        try { fs.copyFileSync(req.file.path, existingPath); } catch (e) {}
+        try { 
+          fs.copyFileSync(req.file.path, existingPath);
+          await generateThumbnailFile(existingPath, undefined, 384);
+        } catch (e) {}
       }
     }
     const updated = assetService.updateAssetMetadata(filename, req.body);
@@ -87,13 +91,16 @@ router.put("/update", upload.single("file"), (req: Request, res: Response) => {
   }
 });
 
-router.put("/:filename", upload.single("file"), (req: Request, res: Response) => {
+router.put("/:filename", upload.single("file"), async (req: Request, res: Response) => {
   try {
     const targetFilename = req.params.filename === "update" ? (req.body.original_filename || "asset") : req.params.filename;
     if (req.file && targetFilename) {
       const existingPath = assetService.getAssetFilePath(targetFilename);
       if (existingPath && fs.existsSync(existingPath)) {
-        try { fs.copyFileSync(req.file.path, existingPath); } catch (e) {}
+        try { 
+          fs.copyFileSync(req.file.path, existingPath);
+          await generateThumbnailFile(existingPath, undefined, 384);
+        } catch (e) {}
       }
     }
     const updated = assetService.updateAssetMetadata(targetFilename, req.body);
@@ -114,10 +121,10 @@ router.post("/sync", (req: Request, res: Response) => {
 });
 
 // Single asset upload
-router.post("/upload", upload.single("file"), (req: Request, res: Response) => {
+router.post("/upload", upload.single("file"), async (req: Request, res: Response) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No media file provided" });
-    const assetRecord = assetService.handleSingleFileUpload(req.file, req.body);
+    const assetRecord = await assetService.handleSingleFileUpload(req.file, req.body);
     res.json({ success: true, asset: assetRecord });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

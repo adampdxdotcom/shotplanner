@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { MediaAsset } from "../types";
-import { UploadCloud, HardDrive, Search, Music, CheckCircle, X, AlertCircle } from "lucide-react";
+import { UploadCloud, HardDrive, Search, Music, CheckCircle, X, AlertCircle, Sparkles, Loader2, RefreshCw, Eye } from "lucide-react";
 import { SubjectCombobox } from "./SubjectCombobox";
 import { getAssetMediaUrl } from "../utils/assetUrl";
 import { 
@@ -9,6 +9,8 @@ import {
   detectActiveModifier,
   updateDescriptionWithModifier 
 } from "../utils/assetModifiers";
+import { useVisionCaption, generateCaptionForFile } from "../hooks/useVisionCaption";
+import { createManagedBlobUrl, revokeManagedBlobUrl } from "../utils/blobRegistry";
 
 interface AssetUploadModalProps {
   isOpen: boolean;
@@ -39,9 +41,16 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
   const [selectedModifier, setSelectedModifier] = useState<string>("");
   const [subjectName, setSubjectName] = useState<string>("");
   const [description, setDescription] = useState<string>("");
+  const [stagedFile, setStagedFile] = useState<File | null>(null);
+  const [stagedPreviewUrl, setStagedPreviewUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isCaptioning, setIsCaptioning] = useState(false);
+  const [captionToast, setCaptionToast] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const visionState = useVisionCaption();
 
   const modifierConfig = useMemo(() => getModifierConfig(assetType), [assetType]);
 
@@ -55,9 +64,21 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
   const [libraryFilter, setLibraryFilter] = useState("All");
   const [selectedLibraryAsset, setSelectedLibraryAsset] = useState<MediaAsset | null>(null);
 
-  // When modal is opened, check if we should default to library
-  // (We can assume the parent sets the initial tab, but let's handle it)
-  // Actually, parent can just pass initial tab if we want, or we manage it here.
+  // Reset/clean up state on open/close
+  useEffect(() => {
+    if (!isOpen) {
+      if (stagedPreviewUrl) {
+        revokeManagedBlobUrl(stagedPreviewUrl);
+      }
+      setStagedFile(null);
+      setStagedPreviewUrl(null);
+      setUploadError(null);
+      setUploading(false);
+      setUploadProgress(0);
+      setIsCaptioning(false);
+      setCaptionToast(null);
+    }
+  }, [isOpen]);
 
   const groupedLibraryAssets = useMemo(() => {
     let filtered = libraryAssets.filter(a => a.media_type === (uploadModalSlot?.type || activeTab));
@@ -85,16 +106,63 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
     return grouped;
   }, [libraryAssets, libraryFilter, librarySearch, uploadModalSlot, activeTab]);
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Request vision caption for staged file
+  const handleRequestVisionCaption = async (fileToDescribe: File) => {
+    if (!visionState.canCaption) return;
+    setIsCaptioning(true);
+    setCaptionToast(null);
+    try {
+      const res = await generateCaptionForFile(fileToDescribe, {
+        contextType: assetType,
+        subjectName: subjectName.trim(),
+        lmStudioUrl: visionState.lmStudioUrl
+      });
+      if (res.success && res.caption) {
+        setDescription(res.caption);
+        setCaptionToast("AI visual description generated");
+        setTimeout(() => setCaptionToast(null), 3000);
+      } else if (res.error) {
+        setCaptionToast(`Vision notice: ${res.error}`);
+        setTimeout(() => setCaptionToast(null), 4000);
+      }
+    } catch (err: any) {
+      setCaptionToast("Failed to request AI description");
+      setTimeout(() => setCaptionToast(null), 3000);
+    } finally {
+      setIsCaptioning(false);
+    }
+  };
+
+  const handleFilePicked = (file: File) => {
+    if (stagedPreviewUrl) {
+      revokeManagedBlobUrl(stagedPreviewUrl);
+    }
+    const url = createManagedBlobUrl(file, "upload-staging");
+    setStagedFile(file);
+    setStagedPreviewUrl(url);
+    setUploadError(null);
+
+    // If auto-caption is active for image assets, trigger auto caption
+    if (activeTab === "image" && visionState.autoCaption) {
+      handleRequestVisionCaption(file);
+    }
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
-    const file = e.target.files[0];
-    
+    handleFilePicked(e.target.files[0]);
+    if (e.target) e.target.value = "";
+  };
+
+  const handleExecuteUpload = async () => {
+    if (!stagedFile) return;
+
     setUploading(true);
     setUploadProgress(0);
     setUploadError(null);
     
     const formData = new FormData();
-    formData.append("file", file);
+    formData.append("file", stagedFile);
     
     const targetSlotIndex = uploadModalSlot ? uploadModalSlot.index : 0;
     const targetMediaType = uploadModalSlot ? uploadModalSlot.type : activeTab;
@@ -109,7 +177,7 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
     if (targetMediaType === "image") {
       formData.append("subject_name", subjectName.trim() || "subject");
       formData.append("type", assetType);
-      formData.append("description", description);
+      formData.append("description", description.trim());
     } else if (targetMediaType === "audio") {
       formData.append("subject_name", subjectName.trim() || "voice");
       formData.append("type", "Voice Reference");
@@ -174,7 +242,7 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
   if (!isOpen || !uploadModalSlot) return null;
 
   const isMetadataIncomplete = activeTab === "image" && (!subjectName.trim() || !description.trim());
-  const isUploadDisabled = isMetadataIncomplete || uploading;
+  const isUploadDisabled = isMetadataIncomplete || !stagedFile || uploading;
 
   // Let's compute a simple preview filename
   const sanitize = (s: string) => s.replace(/[^a-z0-9]/gi, '_').toLowerCase();
@@ -208,13 +276,20 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
           </button>
         </div>
         
-        <div className="p-4 overflow-y-auto max-h-[70vh] min-h-[400px] flex flex-col">
+        <div className="p-4 overflow-y-auto max-h-[72vh] min-h-[400px] flex flex-col custom-scrollbar">
           {uploadModalTab === "upload" ? (
             <div className="space-y-4 flex-1 flex flex-col">
               {uploadError && (
                 <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
                   <p className="text-xs text-red-400">{uploadError}</p>
+                </div>
+              )}
+
+              {captionToast && (
+                <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-center gap-2 text-xs text-amber-300">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span>{captionToast}</span>
                 </div>
               )}
               
@@ -283,7 +358,30 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-zinc-400 mb-1">Visual Description (for prompting)</label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-medium text-zinc-400">Visual Description (for prompting)</label>
+                      {visionState.canCaption && (
+                        <button
+                          type="button"
+                          onClick={() => stagedFile && handleRequestVisionCaption(stagedFile)}
+                          disabled={!stagedFile || isCaptioning}
+                          className="text-[11px] text-amber-400 hover:text-amber-300 disabled:opacity-40 flex items-center gap-1 cursor-pointer transition-colors"
+                          title="Generate AI visual caption with loaded vision model"
+                        >
+                          {isCaptioning ? (
+                            <>
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                              <span>Describing...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="w-3 h-3" />
+                              <span>AI Auto-Describe</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
                     <textarea 
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
@@ -297,49 +395,110 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
                     />
                   </div>
                   
-                  <div className="bg-amber-950/20 border border-amber-900/30 rounded-lg p-3 flex flex-col gap-1.5">
-                    <span className="text-[10px] font-semibold text-amber-500/80 uppercase tracking-wider">Preview Generated Filename</span>
+                  <div className="bg-amber-950/20 border border-amber-900/30 rounded-lg p-2.5 flex flex-col gap-1">
+                    <span className="text-[10px] font-semibold text-amber-500/80 uppercase tracking-wider">Preview Filename</span>
                     <span className="text-xs text-amber-200/90 font-mono break-all">{previewFilename}</span>
                   </div>
                 </>
               )}
               
-              <div className="flex-1 min-h-[140px] mt-2 border-2 border-dashed border-zinc-700 rounded-xl relative transition-all group overflow-hidden bg-zinc-950/60 flex items-center justify-center">
-                <label className={`absolute inset-0 flex flex-col items-center justify-center p-6 ${isUploadDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer group-hover:bg-amber-500/5 group-hover:border-amber-500/50'} transition-all`}>
-                  {uploading ? (
-                    <div className="flex flex-col items-center w-full max-w-xs">
-                      <UploadCloud className="w-8 h-8 text-amber-400 mb-3 animate-bounce" />
-                      <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden mb-2">
-                        <div 
-                          className="h-full bg-amber-500 rounded-full transition-all duration-300"
-                          style={{ width: `${uploadProgress}%` }}
-                        />
-                      </div>
-                      <span className="text-xs font-medium text-amber-200">{uploadProgress}% Uploading...</span>
+              {/* File Dropzone / Staged Preview */}
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept={activeTab === "image" ? "image/*" : activeTab === "audio" ? "audio/*" : "video/*"}
+                onChange={handleFileInputChange}
+                disabled={uploading}
+                className="hidden"
+              />
+
+              {stagedFile && stagedPreviewUrl ? (
+                <div className="rounded-xl border-2 border-zinc-700 bg-zinc-950 p-3 flex flex-col sm:flex-row items-center gap-3">
+                  <div className="w-20 h-20 rounded-lg overflow-hidden border border-zinc-800 bg-black shrink-0 relative flex items-center justify-center">
+                    {activeTab === "image" ? (
+                      <img src={stagedPreviewUrl} alt="Staged" className="w-full h-full object-cover" />
+                    ) : activeTab === "video" ? (
+                      <video src={stagedPreviewUrl} className="w-full h-full object-cover" />
+                    ) : (
+                      <Music className="w-8 h-8 text-emerald-400" />
+                    )}
+                  </div>
+
+                  <div className="flex-1 min-w-0 text-left w-full">
+                    <div className="text-xs font-semibold text-zinc-200 truncate">{stagedFile.name}</div>
+                    <div className="text-[10px] text-zinc-500 mt-0.5">{(stagedFile.size / 1024).toFixed(1)} KB ready for staging</div>
+                    
+                    <div className="flex items-center gap-2 mt-2">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploading}
+                        className="px-2.5 py-1 text-[11px] font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded transition-colors"
+                      >
+                        Change File
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (stagedPreviewUrl) revokeManagedBlobUrl(stagedPreviewUrl);
+                          setStagedFile(null);
+                          setStagedPreviewUrl(null);
+                        }}
+                        disabled={uploading}
+                        className="px-2.5 py-1 text-[11px] font-medium bg-red-950/50 hover:bg-red-900 text-red-300 rounded transition-colors"
+                      >
+                        Clear
+                      </button>
                     </div>
-                  ) : (
-                    <>
-                      <UploadCloud className={`w-10 h-10 mb-3 transition-colors ${isMetadataIncomplete ? "text-zinc-600" : "text-amber-500 group-hover:text-amber-400"}`} />
-                      <p className="text-xs font-semibold text-zinc-200 text-center">
-                        Select {activeTab.toUpperCase()} File
-                      </p>
-                      <p className="text-[11px] text-zinc-400 text-center mt-1">
-                        {isMetadataIncomplete
-                          ? "Enter subject name & description first"
-                          : `Click to browse files`}
-                      </p>
-                    </>
-                  )}
-                  <input
-                    type="file"
-                    accept={activeTab === "image" ? "image/*" : activeTab === "audio" ? "audio/*" : "video/*"}
-                    onChange={handleFileSelect}
-                    disabled={isUploadDisabled}
-                    className="hidden"
-                  />
-                </label>
+                  </div>
+                </div>
+              ) : (
+                <div 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex-1 min-h-[120px] mt-1 border-2 border-dashed border-zinc-700 hover:border-amber-500 rounded-xl relative transition-all group overflow-hidden bg-zinc-950/60 flex flex-col items-center justify-center p-5 cursor-pointer"
+                >
+                  <UploadCloud className="w-8 h-8 mb-2 text-amber-500 group-hover:text-amber-400 transition-colors" />
+                  <p className="text-xs font-semibold text-zinc-200 text-center">
+                    Select or Drop {activeTab.toUpperCase()} File
+                  </p>
+                  <p className="text-[11px] text-zinc-500 text-center mt-0.5">
+                    Click to browse or drag file here
+                  </p>
+                </div>
+              )}
+
+              {/* Upload Progress & Action Button */}
+              {uploading && (
+                <div className="space-y-1.5 pt-2">
+                  <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-amber-500 rounded-full transition-all duration-300"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                  <div className="text-[11px] text-amber-300 text-center">{uploadProgress}% Uploading & Staging...</div>
+                </div>
+              )}
+
+              <div className="pt-3 border-t border-zinc-800 flex justify-end gap-2.5 mt-auto">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  disabled={uploading}
+                  className="px-4 py-2 text-xs font-medium text-zinc-400 hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExecuteUpload}
+                  disabled={isUploadDisabled}
+                  className="px-5 py-2 rounded-lg text-xs font-semibold bg-amber-600 hover:bg-amber-500 disabled:opacity-40 disabled:cursor-not-allowed text-white transition-all shadow-md flex items-center gap-2"
+                >
+                  {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UploadCloud className="w-3.5 h-3.5" />}
+                  <span>{uploading ? "Uploading..." : `Confirm & Stage to Slot ${uploadModalSlot.index + 1}`}</span>
+                </button>
               </div>
-              
             </div>
           ) : (
             <div className="flex-1 flex flex-col min-h-0">
@@ -444,3 +603,4 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
     </div>
   );
 };
+

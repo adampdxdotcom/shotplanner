@@ -199,10 +199,14 @@ export function useScenePersistence({
     const payload: SceneProjectFile = {
       ...sceneProject,
       lm_studio_url: config.lm_studio_url,
+      vision_enabled: Boolean(config.vision_enabled),
+      auto_caption_enabled: Boolean(config.auto_caption_enabled),
       config: {
         ...(sceneProject.config || {}),
         ...config,
         lm_studio_url: config.lm_studio_url,
+        vision_enabled: Boolean(config.vision_enabled),
+        auto_caption_enabled: Boolean(config.auto_caption_enabled),
         gemini_api_key: "",
         civitai_api_key: "",
         huggingface_token: ""
@@ -305,11 +309,20 @@ export function useScenePersistence({
       if (delegate?.setExpandedPrompt) delegate.setExpandedPrompt("");
       
       // Restore config if bundled
-      if (data.config) {
+      if (data.config || data.vision_enabled !== undefined) {
+        const isVision = data.config?.vision_enabled !== undefined
+          ? Boolean(data.config.vision_enabled)
+          : (data.vision_enabled !== undefined ? Boolean(data.vision_enabled) : undefined);
+        const isAutoCaption = data.config?.auto_caption_enabled !== undefined
+          ? Boolean(data.config.auto_caption_enabled)
+          : (data.auto_caption_enabled !== undefined ? Boolean(data.auto_caption_enabled) : undefined);
+
         setConfig(prev => ({
           ...prev,
-          ...data.config,
-          lm_studio_url: restoredLlmUrl || data.config.lm_studio_url || prev.lm_studio_url,
+          ...(data.config || {}),
+          lm_studio_url: restoredLlmUrl || data.config?.lm_studio_url || prev.lm_studio_url,
+          vision_enabled: isVision !== undefined ? isVision : prev.vision_enabled,
+          auto_caption_enabled: isVision !== undefined ? (isVision ? Boolean(isAutoCaption) : false) : prev.auto_caption_enabled,
           gemini_api_key: ""
         }));
       }

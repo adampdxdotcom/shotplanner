@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { AppConfig, LLMProvider } from '../../types';
 
 export const getDefaultLlmProvider = (): LLMProvider => {
@@ -23,12 +23,16 @@ export function useAppConfig({ addToast, onUpdateProjectConfig }: UseAppConfigPa
     let savedPrompt: string | undefined = undefined;
     let savedTemp: number | undefined = undefined;
     let savedMaxTokens: number | undefined = undefined;
+    let savedVision = false;
+    let savedAutoCaption = false;
     try {
       savedPrompt = localStorage.getItem("llm_custom_system_prompt") || undefined;
       const t = localStorage.getItem("llm_temperature");
       if (t) savedTemp = parseFloat(t);
       const m = localStorage.getItem("llm_max_tokens");
       if (m) savedMaxTokens = parseInt(m, 10);
+      savedVision = localStorage.getItem("vision_enabled") === "true";
+      savedAutoCaption = localStorage.getItem("auto_caption_enabled") === "true";
     } catch (e) {}
 
     return {
@@ -48,9 +52,23 @@ export function useAppConfig({ addToast, onUpdateProjectConfig }: UseAppConfigPa
       huggingface_token: "",
       llm_custom_system_prompt: savedPrompt,
       llm_temperature: savedTemp !== undefined ? savedTemp : 0.45,
-      llm_max_tokens: savedMaxTokens !== undefined ? savedMaxTokens : 800
+      llm_max_tokens: savedMaxTokens !== undefined ? savedMaxTokens : 800,
+      vision_enabled: savedVision,
+      auto_caption_enabled: savedVision ? savedAutoCaption : false
     };
   });
+
+  // Sync vision settings to localStorage
+  useEffect(() => {
+    try {
+      if (config.vision_enabled !== undefined) {
+        localStorage.setItem("vision_enabled", String(config.vision_enabled));
+      }
+      if (config.auto_caption_enabled !== undefined) {
+        localStorage.setItem("auto_caption_enabled", String(config.auto_caption_enabled));
+      }
+    } catch (e) {}
+  }, [config.vision_enabled, config.auto_caption_enabled]);
 
   const setDefaultLlmProvider = useCallback((provider: LLMProvider) => {
     try {

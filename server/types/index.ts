@@ -70,6 +70,8 @@ export interface AssetRecord {
   size_bytes: number;
   created_at: number;
   preview_url?: string;
+  thumbnail_url?: string;
+  thumbnail_path?: string;
   slot_index?: number;
   scene_name?: string;
   path?: string;

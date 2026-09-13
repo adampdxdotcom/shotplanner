@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { MediaAsset } from "../types";
-import { Edit3, X, AlertCircle, UploadCloud, Undo2, Trash2, CheckCircle } from "lucide-react";
+import { Edit3, X, AlertCircle, UploadCloud, Undo2, Trash2, CheckCircle, Sparkles, Loader2 } from "lucide-react";
 import { SubjectCombobox } from "./SubjectCombobox";
 import { getAssetMediaUrl } from "../utils/assetUrl";
 import { 
@@ -9,6 +9,7 @@ import {
   updateDescriptionWithModifier, 
   detectActiveModifier 
 } from "../utils/assetModifiers";
+import { useVisionCaption, generateCaptionForFile, generateCaptionForAsset } from "../hooks/useVisionCaption";
 
 interface AssetEditModalProps {
   asset: MediaAsset | null;
@@ -46,6 +47,10 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
   const [editDragActive, setEditDragActive] = useState<boolean>(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const [isCaptioning, setIsCaptioning] = useState(false);
+  const [captionToast, setCaptionToast] = useState<string | null>(null);
+
+  const visionState = useVisionCaption();
 
   useEffect(() => {
     if (asset) {
@@ -86,6 +91,8 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
       setIsReplacingFile(false);
       setEditFile(null);
       setEditError(null);
+      setIsCaptioning(false);
+      setCaptionToast(null);
     }
   }, [asset]);
 
@@ -103,10 +110,58 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
     setEditDescription(prev => updateDescriptionWithModifier(prev, effectiveType, modValue));
   };
 
+  const handleRequestVisionCaption = async () => {
+    if (!asset || !visionState.canCaption) return;
+    setIsCaptioning(true);
+    setCaptionToast(null);
+    try {
+      let res;
+      if (isReplacingFile && editFile) {
+        res = await generateCaptionForFile(editFile, {
+          contextType: effectiveType,
+          subjectName: editSubjectName.trim(),
+          lmStudioUrl: visionState.lmStudioUrl
+        });
+      } else {
+        res = await generateCaptionForAsset(asset, {
+          contextType: effectiveType,
+          subjectName: editSubjectName.trim(),
+          assetMediaUrl: getAssetMediaUrl(asset, true),
+          lmStudioUrl: visionState.lmStudioUrl
+        });
+      }
+
+      if (res.success && res.caption) {
+        setEditDescription(res.caption);
+        setCaptionToast("AI visual description generated");
+        setTimeout(() => setCaptionToast(null), 3000);
+      } else if (res.error) {
+        setCaptionToast(`Vision notice: ${res.error}`);
+        setTimeout(() => setCaptionToast(null), 4000);
+      }
+    } catch (err: any) {
+      setCaptionToast("Failed to generate AI description");
+      setTimeout(() => setCaptionToast(null), 3000);
+    } finally {
+      setIsCaptioning(false);
+    }
+  };
+
   const handleEditFileSelected = (file: File | null) => {
     setEditFile(file);
     setIsReplacingFile(!!file);
     setEditError(null);
+    if (file && visionState.autoCaption) {
+      generateCaptionForFile(file, {
+        contextType: effectiveType,
+        subjectName: editSubjectName.trim(),
+        lmStudioUrl: visionState.lmStudioUrl
+      }).then(res => {
+        if (res.success && res.caption) {
+          setEditDescription(res.caption);
+        }
+      });
+    }
   };
 
   const handleRevertToOriginal = () => {
@@ -204,7 +259,14 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
           </button>
         </div>
 
-        <div className="p-4 space-y-4 overflow-y-auto max-h-[70vh]">
+        <div className="p-4 space-y-4 overflow-y-auto max-h-[70vh] custom-scrollbar">
+          {captionToast && (
+            <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-center gap-2 text-xs text-amber-300">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span>{captionToast}</span>
+            </div>
+          )}
+
           {/* Asset Preview Header Card */}
           <div className="bg-zinc-950/70 border border-zinc-800/80 rounded-xl p-3 flex items-center gap-3.5">
             <div className="w-14 h-14 bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden shrink-0 relative flex items-center justify-center">
@@ -302,7 +364,30 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
 
           {/* Visual Description */}
           <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1">Visual Description (for prompting)</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-medium text-zinc-400">Visual Description (for prompting)</label>
+              {visionState.canCaption && (
+                <button
+                  type="button"
+                  onClick={handleRequestVisionCaption}
+                  disabled={isCaptioning}
+                  className="text-[11px] text-amber-400 hover:text-amber-300 disabled:opacity-40 flex items-center gap-1 cursor-pointer transition-colors"
+                  title="Generate AI visual caption with loaded vision model"
+                >
+                  {isCaptioning ? (
+                    <>
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      <span>Describing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3 h-3" />
+                      <span>AI Auto-Describe</span>
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
             <textarea 
               value={editDescription}
               onChange={(e) => setEditDescription(e.target.value)}

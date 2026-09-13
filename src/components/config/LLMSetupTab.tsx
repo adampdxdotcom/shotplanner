@@ -1,5 +1,5 @@
 import React from "react";
-import { Bot, Cpu, Sparkles, Star, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
+import { Bot, Cpu, Sparkles, Star, RefreshCw, CheckCircle2, AlertCircle, Eye } from "lucide-react";
 import { AppConfig, LLMProvider } from "../../types";
 import { GeminiConfig } from "./GeminiConfig";
 import { LLMPromptSettingsCard } from "./LLMPromptSettingsCard";
@@ -173,6 +173,74 @@ export const LLMSetupTab: React.FC<LLMSetupTabProps> = ({
                 <span className="font-semibold">{lmTestResult.message}</span>
               </div>
             )}
+
+            {/* Vision Model & Auto Captioning Settings */}
+            <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800/80 space-y-3">
+              <div className="flex items-start justify-between gap-3 p-3.5 rounded-lg bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800 transition-colors">
+                <div className="flex items-start gap-3">
+                  <div className={`p-1.5 mt-0.5 rounded-md border shrink-0 transition-colors ${
+                    config.vision_enabled
+                      ? "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/30"
+                      : "bg-zinc-100 text-zinc-500 border-zinc-200 dark:bg-zinc-800/60 dark:text-zinc-400 dark:border-zinc-700/60"
+                  }`}>
+                    <Eye className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <label 
+                      htmlFor="toggle-vision-enabled"
+                      className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5 cursor-pointer select-none"
+                    >
+                      Vision Enabled
+                      {config.vision_enabled && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-medium bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/50">
+                          Active
+                        </span>
+                      )}
+                    </label>
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                      Enable if your loaded LM Studio model supports vision (e.g., Qwen2-VL, Llama-3.2-Vision, MiniCPM-V). Offers AI captioning and visual descriptions for reference uploads.
+                    </p>
+                  </div>
+                </div>
+                <input
+                  id="toggle-vision-enabled"
+                  type="checkbox"
+                  checked={Boolean(config.vision_enabled)}
+                  onChange={(e) => {
+                    const isChecked = e.target.checked;
+                    handleInputChange("vision_enabled", isChecked);
+                    if (!isChecked) {
+                      handleInputChange("auto_caption_enabled", false);
+                    }
+                  }}
+                  className="mt-1 h-4 w-4 rounded border-zinc-300 dark:border-zinc-700 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                />
+              </div>
+
+              {/* Auto Caption Option - Visible only when Vision is enabled */}
+              {config.vision_enabled && (
+                <div className="ml-4 pl-3 border-l-2 border-amber-500/60 flex items-start justify-between gap-3 p-3 rounded-lg bg-amber-50/40 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-800/40 transition-all">
+                  <div className="space-y-0.5">
+                    <label 
+                      htmlFor="toggle-auto-caption"
+                      className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5 cursor-pointer select-none"
+                    >
+                      Auto Caption on Upload
+                    </label>
+                    <p className="text-[11px] text-zinc-600 dark:text-zinc-400">
+                      When enabled, uploaded reference images automatically request an AI caption from the local vision model to populate the Visual Description.
+                    </p>
+                  </div>
+                  <input
+                    id="toggle-auto-caption"
+                    type="checkbox"
+                    checked={Boolean(config.auto_caption_enabled)}
+                    onChange={(e) => handleInputChange("auto_caption_enabled", e.target.checked)}
+                    className="mt-1 h-4 w-4 rounded border-zinc-300 dark:border-zinc-700 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                  />
+                </div>
+              )}
+            </div>
           </div>
         ) : (
           <GeminiConfig 

@@ -64,6 +64,8 @@ export interface SceneProjectFile {
   characters?: Record<string, CharacterProfile>;
   lm_studio_url?: string;
   local_llm_url?: string;
+  vision_enabled?: boolean;
+  auto_caption_enabled?: boolean;
   config?: Partial<AppConfig>;
   llm_provider?: LLMProvider;
   generation_params?: GenerationParameters;
@@ -186,6 +188,8 @@ export interface AppConfig {
   llm_custom_system_prompt?: string;
   llm_temperature?: number;
   llm_max_tokens?: number;
+  vision_enabled?: boolean;
+  auto_caption_enabled?: boolean;
 }
 
 export interface PromptDebugInfo {
@@ -325,6 +329,8 @@ export interface MediaAsset {
   size_bytes: number;
   created_at: number;
   preview_url?: string;
+  thumbnail_url?: string;
+  thumbnail_path?: string;
   slot_index?: number;
   scene_name?: string;
   path?: string;

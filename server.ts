@@ -32,6 +32,11 @@ initDirectories();
 const app = express();
 const PORT = 3000;
 
+// Health check
+app.get("/api/health", (_req, res) => {
+  res.json({ status: "ok" });
+});
+
 // Body parser middlewares
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
@@ -78,25 +83,36 @@ app.use("/api/uploads", express.static(LEGACY_UPLOADS_DIR));
 app.use("/assets", express.static(ASSETS_DIR));
 app.use("/user_assets", express.static(ASSETS_DIR));
 
+// Global error handler
+app.use((err: any, _req: Request, res: Response, _next: any) => {
+  console.error("Server error:", err);
+  res.status(500).json({ error: err?.message || "Internal server error" });
+});
+
 // Application bootstrap and Vite frontend integration
 async function startServer() {
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa"
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req: Request, res: Response) => {
-      res.sendFile(path.join(distPath, "index.html"));
-    });
-  }
+  try {
+    if (process.env.NODE_ENV !== "production") {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa"
+      });
+      app.use(vite.middlewares);
+    } else {
+      const distPath = path.join(process.cwd(), "dist");
+      app.use(express.static(distPath));
+      app.get("*", (req: Request, res: Response) => {
+        res.sendFile(path.join(distPath, "index.html"));
+      });
+    }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`ComfyUI Bridge Server running on http://0.0.0.0:${PORT}`);
-  });
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://0.0.0.0:${PORT}`);
+    });
+  } catch (err) {
+    console.error("Failed to start server:", err);
+    process.exit(1);
+  }
 }
 
 startServer();

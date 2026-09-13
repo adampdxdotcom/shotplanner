@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { expandPrompt, buildDefaultSystemPrompt } from "../services/llm_service";
+import { generateVisionCaption } from "../services/visionCaptionService";
 
 const router = Router();
 
@@ -10,6 +11,51 @@ router.post(["/generate-prompt", "/llm/expand"], async (req: Request, res: Respo
   } catch (err: any) {
     const status = err.message && err.message.includes("is required") ? 400 : 500;
     res.status(status).json({ error: err.message || "Failed to generate prompt" });
+  }
+});
+
+// Dedicated vision captioning endpoint for reference assets and thumbnails
+router.post(["/llm/caption", "/caption"], async (req: Request, res: Response) => {
+  try {
+    const { 
+      thumbnailPath, 
+      thumbnail_path,
+      imageBase64, 
+      image_base64,
+      image,
+      contextType, 
+      context_type,
+      subjectName, 
+      subject_name,
+      lm_studio_url,
+      lmStudioUrl,
+      model 
+    } = req.body || {};
+
+    const resolvedThumbnailPath = thumbnailPath || thumbnail_path;
+    const resolvedImageBase64 = imageBase64 || image_base64 || image;
+
+    if (!resolvedThumbnailPath && !resolvedImageBase64) {
+      return res.status(400).json({ 
+        error: "Missing image source: provide either 'thumbnailPath' or 'imageBase64'" 
+      });
+    }
+
+    const result = await generateVisionCaption({
+      thumbnailPath: resolvedThumbnailPath,
+      imageBase64: resolvedImageBase64,
+      contextType: contextType || context_type || "asset",
+      subjectName: subjectName || subject_name || "",
+      lm_studio_url: lm_studio_url || lmStudioUrl,
+      model
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    console.error("[Vision Caption Error]:", err?.message || err);
+    res.status(500).json({ 
+      error: err?.message || "Failed to generate visual caption" 
+    });
   }
 });
 

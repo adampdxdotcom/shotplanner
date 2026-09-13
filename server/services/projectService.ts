@@ -509,18 +509,18 @@ export async function exportProjectZip(projectName: string, res: Response): Prom
       (shot.generation_params ||
       projectData.generation_params ||
       projectData.generationParams ||
-      { steps: 30, megapixels: 0.5, frames: 81 });
+      {});
 
     // Parameter node mappings
     const effectiveParamNodes =
       shot.parameter_node_mappings ||
       projectData.parameter_node_mappings ||
       projectData.parameterNodeMappings ||
-      {
+      (parsedWf.detectedNodes ? {
         steps: parsedWf.detectedNodes.steps || "",
         megapixels: parsedWf.detectedNodes.megapixels || "",
         frames: parsedWf.detectedNodes.frames || ""
-      };
+      } : {});
 
     // Prefixes
     const takeNum = heroTake ? heroTake.take_number : (takes.length + 1);

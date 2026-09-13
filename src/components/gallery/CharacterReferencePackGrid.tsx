@@ -6,6 +6,7 @@ import {
   updateDescriptionWithModifier
 } from "../../utils/assetModifiers";
 import { createManagedBlobUrl } from "../../utils/blobRegistry";
+import { useVisionCaption, generateCaptionForFile } from "../../hooks/useVisionCaption";
 
 export type ReferencePackSlotId =
   | "headshot_facing"
@@ -33,6 +34,7 @@ export interface CharacterPackSlot {
   status: "idle" | "uploading" | "success" | "error";
   progress: number;
   error?: string;
+  isCaptioning?: boolean;
 }
 
 export const INITIAL_PACK_SLOTS: CharacterPackSlot[] = [
@@ -155,6 +157,7 @@ export const INITIAL_LOCATION_PACK_SLOTS: CharacterPackSlot[] = [
 
 interface CharacterReferencePackGridProps {
   slots: CharacterPackSlot[];
+  subjectName?: string;
   onUpdateSlot: (slotId: ReferencePackSlotId, updater: Partial<CharacterPackSlot>) => void;
   onClearSlot: (slotId: ReferencePackSlotId) => void;
   disabled?: boolean;
@@ -163,13 +166,35 @@ interface CharacterReferencePackGridProps {
 
 export const CharacterReferencePackGrid: React.FC<CharacterReferencePackGridProps> = ({
   slots,
+  subjectName = "",
   onUpdateSlot,
   onClearSlot,
   disabled = false,
   isLocationMode = false
 }) => {
   const [dragActiveSlot, setDragActiveSlot] = useState<CharacterPackSlotId | null>(null);
+  const [captioningSlots, setCaptioningSlots] = useState<Record<string, boolean>>({});
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const visionState = useVisionCaption();
+
+  const handleSlotCaption = async (slotId: ReferencePackSlotId, file: File, assetType: string) => {
+    if (!visionState.canCaption) return;
+    setCaptioningSlots(prev => ({ ...prev, [slotId]: true }));
+    try {
+      const res = await generateCaptionForFile(file, {
+        contextType: assetType,
+        subjectName: subjectName.trim(),
+        lmStudioUrl: visionState.lmStudioUrl
+      });
+      if (res.success && res.caption) {
+        onUpdateSlot(slotId, { description: res.caption });
+      }
+    } catch (err) {
+      console.warn("Auto caption failed for slot:", slotId, err);
+    } finally {
+      setCaptioningSlots(prev => ({ ...prev, [slotId]: false }));
+    }
+  };
 
   const handleDragOver = (e: React.DragEvent, slotId: CharacterPackSlotId) => {
     e.preventDefault();
@@ -198,6 +223,7 @@ export const CharacterReferencePackGrid: React.FC<CharacterReferencePackGridProp
       const file = e.dataTransfer.files[0];
       if (file.type.startsWith("image/")) {
         const previewUrl = createManagedBlobUrl(file, "character-pack");
+        const slot = slots.find(s => s.id === slotId);
         onUpdateSlot(slotId, {
           file,
           previewUrl,
@@ -205,6 +231,10 @@ export const CharacterReferencePackGrid: React.FC<CharacterReferencePackGridProp
           progress: 0,
           error: undefined
         });
+
+        if (visionState.autoCaption && slot) {
+          handleSlotCaption(slotId, file, slot.assetType);
+        }
       }
     }
   };
@@ -213,6 +243,7 @@ export const CharacterReferencePackGrid: React.FC<CharacterReferencePackGridProp
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
       const previewUrl = createManagedBlobUrl(file, "character-pack");
+      const slot = slots.find(s => s.id === slotId);
       onUpdateSlot(slotId, {
         file,
         previewUrl,
@@ -220,8 +251,11 @@ export const CharacterReferencePackGrid: React.FC<CharacterReferencePackGridProp
         progress: 0,
         error: undefined
       });
+
+      if (visionState.autoCaption && slot) {
+        handleSlotCaption(slotId, file, slot.assetType);
+      }
     }
-    // Reset file input value so re-selecting same file triggers onChange
     if (e.target) e.target.value = "";
   };
 
@@ -282,6 +316,7 @@ export const CharacterReferencePackGrid: React.FC<CharacterReferencePackGridProp
         {slots.map((slot) => {
           const isDragOver = dragActiveSlot === slot.id;
           const isPopulated = Boolean(slot.file && slot.previewUrl);
+          const isSlotCaptioning = captioningSlots[slot.id];
 
           return (
             <div
@@ -402,9 +437,27 @@ export const CharacterReferencePackGrid: React.FC<CharacterReferencePackGridProp
               {/* Inline Description Editor */}
               <div className="p-2 bg-zinc-50 dark:bg-zinc-950/95 border-t border-zinc-200 dark:border-zinc-850 flex flex-col gap-1">
                 <div className="flex items-center justify-between">
-                  <label className="text-[9px] font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">
-                    Prompt Description
-                  </label>
+                  <div className="flex items-center gap-1">
+                    <label className="text-[9px] font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">
+                      Prompt Description
+                    </label>
+                    {isPopulated && visionState.canCaption && (
+                      <button
+                        type="button"
+                        onClick={() => slot.file && handleSlotCaption(slot.id, slot.file, slot.assetType)}
+                        disabled={disabled || isSlotCaptioning || !slot.file}
+                        className="text-[9px] text-amber-500 hover:text-amber-400 disabled:opacity-40 flex items-center gap-0.5 cursor-pointer"
+                        title="AI auto-describe image"
+                      >
+                        {isSlotCaptioning ? (
+                          <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                        ) : (
+                          <Sparkles className="w-2.5 h-2.5" />
+                        )}
+                        <span>AI</span>
+                      </button>
+                    )}
+                  </div>
                   {(() => {
                     const modConfig = getModifierConfig(slot.assetType);
                     if (!modConfig) return null;
@@ -447,3 +500,4 @@ export const CharacterReferencePackGrid: React.FC<CharacterReferencePackGridProp
     </div>
   );
 };
+
