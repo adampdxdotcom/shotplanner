@@ -14,10 +14,18 @@ const IGNORED_JSON_FILENAMES = new Set([
   "assets_db.json",
   "gemini_config.json",
   "civitai_config.json",
+  "civitai_favorites.json",
   "huggingface_config.json",
+  "characters.json",
   "package.json",
   "tsconfig.json",
   "metadata.json"
+]);
+
+const IGNORED_ASSET_DIRECTORIES = new Set([
+  "tmp_uploads",
+  "project_jsons",
+  "universe"
 ]);
 
 export function listProjects(): any[] {
@@ -28,7 +36,7 @@ export function listProjects(): any[] {
   if (fs.existsSync(ASSETS_DIR)) {
     const dirs = fs.readdirSync(ASSETS_DIR);
     for (const d of dirs) {
-      if (d === "tmp_uploads" || d === "project_jsons") continue;
+      if (IGNORED_ASSET_DIRECTORIES.has(d)) continue;
       const dirPath = path.join(ASSETS_DIR, d);
       try {
         if (fs.statSync(dirPath).isDirectory()) {
@@ -139,7 +147,7 @@ export function findProjectFile(identifier: string): string | null {
   if (fs.existsSync(ASSETS_DIR)) {
     const items = fs.readdirSync(ASSETS_DIR, { withFileTypes: true });
     for (const item of items) {
-      if (item.isDirectory() && item.name !== "tmp_uploads" && item.name !== "project_jsons") {
+      if (item.isDirectory() && !IGNORED_ASSET_DIRECTORIES.has(item.name)) {
         const cand = path.join(ASSETS_DIR, item.name, `${item.name}.json`);
         if (fs.existsSync(cand) && normalize(item.name) === targetNorm) {
           return cand;
