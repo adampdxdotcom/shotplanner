@@ -22,6 +22,7 @@ export const GalleryBulkUploadModal: React.FC<GalleryBulkUploadModalProps> = ({
   characters,
   assets,
   sceneName,
+  config,
   onAssetUploaded,
   onRegisterSubject
 }) => {
@@ -121,6 +122,7 @@ export const GalleryBulkUploadModal: React.FC<GalleryBulkUploadModalProps> = ({
             <CharacterReferencePackGrid
               slots={packSlots}
               subjectName={bulkSubject}
+              config={config}
               onUpdateSlot={handleUpdatePackSlot}
               onClearSlot={handleClearPackSlot}
               disabled={isBulkUploading}

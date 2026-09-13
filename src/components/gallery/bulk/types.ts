@@ -22,6 +22,7 @@ export interface GalleryBulkUploadModalProps {
   characters?: Record<string, any>;
   assets?: MediaAsset[];
   sceneName?: string;
+  config?: any;
   onAssetUploaded: (asset: MediaAsset) => void;
   onRegisterSubject: (name: string) => void;
 }

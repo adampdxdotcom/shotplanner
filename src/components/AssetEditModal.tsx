@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { MediaAsset } from "../types";
+import { AppConfig, MediaAsset } from "../types";
 import { Edit3, X, AlertCircle, UploadCloud, Undo2, Trash2, CheckCircle, Sparkles, Loader2 } from "lucide-react";
 import { SubjectCombobox } from "./SubjectCombobox";
 import { getAssetMediaUrl } from "../utils/assetUrl";
@@ -15,6 +15,7 @@ interface AssetEditModalProps {
   asset: MediaAsset | null;
   subjects: string[];
   characters: Record<string, any>;
+  config?: AppConfig;
   onRegisterSubject?: (name: string) => void;
   onClose: () => void;
   onAssetUpdated: (oldFilename: string, newAsset: MediaAsset) => void;
@@ -33,6 +34,7 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
   asset,
   subjects,
   characters,
+  config,
   onRegisterSubject,
   onClose,
   onAssetUpdated
@@ -50,7 +52,7 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
   const [isCaptioning, setIsCaptioning] = useState(false);
   const [captionToast, setCaptionToast] = useState<string | null>(null);
 
-  const visionState = useVisionCaption();
+  const visionState = useVisionCaption(config);
 
   useEffect(() => {
     if (asset) {

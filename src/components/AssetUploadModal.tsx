@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
-import { MediaAsset } from "../types";
+import { AppConfig, MediaAsset } from "../types";
 import { UploadCloud, HardDrive, Search, Music, CheckCircle, X, AlertCircle, Sparkles, Loader2, RefreshCw, Eye } from "lucide-react";
 import { SubjectCombobox } from "./SubjectCombobox";
 import { getAssetMediaUrl } from "../utils/assetUrl";
@@ -20,6 +20,7 @@ interface AssetUploadModalProps {
   subjects: string[];
   characters: Record<string, any>;
   sceneName?: string;
+  config?: AppConfig;
   onRegisterSubject?: (name: string) => void;
   onClose: () => void;
   onAssetUploaded: (asset: MediaAsset, slotIndex: number, type: string) => void;
@@ -33,6 +34,7 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
   subjects,
   characters,
   sceneName,
+  config,
   onRegisterSubject,
   onClose,
   onAssetUploaded
@@ -50,7 +52,7 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
   const [captionToast, setCaptionToast] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const visionState = useVisionCaption();
+  const visionState = useVisionCaption(config);
 
   const modifierConfig = useMemo(() => getModifierConfig(assetType), [assetType]);
 

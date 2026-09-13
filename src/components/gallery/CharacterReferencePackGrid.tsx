@@ -1,5 +1,6 @@
 import React, { useRef, useState } from "react";
 import { Camera, User, Image as ImageIcon, X, Check, Loader2, AlertCircle, Sparkles, Shirt, Building2, MapPin, Compass, Sun } from "lucide-react";
+import { AppConfig } from "../../types";
 import {
   getModifierConfig,
   detectActiveModifier,
@@ -158,6 +159,7 @@ export const INITIAL_LOCATION_PACK_SLOTS: CharacterPackSlot[] = [
 interface CharacterReferencePackGridProps {
   slots: CharacterPackSlot[];
   subjectName?: string;
+  config?: AppConfig;
   onUpdateSlot: (slotId: ReferencePackSlotId, updater: Partial<CharacterPackSlot>) => void;
   onClearSlot: (slotId: ReferencePackSlotId) => void;
   disabled?: boolean;
@@ -167,6 +169,7 @@ interface CharacterReferencePackGridProps {
 export const CharacterReferencePackGrid: React.FC<CharacterReferencePackGridProps> = ({
   slots,
   subjectName = "",
+  config,
   onUpdateSlot,
   onClearSlot,
   disabled = false,
@@ -175,7 +178,7 @@ export const CharacterReferencePackGrid: React.FC<CharacterReferencePackGridProp
   const [dragActiveSlot, setDragActiveSlot] = useState<CharacterPackSlotId | null>(null);
   const [captioningSlots, setCaptioningSlots] = useState<Record<string, boolean>>({});
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
-  const visionState = useVisionCaption();
+  const visionState = useVisionCaption(config);
 
   const handleSlotCaption = async (slotId: ReferencePackSlotId, file: File, assetType: string) => {
     if (!visionState.canCaption) return;

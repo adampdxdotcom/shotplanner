@@ -9,6 +9,123 @@ import {
 } from "../utils/formatters";
 import { generateWithGeminiAPI, getStoredGeminiKey } from "./geminiService";
 
+export interface LocalLLMRequestOptions {
+  url?: string;
+  lm_studio_url?: string;
+  lmStudioUrl?: string;
+  model?: string;
+  systemPrompt?: string;
+  userPrompt?: string;
+  messages?: Array<{
+    role: "system" | "user" | "assistant";
+    content: string | Array<{ type: "text" | "image_url"; text?: string; image_url?: { url: string; detail?: string } }>;
+  }>;
+  temperature?: number;
+  max_tokens?: number;
+  timeoutMs?: number;
+}
+
+export interface LocalLLMResponse {
+  content: string;
+  model: string;
+  raw: any;
+}
+
+/**
+ * Standardizes endpoint URL resolution for OpenAI-compatible local LLM servers.
+ */
+export function resolveLocalLLMEndpoint(rawUrl?: string): string {
+  let endpoint = (rawUrl || "").trim() || "http://localhost:1234/v1";
+  endpoint = endpoint.replace(/\/+$/, "");
+  if (!endpoint.endsWith("/chat/completions")) {
+    if (!endpoint.endsWith("/v1")) {
+      endpoint = `${endpoint}/v1`;
+    }
+    endpoint = `${endpoint}/chat/completions`;
+  }
+  return endpoint;
+}
+
+/**
+ * Central orchestrator for sending text or multimodal (image) messages
+ * to local OpenAI-compatible LLM servers (LM Studio / Ollama / LocalAI).
+ */
+export async function callLocalLLM(options: LocalLLMRequestOptions): Promise<LocalLLMResponse> {
+  const targetUrl = options.url || options.lm_studio_url || options.lmStudioUrl || "http://localhost:1234/v1";
+  const endpoint = resolveLocalLLMEndpoint(targetUrl);
+  const model = options.model || "local-model";
+  const timeoutMs = options.timeoutMs || 60000;
+
+  // Build messages array if not provided directly
+  let messages = options.messages;
+  if (!messages || messages.length === 0) {
+    messages = [];
+    if (options.systemPrompt) {
+      messages.push({ role: "system", content: options.systemPrompt });
+    }
+    if (options.userPrompt) {
+      messages.push({ role: "user", content: options.userPrompt });
+    }
+  }
+
+  const payload: Record<string, any> = {
+    model,
+    messages
+  };
+
+  if (typeof options.temperature === "number") {
+    payload.temperature = options.temperature;
+  }
+  if (typeof options.max_tokens === "number" && options.max_tokens > 0) {
+    payload.max_tokens = options.max_tokens;
+  }
+
+  console.log(`[Local LLM Service] Dispatching request to: ${endpoint} (model: ${model})`);
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      throw new Error(`HTTP ${res.status}: ${errText || res.statusText}`);
+    }
+
+    const data = await res.json();
+    const choice = data.choices?.[0];
+    let content = (choice?.message?.content || choice?.text || "").trim();
+
+    // Fallback for reasoning models if final content is empty but reasoning_content exists
+    if (!content && choice?.message?.reasoning_content) {
+      content = choice.message.reasoning_content.trim();
+    }
+
+    if (!content) {
+      throw new Error("Local LLM server returned an empty response.");
+    }
+
+    return {
+      content,
+      model: data.model || model,
+      raw: data
+    };
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    const msg = err.name === "AbortError"
+      ? `Request timed out after ${timeoutMs / 1000}s`
+      : err.message || "Connection refused";
+    throw new Error(`Local LLM service error at ${targetUrl}: ${msg}`);
+  }
+}
+
 export interface ExpandPromptOptions {
   basic_stub: string;
   assets?: any[];
@@ -370,62 +487,19 @@ Generate ONLY the integrated_multimodal_description paragraph incorporating the 
       throw new Error(`Google Gemini service error: ${err.message || "Failed to generate prompt"}`);
     }
   } else {
-    // Try LM Studio endpoint (strictly no secondary fallback)
-    let endpoint = lm_studio_url.trim().replace(/\/$/, "");
-    if (!endpoint.endsWith("/chat/completions")) {
-      if (!endpoint.endsWith("/v1")) endpoint = `${endpoint}/v1`;
-      endpoint = `${endpoint}/chat/completions`;
-    }
+    // Dispatch to centralized local LLM orchestrator (strictly no secondary fallback)
+    const localRes = await callLocalLLM({
+      url: lm_studio_url,
+      model: model || "local-model",
+      systemPrompt,
+      userPrompt,
+      temperature: effectiveTemperature,
+      timeoutMs: 60000
+    });
 
-    try {
-      const controller = new AbortController();
-      // 60-second timeout allows local models sufficient time for prompt ingestion, KV evaluation, and token generation
-      const timeoutId = setTimeout(() => controller.abort(), 60000);
-
-      // Omit max_tokens so LM Studio preset/model configurations control the token budget and reasoning models are not truncated
-      const requestPayload: Record<string, any> = {
-        model: model || "local-model",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
-        ],
-        temperature: effectiveTemperature
-      };
-
-      const lmRes = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestPayload),
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
-
-      if (!lmRes.ok) {
-        const errText = await lmRes.text().catch(() => "");
-        throw new Error(`HTTP ${lmRes.status}: ${errText || lmRes.statusText}`);
-      }
-
-      const data = await lmRes.json();
-      const choice = data.choices?.[0];
-      let content = (choice?.message?.content || choice?.text || "").trim();
-      
-      // Fallback for reasoning models if final content is empty but reasoning_content exists
-      if (!content && choice?.message?.reasoning_content) {
-        content = choice.message.reasoning_content.trim();
-      }
-
-      if (!content) {
-        throw new Error("LM Studio returned an empty response.");
-      }
-      rawLlmDescription = content;
-      modelUsedActual = data.model || model || "local-model";
-      providerUsed = `Local LM Studio (${modelUsedActual})`;
-    } catch (e: any) {
-      const msg = e.name === "AbortError" 
-        ? "Request timed out after 60 seconds" 
-        : e.message || "Connection refused";
-      throw new Error(`LM Studio service error: ${msg}. Verify LM Studio is running at ${lm_studio_url}`);
-    }
+    rawLlmDescription = localRes.content;
+    modelUsedActual = localRes.model || model || "local-model";
+    providerUsed = `Local LM Studio (${modelUsedActual})`;
   }
 
   if (!rawLlmDescription) {

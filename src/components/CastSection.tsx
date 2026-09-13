@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { MediaAsset, CharacterProfile, SceneProjectFile } from "../types";
+import { AppConfig, MediaAsset, CharacterProfile, SceneProjectFile } from "../types";
 import { ChevronRight, Settings, Trash2, AlertTriangle, X, Users, Plus, Sparkles, MapPin, User, Pencil } from "lucide-react";
 import { getAssetMediaUrl } from "../utils/assetUrl";
 import { toCanonicalSubjectName } from "../utils/subjectUtils";
@@ -15,6 +15,7 @@ interface CastSectionProps {
   characters: Record<string, CharacterProfile>;
   sceneProject: SceneProjectFile;
   activeSceneName: string;
+  config?: AppConfig;
   onUpdateCharacter: (profile: CharacterProfile) => void;
   onDeleteCharacter: (name: string) => void;
   onRegisterSubject: (subject: string) => void;
@@ -31,6 +32,7 @@ export const CastSection: React.FC<CastSectionProps> = ({
   characters,
   sceneProject,
   activeSceneName,
+  config,
   onUpdateCharacter,
   onDeleteCharacter,
   onRegisterSubject,
@@ -574,6 +576,7 @@ export const CastSection: React.FC<CastSectionProps> = ({
         characters={characters}
         assets={assets}
         sceneName={activeSceneName}
+        config={config}
         onAssetUploaded={onAssetUploaded}
         onRegisterSubject={onRegisterSubject}
       />
@@ -582,6 +585,7 @@ export const CastSection: React.FC<CastSectionProps> = ({
         asset={editingAsset}
         subjects={renderedSubjects}
         characters={characters}
+        config={config}
         onRegisterSubject={onRegisterSubject}
         onClose={() => setEditingAsset(null)}
         onAssetUpdated={handleAssetUpdated}

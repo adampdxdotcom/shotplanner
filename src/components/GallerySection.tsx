@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { MediaAsset, CharacterProfile } from "../types";
+import { AppConfig, MediaAsset, CharacterProfile } from "../types";
 import { 
   Search, Filter, Plus, Grid, List, Users, Film
 } from "lucide-react";
@@ -15,6 +15,7 @@ interface GallerySectionProps {
   subjects: string[];
   characters?: Record<string, CharacterProfile>;
   sceneName?: string;
+  config?: AppConfig;
   sceneProject?: any; // or SceneProjectFile
   onUpdateProject?: React.Dispatch<React.SetStateAction<any>>;
   onUpdateCharacter?: (profile: CharacterProfile) => void;
@@ -30,6 +31,7 @@ export const GallerySection: React.FC<GallerySectionProps> = ({
   subjects,
   characters = {},
   sceneName = "scene01",
+  config,
   sceneProject,
   onUpdateProject,
   onUpdateCharacter,
@@ -276,6 +278,7 @@ export const GallerySection: React.FC<GallerySectionProps> = ({
         characters={characters}
         assets={assets}
         sceneName={sceneName}
+        config={config}
         onAssetUploaded={onAssetUploaded}
         onRegisterSubject={onRegisterSubject}
       />
@@ -283,6 +286,7 @@ export const GallerySection: React.FC<GallerySectionProps> = ({
       <AssetEditModal
         subjects={subjects}
         characters={characters}
+        config={config}
         onRegisterSubject={onRegisterSubject}
         onAssetUpdated={onAssetUpdated}
         asset={editingAsset}

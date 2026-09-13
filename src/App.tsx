@@ -120,6 +120,7 @@ export default function App() {
             assets={assets}
             subjects={subjects}
             characters={sceneProject.characters || {}}
+            config={config}
             onUpdateCharacter={handleUpdateCharacter}
             activeShotId={activeShotId}
             onSelectShot={setActiveShotId}
@@ -227,6 +228,7 @@ export default function App() {
             assets={assets}
             subjects={subjects}
             characters={sceneProject.characters || {}}
+            config={config}
             sceneProject={sceneProject}
             onUpdateCharacter={handleUpdateCharacter}
             onDeleteCharacter={handleDeleteCharacter}
@@ -245,6 +247,7 @@ export default function App() {
             characters={sceneProject.characters || {}}
             sceneProject={sceneProject}
             activeSceneName={sceneProject.scene_name || currentProjectName || "Untitled_Scene"}
+            config={config}
             onUpdateCharacter={handleUpdateCharacter}
             onDeleteCharacter={handleDeleteCharacter}
             onRegisterSubject={handleRegisterSubject}

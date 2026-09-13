@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { assetService } from "./assetService";
 import { getImageBase64ForVision } from "./thumbnailService";
+import { callLocalLLM } from "./llm_service";
 
 export interface VisionCaptionOptions {
   thumbnailPath?: string;
@@ -150,19 +151,13 @@ Strict rules:
     ? `Describe the visual styling and attire in this image for ${subjectName} in 5-15 words.`
     : `Provide a 5-15 word visual description of the attire, objects, or scene in this image.`;
 
-  // 3. Format OpenAI-compatible multimodal chat completions payload
-  const endpoint = rawUrl.trim().replace(/\/$/, "");
-  let completionsUrl = endpoint;
-  if (!completionsUrl.endsWith("/chat/completions")) {
-    if (completionsUrl.endsWith("/v1")) {
-      completionsUrl = `${completionsUrl}/chat/completions`;
-    } else {
-      completionsUrl = `${completionsUrl}/v1/chat/completions`;
-    }
-  }
-
-  const payload = {
+  // 3. Dispatch to centralized Local LLM orchestrator with multimodal image message
+  const localRes = await callLocalLLM({
+    url: rawUrl,
     model,
+    temperature: 0.2,
+    max_tokens: 60,
+    timeoutMs: 45000,
     messages: [
       {
         role: "system",
@@ -183,51 +178,20 @@ Strict rules:
           }
         ]
       }
-    ],
-    temperature: 0.2,
-    max_tokens: 60
+    ]
+  });
+
+  const rawContent = localRes.content;
+  const sanitized = sanitizeCaptionOutput(rawContent, subjectName);
+  const wordsCount = sanitized.split(/\s+/).filter(Boolean).length;
+  const subjectSubstituted = Boolean(hasSubject && sanitized.toLowerCase().includes(subjectName.toLowerCase()));
+
+  return {
+    success: true,
+    caption: sanitized,
+    words_count: wordsCount,
+    subject_substituted: subjectSubstituted,
+    model_used: localRes.model || model,
+    raw_output: rawContent
   };
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 35000);
-
-  try {
-    const response = await fetch(completionsUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload),
-      signal: controller.signal
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      const errBody = await response.text().catch(() => "");
-      throw new Error(`LM Studio vision call failed (${response.status}): ${errBody || response.statusText}`);
-    }
-
-    const json = await response.json();
-    const rawContent = (json.choices?.[0]?.message?.content || json.choices?.[0]?.text || "").trim();
-
-    const sanitized = sanitizeCaptionOutput(rawContent, subjectName);
-    const wordsCount = sanitized.split(/\s+/).filter(Boolean).length;
-    const subjectSubstituted = Boolean(hasSubject && sanitized.toLowerCase().includes(subjectName.toLowerCase()));
-
-    return {
-      success: true,
-      caption: sanitized,
-      words_count: wordsCount,
-      subject_substituted: subjectSubstituted,
-      model_used: json.model || model,
-      raw_output: rawContent
-    };
-  } catch (err: any) {
-    clearTimeout(timeoutId);
-    if (err.name === "AbortError") {
-      throw new Error("LM Studio vision caption request timed out after 35 seconds. Please check that a vision model is loaded.");
-    }
-    throw err;
-  }
 }

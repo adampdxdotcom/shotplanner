@@ -25,6 +25,7 @@ export function useAppConfig({ addToast, onUpdateProjectConfig }: UseAppConfigPa
     let savedMaxTokens: number | undefined = undefined;
     let savedVision = false;
     let savedAutoCaption = false;
+    let savedLmStudioUrl = "http://localhost:1234/v1";
     try {
       savedPrompt = localStorage.getItem("llm_custom_system_prompt") || undefined;
       const t = localStorage.getItem("llm_temperature");
@@ -33,6 +34,10 @@ export function useAppConfig({ addToast, onUpdateProjectConfig }: UseAppConfigPa
       if (m) savedMaxTokens = parseInt(m, 10);
       savedVision = localStorage.getItem("vision_enabled") === "true";
       savedAutoCaption = localStorage.getItem("auto_caption_enabled") === "true";
+      const url = localStorage.getItem("lm_studio_url");
+      if (url && url.trim()) {
+        savedLmStudioUrl = url.trim();
+      }
     } catch (e) {}
 
     return {
@@ -45,7 +50,7 @@ export function useAppConfig({ addToast, onUpdateProjectConfig }: UseAppConfigPa
       remote_comfyui_root: "/workspace/runpod-slim/ComfyUI",
       comfyui_api_url: "http://127.0.0.1:8188",
       remote_api_token: "",
-      lm_studio_url: "http://localhost:1234/v1",
+      lm_studio_url: savedLmStudioUrl,
       default_llm_provider: getDefaultLlmProvider(),
       gemini_api_key: "",
       civitai_api_key: "",
@@ -58,7 +63,7 @@ export function useAppConfig({ addToast, onUpdateProjectConfig }: UseAppConfigPa
     };
   });
 
-  // Sync vision settings to localStorage
+  // Sync vision and LM Studio settings to localStorage
   useEffect(() => {
     try {
       if (config.vision_enabled !== undefined) {
@@ -67,8 +72,11 @@ export function useAppConfig({ addToast, onUpdateProjectConfig }: UseAppConfigPa
       if (config.auto_caption_enabled !== undefined) {
         localStorage.setItem("auto_caption_enabled", String(config.auto_caption_enabled));
       }
+      if (config.lm_studio_url && config.lm_studio_url.trim()) {
+        localStorage.setItem("lm_studio_url", config.lm_studio_url.trim());
+      }
     } catch (e) {}
-  }, [config.vision_enabled, config.auto_caption_enabled]);
+  }, [config.vision_enabled, config.auto_caption_enabled, config.lm_studio_url]);
 
   const setDefaultLlmProvider = useCallback((provider: LLMProvider) => {
     try {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { MediaAsset, SceneProjectFile, ShotItem, CharacterProfile } from "../types";
+import { AppConfig, MediaAsset, SceneProjectFile, ShotItem, CharacterProfile } from "../types";
 import { 
   FileImage, 
   Trash2, 
@@ -27,6 +27,7 @@ interface AssetManagerSectionProps {
   onSelectShot: (id: string | null) => void;
   sceneProject: SceneProjectFile;
   activeSceneName: string;
+  config?: AppConfig;
   onUpdateProject: (updater: (prev: SceneProjectFile) => SceneProjectFile) => void;
   subjects?: string[];
   characters?: Record<string, CharacterProfile>;
@@ -43,6 +44,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
   onSelectShot,
   sceneProject,
   activeSceneName,
+  config,
   onUpdateProject,
   subjects = [],
   characters = {},
@@ -374,6 +376,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
         subjects={projectSubjects}
         characters={characters}
         sceneName={activeSceneName}
+        config={config}
         onRegisterSubject={onRegisterSubject}
         onClose={() => setUploadModalSlot(null)}
         onAssetUploaded={handleAssetUploaded}
@@ -383,6 +386,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
         asset={editingAsset}
         subjects={projectSubjects}
         characters={characters}
+        config={config}
         onRegisterSubject={onRegisterSubject}
         onClose={() => setEditingAsset(null)}
         onAssetUpdated={(oldFilename, newAsset) => {
