@@ -54,6 +54,21 @@ export async function deleteUniverseCharacter(name: string): Promise<boolean> {
 }
 
 /**
+ * Fetch all media reference assets belonging to the Universe media pool
+ */
+export async function fetchUniverseAssets(): Promise<any[]> {
+  try {
+    const res = await fetch("/api/universe/assets");
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    const data = await res.json();
+    return data.assets || [];
+  } catch (err) {
+    console.error("Failed to load universe media assets:", err);
+    return [];
+  }
+}
+
+/**
  * Promote an asset to the global universe media pool
  */
 export async function promoteAssetToUniverse(filename: string): Promise<{ success: boolean; filename: string; error?: string }> {

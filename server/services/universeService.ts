@@ -33,6 +33,13 @@ export class UniverseService {
   }
 
   /**
+   * Return all universe media reference assets
+   */
+  public getUniverseMediaAssets() {
+    return assetService.getAllAssets(undefined, { universeOnly: true });
+  }
+
+  /**
    * Persist universe character map to disk
    */
   public saveUniverseCharacters(characters: Record<string, UniverseCharacterProfile>): boolean {

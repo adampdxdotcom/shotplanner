@@ -183,12 +183,12 @@ export function useCastManagement({
         s => s.toLowerCase() !== targetLower
       );
 
-      // 4. Preserve media files while removing the character tag (reset subject_name to empty)
-      const nextAssets = (prevProject.assets || []).map(a => {
-        if ((a.subject_name || "").trim().toLowerCase() === targetLower) {
-          return { ...a, subject_name: "" };
-        }
-        return a;
+      // 4. Update scene assets list:
+      // - Remove universe assets from this scene's asset list since the character is removed from the scene.
+      // - For local scene assets matching this character, remove them from the scene's asset list so they don't linger as "unlabeled".
+      const nextAssets = (prevProject.assets || []).filter(a => {
+        const isMatch = (a.subject_name || "").trim().toLowerCase() === targetLower;
+        return !isMatch;
       });
 
       // 5. Surgical shot-level de-assignment across every shot in the project

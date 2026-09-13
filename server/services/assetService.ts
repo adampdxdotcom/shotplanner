@@ -162,7 +162,7 @@ class AssetService {
     return null;
   }
   
-  public getAllAssets(sceneName?: string): AssetRecord[] {
+  public getAllAssets(sceneName?: string, options?: { includeUniverse?: boolean; universeOnly?: boolean }): AssetRecord[] {
     const assets: AssetRecord[] = [];
     const seen = new Set<string>();
 
@@ -181,17 +181,26 @@ class AssetService {
       } catch (e) {}
     }
 
-    const dirsToScan = [];
-    if (sceneName) {
-      const sceneDirs = ensureSceneDirectories(sceneName);
-      dirsToScan.push(sceneDirs.images, sceneDirs.videos, sceneDirs.audios, sceneDirs.shared);
-    }
-    const globalShared = path.join(ASSETS_DIR, "shared");
-    dirsToScan.push(globalShared);
-    dirsToScan.push(UNIVERSE_MEDIA_DIR);
+    const dirsToScan: string[] = [];
 
-    if (!sceneName) {
-      dirsToScan.push(LEGACY_IMAGES_DIR, LEGACY_VIDEOS_DIR, LEGACY_AUDIOS_DIR, LEGACY_UPLOADS_DIR);
+    if (options?.universeOnly) {
+      dirsToScan.push(UNIVERSE_MEDIA_DIR);
+    } else {
+      if (sceneName) {
+        const sceneDirs = ensureSceneDirectories(sceneName);
+        dirsToScan.push(sceneDirs.images, sceneDirs.videos, sceneDirs.audios, sceneDirs.shared);
+      }
+      const globalShared = path.join(ASSETS_DIR, "shared");
+      dirsToScan.push(globalShared);
+
+      // Only scan universe media directory if explicitly requested
+      if (options?.includeUniverse) {
+        dirsToScan.push(UNIVERSE_MEDIA_DIR);
+      }
+
+      if (!sceneName && !options?.includeUniverse) {
+        dirsToScan.push(LEGACY_IMAGES_DIR, LEGACY_VIDEOS_DIR, LEGACY_AUDIOS_DIR, LEGACY_UPLOADS_DIR);
+      }
     }
 
     for (const dir of dirsToScan) {

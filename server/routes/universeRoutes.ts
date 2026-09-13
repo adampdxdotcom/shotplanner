@@ -61,4 +61,14 @@ router.post("/characters/promote-asset", (req: Request, res: Response) => {
   }
 });
 
+// GET all universe reference media assets
+router.get("/assets", (_req: Request, res: Response) => {
+  try {
+    const assets = universeService.getUniverseMediaAssets();
+    res.json({ success: true, assets });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 export default router;

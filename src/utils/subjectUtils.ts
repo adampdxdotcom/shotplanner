@@ -87,7 +87,7 @@ export const normalizeProjectCastAndAssets = <T extends {
   const lowerToCanonical = new Map<string, string>();
   const canonicalSubjects: string[] = [];
 
-  // 1. Process project subjects first
+  // 1. Process explicit project subjects first
   (project.subjects || []).forEach(raw => {
     const canonical = toCanonicalSubjectName(raw);
     if (!canonical) return;
@@ -110,19 +110,7 @@ export const normalizeProjectCastAndAssets = <T extends {
     }
   });
 
-  // 3. Process asset subject names
   const rawAssets = project.assets || [];
-  rawAssets.forEach(a => {
-    const rawSubj = a.subject_name;
-    if (!rawSubj) return;
-    const canonical = toCanonicalSubjectName(rawSubj);
-    if (!canonical) return;
-    const lowerKey = canonical.toLowerCase();
-    if (!lowerToCanonical.has(lowerKey)) {
-      lowerToCanonical.set(lowerKey, canonical);
-      canonicalSubjects.push(canonical);
-    }
-  });
 
   // 4. Build deduplicated canonical characters dictionary
   const nextCharacters: Record<string, CharacterProfile> = {};

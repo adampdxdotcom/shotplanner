@@ -32,6 +32,7 @@ import { CreateUniverseCharacterModal } from "./cast/CreateUniverseCharacterModa
 import { CharacterSyncModal } from "./cast/CharacterSyncModal";
 import { 
   fetchUniverseCharacters, 
+  fetchUniverseAssets,
   saveUniverseCharacter, 
   deleteUniverseCharacter, 
   promoteAssetToUniverse 
@@ -72,6 +73,7 @@ export const CastSection: React.FC<CastSectionProps> = ({
 }) => {
   const [activeRosterTab, setActiveRosterTab] = useState<"scene" | "universe">("scene");
   const [universeCharacters, setUniverseCharacters] = useState<Record<string, UniverseCharacterProfile>>({});
+  const [universeAssets, setUniverseAssets] = useState<MediaAsset[]>([]);
   const [isUniverseLoading, setIsUniverseLoading] = useState(false);
   const [pushingToUniverse, setPushingToUniverse] = useState<Record<string, boolean>>({});
 
@@ -89,12 +91,16 @@ export const CastSection: React.FC<CastSectionProps> = ({
   const [editingAsset, setEditingAsset] = useState<MediaAsset | null>(null);
   const [syncDiffSubject, setSyncDiffSubject] = useState<string | null>(null);
 
-  // Load universe characters
+  // Load universe characters and universe media assets
   const loadUniverseData = async () => {
     setIsUniverseLoading(true);
     try {
-      const data = await fetchUniverseCharacters();
-      setUniverseCharacters(data || {});
+      const [charsData, uAssets] = await Promise.all([
+        fetchUniverseCharacters(),
+        fetchUniverseAssets()
+      ]);
+      setUniverseCharacters(charsData || {});
+      setUniverseAssets(uAssets || []);
     } catch (e) {
       console.error("Error loading universe data:", e);
     } finally {
@@ -129,6 +135,8 @@ export const CastSection: React.FC<CastSectionProps> = ({
         setUniverseCharacters(prev => ({ ...prev, [subject]: saved }));
         onUpdateCharacter?.({ ...profile, in_universe: true });
         addToast(`Added "${subject}" to Universe Roster!`, "success");
+        // Refresh universe media pool
+        fetchUniverseAssets().then(uAssets => setUniverseAssets(uAssets || [])).catch(() => {});
       } else {
         addToast(`Failed to add "${subject}" to Universe`, "error");
       }
@@ -152,6 +160,16 @@ export const CastSection: React.FC<CastSectionProps> = ({
       scene_outfit_ref: char.default_outfit_ref || char.scene_outfit_ref || "",
       is_location: char.is_location,
       in_universe: true
+    });
+
+    // Also import universe reference assets for this character into active scene assets if not already present
+    const charUniverseAssets = universeAssets.filter(
+      a => (a.subject_name || "").trim().toLowerCase() === subject.trim().toLowerCase()
+    );
+    charUniverseAssets.forEach(uAsset => {
+      if (!assets.some(a => a.filename === uAsset.filename)) {
+        onAssetUploaded(uAsset);
+      }
     });
 
     addToast(`Imported "${subject}" from Universe into active scene!`, "success");
@@ -253,12 +271,11 @@ export const CastSection: React.FC<CastSectionProps> = ({
     }
   };
 
-  // Derive strictly deduplicated canonical list of subjects
+  // Derive strictly deduplicated canonical list of subjects belonging to the scene
   const deduplicatedSubjectsMap = new Map<string, string>();
   [
     ...(subjects || []),
-    ...Object.keys(characters || {}),
-    ...(assets || []).map(a => a.subject_name)
+    ...Object.keys(characters || {})
   ].forEach(raw => {
     if (!raw) return;
     const canonical = toCanonicalSubjectName(raw);
@@ -366,7 +383,7 @@ export const CastSection: React.FC<CastSectionProps> = ({
           {activeRosterTab === "universe" ? (
             <UniverseCastView
               universeCharacters={universeCharacters}
-              assets={assets}
+              assets={[...(universeAssets || []), ...(assets || []).filter(a => a.is_universe)]}
               activeSceneName={activeSceneName}
               config={config}
               onImportToScene={handleImportUniverseCharToScene}

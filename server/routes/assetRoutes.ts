@@ -10,7 +10,9 @@ const router = Router();
 // Retrieve all assets
 router.get("/", (req: Request, res: Response) => {
   const sceneName = req.query.scene_name as string | undefined;
-  res.json({ assets: assetService.getAllAssets(sceneName) });
+  const includeUniverse = req.query.include_universe === "true" || req.query.include_universe === "1";
+  const universeOnly = req.query.universe_only === "true" || req.query.universe_only === "1";
+  res.json({ assets: assetService.getAllAssets(sceneName, { includeUniverse, universeOnly }) });
 });
 
 // Dedicated media file serving route with MIME headers and fallback lookup across scene folders
