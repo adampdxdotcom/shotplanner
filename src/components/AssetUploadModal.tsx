@@ -50,6 +50,7 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isCaptioning, setIsCaptioning] = useState(false);
   const [captionToast, setCaptionToast] = useState<string | null>(null);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const visionState = useVisionCaption(config);
@@ -79,8 +80,35 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
       setUploadProgress(0);
       setIsCaptioning(false);
       setCaptionToast(null);
+      setIsDraggingOver(false);
     }
   }, [isOpen]);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!uploading) {
+      setIsDraggingOver(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+    if (uploading) return;
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      handleFilePicked(file);
+    }
+  };
 
   const groupedLibraryAssets = useMemo(() => {
     let filtered = libraryAssets.filter(a => a.media_type === (uploadModalSlot?.type || activeTab));
@@ -415,7 +443,12 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
               />
 
               {stagedFile && stagedPreviewUrl ? (
-                <div className="rounded-xl border-2 border-zinc-700 bg-zinc-950 p-3 flex flex-col sm:flex-row items-center gap-3">
+                <div 
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  className={`rounded-xl border-2 ${isDraggingOver ? "border-amber-400 bg-amber-950/20" : "border-zinc-700 bg-zinc-950"} p-3 flex flex-col sm:flex-row items-center gap-3 transition-colors`}
+                >
                   <div className="w-20 h-20 rounded-lg overflow-hidden border border-zinc-800 bg-black shrink-0 relative flex items-center justify-center">
                     {activeTab === "image" ? (
                       <img src={stagedPreviewUrl} alt="Staged" className="w-full h-full object-cover" />
@@ -457,11 +490,14 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
               ) : (
                 <div 
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex-1 min-h-[120px] mt-1 border-2 border-dashed border-zinc-700 hover:border-amber-500 rounded-xl relative transition-all group overflow-hidden bg-zinc-950/60 flex flex-col items-center justify-center p-5 cursor-pointer"
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  className={`flex-1 min-h-[120px] mt-1 border-2 border-dashed ${isDraggingOver ? "border-amber-400 bg-amber-950/30 scale-[1.01]" : "border-zinc-700 hover:border-amber-500 bg-zinc-950/60"} rounded-xl relative transition-all group overflow-hidden flex flex-col items-center justify-center p-5 cursor-pointer`}
                 >
-                  <UploadCloud className="w-8 h-8 mb-2 text-amber-500 group-hover:text-amber-400 transition-colors" />
+                  <UploadCloud className={`w-8 h-8 mb-2 ${isDraggingOver ? "text-amber-300 animate-bounce" : "text-amber-500 group-hover:text-amber-400"} transition-colors`} />
                   <p className="text-xs font-semibold text-zinc-200 text-center">
-                    Select or Drop {activeTab.toUpperCase()} File
+                    {isDraggingOver ? `Drop ${activeTab.toUpperCase()} File Here` : `Select or Drop ${activeTab.toUpperCase()} File`}
                   </p>
                   <p className="text-[11px] text-zinc-500 text-center mt-0.5">
                     Click to browse or drag file here

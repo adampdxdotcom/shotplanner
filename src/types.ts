@@ -45,6 +45,20 @@ export interface CharacterProfile {
   quick_slots: string[];
   scene_outfit_ref: string;
   is_location?: boolean;
+  in_universe?: boolean;
+  universe_slots?: string[];
+  default_outfit_ref?: string;
+  source_scene?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface UniverseCharacterProfile extends CharacterProfile {
+  source_scene?: string;
+  created_at?: string;
+  updated_at?: string;
+  universe_slots?: string[];
+  default_outfit_ref?: string;
 }
 
 export interface SceneProjectFile {
@@ -334,6 +348,7 @@ export interface MediaAsset {
   slot_index?: number;
   scene_name?: string;
   path?: string;
+  is_universe?: boolean;
 }
 
 export interface WorkflowItem {
@@ -430,6 +445,26 @@ export interface TransferResult {
   updated_workflow_json?: Record<string, any>;
   message: string;
   error?: string;
+}
+
+export interface UniverseInspectionItem {
+  name: string;
+  is_location?: boolean;
+  status: "new" | "identical" | "different";
+  incoming: UniverseCharacterProfile;
+  existing?: UniverseCharacterProfile;
+  diffs: {
+    notes?: { local: string; incoming: string };
+    default_outfit_ref?: { local: string; incoming: string };
+    slots?: { local: string[]; incoming: string[] };
+  };
+}
+
+export interface UniverseInspectionResult {
+  has_universe_data: boolean;
+  items: UniverseInspectionItem[];
+  total_incoming: number;
+  total_conflicts: number;
 }
 
 export { getAssetMediaUrl } from "./utils/assetUrl";

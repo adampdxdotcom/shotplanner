@@ -10,6 +10,9 @@ export const CIVITAI_CONFIG_FILE = path.join(ASSETS_DIR, "civitai_config.json");
 export const CIVITAI_FAVORITES_FILE = path.join(ASSETS_DIR, "civitai_favorites.json");
 export const HUGGINGFACE_CONFIG_FILE = path.join(ASSETS_DIR, "huggingface_config.json");
 export const ASSET_DB_FILE = path.join(ASSETS_DIR, "assets_db.json");
+export const UNIVERSE_DIR = path.join(ASSETS_DIR, "universe");
+export const UNIVERSE_CHARACTERS_FILE = path.join(UNIVERSE_DIR, "characters.json");
+export const UNIVERSE_MEDIA_DIR = path.join(UNIVERSE_DIR, "media");
 export const TMP_DIR = path.join(ROOT_DIR, "tmp");
 
 // Legacy directories for backward compatibility
@@ -86,6 +89,8 @@ export const EMPTY_1X1_PNG_BUFFER = Buffer.from(
 export function initDirectories(): void {
   const baseDirs = [
     ASSETS_DIR,
+    UNIVERSE_DIR,
+    UNIVERSE_MEDIA_DIR,
     TMP_DIR
   ];
   
@@ -94,6 +99,12 @@ export function initDirectories(): void {
       fs.mkdirSync(dir, { recursive: true });
     }
   });
+
+  if (!fs.existsSync(UNIVERSE_CHARACTERS_FILE)) {
+    try {
+      fs.writeFileSync(UNIVERSE_CHARACTERS_FILE, JSON.stringify({}, null, 2), "utf-8");
+    } catch (e) {}
+  }
 }
 
 // Multer upload handler using the temporary directory with 500MB limit for large archives and 4K media

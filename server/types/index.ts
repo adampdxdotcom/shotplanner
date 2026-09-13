@@ -1,4 +1,21 @@
 
+export interface CharacterProfile {
+  id: string;
+  name: string;
+  notes: string;
+  quick_slots: string[];
+  scene_outfit_ref: string;
+  is_location?: boolean;
+}
+
+export interface UniverseCharacterProfile extends CharacterProfile {
+  source_scene?: string;
+  created_at?: string;
+  updated_at?: string;
+  universe_slots?: string[];
+  default_outfit_ref?: string;
+}
+
 export interface GenerationParameters {
   steps: number;
   megapixels: number;
@@ -75,6 +92,7 @@ export interface AssetRecord {
   slot_index?: number;
   scene_name?: string;
   path?: string;
+  is_universe?: boolean;
 }
 
 export interface WorkflowNodeInfo {
@@ -152,6 +170,26 @@ export interface ExpandPromptResult {
   provider: string;
   description_only?: string;
   debug?: PromptDebugInfo;
+}
+
+export interface UniverseInspectionItem {
+  name: string;
+  is_location?: boolean;
+  status: "new" | "identical" | "different";
+  incoming: UniverseCharacterProfile;
+  existing?: UniverseCharacterProfile;
+  diffs: {
+    notes?: { local: string; incoming: string };
+    default_outfit_ref?: { local: string; incoming: string };
+    slots?: { local: string[]; incoming: string[] };
+  };
+}
+
+export interface UniverseInspectionResult {
+  has_universe_data: boolean;
+  items: UniverseInspectionItem[];
+  total_incoming: number;
+  total_conflicts: number;
 }
 
 export const SCENE_REFERENCE_DIRECTIVE = "A scene reference image is provided. Please match the location, lighting, and general environment of the provided reference image.";

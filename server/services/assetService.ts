@@ -7,6 +7,8 @@ import {
   LEGACY_VIDEOS_DIR, 
   LEGACY_AUDIOS_DIR, 
   LEGACY_UPLOADS_DIR, 
+  UNIVERSE_DIR,
+  UNIVERSE_MEDIA_DIR,
   TMP_DIR,
   ensureSceneDirectories,
   formatSceneFolderName 
@@ -132,6 +134,9 @@ class AssetService {
   public getAssetFilePath(filename: string): string | null {
     const dirsToScan = [
       ASSETS_DIR,
+      UNIVERSE_DIR,
+      UNIVERSE_MEDIA_DIR,
+      path.join(UNIVERSE_DIR, "media"),
       path.join(ASSETS_DIR, "shared")
     ];
     // Also include all subdirs
@@ -183,6 +188,7 @@ class AssetService {
     }
     const globalShared = path.join(ASSETS_DIR, "shared");
     dirsToScan.push(globalShared);
+    dirsToScan.push(UNIVERSE_MEDIA_DIR);
 
     if (!sceneName) {
       dirsToScan.push(LEGACY_IMAGES_DIR, LEGACY_VIDEOS_DIR, LEGACY_AUDIOS_DIR, LEGACY_UPLOADS_DIR);
@@ -190,6 +196,7 @@ class AssetService {
 
     for (const dir of dirsToScan) {
       if (fs.existsSync(dir)) {
+        const isUniverseDir = dir === UNIVERSE_MEDIA_DIR || dir.startsWith(UNIVERSE_DIR);
         const files = fs.readdirSync(dir, { withFileTypes: true });
         for (const file of files) {
           if (file.isFile() && file.name !== ".DS_Store" && file.name !== "empty.png") {
@@ -224,8 +231,9 @@ class AssetService {
               created_at: dbRecord?.created_at || mtime,
               preview_url: `/api/uploads/${file.name}`,
               slot_index: dbRecord?.slot_index,
-              scene_name: dbRecord?.scene_name || sceneName || "unknown",
-              path: path.join(dir, file.name)
+              scene_name: dbRecord?.scene_name || (isUniverseDir ? "universe" : (sceneName || "unknown")),
+              path: path.join(dir, file.name),
+              is_universe: isUniverseDir || dbRecord?.is_universe || false
             });
           }
         }

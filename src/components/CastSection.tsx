@@ -1,6 +1,25 @@
-import React, { useState } from "react";
-import { AppConfig, MediaAsset, CharacterProfile, SceneProjectFile } from "../types";
-import { ChevronRight, Settings, Trash2, AlertTriangle, X, Users, Plus, Sparkles, MapPin, User, Pencil } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { AppConfig, MediaAsset, CharacterProfile, SceneProjectFile, UniverseCharacterProfile } from "../types";
+import { 
+  ChevronRight, 
+  Settings, 
+  Trash2, 
+  AlertTriangle, 
+  X, 
+  Users, 
+  Plus, 
+  Sparkles, 
+  MapPin, 
+  User, 
+  Pencil, 
+  Globe, 
+  Clapperboard, 
+  Share2, 
+  Check,
+  ArrowDownToLine,
+  Layers,
+  Sparkle
+} from "lucide-react";
 import { getAssetMediaUrl } from "../utils/assetUrl";
 import { toCanonicalSubjectName } from "../utils/subjectUtils";
 import { isLocationEntity } from "../utils/locationUtils";
@@ -8,6 +27,15 @@ import { GalleryBulkUploadModal } from "./gallery/GalleryBulkUploadModal";
 import { AssetLightbox } from "./AssetLightbox";
 import { AssetEditModal } from "./AssetEditModal";
 import { AiReferenceStagingStudioModal } from "./cast/AiReferenceStagingStudioModal";
+import { UniverseCastView } from "./cast/UniverseCastView";
+import { CreateUniverseCharacterModal } from "./cast/CreateUniverseCharacterModal";
+import { CharacterSyncModal } from "./cast/CharacterSyncModal";
+import { 
+  fetchUniverseCharacters, 
+  saveUniverseCharacter, 
+  deleteUniverseCharacter, 
+  promoteAssetToUniverse 
+} from "../utils/universeApi";
 
 interface CastSectionProps {
   assets: MediaAsset[];
@@ -42,6 +70,11 @@ export const CastSection: React.FC<CastSectionProps> = ({
   onUpdateProject,
   addToast
 }) => {
+  const [activeRosterTab, setActiveRosterTab] = useState<"scene" | "universe">("scene");
+  const [universeCharacters, setUniverseCharacters] = useState<Record<string, UniverseCharacterProfile>>({});
+  const [isUniverseLoading, setIsUniverseLoading] = useState(false);
+  const [pushingToUniverse, setPushingToUniverse] = useState<Record<string, boolean>>({});
+
   const [characterToDelete, setCharacterToDelete] = useState<string | null>(null);
   const [headshotModalSubject, setHeadshotModalSubject] = useState<string | null>(null);
   const [studioInitialTab, setStudioInitialTab] = useState<"headshots" | "staging">("headshots");
@@ -50,9 +83,119 @@ export const CastSection: React.FC<CastSectionProps> = ({
   const [bulkModalIsLocation, setBulkModalIsLocation] = useState<boolean | undefined>();
   const [lightboxAsset, setLightboxAsset] = useState<MediaAsset | null>(null);
   const [isNewCharacterModalOpen, setIsNewCharacterModalOpen] = useState(false);
+  const [isNewUniverseModalOpen, setIsNewUniverseModalOpen] = useState(false);
   const [newCharacterName, setNewCharacterName] = useState("");
   const [newEntityType, setNewEntityType] = useState<"character" | "location">("character");
   const [editingAsset, setEditingAsset] = useState<MediaAsset | null>(null);
+  const [syncDiffSubject, setSyncDiffSubject] = useState<string | null>(null);
+
+  // Load universe characters
+  const loadUniverseData = async () => {
+    setIsUniverseLoading(true);
+    try {
+      const data = await fetchUniverseCharacters();
+      setUniverseCharacters(data || {});
+    } catch (e) {
+      console.error("Error loading universe data:", e);
+    } finally {
+      setIsUniverseLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadUniverseData();
+  }, []);
+
+  const handlePushToUniverse = async (subject: string, profile: CharacterProfile, charAssets: MediaAsset[]) => {
+    setPushingToUniverse(prev => ({ ...prev, [subject]: true }));
+    try {
+      // Promote character reference assets into universe media pool
+      for (const asset of charAssets) {
+        if (asset && asset.filename) {
+          await promoteAssetToUniverse(asset.filename);
+        }
+      }
+
+      const isLoc = isLocationEntity(subject, profile, charAssets);
+      const saved = await saveUniverseCharacter({
+        ...profile,
+        name: subject,
+        is_location: isLoc,
+        source_scene: activeSceneName,
+        default_outfit_ref: profile.scene_outfit_ref || ""
+      });
+
+      if (saved) {
+        setUniverseCharacters(prev => ({ ...prev, [subject]: saved }));
+        onUpdateCharacter?.({ ...profile, in_universe: true });
+        addToast(`Added "${subject}" to Universe Roster!`, "success");
+      } else {
+        addToast(`Failed to add "${subject}" to Universe`, "error");
+      }
+    } catch (err: any) {
+      console.error("Error pushing to universe:", err);
+      addToast(`Error adding to Universe: ${err.message}`, "error");
+    } finally {
+      setPushingToUniverse(prev => ({ ...prev, [subject]: false }));
+    }
+  };
+
+  const handleImportUniverseCharToScene = (char: UniverseCharacterProfile) => {
+    const subject = char.name;
+    onRegisterSubject(subject);
+
+    onUpdateCharacter({
+      id: char.id || `char_${Date.now()}`,
+      name: subject,
+      notes: char.notes || "",
+      quick_slots: char.quick_slots || ["", "", "", ""],
+      scene_outfit_ref: char.default_outfit_ref || char.scene_outfit_ref || "",
+      is_location: char.is_location,
+      in_universe: true
+    });
+
+    addToast(`Imported "${subject}" from Universe into active scene!`, "success");
+  };
+
+  const handleCreateUniverseCharacter = async (profile: Partial<UniverseCharacterProfile> & { name: string }) => {
+    const saved = await saveUniverseCharacter(profile);
+    if (saved) {
+      setUniverseCharacters(prev => ({ ...prev, [saved.name]: saved }));
+      addToast(`Created global universe entity "${saved.name}"`, "success");
+    } else {
+      addToast(`Failed to create universe character`, "error");
+    }
+  };
+
+  const handleUpdateUniverseChar = async (updated: UniverseCharacterProfile) => {
+    try {
+      const res = await saveUniverseCharacter(updated);
+      if (res) {
+        setUniverseCharacters(prev => ({ ...prev, [updated.name]: res }));
+        addToast(`Updated universe profile for "${updated.name}"`, "success");
+      }
+    } catch (err: any) {
+      addToast(`Error updating universe character: ${err.message}`, "error");
+    }
+  };
+
+  const handleDeleteUniverseChar = async (name: string) => {
+    try {
+      const ok = await deleteUniverseCharacter(name);
+      if (ok) {
+        setUniverseCharacters(prev => {
+          const copy = { ...prev };
+          delete copy[name];
+          return copy;
+        });
+        addToast(`Deleted "${name}" from Universe roster`, "success");
+      } else {
+        addToast(`Failed to delete "${name}" from Universe`, "error");
+      }
+    } catch (err: any) {
+      addToast(`Error deleting universe character: ${err.message}`, "error");
+    }
+  };
 
   const handleDeleteAsset = async (asset: MediaAsset) => {
     const displayName = asset.original_name || asset.subject_name || asset.filename;
@@ -127,6 +270,8 @@ export const CastSection: React.FC<CastSectionProps> = ({
   });
   const renderedSubjects = Array.from(deduplicatedSubjectsMap.values());
 
+  const universeCount = Object.keys(universeCharacters || {}).length;
+
   return (
     <div className="flex flex-col h-full bg-transparent">
       {/* Header */}
@@ -140,41 +285,137 @@ export const CastSection: React.FC<CastSectionProps> = ({
               <h2 className="text-xl font-bold text-zinc-100 flex items-center gap-2 flex-wrap">
                 Cast & Characters
                 <span className="text-xs font-medium text-zinc-500 bg-zinc-800 px-2 py-0.5 rounded-full">
-                  {renderedSubjects.length} subjects
+                  {activeRosterTab === "scene" ? `${renderedSubjects.length} scene subjects` : `${universeCount} universe entities`}
                 </span>
               </h2>
-              <p className="text-xs text-zinc-400 mt-0.5 truncate">Manage reference identities and consistent appearances</p>
+              <p className="text-xs text-zinc-400 mt-0.5 truncate">
+                {activeRosterTab === "scene"
+                  ? "Manage reference identities, traits, and outfits for the current scene"
+                  : "Global reference pool that persists across all projects and scenes"}
+              </p>
             </div>
           </div>
-          <button
-            onClick={() => setIsNewCharacterModalOpen(true)}
-            className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md shadow-indigo-900/20 transition-all flex items-center gap-2 shrink-0"
-          >
-            <Plus className="w-4 h-4" />
-            Register Character
-          </button>
+
+          <div className="flex items-center gap-3">
+            {/* Roster Switcher Toggle */}
+            <div className="flex items-center bg-zinc-950 border border-zinc-800 p-1 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setActiveRosterTab("scene")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                  activeRosterTab === "scene"
+                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-900/30"
+                    : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                <Clapperboard className="w-3.5 h-3.5" />
+                <span>🎬 Scene Cast</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                  activeRosterTab === "scene" ? "bg-indigo-700 text-indigo-100" : "bg-zinc-800 text-zinc-400"
+                }`}>
+                  {renderedSubjects.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveRosterTab("universe")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                  activeRosterTab === "universe"
+                    ? "bg-amber-500 text-zinc-950 shadow-md shadow-amber-900/30 font-extrabold"
+                    : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                <Globe className="w-3.5 h-3.5" />
+                <span>🌐 Universe Cast</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                  activeRosterTab === "universe" ? "bg-amber-600 text-zinc-950" : "bg-zinc-800 text-zinc-400"
+                }`}>
+                  {universeCount}
+                </span>
+              </button>
+            </div>
+
+            {/* Register Action Button */}
+            {activeRosterTab === "scene" ? (
+              <button
+                type="button"
+                onClick={() => setIsNewCharacterModalOpen(true)}
+                className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md shadow-indigo-900/20 transition-all flex items-center gap-2 shrink-0"
+              >
+                <Plus className="w-4 h-4" />
+                Register Character
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsNewUniverseModalOpen(true)}
+                className="bg-amber-500 hover:bg-amber-400 text-zinc-950 px-4 py-2 rounded-lg text-sm font-bold shadow-md shadow-amber-900/20 transition-all flex items-center gap-2 shrink-0"
+              >
+                <Plus className="w-4 h-4" />
+                New Universe Entity
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto p-4 md:p-8">
         <div className="max-w-7xl mx-auto space-y-8">
-          {renderedSubjects.length === 0 ? (
+          {activeRosterTab === "universe" ? (
+            <UniverseCastView
+              universeCharacters={universeCharacters}
+              assets={assets}
+              activeSceneName={activeSceneName}
+              config={config}
+              onImportToScene={handleImportUniverseCharToScene}
+              onUpdateUniverseChar={handleUpdateUniverseChar}
+              onDeleteUniverseChar={handleDeleteUniverseChar}
+              onOpenAssetStudio={(subj, isLoc) => {
+                setStudioInitialTab(isLoc ? "staging" : "headshots");
+                setHeadshotModalSubject(subj);
+              }}
+              onOpenBulkUpload={(subj, isLoc) => {
+                setBulkModalSubject(subj);
+                setBulkModalIsLocation(isLoc);
+                setIsBulkModalOpen(true);
+              }}
+              onOpenLightbox={(asset) => setLightboxAsset(asset)}
+              onOpenEditAsset={(asset) => setEditingAsset(asset)}
+              onCreateNewUniverseChar={() => setIsNewUniverseModalOpen(true)}
+              addToast={addToast}
+              sceneCharacterNames={renderedSubjects}
+            />
+          ) : renderedSubjects.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed border-zinc-800 rounded-xl bg-zinc-900/30">
               <div className="w-16 h-16 bg-zinc-800/50 rounded-full flex items-center justify-center mb-4">
                 <Users className="w-8 h-8 text-zinc-600" />
               </div>
-              <h3 className="text-lg font-bold text-zinc-300 mb-2">No characters registered</h3>
-              <p className="text-zinc-500 max-w-md mb-6">
-                Register characters to manage their reference assets, persistent traits, and scene outfits.
+              <h3 className="text-lg font-bold text-zinc-300 mb-2">No characters in scene</h3>
+              <p className="text-zinc-500 max-w-md mb-6 text-xs">
+                Register characters for this scene, or switch to the Universe Cast tab to pull in characters from your global roster.
               </p>
-              <button
-                onClick={() => setIsNewCharacterModalOpen(true)}
-                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2"
-              >
-                <Plus className="w-4 h-4" />
-                Add First Character
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsNewCharacterModalOpen(true)}
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add First Scene Character
+                </button>
+                {universeCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveRosterTab("universe")}
+                    className="bg-amber-600 hover:bg-amber-500 text-black px-4 py-2 rounded-lg text-xs font-bold transition-colors flex items-center gap-2"
+                  >
+                    <Globe className="w-4 h-4" />
+                    Browse Universe ({universeCount})
+                  </button>
+                )}
+              </div>
             </div>
           ) : (
             renderedSubjects.map(subject => {
@@ -185,6 +426,8 @@ export const CastSection: React.FC<CastSectionProps> = ({
                 { name: subject, notes: "", quick_slots: [], scene_outfit_ref: "" };
               
               const isLoc = isLocationEntity(subject, profile, charAssets);
+              const isInUniverse = !!universeCharacters[subject] || !!profile.in_universe;
+              const isPushing = !!pushingToUniverse[subject];
 
               const profilePic = isLoc
                 ? (charAssets.find(a => a.type === "Scene Reference") ||
@@ -196,7 +439,7 @@ export const CastSection: React.FC<CastSectionProps> = ({
                                  
               return (
                 <div key={subject} className="cast-entity-card bg-zinc-900/50 border border-zinc-800/80 rounded-2xl overflow-hidden flex flex-col md:flex-row shadow-lg">
-                  <div className="w-full md:w-72 lg:w-80 bg-zinc-900 p-6 border-b md:border-b-0 md:border-r border-zinc-800 flex flex-col shrink-0">
+                  <div className="w-full md:w-72 lg:w-84 bg-zinc-900 p-6 border-b md:border-b-0 md:border-r border-zinc-800 flex flex-col shrink-0">
                     <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
                       <div className="flex items-center gap-3 min-w-0">
                         <div className={`w-14 h-14 rounded-full bg-zinc-950 border-2 overflow-hidden shrink-0 flex items-center justify-center ${
@@ -236,12 +479,36 @@ export const CastSection: React.FC<CastSectionProps> = ({
                               )}
                             </button>
                           </div>
-                          <p className={`text-xs font-medium ${isLoc ? "text-emerald-400" : "text-amber-500"}`}>
-                            {charAssets.length} reference{charAssets.length === 1 ? "" : "s"}
-                          </p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <p className={`text-xs font-medium ${isLoc ? "text-emerald-400" : "text-amber-500"}`}>
+                              {charAssets.length} reference{charAssets.length === 1 ? "" : "s"}
+                            </p>
+                            {isInUniverse && (
+                              <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-950/80 border border-amber-600/40 text-amber-300 inline-flex items-center gap-1">
+                                <Globe className="w-2.5 h-2.5" />
+                                Universe
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-1.5">
+                        {/* Add to Universe / Sync & Diff Inspector Button */}
+                        <button
+                          type="button"
+                          disabled={isPushing}
+                          onClick={() => setSyncDiffSubject(subject)}
+                          className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer shadow-sm border ${
+                            isInUniverse
+                              ? "bg-amber-950/60 hover:bg-amber-900/80 text-amber-300 border-amber-700/50"
+                              : "bg-zinc-800 hover:bg-amber-600 hover:text-black text-zinc-200 border-zinc-700"
+                          }`}
+                          title={isInUniverse ? "Open Sync & Diff Inspector for Universe" : "Add this character & references to Global Universe"}
+                        >
+                          <Globe className={`w-3.5 h-3.5 ${isPushing ? "animate-spin text-amber-400" : "text-amber-400"}`} />
+                          <span>{isPushing ? "Syncing..." : isInUniverse ? "Sync / Diff" : "Add to Universe"}</span>
+                        </button>
+
                         <button
                           type="button"
                           onClick={() => {
@@ -249,11 +516,11 @@ export const CastSection: React.FC<CastSectionProps> = ({
                             setBulkModalIsLocation(isLoc);
                             setIsBulkModalOpen(true);
                           }}
-                          className="bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border-zinc-300 dark:bg-zinc-800/90 dark:hover:bg-zinc-700/90 dark:text-zinc-200 dark:border-zinc-700/80 border px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer shadow-sm"
+                          className="bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border-zinc-300 dark:bg-zinc-800/90 dark:hover:bg-zinc-700/90 dark:text-zinc-200 dark:border-zinc-700/80 border px-2 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors shrink-0 cursor-pointer shadow-sm"
                           title={isLoc ? `Upload references for ${subject}` : `Upload reference photos for ${subject}`}
                         >
                           <Plus className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-300" />
-                          <span>Add Asset</span>
+                          <span>Asset</span>
                         </button>
 
                         <button
@@ -262,19 +529,19 @@ export const CastSection: React.FC<CastSectionProps> = ({
                             setStudioInitialTab(isLoc ? "staging" : "headshots");
                             setHeadshotModalSubject(subject);
                           }}
-                          className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/80 dark:text-indigo-300 dark:border-indigo-800/60 border px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer shadow-sm"
+                          className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/80 dark:text-indigo-300 dark:border-indigo-800/60 border px-2 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors shrink-0 cursor-pointer shadow-sm"
                           title={isLoc ? "Generate AI Location Reference & Scene Staging" : "Generate AI Assets, Headshots & Scene Staging"}
                         >
                           <Sparkles className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
-                          <span>Asset Generation</span>
+                          <span>AI</span>
                         </button>
 
                         <button
                           type="button"
                           onClick={() => setCharacterToDelete(subject)}
                           className="p-1.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:text-zinc-500 dark:hover:text-red-400 dark:hover:bg-red-950/40 rounded-lg transition-colors shrink-0"
-                          title={`Delete ${subject} profile`}
-                          aria-label={`Delete ${subject} profile`}
+                          title={`Delete ${subject} from Scene`}
+                          aria-label={`Delete ${subject} from Scene`}
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -370,6 +637,14 @@ export const CastSection: React.FC<CastSectionProps> = ({
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
                             </div>
+
+                            {/* Shared Universe Origin Badge */}
+                            {asset.is_universe && (
+                              <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-amber-950/80 border border-amber-500/50 text-amber-300 text-[9px] font-bold flex items-center gap-1 shadow pointer-events-none backdrop-blur-sm">
+                                <Globe className="w-2.5 h-2.5" />
+                                <span>Universe</span>
+                              </div>
+                            )}
 
                             {asset.type && (
                               <div className="absolute bottom-0 inset-x-0 bg-black/80 backdrop-blur-sm p-1.5 pointer-events-none">
@@ -498,6 +773,13 @@ export const CastSection: React.FC<CastSectionProps> = ({
         </div>
       )}
 
+      {/* Universe Character Modal */}
+      <CreateUniverseCharacterModal
+        isOpen={isNewUniverseModalOpen}
+        onClose={() => setIsNewUniverseModalOpen(false)}
+        onCreate={handleCreateUniverseCharacter}
+      />
+
       {characterToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-150">
@@ -612,6 +894,32 @@ export const CastSection: React.FC<CastSectionProps> = ({
         sceneProject={sceneProject}
         onUpdateProject={onUpdateProject}
       />
+
+      {syncDiffSubject && (
+        <CharacterSyncModal
+          isOpen={!!syncDiffSubject}
+          onClose={() => setSyncDiffSubject(null)}
+          sceneProfile={
+            characters[syncDiffSubject] || {
+              id: `char_${Date.now()}`,
+              name: syncDiffSubject,
+              notes: "",
+              quick_slots: ["", "", "", ""],
+              scene_outfit_ref: "",
+              is_location: isLocationEntity(syncDiffSubject, characters[syncDiffSubject], assets)
+            }
+          }
+          universeProfile={universeCharacters[syncDiffSubject]}
+          assets={assets}
+          onPushToUniverse={async (subj, prof, newAssets) => {
+            await handlePushToUniverse(subj, prof, newAssets);
+          }}
+          onPullFromUniverse={(uChar) => {
+            handleImportUniverseCharToScene(uChar);
+          }}
+          isPushing={!!pushingToUniverse[syncDiffSubject]}
+        />
+      )}
     </div>
   );
 };

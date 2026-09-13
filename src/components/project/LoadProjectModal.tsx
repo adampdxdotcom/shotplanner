@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { X, Save, FolderOpen, AlertCircle, Download, Upload, Plus, Trash2, Loader2, FileArchive } from "lucide-react";
+import { UniverseIngestionModal } from "../cast/UniverseIngestionModal";
+import { UniverseInspectionResult } from "../../types";
 
 interface LoadProjectModalProps {
   onReloadProjects?: () => void;
@@ -15,6 +17,12 @@ export const LoadProjectModal: React.FC<LoadProjectModalProps> = ({ isOpen, onCl
   const [loading, setLoading] = useState(false);
   const [loadingFile, setLoadingFile] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Universe Ingestion State
+  const [isUniverseModalOpen, setIsUniverseModalOpen] = useState(false);
+  const [inspectionData, setInspectionData] = useState<UniverseInspectionResult | null>(null);
+  const [tempZipPath, setTempZipPath] = useState<string | null>(null);
+  const [activeZipFileName, setActiveZipFileName] = useState<string>("");
 
   useEffect(() => {
     if (isOpen) {
@@ -38,41 +46,93 @@ export const LoadProjectModal: React.FC<LoadProjectModalProps> = ({ isOpen, onCl
       setLoadingFile(null);
       setUploadStatus(null);
       setUploadingZip(false);
+      setIsUniverseModalOpen(false);
+      setInspectionData(null);
+      setTempZipPath(null);
     }
   }, [isOpen]);
 
   const handleZipUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     const file = e.target.files[0];
+    setActiveZipFileName(file.name);
     setUploadingZip(true);
-    setUploadStatus(`Uploading and extracting "${file.name}"... Large archives up to 500MB may take a few moments.`);
+    setUploadStatus(`Inspecting "${file.name}" for universe characters and assets...`);
     setError(null);
     const formData = new FormData();
     formData.append("file", file);
 
     try {
-      const res = await fetch("/api/projects/import", {
+      // First, run inspection pass
+      const inspectRes = await fetch("/api/projects/inspect-zip", {
         method: "POST",
         body: formData
       });
 
+      if (!inspectRes.ok) {
+        let errMessage = `Failed to inspect project (HTTP ${inspectRes.status})`;
+        try {
+          const errData = await inspectRes.json();
+          errMessage = errData.detail || errData.error || errMessage;
+        } catch {}
+        throw new Error(errMessage);
+      }
+
+      const inspectData = await inspectRes.json();
+      
+      // If there are Universe character conflicts or new universe characters in the archive
+      if (inspectData.has_universe_data && inspectData.items && inspectData.items.length > 0) {
+        setInspectionData(inspectData);
+        setTempZipPath(inspectData.temp_file_path);
+        setIsUniverseModalOpen(true);
+        setUploadingZip(false);
+        setUploadStatus(null);
+        return;
+      }
+
+      // If no universe characters to inspect, proceed directly with extraction
+      await completeImportWithResolutions(inspectData.temp_file_path, {});
+    } catch (err: any) {
+      console.error("ZIP import error:", err);
+      setError(err.message || "Failed to import project archive.");
+      setUploadingZip(false);
+      setUploadStatus(null);
+    } finally {
+      e.target.value = ''; // reset input
+    }
+  };
+
+  const completeImportWithResolutions = async (
+    tempPath: string | null,
+    resolutions: Record<string, "keep_local" | "overwrite" | "ingest_as_new">
+  ) => {
+    setUploadingZip(true);
+    setUploadStatus("Finalizing extraction and updating Universe records...");
+    setError(null);
+
+    try {
+      const res = await fetch("/api/projects/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          temp_file_path: tempPath,
+          universe_resolutions: resolutions
+        })
+      });
+
       if (!res.ok) {
-        let errMessage = `Failed to import project (HTTP ${res.status})`;
+        let errMessage = `Failed to complete import (HTTP ${res.status})`;
         try {
           const errData = await res.json();
           errMessage = errData.detail || errData.error || errMessage;
-        } catch {
-          if (res.status === 413) {
-            errMessage = "File exceeds maximum upload limit (HTTP 413: Entity Too Large). Maximum archive size is 500MB.";
-          }
-        }
+        } catch {}
         throw new Error(errMessage);
       }
 
       const data = await res.json();
       setUploadStatus("Extraction complete! Refreshing projects...");
       
-      // refresh list
+      // Refresh list
       const listRes = await fetch("/api/projects");
       if (listRes.ok) {
         const listData = await listRes.json();
@@ -86,17 +146,17 @@ export const LoadProjectModal: React.FC<LoadProjectModalProps> = ({ isOpen, onCl
         }
       }
       
-      // automatically load it
+      // Automatically load the newly imported scene
       if (data.filename) {
         await handleLoad(data.filename);
       }
     } catch (err: any) {
-      console.error("ZIP import error:", err);
-      setError(err.message || "Failed to import project archive.");
+      console.error("Finalize import error:", err);
+      setError(err.message || "Failed to complete import.");
     } finally {
       setUploadingZip(false);
       setUploadStatus(null);
-      e.target.value = ''; // reset
+      setIsUniverseModalOpen(false);
     }
   };
 
@@ -248,6 +308,18 @@ export const LoadProjectModal: React.FC<LoadProjectModalProps> = ({ isOpen, onCl
           )}
         </div>
       </div>
+
+      {/* Universe Ingestion & Conflict Resolution Modal */}
+      <UniverseIngestionModal
+        isOpen={isUniverseModalOpen}
+        onClose={() => setIsUniverseModalOpen(false)}
+        inspectionResult={inspectionData}
+        tempFilePath={tempZipPath}
+        archiveFileName={activeZipFileName}
+        onConfirmImport={async (resolutions) => {
+          await completeImportWithResolutions(tempZipPath, resolutions);
+        }}
+      />
     </div>
   );
 };

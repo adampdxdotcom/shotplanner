@@ -3,9 +3,10 @@ import path from "path";
 import { Response } from "express";
 import { ZipArchive } from "archiver";
 import unzipper from "unzipper";
-import { ASSETS_DIR, PROJECTS_DIR, UPLOADS_DIR, WORKFLOWS_DIR, ensureSceneDirectories, formatSceneFolderName, EMPTY_1X1_PNG_BUFFER } from "../config/constants";
+import { ASSETS_DIR, PROJECTS_DIR, UPLOADS_DIR, WORKFLOWS_DIR, UNIVERSE_DIR, UNIVERSE_MEDIA_DIR, ensureSceneDirectories, formatSceneFolderName, EMPTY_1X1_PNG_BUFFER } from "../config/constants";
 import { AssetRecord } from "../types";
 import { assetService } from "./assetService";
+import { universeService } from "./universeService";
 import { formatShotNumber, sanitizeFilenamePart, generateSaveVideoPrefix } from "../utils/formatters";
 import { parseWorkflowData, injectAndPrepareWorkflowData } from "./workflowService";
 
@@ -234,16 +235,18 @@ export async function exportProjectZip(projectName: string, res: Response): Prom
   // 1. Add Master Project JSON at root
   archive.append(JSON.stringify(projectData, null, 2), { name: `${rawName}.json` });
 
-  // Helper to locate asset across scene folders and uploads (excluding thumbnails)
+  // Helper to locate asset across scene folders, uploads, and universe media
   const findAssetFile = (filename: string): string | null => {
     if (!filename) return null;
     const cleanFn = path.basename(filename.trim());
     if (!cleanFn || cleanFn === "thumbnails" || cleanFn === ".DS_Store") return null;
     const candidateDirs = [
       UPLOADS_DIR,
+      UNIVERSE_MEDIA_DIR,
       path.join(process.cwd(), "assets", "images"),
       path.join(process.cwd(), "assets", "videos"),
-      path.join(process.cwd(), "assets", "audios")
+      path.join(process.cwd(), "assets", "audios"),
+      path.join(process.cwd(), "assets", "shared")
     ];
     for (const base of candidateDirs) {
       if (fs.existsSync(base)) {
@@ -397,6 +400,34 @@ export async function exportProjectZip(projectName: string, res: Response): Prom
   const relevantAssets = rawDb.filter((a) => addedFiles.has(a.filename));
   const finalAssetsDb = relevantAssets.length > 0 ? relevantAssets : projectData.assets || rawDb;
   archive.append(JSON.stringify(finalAssetsDb, null, 2), { name: "assets_db.json" });
+
+  // 4b. Package referenced Universe Characters in universe/characters.json
+  try {
+    const allUniverseChars = universeService.getUniverseCharacters();
+    const referencedUniverseChars: Record<string, any> = {};
+    
+    // Check characters defined in projectData.characters or scene_planning
+    const sceneChars = projectData.characters || projectData.scene_planning?.characters || {};
+    for (const [name, charProfile] of Object.entries(sceneChars)) {
+      const uChar = allUniverseChars[name] || (charProfile as any)?.in_universe ? charProfile : null;
+      if (uChar) {
+        referencedUniverseChars[name] = allUniverseChars[name] || uChar;
+      }
+    }
+    
+    // Check subjects in assets
+    for (const a of (projectData.assets || [])) {
+      if (a?.subject_name && allUniverseChars[a.subject_name]) {
+        referencedUniverseChars[a.subject_name] = allUniverseChars[a.subject_name];
+      }
+    }
+
+    if (Object.keys(referencedUniverseChars).length > 0) {
+      archive.append(JSON.stringify(referencedUniverseChars, null, 2), { name: "universe/characters.json" });
+    }
+  } catch (e) {
+    console.error("Error packaging universe metadata in ZIP export:", e);
+  }
 
   // 5. Dynamically synthesize and include fully injected ready-to-run workflow JSON for EVERY shot in staged_workflows/
   const shotsList = Array.isArray(projectData.shots) ? projectData.shots : [];
@@ -568,15 +599,19 @@ export async function exportProjectZip(projectName: string, res: Response): Prom
   await archive.finalize();
 }
 
-export async function importProjectZip(uploadedFilePath: string): Promise<string> {
+export async function importProjectZip(
+  uploadedFilePath: string,
+  universeResolutions?: Record<string, "keep_local" | "overwrite" | "ingest_as_new">
+): Promise<string> {
   const zipBuffer = fs.readFileSync(uploadedFilePath);
   const directory = await unzipper.Open.buffer(zipBuffer);
 
   let importedProject = "";
   let projectJsonData: any = null;
   let assetsDbMeta: any[] = [];
+  let incomingUniverseChars: Record<string, any> = {};
 
-  // Pass 1: find master json & assets_db.json
+  // Pass 1: find master json & assets_db.json & universe metadata
   for (const file of directory.files) {
     if (file.type !== "File") continue;
     if (file.path === "assets_db.json" || path.basename(file.path) === "assets_db.json") {
@@ -585,6 +620,14 @@ export async function importProjectZip(uploadedFilePath: string): Promise<string
         const parsed = JSON.parse(buf.toString("utf-8"));
         if (Array.isArray(parsed)) assetsDbMeta = parsed;
       } catch (e) {}
+    } else if (file.path === "universe/characters.json" || file.path.endsWith("/universe/characters.json")) {
+      try {
+        const buf = await file.buffer();
+        const parsed = JSON.parse(buf.toString("utf-8"));
+        if (parsed && typeof parsed === "object") {
+          incomingUniverseChars = { ...incomingUniverseChars, ...parsed };
+        }
+      } catch (e) {}
     } else if (file.path.endsWith(".json") && !file.path.includes("/")) {
       if (!IGNORED_JSON_FILENAMES.has(file.path.toLowerCase())) {
         importedProject = path.basename(file.path).replace(/\.json$/i, "");
@@ -592,6 +635,19 @@ export async function importProjectZip(uploadedFilePath: string): Promise<string
           const buf = await file.buffer();
           projectJsonData = JSON.parse(buf.toString("utf-8"));
         } catch (e) {}
+      }
+    }
+  }
+
+  // If resolutions are provided, apply them
+  if (universeResolutions && Object.keys(universeResolutions).length > 0) {
+    universeService.applyUniverseResolution(universeResolutions, incomingUniverseChars);
+  } else if (Object.keys(incomingUniverseChars).length > 0) {
+    // Default auto-ingest new characters that don't exist locally
+    const currentMaster = universeService.getUniverseCharacters();
+    for (const [name, char] of Object.entries(incomingUniverseChars)) {
+      if (!currentMaster[name]) {
+        universeService.upsertUniverseCharacter(char);
       }
     }
   }
