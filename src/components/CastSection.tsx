@@ -168,7 +168,10 @@ export const CastSection: React.FC<CastSectionProps> = ({
     );
     charUniverseAssets.forEach(uAsset => {
       if (!assets.some(a => a.filename === uAsset.filename)) {
-        onAssetUploaded(uAsset);
+        onAssetUploaded({
+          ...uAsset,
+          is_universe: true
+        });
       }
     });
 
@@ -928,6 +931,7 @@ export const CastSection: React.FC<CastSectionProps> = ({
           }
           universeProfile={universeCharacters[syncDiffSubject]}
           assets={assets}
+          universeAssets={universeAssets}
           onPushToUniverse={async (subj, prof, newAssets) => {
             await handlePushToUniverse(subj, prof, newAssets);
           }}

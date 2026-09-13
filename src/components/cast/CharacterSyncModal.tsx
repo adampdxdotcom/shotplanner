@@ -27,8 +27,13 @@ export interface SyncDiffResult {
 export function computeCharacterSyncDiff(
   sceneProfile: CharacterProfile,
   universeProfile: UniverseCharacterProfile | undefined,
-  allAssets: MediaAsset[]
+  allAssets: MediaAsset[],
+  universeAssets?: MediaAsset[]
 ): SyncDiffResult {
+  const universeFilenameSet = new Set<string>(
+    (universeAssets || []).map(a => a.filename.toLowerCase())
+  );
+
   if (!universeProfile) {
     const charAssets = allAssets.filter(
       a => (a.subject_name || "").trim().toLowerCase() === sceneProfile.name.trim().toLowerCase()
@@ -53,7 +58,9 @@ export function computeCharacterSyncDiff(
   let sharedAssetCount = 0;
 
   for (const asset of charAssets) {
-    if (asset.is_universe) {
+    const fnLower = (asset.filename || "").toLowerCase();
+    const isUniverseAsset = !!asset.is_universe || universeFilenameSet.has(fnLower);
+    if (isUniverseAsset) {
       sharedAssetCount++;
     } else {
       sceneOnlyAssets.push(asset);
@@ -81,6 +88,7 @@ interface CharacterSyncModalProps {
   sceneProfile: CharacterProfile;
   universeProfile?: UniverseCharacterProfile;
   assets: MediaAsset[];
+  universeAssets?: MediaAsset[];
   onPushToUniverse: (subject: string, profile: CharacterProfile, newAssets: MediaAsset[]) => Promise<void>;
   onPullFromUniverse: (universeChar: UniverseCharacterProfile) => void;
   isPushing?: boolean;
@@ -92,13 +100,14 @@ export const CharacterSyncModal: React.FC<CharacterSyncModalProps> = ({
   sceneProfile,
   universeProfile,
   assets,
+  universeAssets = [],
   onPushToUniverse,
   onPullFromUniverse,
   isPushing = false
 }) => {
   if (!isOpen) return null;
 
-  const diff = computeCharacterSyncDiff(sceneProfile, universeProfile, assets);
+  const diff = computeCharacterSyncDiff(sceneProfile, universeProfile, assets, universeAssets);
   const subject = sceneProfile.name;
   const isLoc = sceneProfile.is_location;
 
