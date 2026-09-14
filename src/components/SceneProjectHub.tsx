@@ -132,6 +132,11 @@ export default function SceneProjectHub({
     updateActiveShot(prev => {
       const next = { ...prev.assigned_slots };
       delete next[slotIndex];
+      delete (next as any)[String(slotIndex)];
+      if (slotIndex === 8) {
+        delete next[9];
+        delete (next as any)["9"];
+      }
       return { ...prev, assigned_slots: next };
     });
   };
@@ -158,6 +163,7 @@ export default function SceneProjectHub({
         <div className="flex-1 flex flex-col min-h-0 space-y-6">
           <ShotMetadataPanel 
             activeShot={activeShot}
+            sceneName={project.scene_name}
             onSetHeroTake={(tid) => onUpdateProject(prev => {
               const shots = [...prev.shots];
               const idx = shots.findIndex(s => s.id === activeShot.id);

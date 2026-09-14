@@ -171,17 +171,17 @@ export function setLastStagingTab(tab: "headshots" | "staging" | "sheets"): void
   }
 }
 
-// 6. Active Asset Media Tab (image | audio | video)
-export function getLastAssetTab(fallback: "image" | "audio" | "video" = "image"): "image" | "audio" | "video" {
+// 6. Active Asset Media Tab (image | audio | video | takes)
+export function getLastAssetTab(fallback: "image" | "audio" | "video" | "takes" = "image"): "image" | "audio" | "video" | "takes" {
   const val = safeStorage.getItem(STORAGE_KEYS.ACTIVE_ASSET_TAB);
-  if (val === "image" || val === "audio" || val === "video") {
+  if (val === "image" || val === "audio" || val === "video" || val === "takes") {
     return val;
   }
   return fallback;
 }
 
-export function setLastAssetTab(tab: "image" | "audio" | "video"): void {
-  if (tab === "image" || tab === "audio" || tab === "video") {
+export function setLastAssetTab(tab: "image" | "audio" | "video" | "takes"): void {
+  if (tab === "image" || tab === "audio" || tab === "video" || tab === "takes") {
     safeStorage.setItem(STORAGE_KEYS.ACTIVE_ASSET_TAB, tab);
   }
 }

@@ -41,6 +41,23 @@ export const generateSaveVideoPrefix = (sceneName?: string, shotNumber?: string 
   return `${sn}_Shot_${shotNum}${takePart}`;
 };
 
+export const formatTakeFilename = (
+  sceneName?: string,
+  shotNumber?: string | number,
+  takeNumber?: string | number,
+  ext: string = "mp4"
+): string => {
+  const cleanExt = (ext.startsWith(".") ? ext.slice(1) : ext).toLowerCase();
+  const rawScene = (sceneName || "scene01").trim();
+  const cleanScene = sanitizeFilenamePart(rawScene) || "scene01";
+  const scenePart = cleanScene.toLowerCase().startsWith("scene")
+    ? cleanScene.toLowerCase()
+    : `scene_${cleanScene.toLowerCase()}`;
+  const shotNum = formatShotNumber(shotNumber !== undefined && shotNumber !== null ? shotNumber : 1);
+  const takeNum = formatShotNumber(takeNumber !== undefined && takeNumber !== null ? takeNumber : 1);
+  return `${scenePart}_shot${shotNum}_take${takeNum}.${cleanExt}`;
+};
+
 export const generatePromptPrefix = (planning?: ScenePlanning | Partial<ScenePlanning> | null): string => {
   if (!planning) return "";
   const parts: string[] = [];

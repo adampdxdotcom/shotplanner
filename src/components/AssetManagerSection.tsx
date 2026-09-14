@@ -5,11 +5,14 @@ import {
   Trash2, 
   Image as ImageIcon,
   Video as VideoIcon,
-  Music
+  Music,
+  Clapperboard
 } from "lucide-react";
 import { ScenePlanningHeader } from "./ScenePlanningHeader";
 import { TakeSelector } from "./TakeSelector";
 import { TakeReviewModal } from "./TakeReviewModal";
+import { TakeComparisonModal } from "./TakeComparisonModal";
+import { ShotTakesManager } from "./ShotTakesManager";
 import { AssetUploadModal } from "./AssetUploadModal";
 import { AssetEditModal } from "./AssetEditModal";
 import { AssetLightbox } from "./AssetLightbox";
@@ -18,7 +21,7 @@ import { toCanonicalSubjectName } from "../utils/subjectUtils";
 import { getLastAssetTab, setLastAssetTab } from "../utils/workspaceSessionStore";
 
 const MAX_IMAGES = 9;
-const MAX_VIDEOS = 3;
+const MAX_VIDEOS = 1;
 const MAX_AUDIOS = 3;
 
 interface AssetManagerSectionProps {
@@ -54,7 +57,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
   onAssetDeleted,
   onAssetUpdated
 }) => {
-  const [activeTab, setActiveTab] = useState<"image" | "audio" | "video">(() => getLastAssetTab("image"));
+  const [activeTab, setActiveTab] = useState<"image" | "audio" | "video" | "takes">(() => getLastAssetTab("image"));
 
   useEffect(() => {
     setLastAssetTab(activeTab);
@@ -64,6 +67,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
   const [editingAsset, setEditingAsset] = useState<MediaAsset | null>(null);
   const [lightboxAsset, setLightboxAsset] = useState<MediaAsset | null>(null);
   const [reviewTakeId, setReviewTakeId] = useState<string | null>(null);
+  const [showCompareModal, setShowCompareModal] = useState(false);
 
   const activeShotIndex = sceneProject.shots.findIndex(s => s.id === activeShotId);
   const activeShot = activeShotIndex >= 0 ? sceneProject.shots[activeShotIndex] : null;
@@ -90,19 +94,23 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
 
   const getGlobalSlotIndex = (type: "image" | "audio" | "video", localIndex: number) => {
     if (type === "image") return localIndex;
-    if (type === "video") return MAX_IMAGES + localIndex;
-    return MAX_IMAGES + MAX_VIDEOS + localIndex;
+    if (type === "video") return MAX_IMAGES; // Slot 9: single video upload per shot
+    return MAX_IMAGES + 3 + localIndex; // Audio slots: 12, 13, 14
   };
 
   const getLocalSlotIndex = (globalIndex: number): { type: "image"|"audio"|"video", index: number } => {
     if (globalIndex < MAX_IMAGES) return { type: "image", index: globalIndex };
-    if (globalIndex < MAX_IMAGES + MAX_VIDEOS) return { type: "video", index: globalIndex - MAX_IMAGES };
-    return { type: "audio", index: globalIndex - (MAX_IMAGES + MAX_VIDEOS) };
+    if (globalIndex < MAX_IMAGES + 3) return { type: "video", index: 0 };
+    return { type: "audio", index: globalIndex - (MAX_IMAGES + 3) };
   };
 
   const getAssetForGlobalSlot = (globalSlotStr: string): MediaAsset | null => {
     if (!activeShot || !activeShot.assigned_slots) return null;
-    const filename = activeShot.assigned_slots[globalSlotStr];
+    let filename = activeShot.assigned_slots[globalSlotStr] || (activeShot.assigned_slots as any)[Number(globalSlotStr)];
+    if (!filename && globalSlotStr === "9") {
+      filename = activeShot.assigned_slots[10] || (activeShot.assigned_slots as any)["10"] || 
+                 activeShot.assigned_slots[11] || (activeShot.assigned_slots as any)["11"];
+    }
     if (!filename) return null;
     return assets.find(a => a.filename === filename) || null;
   };
@@ -117,6 +125,14 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
           const nextSlots = { ...shots[shotIdx].assigned_slots };
           delete nextSlots[globalSlot];
           delete nextSlots[String(globalSlot)];
+          if (type === "video") {
+            delete nextSlots[9];
+            delete (nextSlots as any)["9"];
+            delete nextSlots[10];
+            delete (nextSlots as any)["10"];
+            delete nextSlots[11];
+            delete (nextSlots as any)["11"];
+          }
           shots[shotIdx] = { ...shots[shotIdx], assigned_slots: nextSlots , status: "unstaged" };
         }
         return { ...prev, shots };
@@ -148,7 +164,17 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
         const shots = [...prev.shots];
         const shotIdx = shots.findIndex(s => s.id === activeShotId);
         if (shotIdx !== -1) {
-          const nextSlots = { ...shots[shotIdx].assigned_slots, [globalSlot]: asset.filename };
+          const nextSlots = { ...shots[shotIdx].assigned_slots };
+          if (type === "video") {
+            // Enforce only 1 video upload per shot: clear any prior video slot keys
+            delete nextSlots[9];
+            delete (nextSlots as any)["9"];
+            delete nextSlots[10];
+            delete (nextSlots as any)["10"];
+            delete nextSlots[11];
+            delete (nextSlots as any)["11"];
+          }
+          nextSlots[globalSlot] = asset.filename;
           shots[shotIdx] = { ...shots[shotIdx], assigned_slots: nextSlots, status: "unstaged" };
         }
         return { ...prev, shots };
@@ -247,7 +273,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
               }}
             />
 
-            {activeShot.takes && activeShot.takes.length > 0 && (
+            {activeShot.takes && activeShot.takes.length > 0 && activeTab !== "takes" && (
               <div className="bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 shadow-xs -mt-2">
                 <TakeSelector 
                   shot={activeShot} 
@@ -299,7 +325,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
                 }`}
               >
                 <VideoIcon className="w-4 h-4" />
-                Video Slots
+                Video Slot
                 <span className={`ml-1 text-[10px] px-1.5 py-0.5 rounded-full font-semibold transition-colors ${
                   activeTab === "video"
                     ? "bg-indigo-100 text-indigo-800 dark:bg-zinc-800 dark:text-zinc-300"
@@ -327,42 +353,79 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
                   {MAX_AUDIOS}
                 </span>
               </button>
+
+              {/* Takes Tab on Far Right */}
+              <button
+                type="button"
+                onClick={() => setActiveTab("takes")}
+                className={`ml-auto flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
+                  activeTab === "takes" 
+                    ? "border-amber-500 text-amber-700 bg-amber-50/80 dark:border-amber-400 dark:text-amber-300 dark:bg-amber-950/20 font-semibold" 
+                    : "border-transparent text-zinc-600 hover:text-zinc-900 hover:border-zinc-300 dark:text-zinc-500 dark:hover:text-zinc-300 dark:hover:border-zinc-700"
+                }`}
+              >
+                <Clapperboard className="w-4 h-4 text-amber-500" />
+                Takes
+                <span className={`ml-1 text-[10px] px-1.5 py-0.5 rounded-full font-semibold transition-colors ${
+                  activeTab === "takes"
+                    ? "bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200"
+                    : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+                }`}>
+                  {activeShot?.takes?.length || 0}
+                </span>
+              </button>
             </div>
             
-            <div className={
-              activeTab === "image"
-                ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-10 gap-4"
-                : "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4"
-            }>
-              {Array.from({ length: currentMax }).map((_, idx) => {
-                const globalSlot = getGlobalSlotIndex(activeTab, idx);
-                const asset = getAssetForGlobalSlot(globalSlot.toString());
-                const slotClassName = activeTab === "image" 
-                  ? `col-span-1 lg:col-span-2 ${idx === 5 ? "lg:col-start-2" : ""}` 
-                  : "";
-                
-                return asset ? (
-                  <AssetCard 
-                    key={`slot-${activeTab}-${idx}-${asset.filename}`}
-                    asset={asset}
-                    idx={idx}
-                    type={activeTab}
-                    className={slotClassName}
-                    onEdit={() => setEditingAsset(asset)}
-                    onDelete={() => handleClearSlot(activeTab, idx)}
-                    onLightbox={() => setLightboxAsset(asset)}
-                  />
-                ) : (
-                  <EmptySlotCard 
-                    key={`empty-${activeTab}-${idx}`}
-                    idx={idx}
-                    type={activeTab}
-                    className={slotClassName}
-                    onClick={() => setUploadModalSlot({ type: activeTab, index: idx })}
-                  />
-                );
-              })}
-            </div>
+            {activeTab === "takes" ? (
+              <ShotTakesManager
+                shot={activeShot}
+                sceneName={sceneProject.scene_name || activeSceneName}
+                onUpdateShot={(updatedShot) => {
+                  onUpdateProject(prev => {
+                    const shots = [...prev.shots];
+                    const idx = shots.findIndex(s => s.id === updatedShot.id);
+                    if (idx !== -1) {
+                      shots[idx] = updatedShot;
+                    }
+                    return { ...prev, shots };
+                  });
+                }}
+                onReviewTake={setReviewTakeId}
+                onCompareTakes={() => setShowCompareModal(true)}
+              />
+            ) : (
+              <div className={
+                activeTab === "image"
+                  ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4"
+                  : activeTab === "video"
+                    ? "grid grid-cols-1 max-w-sm gap-4"
+                    : "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4"
+              }>
+                {Array.from({ length: currentMax }).map((_, idx) => {
+                  const globalSlot = getGlobalSlotIndex(activeTab, idx);
+                  const asset = getAssetForGlobalSlot(globalSlot.toString());
+                  
+                  return asset ? (
+                    <AssetCard 
+                      key={`slot-${activeTab}-${idx}-${asset.filename}`}
+                      asset={asset}
+                      idx={idx}
+                      type={activeTab}
+                      onEdit={() => setEditingAsset(asset)}
+                      onDelete={() => handleClearSlot(activeTab, idx)}
+                      onLightbox={() => setLightboxAsset(asset)}
+                    />
+                  ) : (
+                    <EmptySlotCard 
+                      key={`empty-${activeTab}-${idx}`}
+                      idx={idx}
+                      type={activeTab}
+                      onClick={() => setUploadModalSlot({ type: activeTab, index: idx })}
+                    />
+                  );
+                })}
+              </div>
+            )}
             </>
           )}
         </>
@@ -370,7 +433,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
 
       <AssetUploadModal 
         isOpen={!!uploadModalSlot}
-        activeTab={activeTab}
+        activeTab={activeTab === "takes" ? "image" : activeTab}
         uploadModalSlot={uploadModalSlot}
         libraryAssets={assets}
         subjects={projectSubjects}
@@ -419,6 +482,57 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
               return { ...prev, shots };
             });
             setReviewTakeId(null);
+          }}
+          onUpdateRating={(rating) => {
+            onUpdateProject(prev => {
+              const shots = [...prev.shots];
+              const idx = shots.findIndex(s => s.id === activeShot.id);
+              if (idx !== -1) {
+                const updatedTakes = (shots[idx].takes || []).map(t => {
+                  if (t.id !== reviewTakeId) return t;
+                  const newReviewStatus = rating === "good" ? "approved" : rating === "bad" ? "needs_work" : "unreviewed";
+                  return { ...t, rating, review_status: newReviewStatus };
+                });
+                shots[idx] = { ...shots[idx], takes: updatedTakes };
+              }
+              return { ...prev, shots };
+            });
+          }}
+          onUpdateNotes={(notes) => {
+            onUpdateProject(prev => {
+              const shots = [...prev.shots];
+              const idx = shots.findIndex(s => s.id === activeShot.id);
+              if (idx !== -1) {
+                const updatedTakes = (shots[idx].takes || []).map(t => {
+                  if (t.id !== reviewTakeId) return t;
+                  return { ...t, notes };
+                });
+                shots[idx] = { ...shots[idx], takes: updatedTakes };
+              }
+              return { ...prev, shots };
+            });
+          }}
+        />
+      )}
+
+      {showCompareModal && activeShot && (
+        <TakeComparisonModal
+          shot={activeShot}
+          sceneName={sceneProject.scene_name || activeSceneName}
+          onClose={() => setShowCompareModal(false)}
+          onSetHeroTake={(takeId) => {
+            onUpdateProject(prev => {
+              const shots = [...prev.shots];
+              const idx = shots.findIndex(s => s.id === activeShot.id);
+              if (idx !== -1) {
+                const updatedTakes = (shots[idx].takes || []).map(t => ({
+                  ...t,
+                  is_hero: t.id === takeId
+                }));
+                shots[idx] = { ...shots[idx], hero_take_id: takeId, takes: updatedTakes };
+              }
+              return { ...prev, shots };
+            });
           }}
         />
       )}

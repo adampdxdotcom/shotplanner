@@ -32,7 +32,11 @@ export interface ShotTake {
   basic_stub?: string;
   generation_params?: GenerationParameters;
   assigned_slots?: Record<number, string>;
-  review_status?: "unreviewed" | "approved" | "needs_work";
+  review_status?: "unreviewed" | "approved" | "needs_work" | "good" | "bad";
+  rating?: "good" | "bad" | null;
+  notes?: string;
+  file_size?: number;
+  aspect_ratio?: string;
   is_hero: boolean;
 }
 export interface SceneProjectFile {

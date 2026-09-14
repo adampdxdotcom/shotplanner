@@ -2,11 +2,92 @@ import { Router, Request, Response } from "express";
 import fs from "fs";
 import path from "path";
 import fetch from "node-fetch";
-import { ASSETS_DIR } from "../config/constants";
+import { ASSETS_DIR, upload, formatSceneFolderName } from "../config/constants";
 import { sanitizeFilenamePart } from "../utils/formatters";
-import mime from "mime-types"; // wait, mime is not in package.json? I'll just use simple extensions.
 
 const router = Router();
+
+/**
+ * Upload an ingested video take directly to scene outputs
+ */
+router.post("/outputs/upload", upload.single("file"), async (req: Request, res: Response) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No video file uploaded" });
+    }
+
+    const scene_name = (req.body.scene_name as string) || "scene01";
+    const target_filename = req.body.target_filename as string;
+
+    const safeSceneName = formatSceneFolderName(scene_name) || sanitizeFilenamePart(scene_name) || "scene01";
+    const outputDir = path.join(ASSETS_DIR, safeSceneName, "outputs");
+
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+
+    let finalFilename = req.file.originalname;
+    if (target_filename && target_filename.trim()) {
+      const ext = path.extname(target_filename) || path.extname(req.file.originalname) || ".mp4";
+      const base = target_filename.replace(/\.[^/.]+$/, "");
+      finalFilename = sanitizeFilenamePart(base) + ext;
+    } else {
+      const ext = path.extname(req.file.originalname) || ".mp4";
+      const base = req.file.originalname.replace(/\.[^/.]+$/, "");
+      finalFilename = sanitizeFilenamePart(base) + ext;
+    }
+
+    const destPath = path.join(outputDir, finalFilename);
+    fs.copyFileSync(req.file.path, destPath);
+    try {
+      fs.unlinkSync(req.file.path);
+    } catch (e) {}
+
+    const streamUrl = `/api/outputs/stream/${encodeURIComponent(safeSceneName)}/${encodeURIComponent(finalFilename)}`;
+
+    return res.json({
+      success: true,
+      filename: finalFilename,
+      size: req.file.size,
+      stream_url: streamUrl
+    });
+  } catch (err: any) {
+    console.error("Take video upload error:", err);
+    return res.status(500).json({ error: err.message || "Failed to upload video take" });
+  }
+});
+
+/**
+ * Delete an output / take video from disk
+ */
+router.delete(["/outputs/:scene_name/:filename", "/outputs/:filename"], (req: Request, res: Response) => {
+  try {
+    const scene_name = req.params.scene_name || (req.query.scene_name as string) || "scene01";
+    const filename = req.params.filename;
+    const safeScene1 = formatSceneFolderName(scene_name);
+    const safeScene2 = sanitizeFilenamePart(scene_name);
+
+    const candidates = [
+      path.join(ASSETS_DIR, safeScene1, "outputs", filename),
+      path.join(ASSETS_DIR, safeScene2, "outputs", filename),
+      path.join(ASSETS_DIR, "outputs", filename)
+    ];
+
+    let deleted = false;
+    for (const filePath of candidates) {
+      if (fs.existsSync(filePath)) {
+        try {
+          fs.unlinkSync(filePath);
+          deleted = true;
+        } catch (e) {}
+      }
+    }
+
+    res.json({ success: true, deleted });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 router.post("/outputs/pull", async (req: Request, res: Response) => {
   try {
@@ -127,49 +208,129 @@ router.get(["/outputs/stream/:scene_name/:filename", "/outputs/stream/:filename"
     const scene_name = req.params.scene_name || (req.query.scene_name as string) || "Scene";
     const filename = req.params.filename;
     
-    const safeSceneName = sanitizeFilenamePart(scene_name);
-    const filePath = path.join(ASSETS_DIR, safeSceneName, "outputs", filename);
-    
-    if (!fs.existsSync(filePath)) {
-      // Also try direct lookup in case file is in root outputs or another scene
+    const candidates = [
+      path.join(ASSETS_DIR, formatSceneFolderName(scene_name), "outputs", filename),
+      path.join(ASSETS_DIR, sanitizeFilenamePart(scene_name), "outputs", filename),
+      path.join(ASSETS_DIR, scene_name, "outputs", filename),
+      path.join(ASSETS_DIR, "outputs", filename)
+    ];
+
+    const filePath = candidates.find(p => fs.existsSync(p));
+    if (!filePath) {
       return res.status(404).send("Not found");
     }
     
     const stat = fs.statSync(filePath);
     const fileSize = stat.size;
-    const range = req.headers.range;
-    
+    const etag = `"${fileSize}-${Math.floor(stat.mtimeMs)}"`;
+    const lastModified = stat.mtime.toUTCString();
+
+    // Cache validation: return 304 Not Modified if browser already has cached version
+    const ifNoneMatch = req.headers["if-none-match"];
+    const ifModifiedSince = req.headers["if-modified-since"];
+    if (ifNoneMatch === etag || (ifModifiedSince && new Date(ifModifiedSince) >= stat.mtime)) {
+      res.status(304).end();
+      return;
+    }
+
     let contentType = "application/octet-stream";
     if (filename.endsWith(".mp4")) contentType = "video/mp4";
     else if (filename.endsWith(".webm")) contentType = "video/webm";
     else if (filename.endsWith(".jpg") || filename.endsWith(".jpeg")) contentType = "image/jpeg";
     else if (filename.endsWith(".png")) contentType = "image/png";
     else if (filename.endsWith(".gif")) contentType = "image/gif";
+
+    const commonHeaders: Record<string, string | number> = {
+      "Accept-Ranges": "bytes",
+      "ETag": etag,
+      "Last-Modified": lastModified,
+      "Cache-Control": "public, max-age=86400, must-revalidate"
+    };
+
+    const range = req.headers.range;
     
     if (range) {
       const parts = range.replace(/bytes=/, "").split("-");
-      const start = parseInt(parts[0], 10);
-      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-      const chunksize = (end - start) + 1;
-      const file = fs.createReadStream(filePath, { start, end });
-      const head = {
-        'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-        'Accept-Ranges': 'bytes',
-        'Content-Length': chunksize,
-        'Content-Type': contentType,
+      let start = parseInt(parts[0], 10);
+      let end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+
+      if (isNaN(start)) start = 0;
+      if (isNaN(end) || end >= fileSize) end = fileSize - 1;
+
+      if (start >= fileSize || start > end) {
+        res.writeHead(416, {
+          "Content-Range": `bytes */${fileSize}`,
+          "Accept-Ranges": "bytes"
+        });
+        res.end();
+        return;
+      }
+
+      // Safe chunk window (2MB limit for initial stream chunk) prevents massive memory buffers
+      const MAX_CHUNK_SIZE = 2 * 1024 * 1024;
+      if (end - start + 1 > MAX_CHUNK_SIZE) {
+        end = start + MAX_CHUNK_SIZE - 1;
+      }
+
+      const chunkSize = (end - start) + 1;
+      res.writeHead(206, {
+        ...commonHeaders,
+        "Content-Range": `bytes ${start}-${end}/${fileSize}`,
+        "Content-Length": chunkSize,
+        "Content-Type": contentType
+      });
+
+      const fileStream = fs.createReadStream(filePath, { start, end });
+      fileStream.pipe(res);
+
+      // Memory leak guard: ensure stream is destroyed on client abort/disconnect
+      let isDestroyed = false;
+      const destroyStream = () => {
+        if (!isDestroyed) {
+          isDestroyed = true;
+          fileStream.destroy();
+        }
       };
-      res.writeHead(206, head);
-      file.pipe(res);
+
+      req.on("close", destroyStream);
+      res.on("close", destroyStream);
+      fileStream.on("error", (err) => {
+        destroyStream();
+        if (!res.headersSent) {
+          res.status(500).end();
+        }
+      });
     } else {
-      const head = {
-        'Content-Length': fileSize,
-        'Content-Type': contentType,
+      res.writeHead(200, {
+        ...commonHeaders,
+        "Content-Length": fileSize,
+        "Content-Type": contentType
+      });
+
+      const fileStream = fs.createReadStream(filePath);
+      fileStream.pipe(res);
+
+      let isDestroyed = false;
+      const destroyStream = () => {
+        if (!isDestroyed) {
+          isDestroyed = true;
+          fileStream.destroy();
+        }
       };
-      res.writeHead(200, head);
-      fs.createReadStream(filePath).pipe(res);
+
+      req.on("close", destroyStream);
+      res.on("close", destroyStream);
+      fileStream.on("error", (err) => {
+        destroyStream();
+        if (!res.headersSent) {
+          res.status(500).end();
+        }
+      });
     }
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    if (!res.headersSent) {
+      res.status(500).json({ error: err.message });
+    }
   }
 });
 

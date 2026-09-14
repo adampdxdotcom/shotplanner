@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { ShotTake } from "../types";
-import { X, Star, CheckCircle, XCircle } from "lucide-react";
+import { X, Star, CheckCircle, XCircle, ThumbsUp, ThumbsDown, Download } from "lucide-react";
 
 interface TakeReviewModalProps {
   take: ShotTake;
@@ -8,19 +8,46 @@ interface TakeReviewModalProps {
   shotNumber: number;
   onClose: () => void;
   onSetHero: () => void;
+  onUpdateRating?: (rating: "good" | "bad" | null) => void;
+  onUpdateNotes?: (notes: string) => void;
 }
 
-export function TakeReviewModal({ take, sceneName, shotNumber, onClose, onSetHero }: TakeReviewModalProps) {
+export function TakeReviewModal({ 
+  take, 
+  sceneName, 
+  shotNumber, 
+  onClose, 
+  onSetHero,
+  onUpdateRating,
+  onUpdateNotes 
+}: TakeReviewModalProps) {
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    // Determine the video filename
-    // Typically it will be {sceneName}_Shot_{paddedShot}_Take_{takeNumber}.mp4
-    const paddedShot = String(shotNumber).padStart(2, "0");
-    const filename = `${sceneName}_Shot_${paddedShot}_Take_${take.take_number}.mp4`;
-    setVideoSrc(`/api/outputs/stream/${filename}?scene_name=${encodeURIComponent(sceneName)}`);
+    if (take.video_url) {
+      setVideoSrc(take.video_url);
+    } else {
+      const paddedShot = String(shotNumber).padStart(2, "0");
+      const filename = take.video_filename || `${sceneName}_Shot_${paddedShot}_Take_${take.take_number}.mp4`;
+      setVideoSrc(`/api/outputs/stream/${encodeURIComponent(sceneName)}/${encodeURIComponent(filename)}`);
+    }
   }, [take, sceneName, shotNumber]);
+
+  // Clean up video player to prevent memory leaks and background decoding
+  useEffect(() => {
+    const el = videoRef.current;
+    return () => {
+      if (el) {
+        el.pause();
+        el.removeAttribute("src");
+        el.load();
+      }
+    };
+  }, []);
+
+  const isGood = take.rating === "good" || take.review_status === "approved";
+  const isBad = take.rating === "bad" || take.review_status === "needs_work";
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[100] p-4 sm:p-8">
@@ -35,8 +62,18 @@ export function TakeReviewModal({ take, sceneName, shotNumber, onClose, onSetHer
                 Hero Take
               </span>
             )}
+            {isGood && (
+              <span className="text-xs font-semibold px-2 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full">
+                Good Take
+              </span>
+            )}
+            {isBad && (
+              <span className="text-xs font-semibold px-2 py-0.5 bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-full">
+                Needs Work
+              </span>
+            )}
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition-colors">
+          <button onClick={onClose} className="p-1 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition-colors cursor-pointer">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -63,16 +100,71 @@ export function TakeReviewModal({ take, sceneName, shotNumber, onClose, onSetHer
               )}
             </div>
             
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <button 
                 onClick={onSetHero}
                 disabled={take.is_hero}
-                className="flex-1 flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500 disabled:bg-zinc-800 disabled:text-zinc-500 text-white font-semibold py-2.5 rounded-lg transition-colors"
+                className="flex-1 min-w-[140px] flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500 disabled:bg-zinc-800 disabled:text-zinc-500 text-white font-semibold py-2 px-3 rounded-lg transition-colors cursor-pointer text-sm"
               >
                 <Star className={`w-4 h-4 ${take.is_hero ? "" : "fill-amber-400"}`} />
                 {take.is_hero ? "Current Hero Take" : "Set as Hero Take"}
               </button>
+
+              {onUpdateRating && (
+                <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 p-1 rounded-lg">
+                  <button
+                    type="button"
+                    onClick={() => onUpdateRating(isGood ? null : "good")}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
+                      isGood
+                        ? "bg-emerald-600 text-white"
+                        : "text-zinc-400 hover:text-emerald-400 hover:bg-zinc-800"
+                    }`}
+                  >
+                    <ThumbsUp className={`w-3.5 h-3.5 ${isGood ? "fill-white" : ""}`} />
+                    <span>Good</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onUpdateRating(isBad ? null : "bad")}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
+                      isBad
+                        ? "bg-rose-600 text-white"
+                        : "text-zinc-400 hover:text-rose-400 hover:bg-zinc-800"
+                    }`}
+                  >
+                    <ThumbsDown className={`w-3.5 h-3.5 ${isBad ? "fill-white" : ""}`} />
+                    <span>Bad</span>
+                  </button>
+                </div>
+              )}
+
+              {videoSrc && (
+                <a
+                  href={videoSrc}
+                  download={take.video_filename || `Take_${take.take_number}.mp4`}
+                  className="p-2.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white rounded-lg border border-zinc-800 transition-colors"
+                  title="Download Video File"
+                >
+                  <Download className="w-4 h-4" />
+                </a>
+              )}
             </div>
+
+            {/* Notes in modal */}
+            {onUpdateNotes && (
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 flex flex-col space-y-1.5">
+                <label className="text-xs font-semibold text-zinc-400">Director / Review Notes</label>
+                <textarea
+                  value={take.notes || ""}
+                  onChange={(e) => onUpdateNotes(e.target.value)}
+                  placeholder="Notes for this take..."
+                  rows={2}
+                  className="bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-xs text-zinc-200 focus:outline-none focus:border-amber-500 resize-none"
+                />
+              </div>
+            )}
           </div>
 
           {/* Right Column: Prompt & Metadata */}

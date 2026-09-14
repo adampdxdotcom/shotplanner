@@ -2,7 +2,16 @@ import { Router, Request, Response } from "express";
 import fs from "fs";
 import path from "path";
 import { upload } from "../config/constants";
-import { exportProjectZip, getProjectData, importProjectZip, listProjects, saveProjectData, deleteProject } from "../services/projectService";
+import { 
+  exportProjectZip, 
+  exportTakesZip,
+  getProjectTakesSummary,
+  getProjectData, 
+  importProjectZip, 
+  listProjects, 
+  saveProjectData, 
+  deleteProject 
+} from "../services/projectService";
 import { universeService } from "../services/universeService";
 
 const router = Router();
@@ -39,15 +48,41 @@ router.get("/:filename", (req: Request, res: Response) => {
   }
 });
 
-// Export project as ZIP
+// Export standard project as ZIP (lightweight JSON + assets)
 router.get("/:filename/export", async (req: Request, res: Response) => {
   try {
-    await exportProjectZip(req.params.filename, res);
+    const includeTakes = req.query.include_takes === "true";
+    await exportProjectZip(req.params.filename, res, { includeTakes });
   } catch (err: any) {
     console.error("Export error:", err);
     if (!res.headersSent) {
       res.status(500).json({ error: err.message || "Export error" });
     }
+  }
+});
+
+// Export takes as separate ZIP (bundles all .mp4 video takes into organized folders)
+router.get("/:filename/export-takes", async (req: Request, res: Response) => {
+  try {
+    await exportTakesZip(req.params.filename, res);
+  } catch (err: any) {
+    console.error("Export takes error:", err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: err.message || "Export takes error" });
+    }
+  }
+});
+
+// Get summary of takes and media storage for project
+router.get("/:filename/takes-summary", (req: Request, res: Response) => {
+  try {
+    const summary = getProjectTakesSummary(req.params.filename);
+    if (!summary) {
+      return res.status(404).json({ error: `Project '${req.params.filename}' not found` });
+    }
+    res.json(summary);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 

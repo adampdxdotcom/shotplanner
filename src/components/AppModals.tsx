@@ -7,7 +7,8 @@ export const AppModals = ({
   isLoadModalOpen, setIsLoadModalOpen,
   handleLoadProject,
   isNewModalOpen, setIsNewModalOpen,
-  handleCreateNewProject
+  handleCreateNewProject,
+  sceneProject
 }: any) => {
   return (
     <>
@@ -16,6 +17,7 @@ export const AppModals = ({
         onClose={() => setIsSaveModalOpen(false)}
         onSave={handleSaveProject}
         currentProjectName={currentProjectName}
+        sceneProject={sceneProject}
       />
       <LoadProjectModal
         isOpen={isLoadModalOpen}

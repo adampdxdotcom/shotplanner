@@ -147,7 +147,13 @@ export function TakeComparisonModal({
               </div>
               <div className="bg-black border border-zinc-800 rounded-xl overflow-hidden aspect-video flex items-center justify-center relative">
                 {urlA ? (
-                  <video src={urlA} controls className="w-full h-full object-contain" />
+                  <video 
+                    src={urlA} 
+                    controls 
+                    preload="metadata"
+                    playsInline
+                    className="w-full h-full object-contain" 
+                  />
                 ) : (
                   <div className="text-zinc-600 text-xs flex flex-col items-center gap-1">
                     <Film className="w-6 h-6" />
@@ -164,7 +170,13 @@ export function TakeComparisonModal({
               </div>
               <div className="bg-black border border-zinc-800 rounded-xl overflow-hidden aspect-video flex items-center justify-center relative">
                 {urlB ? (
-                  <video src={urlB} controls className="w-full h-full object-contain" />
+                  <video 
+                    src={urlB} 
+                    controls 
+                    preload="metadata"
+                    playsInline
+                    className="w-full h-full object-contain" 
+                  />
                 ) : (
                   <div className="text-zinc-600 text-xs flex flex-col items-center gap-1">
                     <Film className="w-6 h-6" />

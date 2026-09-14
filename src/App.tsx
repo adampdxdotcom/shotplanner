@@ -307,6 +307,7 @@ export default function App() {
         handleLoadProject={handleLoadProject}
         isNewModalOpen={isNewModalOpen} setIsNewModalOpen={setIsNewModalOpen}
         handleCreateNewProject={handleCreateNewProject}
+        sceneProject={sceneProject}
       />
 
       {/* Footer */}
