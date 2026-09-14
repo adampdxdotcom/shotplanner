@@ -80,7 +80,26 @@ export function useShotOperations({
 
   // UI Navigation (persisted across page reloads & tab navigation)
   const [activeSection, setActiveSection] = useState<string>(() => getLastActiveSection("scene"));
-  const [activeShotId, setActiveShotId] = useState<string | null>(() => getLastActiveShotId(sceneProject?.scene_name));
+  const [activeShotId, setActiveShotIdRaw] = useState<string | null>(() => getLastActiveShotId(sceneProject?.scene_name));
+
+  const setActiveShotId = useCallback((id: string | null) => {
+    setActiveShotIdRaw(id);
+    if (id && sceneProject?.shots) {
+      const shot = sceneProject.shots.find(s => s.id === id);
+      if (shot) {
+        setBasicStub(shot.basic_stub || "");
+        setExpandedPrompt(shot.expanded_prompt || "");
+        if (shot.workflow_file !== undefined) setSelectedWorkflowFile(shot.workflow_file);
+        if (shot.prompt_node_id !== undefined) setSelectedPromptNodeId(shot.prompt_node_id);
+        setNodeMappings(shot.node_mappings || {});
+        if (shot.generation_params) setGenerationParams(shot.generation_params);
+        if (shot.parameter_node_mappings) setParameterNodeMappings(shot.parameter_node_mappings);
+      }
+    } else if (!id) {
+      setBasicStub("");
+      setExpandedPrompt("");
+    }
+  }, [sceneProject?.shots, setSelectedWorkflowFile, setSelectedPromptNodeId, setNodeMappings, setGenerationParams, setParameterNodeMappings]);
 
   const scrollToSection = useCallback((sectionId: string) => {
     setActiveSection(sectionId);

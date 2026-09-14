@@ -183,12 +183,12 @@ export default function App() {
             basicStub={basicStub}
             onChangeBasicStub={(val) => {
               setBasicStub(val);
-              if (activeShotId) updateActiveShot(prev => ({ ...prev, basic_stub: val, status: "unstaged" }));
+              if (activeShotId) updateShot(activeShotId, prev => ({ ...prev, basic_stub: val, status: "unstaged" }));
             }}
             expandedPrompt={expandedPrompt}
             onChangeExpandedPrompt={(val) => {
               setExpandedPrompt(val);
-              if (activeShotId) updateActiveShot(prev => ({ ...prev, expanded_prompt: val, status: "unstaged" }));
+              if (activeShotId) updateShot(activeShotId, prev => ({ ...prev, expanded_prompt: val, status: "unstaged" }));
             }}
             defaultProvider={defaultLlmProvider || config.default_llm_provider}
             providerChoice={defaultLlmProvider || config.default_llm_provider || llmProvider}

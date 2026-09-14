@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { WORKFLOWS_DIR, formatSceneFolderName } from "../config/constants";
+import { WORKFLOWS_DIR, formatSceneFolderName, ASSETS_DIR, getSceneDirectories } from "../config/constants";
 import { ParsedWorkflowData, WorkflowNodeInfo } from "../types";
 import { assembleFinalPrompt, hasSceneReferencePhoto } from "../utils/formatters";
 import { assetService } from "./assetService";
@@ -601,70 +601,76 @@ export function injectAndPrepareWorkflowData(
 }
 
 export function listWorkflows(sceneName?: string) {
-  if (!fs.existsSync(WORKFLOWS_DIR)) return { workflows: [], workflow_items: [] };
-
   const workflowMap = new Map<string, { filename: string; path: string; node_count: number; title: string }>();
 
-  // 1. Check scene-specific workflows folder if specified or default
-  const sceneFolders = sceneName
-    ? [formatSceneFolderName(sceneName)]
-    : fs
-        .readdirSync(WORKFLOWS_DIR, { withFileTypes: true })
-        .filter((d) => d.isDirectory())
-        .map((d) => d.name);
-
-  sceneFolders.forEach((folder) => {
-    const sceneWfDir = path.join(WORKFLOWS_DIR, folder);
-    if (fs.existsSync(sceneWfDir)) {
-      const files = fs.readdirSync(sceneWfDir).filter((f) => f.endsWith(".json"));
-      files.forEach((f) => {
-        try {
-          const content = JSON.parse(fs.readFileSync(path.join(sceneWfDir, f), "utf-8"));
-          const parsed = parseWorkflowData(content);
-          workflowMap.set(f, {
-            filename: f,
-            path: `/assets/workflows/${folder}/${f}`,
-            node_count: parsed.totalNodes,
-            title: `[${folder}] ${f.replace(/\.json$/, "").replace(/[_-]/g, " ")}`
-          });
-        } catch {
-          workflowMap.set(f, {
-            filename: f,
-            path: `/assets/workflows/${folder}/${f}`,
-            node_count: 0,
-            title: `[${folder}] ${f.replace(/\.json$/, "")}`
-          });
+  const scanDir = (dirPath: string, folderLabel?: string, publicPathPrefix?: string) => {
+    if (!fs.existsSync(dirPath)) return;
+    try {
+      const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isFile() && /\.json$/i.test(entry.name)) {
+          const f = entry.name;
+          if (workflowMap.has(f.toLowerCase())) continue;
+          const fullPath = path.join(dirPath, f);
+          try {
+            const content = JSON.parse(fs.readFileSync(fullPath, "utf-8"));
+            const parsed = parseWorkflowData(content);
+            const prefix = folderLabel ? `[${folderLabel}] ` : "";
+            workflowMap.set(f.toLowerCase(), {
+              filename: f,
+              path: publicPathPrefix ? `${publicPathPrefix}/${f}` : `/assets/workflows/${f}`,
+              node_count: parsed.totalNodes,
+              title: `${prefix}${f.replace(/\.json$/i, "").replace(/[_-]/g, " ")}`
+            });
+          } catch {
+            workflowMap.set(f.toLowerCase(), {
+              filename: f,
+              path: publicPathPrefix ? `${publicPathPrefix}/${f}` : `/assets/workflows/${f}`,
+              node_count: 0,
+              title: `${folderLabel ? `[${folderLabel}] ` : ""}${f.replace(/\.json$/i, "")}`
+            });
+          }
         }
-      });
-    }
-  });
-
-  // 2. Also check root workflows directory
-  const rootFiles = fs.readdirSync(WORKFLOWS_DIR, { withFileTypes: true })
-    .filter((d) => d.isFile() && d.name.endsWith(".json"))
-    .map((d) => d.name);
-
-  rootFiles.forEach((f) => {
-    if (!workflowMap.has(f)) {
-      try {
-        const content = JSON.parse(fs.readFileSync(path.join(WORKFLOWS_DIR, f), "utf-8"));
-        const parsed = parseWorkflowData(content);
-        workflowMap.set(f, {
-          filename: f,
-          path: `/assets/workflows/${f}`,
-          node_count: parsed.totalNodes,
-          title: f.replace(/\.json$/, "").replace(/[_-]/g, " ")
-        });
-      } catch {
-        workflowMap.set(f, {
-          filename: f,
-          path: `/assets/workflows/${f}`,
-          node_count: 0,
-          title: f.replace(/\.json$/, "")
-        });
       }
+    } catch (e) {
+      console.warn(`[Workflow Scan Error] Failed reading ${dirPath}:`, e);
     }
-  });
+  };
+
+  // 1. If scene specified, scan scene workflows first
+  if (sceneName) {
+    const sceneFolder = formatSceneFolderName(sceneName);
+    scanDir(getSceneDirectories(sceneName).workflows, sceneFolder, `/assets/${sceneFolder}/workflows`);
+    scanDir(path.join(WORKFLOWS_DIR, sceneFolder), sceneFolder, `/assets/workflows/${sceneFolder}`);
+  }
+
+  // 2. Scan all scenes under ASSETS_DIR (<scene>/workflows)
+  if (fs.existsSync(ASSETS_DIR)) {
+    try {
+      const dirs = fs.readdirSync(ASSETS_DIR, { withFileTypes: true });
+      for (const d of dirs) {
+        if (d.isDirectory() && d.name !== "workflows" && d.name !== "uploads") {
+          const sceneWfDir = path.join(ASSETS_DIR, d.name, "workflows");
+          scanDir(sceneWfDir, d.name, `/assets/${d.name}/workflows`);
+        }
+      }
+    } catch {}
+  }
+
+  // 3. Scan subdirectories under WORKFLOWS_DIR
+  if (fs.existsSync(WORKFLOWS_DIR)) {
+    try {
+      const dirs = fs.readdirSync(WORKFLOWS_DIR, { withFileTypes: true });
+      for (const d of dirs) {
+        if (d.isDirectory()) {
+          scanDir(path.join(WORKFLOWS_DIR, d.name), d.name, `/assets/workflows/${d.name}`);
+        }
+      }
+    } catch {}
+  }
+
+  // 4. Scan root WORKFLOWS_DIR
+  scanDir(WORKFLOWS_DIR, undefined, "/assets/workflows");
 
   const workflowItems = Array.from(workflowMap.values());
   const files = workflowItems.map((item) => item.filename);

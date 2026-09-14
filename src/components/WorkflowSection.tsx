@@ -139,7 +139,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.name.endsWith(".json")) {
+    if (!file.name.toLowerCase().endsWith(".json")) {
       setUploadError("Only .json ComfyUI workflow files are allowed.");
       return;
     }
@@ -182,33 +182,33 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
         activeShot={activeShot}
       />
 
-      {!activeShotId ? (
-        <div className="flex flex-col items-center justify-center p-12 bg-zinc-900/40 border-2 border-dashed border-zinc-800 rounded-xl">
-          <Layers className="w-12 h-12 text-zinc-600 mb-4" />
-          <h2 className="text-xl font-semibold text-zinc-300 mb-2">No Shot Selected</h2>
-          <p className="text-sm text-zinc-500 text-center max-w-md">
-            Please select a shot from the top dropdown or the Scene Planning panel to configure its workflow mapping.
-          </p>
-        </div>
-      ) : (
-        <div className="bg-zinc-900/60 border-2 border-zinc-700 rounded-xl p-5 shadow-sm space-y-5">
-          <WorkflowFileSelector 
-            activeShotId={activeShotId}
-            parsedWorkflow={parsedWorkflow}
-            workflows={workflows}
-            selectedWorkflowFile={selectedWorkflowFile}
-            onSelectWorkflow={onSelectWorkflow}
-            onRefreshWorkflows={onRefreshWorkflows}
-            handleFileUpload={handleFileUpload}
-            uploading={uploading}
-            uploadError={uploadError}
-            bypassMissing={bypassMissing}
-            onToggleBypass={() => onToggleBypass(!bypassMissing)}
-            showRawJson={showRawJson}
-            setShowRawJson={setShowRawJson}
-          />
+      <div className="bg-zinc-900/60 border-2 border-zinc-700 rounded-xl p-5 shadow-sm space-y-5">
+        <WorkflowFileSelector 
+          activeShotId={activeShotId}
+          parsedWorkflow={parsedWorkflow}
+          workflows={workflows}
+          selectedWorkflowFile={selectedWorkflowFile}
+          onSelectWorkflow={onSelectWorkflow}
+          onRefreshWorkflows={onRefreshWorkflows}
+          handleFileUpload={handleFileUpload}
+          uploading={uploading}
+          uploadError={uploadError}
+          bypassMissing={bypassMissing}
+          onToggleBypass={() => onToggleBypass(!bypassMissing)}
+          showRawJson={showRawJson}
+          setShowRawJson={setShowRawJson}
+        />
 
-          {parsedWorkflow && (
+        {!activeShotId ? (
+          <div className="flex flex-col items-center justify-center p-8 bg-zinc-950/50 border border-zinc-800 rounded-lg text-center space-y-2">
+            <Layers className="w-8 h-8 text-zinc-500" />
+            <h3 className="text-sm font-semibold text-zinc-300">Scene-Wide Workflow Active</h3>
+            <p className="text-xs text-zinc-400 max-w-md">
+              Workflows can be uploaded and inspected at any time. Select a shot above to map assets to node inputs and adjust per-shot generation parameters.
+            </p>
+          </div>
+        ) : (
+          parsedWorkflow && (
             <div className="pt-2 border-t border-zinc-800/80 space-y-5">
               <GenerationParametersSection
                 generationParams={generationParams}
@@ -236,9 +236,9 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
                 onUpdateShot={onUpdateShot}
               />
             </div>
-          )}
-        </div>
-      )}
+          )
+        )}
+      </div>
 
       <LiveWorkflowPreview 
         showRawJson={showRawJson}

@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import fs from "fs";
 import path from "path";
-import { upload, LEGACY_WORKFLOWS_DIR, formatSceneFolderName, getSceneDirectories, ASSETS_DIR } from "../config/constants";
+import { upload, LEGACY_WORKFLOWS_DIR, WORKFLOWS_DIR, formatSceneFolderName, getSceneDirectories, ASSETS_DIR } from "../config/constants";
 import { listWorkflows, parseWorkflowData } from "../services/workflowService";
 import { processAssetTransfer, processSceneTransfer } from "../services/executionService";
 
@@ -14,7 +14,7 @@ router.get("/", (req: Request, res: Response) => {
 });
 
 router.post("/upload", upload.single("file"), (req: Request, res: Response) => {
-  if (!req.file) return res.status(400).json({ error: "No file" });
+  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
   const sceneName = (req.body.scene_name as string) || "scene01";
   const sceneFolder = formatSceneFolderName(sceneName);
   const targetDir = getSceneDirectories(sceneName).workflows;
@@ -23,8 +23,25 @@ router.post("/upload", upload.single("file"), (req: Request, res: Response) => {
     fs.mkdirSync(targetDir, { recursive: true });
   }
 
+  // Also ensure global workflows directory and scene workflows directory exist
+  const globalSceneWfDir = path.join(WORKFLOWS_DIR, sceneFolder);
+  if (!fs.existsSync(globalSceneWfDir)) {
+    fs.mkdirSync(globalSceneWfDir, { recursive: true });
+  }
+  if (!fs.existsSync(WORKFLOWS_DIR)) {
+    fs.mkdirSync(WORKFLOWS_DIR, { recursive: true });
+  }
+
   const target = path.join(targetDir, req.file.originalname);
+  const globalSceneTarget = path.join(globalSceneWfDir, req.file.originalname);
+  const rootTarget = path.join(WORKFLOWS_DIR, req.file.originalname);
+
   fs.copyFileSync(req.file.path, target);
+  fs.copyFileSync(req.file.path, globalSceneTarget);
+  fs.copyFileSync(req.file.path, rootTarget);
+
+  console.log(`[Workflow Upload] Stored "${req.file.originalname}" in ${targetDir} and ${WORKFLOWS_DIR}`);
+
   try {
     fs.unlinkSync(req.file.path);
   } catch (e) {}

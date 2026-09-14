@@ -48,15 +48,15 @@ export const WorkflowFileSelector: React.FC<WorkflowFileSelectorProps> = ({
         </div>
         <div className="flex items-center gap-2">
           {/* Upload Button */}
-          <label className={`cursor-pointer px-3 py-1.5 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 rounded-lg transition-colors flex items-center gap-1.5 shadow-xs ${!activeShotId || uploading ? "opacity-50 cursor-not-allowed" : ""}`}>
+          <label className={`cursor-pointer px-3 py-1.5 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 rounded-lg transition-colors flex items-center gap-1.5 shadow-xs ${uploading ? "opacity-50 cursor-not-allowed" : ""}`}>
             <Upload className="w-3.5 h-3.5 text-amber-400" />
             <span>{uploading ? "Uploading..." : "Upload Visual Workflow JSON"}</span>
             <input 
               type="file" 
-              accept=".json" 
+              accept=".json,.JSON,application/json" 
               onChange={handleFileUpload} 
               className="hidden" 
-              disabled={!activeShotId || uploading}
+              disabled={uploading}
             />
           </label>
 

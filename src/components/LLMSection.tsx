@@ -133,6 +133,10 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
   const activeShot = activeShotId ? sceneProject.shots.find(s => s.id === activeShotId) : null;
   const activeShotAssets = activeShot ? Object.values(activeShot.assigned_slots).filter(Boolean) : [];
   
+  // Isolate active shot data as source of truth for prompt and stub
+  const currentBasicStub = activeShot ? (activeShot.basic_stub ?? "") : basicStub;
+  const currentExpandedPrompt = activeShot ? (activeShot.expanded_prompt ?? "") : expandedPrompt;
+  
   const relevantAssets = useMemo(() => {
     if (!activeShot) return assets;
     const slotEntries = Object.entries(activeShot.assigned_slots || {});
@@ -180,7 +184,7 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
       otsAnchorSubject: activeShot?.ots_anchor_subject || planning?.ots_anchor_subject,
       otsFocusSubject: activeShot?.ots_focus_subject || planning?.ots_focus_subject,
       otsSide: activeShot?.ots_side || planning?.ots_side,
-      basicStub: basicStub,
+      basicStub: currentBasicStub,
       assets: relevantAssets
     });
   }, [
@@ -195,21 +199,12 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
     activeShot?.ots_focus_subject,
     activeShot?.ots_side,
     planning,
-    basicStub,
+    currentBasicStub,
     relevantAssets
   ]);
 
-  const isLivePreview = !expandedPrompt || !expandedPrompt.trim();
-  const displayedPrompt = isLivePreview ? livePrePromptContext : expandedPrompt;
-
-  // Track the most recent successfully generated or loaded prompt
-  useEffect(() => {
-    if (expandedPrompt && expandedPrompt.trim()) {
-      lastGeneratedPromptRef.current = expandedPrompt;
-    } else if (activeShot?.expanded_prompt && activeShot.expanded_prompt.trim()) {
-      lastGeneratedPromptRef.current = activeShot.expanded_prompt;
-    }
-  }, [expandedPrompt, activeShot?.expanded_prompt]);
+  const isLivePreview = !currentExpandedPrompt || !currentExpandedPrompt.trim();
+  const displayedPrompt = isLivePreview ? livePrePromptContext : currentExpandedPrompt;
 
   const handleCancelGeneration = () => {
     if (abortControllerRef.current) {
@@ -220,6 +215,20 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
     onShowToast?.("LLM prompt expansion cancelled.", "info");
   };
 
+  const handleStubChange = (val: string) => {
+    onChangeBasicStub(val);
+    if (activeShotId && onUpdateSpecificShot) {
+      onUpdateSpecificShot(activeShotId, prev => ({ ...prev, basic_stub: val, status: "unstaged" }));
+    }
+  };
+
+  const handlePromptChange = (val: string) => {
+    onChangeExpandedPrompt(val);
+    if (activeShotId && onUpdateSpecificShot) {
+      onUpdateSpecificShot(activeShotId, prev => ({ ...prev, expanded_prompt: val, status: "unstaged" }));
+    }
+  };
+
   const handleGeneratePrompt = async () => {
     // If already generating, act as Cancel button (double duty)
     if (generating) {
@@ -227,15 +236,23 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
       return;
     }
 
-    if (!basicStub.trim()) {
-      setError("Please provide a basic prompt stub first.");
+    if (!activeShotId) {
+      setError("Please select a shot to rework or generate its prompt.");
+      onShowToast?.("Please select a shot first.", "error");
       return;
     }
 
     const currentShotId = activeShotId;
+    const targetShot = sceneProject.shots.find(s => s.id === currentShotId) || activeShot;
+    const stubToUse = (targetShot?.basic_stub ?? currentBasicStub).trim();
 
-    // Snapshot last generated prompt to present if default fails
-    const priorPrompt = expandedPrompt?.trim() || activeShot?.expanded_prompt?.trim() || lastGeneratedPromptRef.current || "";
+    if (!stubToUse) {
+      setError("Please provide a basic prompt stub first.");
+      return;
+    }
+
+    // Snapshot prior prompt strictly for THIS shot in case of failure fallback
+    const priorPrompt = targetShot?.expanded_prompt?.trim() || "";
 
     // Create and attach new AbortController
     const controller = new AbortController();
@@ -252,22 +269,22 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
         headers: { "Content-Type": "application/json" },
         signal: controller.signal,
         body: JSON.stringify({
-          basic_stub: basicStub,
+          basic_stub: stubToUse,
           assets: relevantAssets,
           lm_studio_url: lmStudioUrl,
           provider: providerChoice,
           prompt_prefix: activeShotPrefix,
           scene_planning: planning,
           planning: planning,
-          active_shot: activeShot || undefined,
-          shot_type: activeShot ? activeShot.shot_type : planning?.shot_type,
-          camera_movement: activeShot ? activeShot.camera_movement : planning?.camera_movement,
-          lens_focal_length: activeShot ? activeShot.lens_focal_length : planning?.lens_focal_length,
-          aspect_ratio: activeShot ? activeShot.aspect_ratio : planning?.aspect_ratio,
-          ots_anchor_subject: activeShot?.ots_anchor_subject || planning?.ots_anchor_subject,
-          ots_focus_subject: activeShot?.ots_focus_subject || planning?.ots_focus_subject,
-          ots_side: activeShot?.ots_side || planning?.ots_side,
-          shot_number: activeShot ? activeShot.shot_number : planning?.shot_number,
+          active_shot: targetShot || undefined,
+          shot_type: targetShot ? targetShot.shot_type : planning?.shot_type,
+          camera_movement: targetShot ? targetShot.camera_movement : planning?.camera_movement,
+          lens_focal_length: targetShot ? targetShot.lens_focal_length : planning?.lens_focal_length,
+          aspect_ratio: targetShot ? targetShot.aspect_ratio : planning?.aspect_ratio,
+          ots_anchor_subject: targetShot?.ots_anchor_subject || planning?.ots_anchor_subject,
+          ots_focus_subject: targetShot?.ots_focus_subject || planning?.ots_focus_subject,
+          ots_side: targetShot?.ots_side || planning?.ots_side,
+          shot_number: targetShot ? targetShot.shot_number : planning?.shot_number,
           scene_name: sceneProject?.scene_name || planning?.scene_name,
           characters: sceneProject?.characters,
           gemini_api_key: geminiApiKey,
@@ -279,33 +296,47 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
 
       const data = await res.json();
       if (res.ok && data.expanded_prompt) {
-        lastGeneratedPromptRef.current = data.expanded_prompt;
         setPresentedFallbackNotice(null);
-        if (currentShotId && onUpdateSpecificShot) {
-          onUpdateSpecificShot(currentShotId, prev => ({ ...prev, expanded_prompt: data.expanded_prompt, status: "unstaged" }));
+        // CRITICAL: Update strictly and ONLY the selected target shot
+        if (onUpdateSpecificShot) {
+          onUpdateSpecificShot(currentShotId, prev => ({ 
+            ...prev, 
+            expanded_prompt: data.expanded_prompt, 
+            status: "unstaged" 
+          }));
         } else {
+          onUpdateShot(prev => ({ 
+            ...prev, 
+            expanded_prompt: data.expanded_prompt, 
+            status: "unstaged" 
+          }));
+        }
+        
+        // Only update current prompt state if user is still on this same shot
+        if (activeShotId === currentShotId) {
           onChangeExpandedPrompt(data.expanded_prompt);
         }
         
         if (data.provider) setProviderUsed(data.provider);
         if (data.debug) setLastDebugInfo(data.debug);
-        onShowToast?.("Prompt expanded and auto-compiled successfully!", "success");
+        onShowToast?.(`Prompt for Shot ${targetShot?.shot_number ?? ""} generated successfully!`, "success");
       } else {
         const errorMsg = data.error || `Failed to generate prompt with ${providerChoice === "gemini" ? "Google Gemini" : "LM Studio"}`;
         setError(errorMsg);
         onShowToast?.(`LLM generation failed: ${errorMsg}`, "error");
 
-        // Present the last generated prompt as requested
+        // Present the last generated prompt strictly for this shot
         if (priorPrompt) {
-          if (currentShotId && onUpdateSpecificShot) {
+          if (onUpdateSpecificShot) {
             onUpdateSpecificShot(currentShotId, prev => ({ ...prev, expanded_prompt: priorPrompt }));
-          } else {
+          }
+          if (activeShotId === currentShotId) {
             onChangeExpandedPrompt(priorPrompt);
           }
-          setPresentedFallbackNotice(`Default LLM service failed (${providerChoice === "gemini" ? "Google Gemini" : "LM Studio"}). Presenting last generated prompt.`);
-          onShowToast?.("Presenting last generated prompt.", "info");
+          setPresentedFallbackNotice(`Default LLM service failed (${providerChoice === "gemini" ? "Google Gemini" : "LM Studio"}). Presenting last prompt for this shot.`);
+          onShowToast?.("Presenting last prompt for this shot.", "info");
         } else {
-          setPresentedFallbackNotice(`Default LLM service failed (${providerChoice === "gemini" ? "Google Gemini" : "LM Studio"}). No previous prompt available.`);
+          setPresentedFallbackNotice(`Default LLM service failed (${providerChoice === "gemini" ? "Google Gemini" : "LM Studio"}). No previous prompt available for this shot.`);
         }
       }
     } catch (err: any) {
@@ -317,17 +348,18 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
       setError(errorMsg);
       onShowToast?.(`LLM generation failed: ${errorMsg}`, "error");
 
-      // Present the last generated prompt as requested
+      // Present the last generated prompt strictly for this shot
       if (priorPrompt) {
-        if (currentShotId && onUpdateSpecificShot) {
+        if (onUpdateSpecificShot) {
           onUpdateSpecificShot(currentShotId, prev => ({ ...prev, expanded_prompt: priorPrompt }));
-        } else {
+        }
+        if (activeShotId === currentShotId) {
           onChangeExpandedPrompt(priorPrompt);
         }
-        setPresentedFallbackNotice(`Default LLM service failed (${providerChoice === "gemini" ? "Google Gemini" : "LM Studio"}). Presenting last generated prompt.`);
-        onShowToast?.("Presenting last generated prompt.", "info");
+        setPresentedFallbackNotice(`Default LLM service failed (${providerChoice === "gemini" ? "Google Gemini" : "LM Studio"}). Presenting last prompt for this shot.`);
+        onShowToast?.("Presenting last prompt for this shot.", "info");
       } else {
-        setPresentedFallbackNotice(`Default LLM service failed (${providerChoice === "gemini" ? "Google Gemini" : "LM Studio"}). No previous prompt available.`);
+        setPresentedFallbackNotice(`Default LLM service failed (${providerChoice === "gemini" ? "Google Gemini" : "LM Studio"}). No previous prompt available for this shot.`);
       }
     } finally {
       abortControllerRef.current = null;
@@ -335,25 +367,11 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
     }
   };
 
-  // Auto-inject header and photo statement once when shot changes if already has an expanded prompt
-  const lastLoadedShotIdRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (activeShotId && expandedPrompt && expandedPrompt.trim()) {
-      if (lastLoadedShotIdRef.current !== activeShotId) {
-        const assembled = assembleFinalPrompt(expandedPrompt, activeShotPrefix, isSceneRefPresent);
-        if (assembled !== expandedPrompt) {
-          onChangeExpandedPrompt(assembled);
-        }
-        lastLoadedShotIdRef.current = activeShotId;
-      }
-    } else if (!expandedPrompt || !expandedPrompt.trim()) {
-      lastLoadedShotIdRef.current = null;
-    }
-  }, [activeShotId, expandedPrompt, activeShotPrefix, isSceneRefPresent, onChangeExpandedPrompt]);
-
   const handleResetToLivePreview = () => {
     onChangeExpandedPrompt("");
+    if (activeShotId && onUpdateSpecificShot) {
+      onUpdateSpecificShot(activeShotId, prev => ({ ...prev, expanded_prompt: "", status: "unstaged" }));
+    }
     onShowToast?.("Prompt cleared — live context preview re-engaged.", "info");
   };
 
@@ -509,8 +527,8 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
             <textarea
               rows={5}
               placeholder="e.g. Jackie walking through a neon-lit cyberpunk alleyway in the rain, turning towards the camera with a confident smile..."
-              value={basicStub}
-              onChange={(e) => onChangeBasicStub(e.target.value)}
+              value={currentBasicStub}
+              onChange={(e) => handleStubChange(e.target.value)}
               className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-amber-500 rounded-lg p-3 text-xs text-zinc-100 placeholder-zinc-600 outline-none resize-none leading-relaxed"
             />
 
@@ -536,7 +554,7 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
 
           <button
             onClick={handleGeneratePrompt}
-            disabled={!generating && (!basicStub.trim() || assets.length === 0)}
+            disabled={!generating && (!currentBasicStub.trim() || assets.length === 0)}
             title={
               generating 
                 ? "Click to cancel prompt expansion" 
@@ -658,7 +676,7 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
                 rows={18}
                 placeholder="The dynamic pre-prompt context or expanded prompt will appear here ready for editing before execution..."
                 value={displayedPrompt}
-                onChange={(e) => onChangeExpandedPrompt(e.target.value)}
+                onChange={(e) => handlePromptChange(e.target.value)}
                 disabled={generating}
                 className={`w-full bg-zinc-900 border-2 rounded-lg p-3 text-xs text-zinc-100 placeholder-zinc-600 outline-none resize-none leading-relaxed font-mono transition-opacity duration-300 ${
                   generating ? "opacity-40 cursor-not-allowed select-none" : ""
