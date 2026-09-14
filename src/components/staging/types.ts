@@ -47,6 +47,9 @@ export const LIGHTING_ATMOSPHERES: LightingAtmosphereOption[] = [
 export const ASPECT_RATIOS: AspectRatioOption[] = [
   { id: "16:9", label: "16:9 Widescreen", ratioClass: "aspect-video" },
   { id: "2.39:1", label: "2.39:1 Anamorphic Scope", ratioClass: "aspect-[2.39/1]" },
+  { id: "3:2", label: "3:2 Landscape", ratioClass: "aspect-[3/2]" },
   { id: "4:3", label: "4:3 Classic", ratioClass: "aspect-[4/3]" },
+  { id: "1:1", label: "1:1 Square", ratioClass: "aspect-square" },
+  { id: "2:3", label: "2:3 Portrait", ratioClass: "aspect-[2/3]" },
   { id: "9:16", label: "9:16 Vertical", ratioClass: "aspect-[9/16]" }
 ];

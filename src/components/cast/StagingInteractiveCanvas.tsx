@@ -212,10 +212,16 @@ export const StagingInteractiveCanvas: React.FC<StagingInteractiveCanvasProps> =
         } ${
           aspectRatio === "16:9"
             ? "aspect-video"
-            : aspectRatio === "2.39:1"
+            : aspectRatio === "2.39:1" || aspectRatio === "21:9"
             ? "aspect-[2.39/1]"
+            : aspectRatio === "3:2"
+            ? "aspect-[3/2]"
             : aspectRatio === "4:3"
             ? "aspect-[4/3]"
+            : aspectRatio === "1:1"
+            ? "aspect-square"
+            : aspectRatio === "2:3"
+            ? "aspect-[2/3] max-w-md mx-auto"
             : "aspect-[9/16] max-w-sm mx-auto"
         }`}
       >

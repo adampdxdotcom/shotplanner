@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { ScenePlanning, formatShotNumber, generateSaveVideoPrefix, sanitizeFilenamePart, generatePromptPrefix, assembleFinalPrompt } from "../types";
 import { copyToClipboard } from "../utils/clipboard";
 import { 
@@ -59,9 +59,11 @@ export const LENS_PRESETS = [
 export const ASPECT_RATIO_PRESETS = [
   { label: "16:9 Widescreen", value: "16:9 Widescreen" },
   { label: "2.39:1 Anamorphic Scope", value: "2.39:1 Anamorphic Scope" },
-  { label: "9:16 Vertical (Reels)", value: "9:16 Vertical (Reels)" },
+  { label: "3:2 Landscape", value: "3:2 Landscape" },
+  { label: "4:3 Classic", value: "4:3 Classic" },
   { label: "1:1 Square", value: "1:1 Square" },
-  { label: "4:3 Classic", value: "4:3 Classic" }
+  { label: "2:3 Portrait", value: "2:3 Portrait" },
+  { label: "9:16 Vertical (Reels)", value: "9:16 Vertical (Reels)" }
 ];
 
 interface ScenePlanningHeaderProps {
@@ -77,6 +79,19 @@ export const ScenePlanningHeader: React.FC<ScenePlanningHeaderProps> = ({
 
   const prefix = generatePromptPrefix(planning);
   const formattedShot = formatShotNumber(planning.shot_number);
+
+  const normalizedAspectRatio = useMemo(() => {
+    const current = planning.aspect_ratio?.trim();
+    if (!current) return "16:9 Widescreen";
+    const exactMatch = ASPECT_RATIO_PRESETS.find(p => p.value === current);
+    if (exactMatch) return exactMatch.value;
+    const prefixMatch = ASPECT_RATIO_PRESETS.find(p => 
+      p.value.toLowerCase().startsWith(current.toLowerCase()) || 
+      current.toLowerCase().startsWith(p.value.split(" ")[0].toLowerCase())
+    );
+    if (prefixMatch) return prefixMatch.value;
+    return current;
+  }, [planning.aspect_ratio]);
 
   const handleSceneNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onChangePlanning({ ...planning, scene_name: e.target.value });
@@ -243,7 +258,7 @@ export const ScenePlanningHeader: React.FC<ScenePlanningHeaderProps> = ({
             <span>Aspect Ratio</span>
           </label>
           <select
-            value={planning.aspect_ratio || "16:9 Widescreen"}
+            value={normalizedAspectRatio}
             onChange={handleAspectRatioChange}
             className="w-full bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-700 focus:border-indigo-500 focus:outline-hidden text-zinc-900 dark:text-zinc-100 text-xs px-3 py-2 rounded-lg transition-colors cursor-pointer shadow-xs"
           >
@@ -252,6 +267,9 @@ export const ScenePlanningHeader: React.FC<ScenePlanningHeaderProps> = ({
                 {ar.label}
               </option>
             ))}
+            {!ASPECT_RATIO_PRESETS.some((p) => p.value === normalizedAspectRatio) && (
+              <option value={normalizedAspectRatio}>{normalizedAspectRatio}</option>
+            )}
           </select>
         </div>
       </div>

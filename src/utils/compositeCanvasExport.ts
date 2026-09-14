@@ -35,6 +35,12 @@ export function getCanvasDimensions(aspectRatio: string, customWidth?: number): 
     if (aspectRatio === "9:16") {
       return { width: customWidth, height: Math.round((customWidth * 16) / 9) };
     }
+    if (aspectRatio === "3:2" || aspectRatio.startsWith("3:2")) {
+      return { width: customWidth, height: Math.round((customWidth * 2) / 3) };
+    }
+    if (aspectRatio === "2:3" || aspectRatio.startsWith("2:3")) {
+      return { width: customWidth, height: Math.round((customWidth * 3) / 2) };
+    }
     // Default 16:9
     return { width: customWidth, height: Math.round((customWidth * 9) / 16) };
   }
@@ -43,6 +49,10 @@ export function getCanvasDimensions(aspectRatio: string, customWidth?: number): 
   switch (aspectRatio) {
     case "2.39:1":
       return { width: 2390, height: 1000 };
+    case "3:2":
+      return { width: 1920, height: 1280 };
+    case "2:3":
+      return { width: 1280, height: 1920 };
     case "4:3":
       return { width: 1440, height: 1080 };
     case "9:16":
