@@ -47,6 +47,7 @@ app.use("/api/settings", settingsRoutes);
 app.use("/api/civitai", civitaiRoutes);
 app.use("/api/model-hub", modelHubRoutes);
 app.use("/api/workflows", workflowRoutes);
+app.use("/api/workflow", workflowRoutes);
 app.use("/api/assets", assetRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/ssh", sshRoutes);

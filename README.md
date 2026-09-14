@@ -15,14 +15,18 @@ The platform decouples scene asset staging, character consistency, and multimoda
 
 ```bash
 # 1. Clone the repository
-git clone <your-repo-url>
-cd ais-runpod-scene-stager
+git clone https://github.com/adampdxdotcom/shotplanner
+cd shotplanner
 
 # 2. Start the container
-docker compose up -d
+docker compose up --build -d
 
 # 3. Open in your browser
 http://localhost:3000
+
+# 4. Updating
+git pull
+docker compose up --build -d
 ```
 
 ### Running with Standalone Docker

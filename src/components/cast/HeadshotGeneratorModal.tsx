@@ -1,5 +1,5 @@
 import React from "react";
-import { MediaAsset, SceneProjectFile, ShotItem, CharacterProfile } from "../../types";
+import { MediaAsset, SceneProjectFile, ShotItem, CharacterProfile, AppConfig } from "../../types";
 import { AiReferenceStagingStudioModal, AiReferenceStagingStudioModalProps } from "./AiReferenceStagingStudioModal";
 
 export interface HeadshotGeneratorModalProps {
@@ -8,6 +8,7 @@ export interface HeadshotGeneratorModalProps {
   subjectName: string;
   characterAssets: MediaAsset[];
   activeSceneName: string;
+  config?: AppConfig;
   onAssetSaved: (asset: MediaAsset) => void;
   addToast?: (msg: string, type?: "success" | "error" | "info") => void;
   initialTab?: "headshots" | "staging";

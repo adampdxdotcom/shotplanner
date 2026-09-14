@@ -15,6 +15,7 @@ export interface AiReferenceStagingStudioModalProps {
   subjectName?: string;
   characterAssets?: MediaAsset[];
   activeSceneName: string;
+  config?: any;
   onAssetSaved?: (asset: MediaAsset) => void;
   addToast?: (msg: string, type?: "success" | "error" | "info") => void;
   characters?: Record<string, CharacterProfile>;
@@ -34,6 +35,7 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
   subjectName = "",
   characterAssets = [],
   activeSceneName,
+  config,
   onAssetSaved,
   addToast,
   characters = {},
@@ -98,6 +100,7 @@ export const AiReferenceStagingStudioModal: React.FC<AiReferenceStagingStudioMod
               characters={characters}
               subjects={subjects.length > 0 ? subjects : (subjectName ? [subjectName] : [])}
               activeSceneName={activeSceneName}
+              config={config}
               onUpdateProject={onUpdateProject || (() => {})}
               onUpdateShot={onUpdateShot}
               onAssetUploaded={onAssetSaved}

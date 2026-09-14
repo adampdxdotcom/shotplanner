@@ -23,6 +23,7 @@ export interface StagingSectionProps {
   characters?: Record<string, CharacterProfile>;
   subjects?: string[];
   activeSceneName?: string;
+  config?: any;
   onUpdateProject?: React.Dispatch<React.SetStateAction<SceneProjectFile>> | ((updater: (prev: SceneProjectFile) => SceneProjectFile) => void);
   onUpdateShot?: (updater: (prev: ShotItem) => ShotItem) => void;
   onAssetUploaded?: (asset: MediaAsset, targetSlotIndex?: number) => void;
@@ -41,6 +42,7 @@ export const StagingSection: React.FC<StagingSectionProps> = ({
   characters = {},
   subjects = [],
   activeSceneName,
+  config,
   onUpdateProject,
   onUpdateShot,
   onAssetUploaded,
@@ -241,6 +243,10 @@ export const StagingSection: React.FC<StagingSectionProps> = ({
               activeSubject={activeSubject}
               activeScene={activeScene}
               currentCharacterAssets={currentCharacterAssets}
+              allAssets={assets}
+              characters={characters}
+              subjects={availableCharacters.length > 0 ? availableCharacters : subjects}
+              config={config}
               onAssetSaved={onAssetUploaded}
               addToast={addToast}
             />

@@ -15,15 +15,19 @@ import { createManagedBlobUrl, revokeManagedBlobUrl } from "../utils/blobRegistr
 interface AssetUploadModalProps {
   isOpen: boolean;
   activeTab: "image" | "audio" | "video";
-  uploadModalSlot: { type: "image" | "audio" | "video", index: number } | null;
+  uploadModalSlot?: { type: "image" | "audio" | "video", index: number } | null;
   libraryAssets: MediaAsset[];
   subjects: string[];
   characters: Record<string, any>;
   sceneName?: string;
   config?: AppConfig;
+  customTitle?: string;
+  initialModalTab?: "upload" | "library";
+  defaultSubject?: string;
   onRegisterSubject?: (name: string) => void;
   onClose: () => void;
-  onAssetUploaded: (asset: MediaAsset, slotIndex: number, type: string) => void;
+  onAssetUploaded?: (asset: MediaAsset, slotIndex: number, type: string) => void;
+  onSelectAsset?: (asset: MediaAsset) => void;
 }
 
 export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
@@ -35,9 +39,13 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
   characters,
   sceneName,
   config,
+  customTitle,
+  initialModalTab,
+  defaultSubject,
   onRegisterSubject,
   onClose,
-  onAssetUploaded
+  onAssetUploaded,
+  onSelectAsset
 }) => {
   const [assetType, setAssetType] = useState<string>("Headshot");
   const [selectedModifier, setSelectedModifier] = useState<string>("");
@@ -67,9 +75,16 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
   const [libraryFilter, setLibraryFilter] = useState("All");
   const [selectedLibraryAsset, setSelectedLibraryAsset] = useState<MediaAsset | null>(null);
 
-  // Reset/clean up state on open/close
+  // Reset/clean up or initialize state on open/close
   useEffect(() => {
-    if (!isOpen) {
+    if (isOpen) {
+      if (initialModalTab) {
+        setUploadModalTab(initialModalTab);
+      }
+      if (defaultSubject) {
+        setSubjectName(defaultSubject);
+      }
+    } else {
       if (stagedPreviewUrl) {
         revokeManagedBlobUrl(stagedPreviewUrl);
       }
@@ -82,7 +97,7 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
       setCaptionToast(null);
       setIsDraggingOver(false);
     }
-  }, [isOpen]);
+  }, [isOpen, initialModalTab, defaultSubject]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -253,8 +268,10 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
       const newAsset = await p;
       setUploading(false);
       
-      if (uploadModalSlot) {
+      if (uploadModalSlot && onAssetUploaded) {
         onAssetUploaded(newAsset, uploadModalSlot.index, uploadModalSlot.type);
+      } else if (onSelectAsset) {
+        onSelectAsset(newAsset);
       }
       onClose();
     } catch (err: any) {
@@ -264,12 +281,16 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
   };
 
   const handleAssignExistingAsset = () => {
-    if (!selectedLibraryAsset || !uploadModalSlot) return;
-    onAssetUploaded(selectedLibraryAsset, uploadModalSlot.index, uploadModalSlot.type);
+    if (!selectedLibraryAsset) return;
+    if (uploadModalSlot && onAssetUploaded) {
+      onAssetUploaded(selectedLibraryAsset, uploadModalSlot.index, uploadModalSlot.type);
+    } else if (onSelectAsset) {
+      onSelectAsset(selectedLibraryAsset);
+    }
     onClose();
   };
 
-  if (!isOpen || !uploadModalSlot) return null;
+  if (!isOpen) return null;
 
   const isMetadataIncomplete = activeTab === "image" && (!subjectName.trim() || !description.trim());
   const isUploadDisabled = isMetadataIncomplete || !stagedFile || uploading;
@@ -284,7 +305,7 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
         <div className="flex items-center justify-between p-4 border-b border-zinc-800 bg-zinc-950/50">
           <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
             <UploadCloud className="w-4 h-4 text-amber-400" />
-            Assign {uploadModalSlot.type.toUpperCase()} to Slot {uploadModalSlot.index + 1}
+            {customTitle || (uploadModalSlot ? `Assign ${uploadModalSlot.type.toUpperCase()} to Slot ${uploadModalSlot.index + 1}` : `Select or Upload Reference Asset`)}
           </h3>
           <button onClick={onClose} className="text-zinc-400 hover:text-white transition-colors" disabled={uploading}>
             <X className="w-4 h-4" />
@@ -531,10 +552,10 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
                   type="button"
                   onClick={handleExecuteUpload}
                   disabled={isUploadDisabled}
-                  className="px-5 py-2 rounded-lg text-xs font-semibold bg-amber-600 hover:bg-amber-500 disabled:opacity-40 disabled:cursor-not-allowed text-white transition-all shadow-md flex items-center gap-2"
+                  className="px-5 py-2 rounded-lg text-xs font-semibold bg-amber-600 hover:bg-amber-500 disabled:opacity-40 disabled:cursor-not-allowed text-white transition-all shadow-md flex items-center gap-2 cursor-pointer"
                 >
                   {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UploadCloud className="w-3.5 h-3.5" />}
-                  <span>{uploading ? "Uploading..." : `Confirm & Stage to Slot ${uploadModalSlot.index + 1}`}</span>
+                  <span>{uploading ? "Uploading..." : uploadModalSlot ? `Confirm & Stage to Slot ${uploadModalSlot.index + 1}` : "Confirm & Use Asset"}</span>
                 </button>
               </div>
             </div>
@@ -593,9 +614,9 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
                                 onClick={() => setSelectedLibraryAsset(asset)}
                                 className={`relative aspect-square rounded-lg border-2 cursor-pointer overflow-hidden transition-all group ${selectedLibraryAsset?.filename === asset.filename ? "border-amber-500 ring-2 ring-amber-500/20" : "border-zinc-800 hover:border-zinc-600"}`}
                               >
-                                {uploadModalSlot?.type === "image" ? (
+                                {(uploadModalSlot?.type || activeTab) === "image" ? (
                                   <img src={getAssetMediaUrl(asset, true)} className="absolute inset-0 w-full h-full object-cover" alt="" />
-                                ) : uploadModalSlot?.type === "video" ? (
+                                ) : (uploadModalSlot?.type || activeTab) === "video" ? (
                                   <video src={getAssetMediaUrl(asset, true)} className="absolute inset-0 w-full h-full object-cover" />
                                 ) : (
                                   <div className="absolute inset-0 bg-zinc-800 flex items-center justify-center">
@@ -626,10 +647,12 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
                     <button
                       onClick={handleAssignExistingAsset}
                       disabled={!selectedLibraryAsset}
-                      className="bg-amber-600 hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-5 py-2 rounded-md text-sm font-semibold transition-colors flex items-center gap-2 shadow-lg shadow-amber-900/20"
+                      className="bg-amber-600 hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-5 py-2 rounded-md text-sm font-semibold transition-colors flex items-center gap-2 shadow-lg shadow-amber-900/20 cursor-pointer"
                     >
                       <CheckCircle className="w-4 h-4" />
-                      Assign {selectedLibraryAsset ? `"${selectedLibraryAsset.subject_name}"` : ""} to Slot {uploadModalSlot?.index !== undefined ? uploadModalSlot.index + 1 : ""}
+                      {uploadModalSlot 
+                        ? `Assign ${selectedLibraryAsset ? `"${selectedLibraryAsset.subject_name}"` : ""} to Slot ${uploadModalSlot.index + 1}`
+                        : `Select ${selectedLibraryAsset ? `"${selectedLibraryAsset.subject_name || selectedLibraryAsset.filename}"` : "Asset"}`}
                     </button>
                   </div>
                 </>

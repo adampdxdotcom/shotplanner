@@ -1,7 +1,9 @@
 import React, { useState, useRef } from "react";
-import { Zap, X, UploadCloud, CheckCircle2, Check } from "lucide-react";
-import { MediaAsset } from "../../types";
+import { Zap, X, UploadCloud, CheckCircle2, Check, Sparkles, FolderOpen, RefreshCw } from "lucide-react";
+import { MediaAsset, AppConfig, CharacterProfile } from "../../types";
 import { useHeadshotGenerator } from "../../hooks/useHeadshotGenerator";
+import { AssetUploadModal } from "../AssetUploadModal";
+import { getAssetMediaUrl } from "../../utils/assetUrl";
 
 const HEADSHOT_PRESETS = [
   "Facing",
@@ -14,24 +16,35 @@ export interface HeadshotGeneratorTabProps {
   activeSubject: string;
   activeScene: string;
   currentCharacterAssets: MediaAsset[];
+  allAssets?: MediaAsset[];
+  characters?: Record<string, CharacterProfile>;
+  subjects?: string[];
+  config?: AppConfig;
   onAssetSaved?: (asset: MediaAsset) => void;
   addToast?: (message: string, type: "success" | "error" | "info") => void;
-  onClose: () => void;
+  onClose?: () => void;
 }
 
 export const HeadshotGeneratorTab: React.FC<HeadshotGeneratorTabProps> = ({
   activeSubject,
   activeScene,
   currentCharacterAssets,
+  allAssets = [],
+  characters = {},
+  subjects = [],
+  config,
   onAssetSaved,
   addToast,
-  onClose
+  onClose = () => {}
 }) => {
   const [selectedSeed, setSelectedSeed] = useState<string | null>(null);
   const [seedType, setSeedType] = useState<"existing" | "upload" | null>(null);
   const [seedMimeType, setSeedMimeType] = useState<string>("image/png");
+  const [selectedAssetObject, setSelectedAssetObject] = useState<MediaAsset | null>(null);
   const [aspectRatio, setAspectRatio] = useState<"1:1" | "2:3" | "3:4" | "4:3" | "9:16" | "16:9">("1:1");
   const [selectedPresets, setSelectedPresets] = useState<string[]>(["Facing", "3/4 Profile"]);
+  const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
+
   const {
     isGenerating,
     isSaving,
@@ -54,6 +67,7 @@ export const HeadshotGeneratorTab: React.FC<HeadshotGeneratorTabProps> = ({
     addToast,
     onClose
   });
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -67,14 +81,34 @@ export const HeadshotGeneratorTab: React.FC<HeadshotGeneratorTabProps> = ({
       setSelectedSeed(b64);
       setSeedType("upload");
       setSeedMimeType(file.type);
+      setSelectedAssetObject(null);
     };
     reader.readAsDataURL(file);
   };
 
-  const handleSelectExisting = (filename: string) => {
-    setSelectedSeed(filename);
+  const handleSelectExisting = (asset: MediaAsset) => {
+    setSelectedSeed(asset.filename);
     setSeedType("existing");
     setSeedMimeType("image/png");
+    setSelectedAssetObject(asset);
+  };
+
+  const handleAssetChosenFromModal = (asset: MediaAsset) => {
+    handleSelectExisting(asset);
+    setIsAssetModalOpen(false);
+    if (addToast) {
+      addToast(`Selected "${asset.subject_name || asset.filename}" as base reference`, "info");
+    }
+  };
+
+  const handleUseCandidateAsBase = (cand: { key: string; base64: string }) => {
+    setSelectedSeed(cand.base64);
+    setSeedType("upload");
+    setSeedMimeType("image/png");
+    setSelectedAssetObject(null);
+    if (addToast) {
+      addToast(`Set generated variation (${cand.key}) as active seed reference`, "info");
+    }
   };
 
   const togglePreset = (preset: string) => {
@@ -91,8 +125,8 @@ export const HeadshotGeneratorTab: React.FC<HeadshotGeneratorTabProps> = ({
     }
   };
 
-
-  
+  // Combine character assets + all assets if passed
+  const availableLibraryAssets = allAssets.length > 0 ? allAssets : currentCharacterAssets;
 
   return (
     <div className="p-5 space-y-6">
@@ -107,16 +141,27 @@ export const HeadshotGeneratorTab: React.FC<HeadshotGeneratorTabProps> = ({
 
       {/* Seed Selection Section */}
       <div className="bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 space-y-3 shadow-2xs">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-200 flex items-center gap-2">
             <span className="w-5 h-5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20 flex items-center justify-center text-xs font-bold">
               1
             </span>
             Select Base Reference (Seed) for {activeSubject || "Selected Actor"}
           </h3>
-          <span className="text-xs text-zinc-500 dark:text-zinc-400 font-mono">
-            {currentCharacterAssets.length} reference asset{currentCharacterAssets.length === 1 ? "" : "s"} found
-          </span>
+          
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsAssetModalOpen(true)}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-200 dark:border-zinc-700 flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+            >
+              <FolderOpen className="w-3.5 h-3.5 text-amber-500" />
+              <span>Browse All Library Assets</span>
+            </button>
+            <span className="text-xs text-zinc-500 dark:text-zinc-400 font-mono">
+              {currentCharacterAssets.length} character ref{currentCharacterAssets.length === 1 ? "" : "s"}
+            </span>
+          </div>
         </div>
 
         {/* Upload or Grid Picker */}
@@ -156,13 +201,13 @@ export const HeadshotGeneratorTab: React.FC<HeadshotGeneratorTabProps> = ({
             )}
           </div>
 
-          {/* Existing Assets */}
+          {/* Existing Character Headshots & References */}
           {currentCharacterAssets.map((asset, i) => {
             const isSelected = seedType === "existing" && selectedSeed === asset.filename;
             return (
               <div
-                key={asset.id || i}
-                onClick={() => handleSelectExisting(asset.filename)}
+                key={asset.id || asset.filename || i}
+                onClick={() => handleSelectExisting(asset)}
                 className={`relative rounded-xl overflow-hidden aspect-square border-2 transition-all cursor-pointer group shadow-2xs ${
                   isSelected 
                     ? "border-amber-500 ring-2 ring-amber-500/40" 
@@ -170,7 +215,7 @@ export const HeadshotGeneratorTab: React.FC<HeadshotGeneratorTabProps> = ({
                 }`}
               >
                 <img
-                  src={`/api/assets/${asset.filename}`}
+                  src={getAssetMediaUrl(asset, true)}
                   alt={asset.description || asset.filename}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   referrerPolicy="no-referrer"
@@ -187,6 +232,30 @@ export const HeadshotGeneratorTab: React.FC<HeadshotGeneratorTabProps> = ({
             );
           })}
         </div>
+
+        {/* Selected Seed Preview Info Banner */}
+        {selectedSeed && (
+          <div className="flex items-center justify-between px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-800 dark:text-amber-300">
+            <div className="flex items-center gap-2 truncate">
+              <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+              <span className="font-semibold">Active Base Reference:</span>
+              <span className="font-mono truncate">
+                {selectedAssetObject ? (selectedAssetObject.subject_name ? `${selectedAssetObject.subject_name} (${selectedAssetObject.type || 'Asset'})` : selectedAssetObject.filename) : (seedType === "upload" ? "Custom Uploaded Image" : selectedSeed)}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedSeed(null);
+                setSeedType(null);
+                setSelectedAssetObject(null);
+              }}
+              className="text-zinc-500 hover:text-red-500 text-[11px] font-medium shrink-0 ml-2 cursor-pointer"
+            >
+              Clear
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Generation Controls */}
@@ -298,8 +367,7 @@ export const HeadshotGeneratorTab: React.FC<HeadshotGeneratorTabProps> = ({
               return (
                 <div
                   key={idx}
-                  onClick={() => toggleCandidate(idx)}
-                  className={`relative rounded-xl aspect-square overflow-hidden border-2 cursor-pointer transition-all group shadow-2xs ${
+                  className={`relative rounded-xl aspect-square overflow-hidden border-2 transition-all group shadow-2xs ${
                     isSelected 
                       ? "border-amber-500 ring-2 ring-amber-500/40" 
                       : "border-zinc-200 dark:border-zinc-800 opacity-70 hover:opacity-100"
@@ -308,23 +376,59 @@ export const HeadshotGeneratorTab: React.FC<HeadshotGeneratorTabProps> = ({
                   <img
                     src={`data:image/png;base64,${cand.base64}`}
                     alt={cand.key}
-                    className="w-full h-full object-cover"
+                    onClick={() => toggleCandidate(idx)}
+                    className="w-full h-full object-cover cursor-pointer"
                   />
-                  <div className="absolute top-2 right-2">
+                  <div 
+                    onClick={() => toggleCandidate(idx)}
+                    className="absolute top-2 right-2 cursor-pointer z-10"
+                  >
                     <div className={`w-5 h-5 rounded-full flex items-center justify-center ${
                       isSelected ? "bg-amber-500 text-black font-bold" : "bg-black/60 border border-zinc-600 text-white"
                     }`}>
                       {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                     </div>
                   </div>
-                  <div className="absolute inset-x-0 bottom-0 bg-black/80 px-2 py-1 text-[10px] text-zinc-300 font-mono text-center">
-                    {cand.key}
+                  
+                  {/* Candidate Quick Action Overlay */}
+                  <div className="absolute inset-x-0 bottom-0 bg-black/85 p-1.5 flex items-center justify-between text-[10px] text-zinc-300 font-mono">
+                    <span className="truncate">{cand.key}</span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleUseCandidateAsBase(cand);
+                      }}
+                      title="Use this generated variation as the active base seed"
+                      className="px-1.5 py-0.5 bg-zinc-800 hover:bg-amber-600 text-zinc-300 hover:text-white rounded text-[9px] flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      <RefreshCw className="w-2.5 h-2.5" />
+                      <span>Use as Base</span>
+                    </button>
                   </div>
                 </div>
               );
             })}
           </div>
         </div>
+      )}
+
+      {/* Repurposed Single Asset Upload & Library Selection Modal */}
+      {isAssetModalOpen && (
+        <AssetUploadModal
+          isOpen={isAssetModalOpen}
+          activeTab="image"
+          initialModalTab="library"
+          defaultSubject={activeSubject}
+          libraryAssets={availableLibraryAssets}
+          subjects={subjects.length > 0 ? subjects : (activeSubject ? [activeSubject] : [])}
+          characters={characters}
+          sceneName={activeScene}
+          config={config}
+          customTitle={`Select Base Reference for ${activeSubject || "Character"}`}
+          onClose={() => setIsAssetModalOpen(false)}
+          onSelectAsset={handleAssetChosenFromModal}
+        />
       )}
     </div>
   );

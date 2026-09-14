@@ -360,6 +360,7 @@ export const CastSection: React.FC<CastSectionProps> = ({
         subjectName={headshotModalSubject || ""}
         characterAssets={headshotModalSubject ? assets.filter(a => (a.subject_name || "").toLowerCase() === headshotModalSubject.toLowerCase()) : []}
         activeSceneName={activeSceneName}
+        config={config}
         onAssetSaved={onAssetUploaded}
         addToast={addToast}
         characters={characters}
