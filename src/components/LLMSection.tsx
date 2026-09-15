@@ -9,12 +9,14 @@ import {
   generatePromptPrefix,
   computePrePromptContext,
   PromptDebugInfo,
+  PromptVariation,
   AppConfig
 } from "../types";
 import { formatShotNumber } from "./ScenePlanningHeader";
 import { TakeSelector } from "./TakeSelector";
 import { TakeReviewModal } from "./TakeReviewModal";
 import { PromptDebugModal } from "./PromptDebugModal";
+import { VariationSelector } from "./workflow/VariationSelector";
 import { copyToClipboard } from "../utils/clipboard";
 import { 
   Sparkles, 
@@ -297,19 +299,35 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
       const data = await res.json();
       if (res.ok && data.expanded_prompt) {
         setPresentedFallbackNotice(null);
+        
+        // Build new PromptVariation record
+        const newVariation: PromptVariation = {
+          id: "var_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
+          variation_number: ((targetShot?.prompt_variations || []).length) + 1,
+          created_at: new Date().toISOString(),
+          basic_stub: stubToUse,
+          expanded_prompt: data.expanded_prompt,
+          provider: data.provider || providerChoice,
+          label: `Variation ${((targetShot?.prompt_variations || []).length) + 1}`
+        };
+
+        const updatedShotUpdater = (prev: import("../types").ShotItem): import("../types").ShotItem => {
+          const currentVariations = prev.prompt_variations || [];
+          return {
+            ...prev,
+            expanded_prompt: data.expanded_prompt,
+            prompt_variations: [...currentVariations, newVariation],
+            active_variation_id: newVariation.id,
+            status: "unstaged",
+            updated_at: new Date().toISOString()
+          };
+        };
+
         // CRITICAL: Update strictly and ONLY the selected target shot
         if (onUpdateSpecificShot) {
-          onUpdateSpecificShot(currentShotId, prev => ({ 
-            ...prev, 
-            expanded_prompt: data.expanded_prompt, 
-            status: "unstaged" 
-          }));
+          onUpdateSpecificShot(currentShotId, updatedShotUpdater);
         } else {
-          onUpdateShot(prev => ({ 
-            ...prev, 
-            expanded_prompt: data.expanded_prompt, 
-            status: "unstaged" 
-          }));
+          onUpdateShot(updatedShotUpdater);
         }
         
         // Only update current prompt state if user is still on this same shot
@@ -319,7 +337,7 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
         
         if (data.provider) setProviderUsed(data.provider);
         if (data.debug) setLastDebugInfo(data.debug);
-        onShowToast?.(`Prompt for Shot ${targetShot?.shot_number ?? ""} generated successfully!`, "success");
+        onShowToast?.(`Prompt Variation ${newVariation.variation_number} generated successfully!`, "success");
       } else {
         const errorMsg = data.error || `Failed to generate prompt with ${providerChoice === "gemini" ? "Google Gemini" : "LM Studio"}`;
         setError(errorMsg);
@@ -419,6 +437,60 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
         </div>
       </div>
       
+      {activeShot && activeShot.prompt_variations && activeShot.prompt_variations.length > 0 && (
+        <div className="bg-zinc-900/80 border border-amber-500/30 rounded-xl p-3 shadow-sm -mt-2">
+          <VariationSelector
+            variations={activeShot.prompt_variations}
+            activeVariationId={activeShot.active_variation_id}
+            onSelectVariation={(variation) => {
+              if (onUpdateSpecificShot && activeShotId) {
+                onUpdateSpecificShot(activeShotId, prev => ({
+                  ...prev,
+                  expanded_prompt: variation.expanded_prompt,
+                  basic_stub: variation.basic_stub || prev.basic_stub,
+                  active_variation_id: variation.id,
+                  status: "unstaged"
+                }));
+              } else {
+                onUpdateShot(prev => ({
+                  ...prev,
+                  expanded_prompt: variation.expanded_prompt,
+                  basic_stub: variation.basic_stub || prev.basic_stub,
+                  active_variation_id: variation.id,
+                  status: "unstaged"
+                }));
+              }
+              onChangeExpandedPrompt(variation.expanded_prompt);
+              if (variation.basic_stub) {
+                onChangeBasicStub(variation.basic_stub);
+              }
+              onShowToast?.(`Loaded ${variation.label || `Variation ${variation.variation_number}`} into prompt editor.`, "info");
+            }}
+            onDeleteVariation={(varId) => {
+              if (onUpdateSpecificShot && activeShotId) {
+                onUpdateSpecificShot(activeShotId, prev => {
+                  const filtered = (prev.prompt_variations || []).filter(v => v.id !== varId);
+                  return {
+                    ...prev,
+                    prompt_variations: filtered,
+                    active_variation_id: prev.active_variation_id === varId ? (filtered[filtered.length - 1]?.id || undefined) : prev.active_variation_id
+                  };
+                });
+              } else {
+                onUpdateShot(prev => {
+                  const filtered = (prev.prompt_variations || []).filter(v => v.id !== varId);
+                  return {
+                    ...prev,
+                    prompt_variations: filtered,
+                    active_variation_id: prev.active_variation_id === varId ? (filtered[filtered.length - 1]?.id || undefined) : prev.active_variation_id
+                  };
+                });
+              }
+            }}
+          />
+        </div>
+      )}
+
       {activeShot && activeShot.takes && activeShot.takes.length > 0 && (
         <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-3 shadow-sm -mt-2">
           <TakeSelector 
@@ -752,6 +824,7 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
           take={activeShot.takes?.find(t => t.id === reviewTakeId)!}
           sceneName={sceneProject.scene_name || "Untitled_Scene"}
           shotNumber={activeShot.shot_number}
+          variations={activeShot.prompt_variations}
           onClose={() => setReviewTakeId(null)}
           onSetHero={() => {
             onUpdateShot(prev => {

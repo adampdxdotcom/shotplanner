@@ -243,11 +243,21 @@ export function TakeComparisonModal({
                   <Sparkles className="w-3.5 h-3.5" />
                   Take {takeA?.take_number} Prompt Snapshot
                 </span>
-                {takeA?.basic_stub && (
-                  <span className="text-[10px] font-normal text-zinc-400 bg-zinc-950 px-2 py-0.5 rounded border border-zinc-800">
-                    Stub: {takeA.basic_stub}
-                  </span>
-                )}
+                <div className="flex items-center gap-1.5">
+                  {takeA?.variation_id && (() => {
+                    const varA = (shot.prompt_variations || []).find(v => v.id === takeA.variation_id);
+                    return (
+                      <span className="text-[10px] font-mono font-medium text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                        {varA?.label || `Var ${varA?.variation_number}`}
+                      </span>
+                    );
+                  })()}
+                  {takeA?.basic_stub && (
+                    <span className="text-[10px] font-normal text-zinc-400 bg-zinc-950 px-2 py-0.5 rounded border border-zinc-800">
+                      Stub: {takeA.basic_stub}
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="bg-zinc-950 p-3 rounded-lg border border-zinc-800 text-xs font-mono text-zinc-300 whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed">
                 {takeA?.expanded_prompt || "No prompt snapshot recorded for this take."}
@@ -261,11 +271,21 @@ export function TakeComparisonModal({
                   <Sparkles className="w-3.5 h-3.5" />
                   Take {takeB?.take_number} Prompt Snapshot
                 </span>
-                {takeB?.basic_stub && (
-                  <span className="text-[10px] font-normal text-zinc-400 bg-zinc-950 px-2 py-0.5 rounded border border-zinc-800">
-                    Stub: {takeB.basic_stub}
-                  </span>
-                )}
+                <div className="flex items-center gap-1.5">
+                  {takeB?.variation_id && (() => {
+                    const varB = (shot.prompt_variations || []).find(v => v.id === takeB.variation_id);
+                    return (
+                      <span className="text-[10px] font-mono font-medium text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                        {varB?.label || `Var ${varB?.variation_number}`}
+                      </span>
+                    );
+                  })()}
+                  {takeB?.basic_stub && (
+                    <span className="text-[10px] font-normal text-zinc-400 bg-zinc-950 px-2 py-0.5 rounded border border-zinc-800">
+                      Stub: {takeB.basic_stub}
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="bg-zinc-950 p-3 rounded-lg border border-zinc-800 text-xs font-mono text-zinc-300 whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed">
                 {takeB?.expanded_prompt || "No prompt snapshot recorded for this take."}

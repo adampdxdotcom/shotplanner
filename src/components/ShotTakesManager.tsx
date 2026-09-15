@@ -160,6 +160,7 @@ export const ShotTakesManager: React.FC<ShotTakesManagerProps> = ({
         created_at: new Date().toISOString(),
         video_filename: savedFilename,
         video_url: streamUrl,
+        variation_id: shot.active_variation_id || (shot.prompt_variations && shot.prompt_variations.length > 0 ? shot.prompt_variations[shot.prompt_variations.length - 1].id : undefined),
         expanded_prompt: shot.expanded_prompt || "",
         basic_stub: shot.basic_stub || "",
         generation_params: shot.generation_params,
@@ -231,6 +232,33 @@ export const ShotTakesManager: React.FC<ShotTakesManagerProps> = ({
     const updatedTakes = takes.map(t => {
       if (t.id !== takeId) return t;
       return { ...t, notes };
+    });
+
+    onUpdateShot({
+      ...shot,
+      takes: updatedTakes,
+      updated_at: new Date().toISOString()
+    });
+  };
+
+  const handleAssignVariation = (takeId: string, variationId: string) => {
+    const selectedVar = (shot.prompt_variations || []).find(v => v.id === variationId);
+    
+    const updatedTakes = takes.map(t => {
+      if (t.id !== takeId) return t;
+      if (!selectedVar) {
+        // Unlinked / Custom variation
+        return {
+          ...t,
+          variation_id: undefined
+        };
+      }
+      return {
+        ...t,
+        variation_id: selectedVar.id,
+        expanded_prompt: selectedVar.expanded_prompt,
+        basic_stub: selectedVar.basic_stub || t.basic_stub
+      };
     });
 
     onUpdateShot({
@@ -560,6 +588,17 @@ export const ShotTakesManager: React.FC<ShotTakesManagerProps> = ({
                         Take {String(take.take_number).padStart(2, "0")}
                       </span>
 
+                      {/* Assigned Variation Badge */}
+                      {take.variation_id && (() => {
+                        const matchedVar = (shot.prompt_variations || []).find(v => v.id === take.variation_id);
+                        return (
+                          <span className="flex items-center gap-1 text-[11px] font-mono font-semibold px-2 py-0.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 rounded-md">
+                            <Sparkles className="w-3 h-3 text-amber-500" />
+                            {matchedVar?.label || `Var ${matchedVar?.variation_number || ""}`}
+                          </span>
+                        );
+                      })()}
+
                       {isHero && (
                         <span className="flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30 rounded-full">
                           <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
@@ -746,6 +785,27 @@ export const ShotTakesManager: React.FC<ShotTakesManagerProps> = ({
                           {take.aspect_ratio && <span>{take.aspect_ratio}</span>}
                           {take.sampling_steps && <span>• {take.sampling_steps} steps</span>}
                         </div>
+                      </div>
+
+                      {/* Prompt Variation Assignment Bar */}
+                      <div className="mt-2 pt-2 border-t border-zinc-200/80 dark:border-zinc-800/80 flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                          <label className="text-[11px] font-semibold text-zinc-600 dark:text-zinc-400">Assigned Variation:</label>
+                        </div>
+
+                        <select
+                          value={take.variation_id || ""}
+                          onChange={(e) => handleAssignVariation(take.id, e.target.value)}
+                          className="bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-md px-2 py-1 text-xs text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-amber-500 font-mono max-w-[240px]"
+                        >
+                          <option value="">-- Custom / Current Prompt --</option>
+                          {(shot.prompt_variations || []).map((v) => (
+                            <option key={v.id} value={v.id}>
+                              Variation {v.variation_number} {v.provider ? `(${v.provider})` : ""}
+                            </option>
+                          ))}
+                        </select>
                       </div>
 
                       {expandedPrompts[take.id] && (

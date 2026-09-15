@@ -573,6 +573,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
           take={activeShot.takes?.find(t => t.id === reviewTakeId)!}
           sceneName={sceneProject.scene_name || "Untitled_Scene"}
           shotNumber={activeShot.shot_number}
+          variations={activeShot.prompt_variations}
           onClose={() => setReviewTakeId(null)}
           onSetHero={() => {
             onUpdateProject(prev => {

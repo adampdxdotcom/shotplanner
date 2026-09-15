@@ -119,6 +119,16 @@ export interface StagingLayerRecipe {
   updatedAt?: string;
 }
 
+export interface PromptVariation {
+  id: string;
+  variation_number: number;
+  created_at: string;
+  basic_stub?: string;
+  expanded_prompt: string;
+  provider?: string;
+  label?: string;
+}
+
 export interface ShotTake {
   id: string;
   take_number: number;
@@ -127,6 +137,7 @@ export interface ShotTake {
   video_filename?: string;
   expanded_prompt: string;
   basic_stub?: string;
+  variation_id?: string;
   generation_params?: GenerationParameters;
   sampling_steps?: number;
   assigned_slots?: Record<number, string>;
@@ -148,6 +159,8 @@ export interface ShotItem {
   aspect_ratio?: string;
   basic_stub: string;
   expanded_prompt: string;
+  prompt_variations?: PromptVariation[];
+  active_variation_id?: string;
   assigned_slots: Record<number, string>;
   status: "unstaged" | "staged" | "rendering" | "rendered";
   latest_prompt_id?: string;
