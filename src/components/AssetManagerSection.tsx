@@ -68,6 +68,8 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
   const [lightboxAsset, setLightboxAsset] = useState<MediaAsset | null>(null);
   const [reviewTakeId, setReviewTakeId] = useState<string | null>(null);
   const [showCompareModal, setShowCompareModal] = useState(false);
+  const [draggingSlot, setDraggingSlot] = useState<{ type: string; localIdx: number; globalSlot: number } | null>(null);
+  const [dragOverSlot, setDragOverSlot] = useState<number | null>(null);
 
   const activeShotIndex = sceneProject.shots.findIndex(s => s.id === activeShotId);
   const activeShot = activeShotIndex >= 0 ? sceneProject.shots[activeShotIndex] : null;
@@ -113,6 +115,64 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
     }
     if (!filename) return null;
     return assets.find(a => a.filename === filename) || null;
+  };
+
+  // Drag and drop slot movement / swapping handler
+  const handleDropOnSlot = (targetType: "image" | "audio" | "video", targetIdx: number) => {
+    setDragOverSlot(null);
+    if (!draggingSlot || !activeShotId) return;
+
+    // Enforce matching media types (cannot drag audio into image slot, etc.)
+    if (draggingSlot.type !== targetType) {
+      setDraggingSlot(null);
+      return;
+    }
+
+    const sourceGlobalSlot = draggingSlot.globalSlot;
+    const targetGlobalSlot = getGlobalSlotIndex(targetType, targetIdx);
+
+    if (sourceGlobalSlot === targetGlobalSlot) {
+      setDraggingSlot(null);
+      return;
+    }
+
+    onUpdateProject(prev => {
+      const shots = [...prev.shots];
+      const shotIdx = shots.findIndex(s => s.id === activeShotId);
+      if (shotIdx === -1) return prev;
+
+      const currentSlots = { ...shots[shotIdx].assigned_slots };
+      const sourceFilename = currentSlots[sourceGlobalSlot] || (currentSlots as any)[String(sourceGlobalSlot)];
+      const targetFilename = currentSlots[targetGlobalSlot] || (currentSlots as any)[String(targetGlobalSlot)];
+
+      if (!sourceFilename) return prev;
+
+      // Clean up source slot
+      delete currentSlots[sourceGlobalSlot];
+      delete (currentSlots as any)[String(sourceGlobalSlot)];
+
+      // Move source to target slot
+      currentSlots[targetGlobalSlot] = sourceFilename;
+
+      // If target had an asset, place it back into source (swap)
+      if (targetFilename) {
+        currentSlots[sourceGlobalSlot] = targetFilename;
+      } else {
+        delete currentSlots[sourceGlobalSlot];
+        delete (currentSlots as any)[String(sourceGlobalSlot)];
+      }
+
+      shots[shotIdx] = {
+        ...shots[shotIdx],
+        assigned_slots: currentSlots,
+        status: "unstaged",
+        updated_at: new Date().toISOString()
+      };
+
+      return { ...prev, shots };
+    });
+
+    setDraggingSlot(null);
   };
 
   const handleClearSlot = (type: "image" | "audio" | "video", idx: number) => {
@@ -404,6 +464,8 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
                 {Array.from({ length: currentMax }).map((_, idx) => {
                   const globalSlot = getGlobalSlotIndex(activeTab, idx);
                   const asset = getAssetForGlobalSlot(globalSlot.toString());
+                  const isThisDragging = draggingSlot?.globalSlot === globalSlot;
+                  const isThisDragOver = dragOverSlot === globalSlot && !isThisDragging;
                   
                   return asset ? (
                     <AssetCard 
@@ -411,16 +473,60 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
                       asset={asset}
                       idx={idx}
                       type={activeTab}
+                      isDragging={isThisDragging}
+                      isDragOver={isThisDragOver}
                       onEdit={() => setEditingAsset(asset)}
                       onDelete={() => handleClearSlot(activeTab, idx)}
                       onLightbox={() => setLightboxAsset(asset)}
+                      onDragStart={(e) => {
+                        setDraggingSlot({ type: activeTab, localIdx: idx, globalSlot });
+                        e.dataTransfer.setData("text/plain", JSON.stringify({ type: activeTab, localIdx: idx, globalSlot }));
+                        e.dataTransfer.effectAllowed = "move";
+                      }}
+                      onDragEnd={() => {
+                        setDraggingSlot(null);
+                        setDragOverSlot(null);
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                        if (dragOverSlot !== globalSlot) {
+                          setDragOverSlot(globalSlot);
+                        }
+                      }}
+                      onDragLeave={() => {
+                        if (dragOverSlot === globalSlot) {
+                          setDragOverSlot(null);
+                        }
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        handleDropOnSlot(activeTab, idx);
+                      }}
                     />
                   ) : (
                     <EmptySlotCard 
                       key={`empty-${activeTab}-${idx}`}
                       idx={idx}
                       type={activeTab}
+                      isDragOver={isThisDragOver}
                       onClick={() => setUploadModalSlot({ type: activeTab, index: idx })}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                        if (dragOverSlot !== globalSlot) {
+                          setDragOverSlot(globalSlot);
+                        }
+                      }}
+                      onDragLeave={() => {
+                        if (dragOverSlot === globalSlot) {
+                          setDragOverSlot(null);
+                        }
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        handleDropOnSlot(activeTab, idx);
+                      }}
                     />
                   );
                 })}

@@ -8,19 +8,53 @@ interface AssetCardProps {
   idx: number;
   type: string;
   className?: string;
+  isDragging?: boolean;
+  isDragOver?: boolean;
   onEdit: () => void;
   onDelete: () => void;
   onLightbox: () => void;
+  onDragStart?: (e: React.DragEvent) => void;
+  onDragEnd?: (e: React.DragEvent) => void;
+  onDragOver?: (e: React.DragEvent) => void;
+  onDragLeave?: (e: React.DragEvent) => void;
+  onDrop?: (e: React.DragEvent) => void;
 }
 
-export const AssetCard: React.FC<AssetCardProps> = ({ asset, idx, type, className = "", onEdit, onDelete, onLightbox }) => {
+export const AssetCard: React.FC<AssetCardProps> = ({ 
+  asset, 
+  idx, 
+  type, 
+  className = "", 
+  isDragging = false,
+  isDragOver = false,
+  onEdit, 
+  onDelete, 
+  onLightbox,
+  onDragStart,
+  onDragEnd,
+  onDragOver,
+  onDragLeave,
+  onDrop
+}) => {
   const isImage = asset.media_type === "image" || (!asset.media_type && !/\.(mp3|wav|ogg|m4a|mp4|mov|webm)$/i.test(asset.filename)) || /\.(png|jpe?g|webp|gif|svg|avif|bmp)$/i.test(asset.filename);
   const isAudio = asset.media_type === "audio" || /\.(mp3|wav|ogg|m4a|flac)$/i.test(asset.filename);
   const isVideo = asset.media_type === "video" || /\.(mp4|mov|webm|mkv)$/i.test(asset.filename);
   const imageSrc = getAssetMediaUrl(asset, true);
 
   return (
-    <div className={`character-asset-card bg-white dark:bg-zinc-900/80 p-3 rounded-xl border-2 border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-700 transition-all space-y-2 relative group flex flex-col shadow-xs hover:shadow-sm ${className}`}>
+    <div 
+      draggable={true}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+      className={`character-asset-card bg-white dark:bg-zinc-900/80 p-3 rounded-xl border-2 transition-all space-y-2 relative group flex flex-col shadow-xs hover:shadow-sm cursor-grab active:cursor-grabbing ${
+        isDragOver 
+          ? "border-indigo-500 ring-2 ring-indigo-400/40 bg-indigo-50/30 dark:bg-indigo-950/30 scale-[1.02]" 
+          : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-700"
+      } ${isDragging ? "opacity-40 scale-95" : "opacity-100"} ${className}`}
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="w-5 h-5 rounded-full bg-zinc-100 text-zinc-700 border border-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700 text-[10px] font-mono font-bold flex items-center justify-center">
@@ -52,13 +86,13 @@ export const AssetCard: React.FC<AssetCardProps> = ({ asset, idx, type, classNam
 
       {isImage ? (
         <div 
-          className="relative w-full aspect-square bg-zinc-100 dark:bg-zinc-950 rounded-lg overflow-hidden cursor-pointer group/img border border-zinc-200 dark:border-zinc-800 flex items-center justify-center"
+          className="relative w-full aspect-square bg-zinc-100 dark:bg-zinc-950 rounded-lg overflow-hidden cursor-pointer group/img border border-zinc-200 dark:border-zinc-800 flex items-center justify-center pointer-events-auto"
           onClick={onLightbox}
         >
           <img 
             src={imageSrc} 
             alt={asset.subject_name || "Asset"} 
-            className="w-full h-full object-cover" 
+            className="w-full h-full object-cover pointer-events-none" 
           />
           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
             <Maximize className="w-6 h-6 text-white" />
@@ -101,10 +135,35 @@ export const AssetCard: React.FC<AssetCardProps> = ({ asset, idx, type, classNam
   );
 };
 
-export const EmptySlotCard: React.FC<{ idx: number, type: string, className?: string, onClick: () => void }> = ({ idx, type, className = "", onClick }) => (
+export const EmptySlotCard: React.FC<{ 
+  idx: number, 
+  type: string, 
+  className?: string, 
+  isDragOver?: boolean,
+  onClick: () => void,
+  onDragOver?: (e: React.DragEvent) => void,
+  onDragLeave?: (e: React.DragEvent) => void,
+  onDrop?: (e: React.DragEvent) => void
+}> = ({ 
+  idx, 
+  type, 
+  className = "", 
+  isDragOver = false,
+  onClick,
+  onDragOver,
+  onDragLeave,
+  onDrop
+}) => (
   <div 
     onClick={onClick}
-    className={`empty-slot-card bg-slate-50/80 dark:bg-zinc-900/40 p-3 rounded-xl border-2 border-dashed border-zinc-300 dark:border-zinc-800 flex flex-col items-center justify-center min-h-[160px] text-zinc-600 dark:text-zinc-400 transition-all cursor-pointer hover:border-indigo-400 dark:hover:border-indigo-500/60 hover:bg-indigo-50/40 dark:hover:bg-zinc-850 hover:text-indigo-600 dark:hover:text-indigo-300 group shadow-xs hover:shadow-sm ${className}`}
+    onDragOver={onDragOver}
+    onDragLeave={onDragLeave}
+    onDrop={onDrop}
+    className={`empty-slot-card p-3 rounded-xl border-2 border-dashed flex flex-col items-center justify-center min-h-[160px] text-zinc-600 dark:text-zinc-400 transition-all cursor-pointer group shadow-xs hover:shadow-sm ${
+      isDragOver
+        ? "border-indigo-500 ring-2 ring-indigo-400/40 bg-indigo-50/60 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-300 scale-[1.02]"
+        : "bg-slate-50/80 dark:bg-zinc-900/40 border-zinc-300 dark:border-zinc-800 hover:border-indigo-400 dark:hover:border-indigo-500/60 hover:bg-indigo-50/40 dark:hover:bg-zinc-850 hover:text-indigo-600 dark:hover:text-indigo-300"
+    } ${className}`}
   >
     <div className="w-9 h-9 rounded-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center mb-2 shadow-xs group-hover:bg-indigo-600 group-hover:text-white group-hover:border-indigo-600 dark:group-hover:bg-indigo-600 dark:group-hover:text-white dark:group-hover:border-indigo-500 transition-all text-zinc-500 dark:text-zinc-400">
       <UploadCloud className="w-4 h-4" />
