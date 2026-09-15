@@ -18,6 +18,7 @@ import { TakeReviewModal } from "./TakeReviewModal";
 import { PromptDebugModal } from "./PromptDebugModal";
 import { VariationSelector } from "./workflow/VariationSelector";
 import { copyToClipboard } from "../utils/clipboard";
+import { getAssetMediaUrl } from "../utils/assetUrl";
 import { 
   Sparkles, 
   Bot, 
@@ -38,7 +39,10 @@ import {
   Square,
   XSquare,
   History,
-  Clock
+  Clock,
+  Image as ImageIcon,
+  Video as VideoIcon,
+  Music as MusicIcon
 } from "lucide-react";
 
 interface LLMSectionProps {
@@ -163,6 +167,22 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
     }
     return assets.filter(a => activeShotAssets.includes(a.filename) || sceneProject.shared_assets?.some(sa => sa.filename === a.filename));
   }, [activeShot, assets, activeShotAssets, sceneProject.shared_assets]);
+
+  // Unique associated assets with their slot index for 3-wide thumbnail preview
+  const displayAssociatedAssets = useMemo(() => {
+    const list = relevantAssets.length > 0 ? relevantAssets : assets;
+    const seen = new Set<string>();
+    const result: Array<MediaAsset & { slot_index?: number }> = [];
+    list.forEach((item, idx) => {
+      const slotNum = item.slot_index !== undefined ? item.slot_index : idx;
+      const key = `${slotNum}_${item.filename}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push({ ...item, slot_index: slotNum });
+      }
+    });
+    return result.sort((a, b) => (a.slot_index ?? 0) - (b.slot_index ?? 0));
+  }, [relevantAssets, assets]);
 
   const activeShotPrefix = activeShot 
     ? generatePromptPrefix({
@@ -604,19 +624,84 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
               className="w-full bg-zinc-900 border-2 border-zinc-700 focus:border-amber-500 rounded-lg p-3 text-xs text-zinc-100 placeholder-zinc-600 outline-none resize-none leading-relaxed"
             />
 
-            {/* Asset Context Formatter Preview */}
-            <div className="bg-zinc-900/60 p-2.5 rounded-lg border-2 border-zinc-700/60 text-[11px] space-y-1">
-              <span className="font-semibold text-zinc-300 block">LLM Formatted Reference Tags:</span>
-              {assets.length === 0 ? (
-                <p className="text-zinc-500 italic">No assets uploaded. Upload in section 3 to inject reference tags.</p>
+            {/* 3-Wide Associated Assets & Slot Numbers Thumbnail Preview */}
+            <div className="bg-zinc-900/70 p-3 rounded-lg border-2 border-zinc-700/60 text-[11px] space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-zinc-200 flex items-center gap-1.5">
+                  <ImageIcon className="w-3.5 h-3.5 text-amber-400" />
+                  Associated Reference Assets ({displayAssociatedAssets.length})
+                </span>
+                <span className="text-[10px] text-zinc-400 font-mono">
+                  3-wide preview
+                </span>
+              </div>
+
+              {displayAssociatedAssets.length === 0 ? (
+                <p className="text-zinc-500 italic py-2 text-center bg-zinc-950/40 rounded border border-zinc-800/60 text-xs">
+                  No assets associated with this shot. Upload or assign assets to inject reference tags.
+                </p>
               ) : (
-                <div className="flex flex-wrap gap-1.5 pt-0.5">
-                  {assets.map((asset, i) => {
+                <div className="grid grid-cols-3 gap-2.5 max-h-64 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-zinc-700">
+                  {displayAssociatedAssets.map((asset, i) => {
                     const slotNum = asset.slot_index !== undefined ? asset.slot_index + 1 : i + 1;
+                    const tagLabel = asset.media_type === "video" ? `<Video ${slotNum}>` : asset.media_type === "audio" ? `<Audio ${slotNum}>` : `<Picture ${slotNum}>`;
+                    const isVideo = asset.media_type === "video" || /\.(mp4|mov|webm|mkv)$/i.test(asset.filename);
+                    const isAudio = asset.media_type === "audio" || /\.(mp3|wav|ogg|m4a|flac)$/i.test(asset.filename);
+
                     return (
-                      <span key={asset.filename} className="px-2 py-0.5 bg-zinc-800 text-amber-300 font-mono text-[10px] rounded border border-zinc-700">
-                        {asset.media_type === "video" ? `<Video ${slotNum}>` : asset.media_type === "audio" ? `<Audio ${slotNum}>` : `<Picture ${slotNum}>`} ({asset.subject_name})
-                      </span>
+                      <div 
+                        key={`${slotNum}_${asset.filename}`}
+                        className="bg-zinc-950/80 border border-zinc-700/80 hover:border-amber-500/50 rounded-lg p-2 flex flex-col gap-1.5 transition-all shadow-xs group"
+                      >
+                        {/* Slot Badge & Tag Header */}
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="px-1.5 py-0.5 bg-amber-500/10 text-amber-300 font-mono font-bold text-[10px] rounded border border-amber-500/30 truncate">
+                            {tagLabel}
+                          </span>
+                          <span className="text-[9px] font-mono text-zinc-400 font-medium shrink-0">
+                            Slot {slotNum}
+                          </span>
+                        </div>
+
+                        {/* Thumbnail View */}
+                        <div className="relative w-full aspect-[4/3] bg-zinc-900 rounded overflow-hidden border border-zinc-800 flex items-center justify-center">
+                          {isAudio ? (
+                            <div className="flex flex-col items-center justify-center gap-1 text-zinc-400 p-2">
+                              <MusicIcon className="w-5 h-5 text-amber-400" />
+                              <span className="text-[9px] font-mono">Audio Track</span>
+                            </div>
+                          ) : isVideo ? (
+                            <>
+                              <video
+                                src={getAssetMediaUrl(asset)}
+                                className="w-full h-full object-cover"
+                                preload="metadata"
+                                muted
+                              />
+                              <div className="absolute top-1 left-1 p-0.5 bg-black/70 rounded text-amber-400">
+                                <VideoIcon className="w-3 h-3" />
+                              </div>
+                            </>
+                          ) : (
+                            <img
+                              src={getAssetMediaUrl(asset, true)}
+                              alt={asset.subject_name || asset.filename}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                              loading="lazy"
+                            />
+                          )}
+                        </div>
+
+                        {/* Caption / Subject Info */}
+                        <div className="space-y-0.5 min-w-0">
+                          <p className="text-[11px] font-semibold text-zinc-200 truncate" title={asset.subject_name || asset.filename}>
+                            {asset.subject_name || asset.filename}
+                          </p>
+                          <p className="text-[9px] text-zinc-400 truncate capitalize">
+                            {asset.asset_type || asset.media_type || "Image"}
+                          </p>
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
