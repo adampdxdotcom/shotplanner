@@ -70,18 +70,34 @@ export function useWorkflowManagement({
 
   const fetchWorkflows = useCallback(async () => {
     try {
-      const res = await fetch("/api/workflows");
+      const activeName = activeSceneName || "Untitled_Scene";
+      const res = await fetch(`/api/workflows?scene=${encodeURIComponent(activeName)}`);
       const data = await res.json();
-      if (data.workflows) {
-        setWorkflows(data.workflows);
-        if (data.workflows.length > 0 && !selectedWorkflowFile) {
-          setSelectedWorkflowFile(data.workflows[0].filename);
+      const rawList: any[] = data.workflow_items || data.workflows || [];
+      const normalized: WorkflowItem[] = rawList.map((item: any) => {
+        if (typeof item === "string") {
+          return {
+            filename: item,
+            path: `/assets/workflows/${item}`,
+            node_count: 0,
+            title: item.replace(/\.json$/i, "").replace(/[_-]/g, " ")
+          };
         }
+        return {
+          filename: item.filename || item.name || "",
+          path: item.path || `/assets/workflows/${item.filename}`,
+          node_count: item.node_count || 0,
+          title: item.title || item.filename?.replace(/\.json$/i, "").replace(/[_-]/g, " ") || item.filename || "Workflow"
+        };
+      });
+      setWorkflows(normalized);
+      if (normalized.length > 0 && !selectedWorkflowFile) {
+        setSelectedWorkflowFile(normalized[0].filename);
       }
     } catch (e) {
       console.error("Failed to load workflows", e);
     }
-  }, [selectedWorkflowFile]);
+  }, [activeSceneName, selectedWorkflowFile]);
 
   // Parse workflow when selection changes
   useEffect(() => {

@@ -669,8 +669,12 @@ export function listWorkflows(sceneName?: string) {
     } catch {}
   }
 
-  // 4. Scan root WORKFLOWS_DIR
+  // 4. Scan root WORKFLOWS_DIR and process.cwd() workflows if exists
   scanDir(WORKFLOWS_DIR, undefined, "/assets/workflows");
+  const topLevelWfDir = path.join(process.cwd(), "workflows");
+  if (fs.existsSync(topLevelWfDir) && topLevelWfDir !== WORKFLOWS_DIR) {
+    scanDir(topLevelWfDir, undefined, "/workflows");
+  }
 
   const workflowItems = Array.from(workflowMap.values());
   const files = workflowItems.map((item) => item.filename);

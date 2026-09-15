@@ -91,11 +91,17 @@ export const WorkflowFileSelector: React.FC<WorkflowFileSelectorProps> = ({
               className="flex-1 bg-zinc-900 border-2 border-zinc-700 focus:border-amber-500 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none"
             >
               <option value="">-- No Workflow Selected --</option>
-              {workflows.map((wf, i) => (
-                <option key={`wf-${wf.filename}-${i}`} value={wf.filename}>
-                  {wf.title} ({wf.filename} • {wf.node_count} nodes)
-                </option>
-              ))}
+              {workflows.map((wf: any, i) => {
+                const filename = typeof wf === "string" ? wf : (wf.filename || "");
+                const title = typeof wf === "string" 
+                  ? wf.replace(/\.json$/i, "").replace(/[_-]/g, " ") 
+                  : (wf.title || wf.filename?.replace(/\.json$/i, "").replace(/[_-]/g, " ") || filename || "Untitled Workflow");
+                return (
+                  <option key={`wf-${filename || i}-${i}`} value={filename}>
+                    {title}
+                  </option>
+                );
+              })}
             </select>
             <button
               onClick={onRefreshWorkflows}
