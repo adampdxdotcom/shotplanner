@@ -133,6 +133,7 @@ export default function App() {
             onAssetUploaded={handleAssetUploaded}
             onAssetDeleted={handleAssetDeleted}
             onAssetUpdated={handleAssetUpdated}
+            addToast={addToast}
           />
         )}
 

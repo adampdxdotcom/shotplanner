@@ -6,6 +6,7 @@ import { TakeReviewModal } from "./TakeReviewModal";
 import { TakeComparisonModal } from "./TakeComparisonModal";
 import { ShotCarousel } from "./hub/ShotCarousel";
 import { ShotMetadataPanel } from "./hub/ShotMetadataPanel";
+import { ShotCharacterRoster } from "./hub/ShotCharacterRoster";
 import { AssetMatrixPanel } from "./hub/AssetMatrixPanel";
 import { PromptPreviewPanel } from "./hub/PromptPreviewPanel";
 import { AiReferenceStagingStudioModal } from "./cast/AiReferenceStagingStudioModal";
@@ -184,6 +185,14 @@ export default function SceneProjectHub({
             })}
             onReviewTake={setReviewTakeId}
             onCompareTakes={() => setIsComparisonOpen(true)}
+          />
+
+          <ShotCharacterRoster
+            activeShot={activeShot}
+            sceneProject={project}
+            assets={assets}
+            onNavigateToCast={onNavigate ? () => onNavigate("cast") : undefined}
+            onSelectShot={onSelectShot}
           />
 
           <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-0 items-stretch">

@@ -165,6 +165,7 @@ export interface ShotItem {
   status: "unstaged" | "staged" | "rendering" | "rendered";
   latest_prompt_id?: string;
   updated_at: string;
+  characters?: string[];
   ots_anchor_subject?: string;
   ots_focus_subject?: string;
   ots_side?: "Left" | "Right";

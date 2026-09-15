@@ -6,7 +6,8 @@ import {
   Image as ImageIcon,
   Video as VideoIcon,
   Music,
-  Clapperboard
+  Clapperboard,
+  UserPlus
 } from "lucide-react";
 import { ScenePlanningHeader } from "./ScenePlanningHeader";
 import { TakeSelector } from "./TakeSelector";
@@ -19,6 +20,7 @@ import { AssetLightbox } from "./AssetLightbox";
 import { AssetCard, EmptySlotCard } from "./AssetSlotGrid";
 import { toCanonicalSubjectName } from "../utils/subjectUtils";
 import { getLastAssetTab, setLastAssetTab } from "../utils/workspaceSessionStore";
+import { AddCharacterToShotModal } from "./hub/AddCharacterToShotModal";
 
 const MAX_IMAGES = 9;
 const MAX_VIDEOS = 1;
@@ -39,6 +41,7 @@ interface AssetManagerSectionProps {
   onAssetUploaded: (asset: MediaAsset, slotIndex?: number, type?: string) => void;
   onAssetDeleted: (filename: string) => void;
   onAssetUpdated: (oldFilename: string, newAsset: MediaAsset) => void;
+  addToast?: (text: string, type?: "success" | "error" | "info") => void;
 }
 
 export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
@@ -55,7 +58,8 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
   onRegisterSubject = (_name: string) => {},
   onAssetUploaded,
   onAssetDeleted,
-  onAssetUpdated
+  onAssetUpdated,
+  addToast
 }) => {
   const [activeTab, setActiveTab] = useState<"image" | "audio" | "video" | "takes">(() => getLastAssetTab("image"));
 
@@ -70,9 +74,34 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
   const [showCompareModal, setShowCompareModal] = useState(false);
   const [draggingSlot, setDraggingSlot] = useState<{ type: string; localIdx: number; globalSlot: number } | null>(null);
   const [dragOverSlot, setDragOverSlot] = useState<number | null>(null);
+  const [isAddCharacterModalOpen, setIsAddCharacterModalOpen] = useState(false);
 
   const activeShotIndex = sceneProject.shots.findIndex(s => s.id === activeShotId);
   const activeShot = activeShotIndex >= 0 ? sceneProject.shots[activeShotIndex] : null;
+
+  const handleConfirmAddCharacterToShot = (characterName: string, slotsToAssign: Record<number, string>) => {
+    if (!activeShotId) return;
+    onUpdateProject(prev => {
+      const shots = [...prev.shots];
+      const idx = shots.findIndex(s => s.id === activeShotId);
+      if (idx === -1) return prev;
+
+      const currentChars = shots[idx].characters || [];
+      const updatedChars = currentChars.some(c => c.toLowerCase() === characterName.toLowerCase())
+        ? currentChars
+        : [...currentChars, characterName];
+
+      shots[idx] = {
+        ...shots[idx],
+        characters: updatedChars,
+        assigned_slots: slotsToAssign,
+        status: "unstaged",
+        updated_at: new Date().toISOString()
+      };
+
+      return { ...prev, shots };
+    });
+  };
 
   const handleAddBlankShot = () => {
     onUpdateProject(prev => {
@@ -283,12 +312,25 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
             ))}
           </select>
         </div>
-        <button
-          onClick={handleAddBlankShot}
-          className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 dark:bg-indigo-600/20 dark:hover:bg-indigo-600/30 dark:text-indigo-300 dark:border-indigo-500/30 rounded-lg text-sm font-medium transition-colors shadow-xs cursor-pointer"
-        >
-          + New Shot
-        </button>
+        <div className="flex items-center gap-2">
+          {activeShot && (
+            <button
+              type="button"
+              onClick={() => setIsAddCharacterModalOpen(true)}
+              className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
+              title="Add character references to active shot"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>Add Character to Shot</span>
+            </button>
+          )}
+          <button
+            onClick={handleAddBlankShot}
+            className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 dark:bg-indigo-600/20 dark:hover:bg-indigo-600/30 dark:text-indigo-300 dark:border-indigo-500/30 rounded-lg text-sm font-medium transition-colors shadow-xs cursor-pointer"
+          >
+            + New Shot
+          </button>
+        </div>
       </div>
 
       {!activeShotId ? (
@@ -641,6 +683,18 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
               return { ...prev, shots };
             });
           }}
+        />
+      )}
+
+      {isAddCharacterModalOpen && activeShot && (
+        <AddCharacterToShotModal
+          isOpen={isAddCharacterModalOpen}
+          onClose={() => setIsAddCharacterModalOpen(false)}
+          activeShot={activeShot}
+          sceneProject={sceneProject}
+          assets={assets}
+          onConfirmAdd={handleConfirmAddCharacterToShot}
+          addToast={addToast}
         />
       )}
     </div>
