@@ -1,6 +1,6 @@
 {
   "name": "Shot Planner",
-  "description": "Shot Planner for managing scenes, character blocking, prompts, and shot orchestration.",
+  "description": "Shot Planner for managing scenes, character blocking, prompts, remote ComfyUI workflow monitoring, and shot orchestration.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

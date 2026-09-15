@@ -88,6 +88,7 @@ export default function App() {
         onNewProject={() => setIsNewModalOpen(true)}
         toasts={toasts}
         onDismissToast={dismissToast}
+        monitorState={monitorState}
       />
 
       {/* Main Workspace Layout */}
@@ -110,6 +111,7 @@ export default function App() {
               onAssetUploaded={handleAssetUploaded}
               onUpdateSpecificShot={updateShot}
               onNavigate={scrollToSection}
+              monitorState={monitorState}
             />
           </div>
         )}

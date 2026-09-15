@@ -51,6 +51,7 @@ export function TakeReviewModal({
   const isGood = take.rating === "good" || take.review_status === "approved";
   const isBad = take.rating === "bad" || take.review_status === "needs_work";
   const matchedVar = variations?.find(v => v.id === take.variation_id);
+  const isImage = /\.(png|jpg|jpeg|webp|avif)$/i.test(take.video_filename || videoSrc || "");
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[100] p-4 sm:p-8">
@@ -92,19 +93,30 @@ export function TakeReviewModal({
           <div className="space-y-4 flex flex-col">
             <div className="bg-black border border-zinc-800 rounded-xl overflow-hidden aspect-video relative flex items-center justify-center">
               {videoSrc ? (
-                <video 
-                  ref={videoRef}
-                  src={videoSrc}
-                  className="w-full h-full object-contain"
-                  controls
-                  autoPlay
-                  loop
-                  onError={() => setVideoSrc(null)}
-                />
+                isImage ? (
+                  <img 
+                    src={videoSrc}
+                    alt={`Take ${take.take_number}`}
+                    className="w-full h-full object-contain"
+                    referrerPolicy="no-referrer"
+                    onError={() => setVideoSrc(null)}
+                  />
+                ) : (
+                  <video 
+                    ref={videoRef}
+                    src={videoSrc}
+                    className="w-full h-full object-contain"
+                    controls
+                    autoPlay
+                    loop
+                    playsInline
+                    onError={() => setVideoSrc(null)}
+                  />
+                )
               ) : (
                 <div className="text-zinc-500 text-sm flex flex-col items-center gap-2">
                   <XCircle className="w-8 h-8 opacity-50" />
-                  <span>Output video not found or not rendered yet.</span>
+                  <span>Output media not found or not rendered yet.</span>
                 </div>
               )}
             </div>

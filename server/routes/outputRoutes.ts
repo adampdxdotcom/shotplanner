@@ -2,8 +2,9 @@ import { Router, Request, Response } from "express";
 import fs from "fs";
 import path from "path";
 import fetch from "node-fetch";
-import { ASSETS_DIR, upload, formatSceneFolderName } from "../config/constants";
+import { ASSETS_DIR, upload, formatSceneFolderName, ensureSceneDirectories } from "../config/constants";
 import { sanitizeFilenamePart } from "../utils/formatters";
+import { generateThumbnailFile } from "../services/thumbnailService";
 
 const router = Router();
 
@@ -92,11 +93,11 @@ router.delete(["/outputs/:scene_name/:filename", "/outputs/:filename"], (req: Re
 router.post("/outputs/pull", async (req: Request, res: Response) => {
   try {
     const { scene_name, filename, subfolder, comfyui_api_url } = req.body;
-    if (!scene_name || !filename || !comfyui_api_url) {
-      return res.status(400).json({ error: "Missing parameters" });
+    if (!scene_name || !filename) {
+      return res.status(400).json({ error: "Missing required parameters: scene_name and filename are required" });
     }
     
-    const safeSceneName = sanitizeFilenamePart(scene_name);
+    const safeSceneName = formatSceneFolderName(scene_name) || sanitizeFilenamePart(scene_name) || "scene01";
     const outputDir = path.join(ASSETS_DIR, safeSceneName, "outputs");
     
     if (!fs.existsSync(outputDir)) {
@@ -104,30 +105,60 @@ router.post("/outputs/pull", async (req: Request, res: Response) => {
     }
     
     const filePath = path.join(outputDir, filename);
-    const baseUrl = comfyui_api_url.replace(/\/$/, "");
+    const configuredApiUrl = comfyui_api_url || process.env.COMFYUI_API_URL || "http://127.0.0.1:8188";
+    const baseUrl = configuredApiUrl.replace(/\/$/, "");
     let downloadUrl = `${baseUrl}/view?filename=${encodeURIComponent(filename)}&type=output`;
     if (subfolder) {
       downloadUrl += `&subfolder=${encodeURIComponent(subfolder)}`;
     }
     
+    console.log(`[Output Ingestion] Requesting output from ComfyUI: ${downloadUrl}`);
     const response = await fetch(downloadUrl);
     if (!response.ok) {
-      throw new Error(`Failed to download from ComfyUI: ${response.statusText}`);
+      throw new Error(`Failed to download from ComfyUI (${response.status} ${response.statusText})`);
     }
     
-    const dest = fs.createWriteStream(filePath);
-    response.body.pipe(dest);
-    
-    dest.on('finish', () => {
-      res.json({ status: "success", filename, path: filePath });
+    const arrayBuf = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuf);
+    fs.writeFileSync(filePath, buffer);
+    const fileSize = buffer.length;
+
+    // Detect media type
+    const isVideo = /\.(mp4|mov|webm|mkv|avi)$/i.test(filename);
+    const isImage = /\.(png|jpg|jpeg|webp|avif)$/i.test(filename);
+    const mediaType = isVideo ? "video" : isImage ? "image" : "other";
+
+    // Also persist into the scene's project asset storage
+    const sceneDirs = ensureSceneDirectories(safeSceneName);
+    const targetAssetDir = isVideo ? sceneDirs.videos : sceneDirs.images;
+    if (!fs.existsSync(targetAssetDir)) {
+      fs.mkdirSync(targetAssetDir, { recursive: true });
+    }
+    const assetPath = path.join(targetAssetDir, filename);
+    try {
+      fs.writeFileSync(assetPath, buffer);
+      if (isImage) {
+        generateThumbnailFile(assetPath).catch(() => {});
+      }
+    } catch (copyErr) {
+      console.warn("[Output Ingestion] Failed to copy output to scene asset storage:", copyErr);
+    }
+
+    const streamUrl = `/api/outputs/stream/${encodeURIComponent(safeSceneName)}/${encodeURIComponent(filename)}`;
+
+    console.log(`[Output Ingestion] Output successfully saved: ${filePath} (${fileSize} bytes)`);
+
+    return res.json({
+      status: "success",
+      filename,
+      path: filePath,
+      asset_path: assetPath,
+      size: fileSize,
+      stream_url: streamUrl,
+      media_type: mediaType
     });
-    
-    dest.on('error', (err) => {
-      console.error(err);
-      res.status(500).json({ error: err.message });
-    });
-    
   } catch (error: any) {
+    console.error("[Output Ingestion Error]:", error);
     res.status(500).json({ error: error.message });
   }
 });

@@ -32,8 +32,9 @@ export function TakeComparisonModal({
 
   const getStreamUrl = (take?: ShotTake) => {
     if (!take) return null;
+    if (take.video_url) return take.video_url;
     const filename = take.video_filename || `${sceneName}_Shot_${paddedShot}_Take_${take.take_number}.mp4`;
-    return `/api/outputs/stream/${encodeURIComponent(filename)}?scene_name=${encodeURIComponent(sceneName)}`;
+    return `/api/outputs/stream/${encodeURIComponent(sceneName)}/${encodeURIComponent(filename)}`;
   };
 
   const isHeroA = takeA?.id === shot.hero_take_id || takeA?.is_hero;
@@ -41,6 +42,9 @@ export function TakeComparisonModal({
 
   const urlA = getStreamUrl(takeA);
   const urlB = getStreamUrl(takeB);
+
+  const isImageA = /\.(png|jpg|jpeg|webp|avif)$/i.test(takeA?.video_filename || urlA || "");
+  const isImageB = /\.(png|jpg|jpeg|webp|avif)$/i.test(takeB?.video_filename || urlB || "");
 
   return (
     <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-[110] p-3 sm:p-6">
@@ -142,18 +146,27 @@ export function TakeComparisonModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div className="space-y-2">
               <div className="flex items-center justify-between text-xs text-zinc-400 font-semibold px-1">
-                <span>Take {takeA?.take_number || 1} Output Video</span>
+                <span>Take {takeA?.take_number || 1} Output {isImageA ? "Image" : "Video"}</span>
                 <span className="font-mono text-zinc-500">{takeA?.video_filename || "output.mp4"}</span>
               </div>
               <div className="bg-black border border-zinc-800 rounded-xl overflow-hidden aspect-video flex items-center justify-center relative">
                 {urlA ? (
-                  <video 
-                    src={urlA} 
-                    controls 
-                    preload="metadata"
-                    playsInline
-                    className="w-full h-full object-contain" 
-                  />
+                  isImageA ? (
+                    <img 
+                      src={urlA} 
+                      alt={`Take ${takeA?.take_number || 1}`}
+                      className="w-full h-full object-contain" 
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <video 
+                      src={urlA} 
+                      controls 
+                      preload="metadata"
+                      playsInline
+                      className="w-full h-full object-contain" 
+                    />
+                  )
                 ) : (
                   <div className="text-zinc-600 text-xs flex flex-col items-center gap-1">
                     <Film className="w-6 h-6" />
@@ -165,18 +178,27 @@ export function TakeComparisonModal({
 
             <div className="space-y-2">
               <div className="flex items-center justify-between text-xs text-zinc-400 font-semibold px-1">
-                <span>Take {takeB?.take_number || 2} Output Video</span>
+                <span>Take {takeB?.take_number || 2} Output {isImageB ? "Image" : "Video"}</span>
                 <span className="font-mono text-zinc-500">{takeB?.video_filename || "output.mp4"}</span>
               </div>
               <div className="bg-black border border-zinc-800 rounded-xl overflow-hidden aspect-video flex items-center justify-center relative">
                 {urlB ? (
-                  <video 
-                    src={urlB} 
-                    controls 
-                    preload="metadata"
-                    playsInline
-                    className="w-full h-full object-contain" 
-                  />
+                  isImageB ? (
+                    <img 
+                      src={urlB} 
+                      alt={`Take ${takeB?.take_number || 2}`}
+                      className="w-full h-full object-contain" 
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <video 
+                      src={urlB} 
+                      controls 
+                      preload="metadata"
+                      playsInline
+                      className="w-full h-full object-contain" 
+                    />
+                  )
                 ) : (
                   <div className="text-zinc-600 text-xs flex flex-col items-center gap-1">
                     <Film className="w-6 h-6" />

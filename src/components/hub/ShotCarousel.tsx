@@ -1,7 +1,8 @@
 import React, { useState, useRef } from "react";
 import { ShotItem, MediaAsset } from "../../types";
+import { ComfyMonitorState } from "../../hooks/useComfyMonitor";
 import { getAssetMediaUrl } from "../../utils/assetUrl";
-import { ChevronLeft, ChevronRight, Copy, Trash2, Plus, Sparkles } from "lucide-react";
+import { ChevronLeft, ChevronRight, Copy, Trash2, Plus, Sparkles, Radio } from "lucide-react";
 
 interface ShotCarouselProps {
   sceneName: string;
@@ -13,6 +14,7 @@ interface ShotCarouselProps {
   onDuplicateShot: (shot: ShotItem, e: React.MouseEvent) => void;
   onDeleteShot: (shotId: string, e: React.MouseEvent) => void;
   onReorderShots: (newShots: ShotItem[]) => void;
+  monitorState?: ComfyMonitorState;
 }
 
 export const ShotCarousel: React.FC<ShotCarouselProps> = ({
@@ -24,7 +26,8 @@ export const ShotCarousel: React.FC<ShotCarouselProps> = ({
   onAddBlankShot,
   onDuplicateShot,
   onDeleteShot,
-  onReorderShots
+  onReorderShots,
+  monitorState
 }) => {
   const carouselRef = useRef<HTMLDivElement>(null);
   const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
@@ -88,21 +91,48 @@ export const ShotCarousel: React.FC<ShotCarouselProps> = ({
           const thumbnailUrl = getShotThumbnailUrl(shot);
           const currentSceneName = (shot.shot_name && shot.shot_name.trim()) || (sceneName && sceneName.trim()) || "Scene";
           const shotNumberDisplay = shot.shot_number.toString().padStart(2, "0");
-          
+          const isMonitoredExecuting = Boolean(
+            monitorState?.isExecuting && 
+            shot.monitored_workflow && 
+            monitorState.isConnected
+          );
+
+          const isVideoThumb = Boolean(thumbnailUrl && /\.(mp4|mov|webm|mkv|avi)$/i.test(thumbnailUrl));
+
           return (
             <div
               key={shot.id}
+              id={`shot-card-${shot.id}`}
               draggable
               onDragStart={() => handleDragStart(idx)}
               onDragOver={handleDragOver}
               onDrop={() => handleDrop(idx)}
               onClick={() => onSelectShot(shot.id)}
               className={`snap-start shrink-0 w-64 aspect-video rounded-xl border-2 relative cursor-pointer overflow-hidden transition-all group ${
-                activeShotId === shot.id ? "border-indigo-500 ring-4 ring-indigo-500/20" : "border-zinc-700 hover:border-zinc-500"
+                isMonitoredExecuting
+                  ? "border-amber-400 ring-4 ring-amber-400/40 shadow-lg shadow-amber-500/20"
+                  : activeShotId === shot.id 
+                  ? "border-indigo-500 ring-4 ring-indigo-500/20" 
+                  : "border-zinc-700 hover:border-zinc-500"
               }`}
             >
               {thumbnailUrl ? (
-                <img src={thumbnailUrl} className="absolute inset-0 w-full h-full object-cover opacity-60" alt="" />
+                isVideoThumb ? (
+                  <video
+                    src={`${thumbnailUrl}#t=0.001`}
+                    preload="metadata"
+                    muted
+                    playsInline
+                    className="absolute inset-0 w-full h-full object-cover opacity-60 pointer-events-none"
+                  />
+                ) : (
+                  <img
+                    src={thumbnailUrl}
+                    className="absolute inset-0 w-full h-full object-cover opacity-60 pointer-events-none"
+                    alt=""
+                    referrerPolicy="no-referrer"
+                  />
+                )
               ) : (
                 <div className="absolute inset-0 bg-zinc-800 flex items-center justify-center">
                   <span className="text-zinc-400 dark:text-zinc-600 text-sm font-medium">No Location</span>
@@ -117,17 +147,24 @@ export const ShotCarousel: React.FC<ShotCarouselProps> = ({
                   Shot {shotNumberDisplay} - {currentSceneName}
                 </span>
                 <div className="flex items-center gap-1 flex-wrap">
-                  <span className={`px-2 py-0.5 text-[10px] font-bold rounded shadow uppercase tracking-wider text-white ${
-                    shot.status === "rendered" ? "bg-purple-500/90" :
-                    shot.status === "rendering" ? "bg-indigo-500/90 animate-pulse" :
-                    shot.status === "staged" ? "bg-emerald-500/90" :
-                    "bg-orange-500/90"
-                  }`}>
-                    {shot.status === "rendered" ? "✓ Rendered" :
-                     shot.status === "rendering" ? "⟳ Rendering" :
-                     shot.status === "staged" ? "✓ Staged" :
-                     "Unstaged"}
-                  </span>
+                  {isMonitoredExecuting ? (
+                    <span className="px-2 py-0.5 text-[10px] font-bold rounded shadow uppercase tracking-wider text-amber-950 bg-amber-400 animate-pulse flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-950 animate-ping" />
+                      Rendering Take...
+                    </span>
+                  ) : (
+                    <span className={`px-2 py-0.5 text-[10px] font-bold rounded shadow uppercase tracking-wider text-white ${
+                      shot.status === "rendered" ? "bg-purple-500/90" :
+                      shot.status === "rendering" ? "bg-indigo-500/90 animate-pulse" :
+                      shot.status === "staged" ? "bg-emerald-500/90" :
+                      "bg-orange-500/90"
+                    }`}>
+                      {shot.status === "rendered" ? "✓ Rendered" :
+                       shot.status === "rendering" ? "⟳ Rendering" :
+                       shot.status === "staged" ? "✓ Staged" :
+                       "Unstaged"}
+                    </span>
+                  )}
                   {shot.prompt_variations && shot.prompt_variations.length > 0 && (
                     <span className="flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-mono font-semibold bg-amber-500/90 text-zinc-950 rounded shadow" title={`${shot.prompt_variations.length} Prompt Variations`}>
                       <Sparkles className="w-2.5 h-2.5 fill-current" />
@@ -135,6 +172,16 @@ export const ShotCarousel: React.FC<ShotCarouselProps> = ({
                         const activeV = shot.prompt_variations.find(v => v.id === shot.active_variation_id);
                         return activeV ? activeV.variation_number : shot.prompt_variations.length;
                       })()}
+                    </span>
+                  )}
+                  {shot.monitored_workflow && (
+                    <span className={`flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-mono font-semibold rounded shadow truncate max-w-[100px] border ${
+                      isMonitoredExecuting 
+                        ? "bg-amber-950/80 text-amber-300 border-amber-500/50 animate-pulse" 
+                        : "bg-cyan-950/80 text-cyan-300 border-cyan-500/40"
+                    }`} title={`Monitored Workflow: ${shot.monitored_workflow}`}>
+                      <Radio className={`w-2.5 h-2.5 shrink-0 ${isMonitoredExecuting ? "text-amber-400 animate-pulse" : "text-cyan-400"}`} />
+                      <span className="truncate">{shot.monitored_workflow.split("/").pop()}</span>
                     </span>
                   )}
                 </div>

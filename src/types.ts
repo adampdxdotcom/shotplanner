@@ -169,6 +169,7 @@ export interface ShotItem {
   ots_focus_subject?: string;
   ots_side?: "Left" | "Right";
   workflow_file?: string;
+  monitored_workflow?: string; // Assigned remote ComfyUI workflow for passive monitoring & takes ingestion
   prompt_node_id?: string;
   node_mappings?: Record<string, string>;
   generation_params?: GenerationParameters;
@@ -373,6 +374,24 @@ export interface WorkflowItem {
   path: string;
   node_count: number;
   title: string;
+}
+
+export interface RemoteWorkflowItem {
+  filename: string;
+  path: string;
+  folder?: string;
+  size_bytes?: number;
+  modified_at?: string | number;
+  node_count?: number;
+  source?: "ssh" | "api";
+}
+
+export interface RemoteWorkflowsResult {
+  success: boolean;
+  workflows: RemoteWorkflowItem[];
+  message: string;
+  source: "ssh" | "api" | "none";
+  host?: string;
 }
 
 export interface WorkflowNodeInfo {

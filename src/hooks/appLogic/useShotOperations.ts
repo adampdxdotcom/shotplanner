@@ -8,10 +8,11 @@ import {
   ParsedWorkflow, 
   GenerationParameters, 
   ParameterNodeMappings, 
-  LLMProvider 
+  LLMProvider,
+  ShotTake
 } from '../../types';
 import { generatePromptPrefix } from '../../components/ScenePlanningHeader';
-import { useComfyMonitor } from '../useComfyMonitor';
+import { useComfyMonitor, PulledOutputDetails } from '../useComfyMonitor';
 import { getDefaultLlmProvider } from './useAppConfig';
 import { 
   getLastActiveSection, 
@@ -182,46 +183,102 @@ export function useShotOperations({
     }
   }, [activeShotId, sceneProject.shots, setSelectedWorkflowFile, setSelectedPromptNodeId, setNodeMappings, setGenerationParams, setParameterNodeMappings]);
 
-  const handleOutputPulled = useCallback((filename: string) => {
+  const handleOutputPulled = useCallback((filename: string, details?: PulledOutputDetails) => {
+    let affectedShotNumber: number | null = null;
+    let createdTakeNumber: number | null = null;
+
     setSceneProject(prev => {
-      const match = filename.match(/_Shot_(\d+)/i);
-      if (!match) return prev;
-      
-      const shotNumber = parseInt(match[1], 10);
-      const shots = [...prev.shots];
-      const shotIdx = shots.findIndex(s => s.shot_number === shotNumber);
-      
-      if (shotIdx !== -1) {
-        const shot = shots[shotIdx];
-        const newTakeId = Math.random().toString(36).substring(2, 9);
-        const takeNumMatch = filename.match(/_Take_(\d+)/i);
-        const takeNum = takeNumMatch ? parseInt(takeNumMatch[1], 10) : (shot.takes?.length || 0) + 1;
-        
-        const newTake = {
-          id: newTakeId,
-          take_number: takeNum,
-          created_at: new Date().toISOString(),
-          video_filename: filename,
-          expanded_prompt: shot.expanded_prompt,
-          basic_stub: shot.basic_stub,
-          generation_params: shot.generation_params,
-          assigned_slots: shot.assigned_slots
-        };
-        
-        const updatedTakes = [...(shot.takes || []), newTake];
-        
-        shots[shotIdx] = {
-          ...shot,
-          status: "rendered",
-          takes: updatedTakes,
-          active_take_id: newTakeId,
-          hero_take_id: shot.hero_take_id || newTakeId
-        };
+      // 1. Match by prompt_id if available
+      let shotIdx = -1;
+      if (details?.promptId) {
+        shotIdx = prev.shots.findIndex(s => s.latest_prompt_id === details.promptId);
       }
+
+      // 2. Match by shot number in filename (e.g., _Shot_01, Shot_1, Shot1, S01)
+      if (shotIdx === -1) {
+        const match = filename.match(/(?:_|^)(?:Shot|S)_?(\d+)/i);
+        if (match) {
+          const shotNumber = parseInt(match[1], 10);
+          shotIdx = prev.shots.findIndex(s => s.shot_number === shotNumber);
+        }
+      }
+
+      // 3. Match by active monitored workflow or rendering shot
+      if (shotIdx === -1) {
+        shotIdx = prev.shots.findIndex(s => s.monitored_workflow && s.status === "rendering");
+      }
+      if (shotIdx === -1) {
+        shotIdx = prev.shots.findIndex(s => Boolean(s.monitored_workflow));
+      }
+
+      // 4. Fallback to activeShotId if currently selected
+      if (shotIdx === -1 && activeShotId) {
+        shotIdx = prev.shots.findIndex(s => s.id === activeShotId);
+      }
+
+      // 5. Fallback to first shot
+      if (shotIdx === -1 && prev.shots.length > 0) {
+        shotIdx = 0;
+      }
+
+      if (shotIdx === -1) return prev;
+
+      const shots = [...prev.shots];
+      const shot = shots[shotIdx];
+      affectedShotNumber = shot.shot_number;
+      const existingTakes = shot.takes || [];
+
+      // Calculate take number: e.g. "Take 01", "Take 02"
+      let takeNum = existingTakes.reduce((max, t) => Math.max(max, t.take_number || 0), 0) + 1;
+      const takeMatch = filename.match(/(?:_|^)(?:Take|T)_?(\d+)/i);
+      if (takeMatch) {
+        const parsedTake = parseInt(takeMatch[1], 10);
+        if (!isNaN(parsedTake) && parsedTake > 0) {
+          takeNum = parsedTake;
+        }
+      }
+      createdTakeNumber = takeNum;
+
+      const newTakeId = `take_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const safeScene = prev.scene_name || "Scene";
+      const streamUrl = details?.streamUrl || `/api/outputs/stream/${encodeURIComponent(safeScene)}/${encodeURIComponent(filename)}`;
+
+      const newTake: ShotTake = {
+        id: newTakeId,
+        take_number: takeNum,
+        created_at: new Date().toISOString(),
+        video_filename: filename,
+        video_url: streamUrl,
+        expanded_prompt: shot.expanded_prompt || "",
+        basic_stub: shot.basic_stub || "",
+        variation_id: shot.active_variation_id,
+        generation_params: shot.generation_params,
+        sampling_steps: shot.generation_params?.steps,
+        assigned_slots: shot.assigned_slots ? { ...shot.assigned_slots } : undefined,
+        review_status: "unreviewed",
+        rating: null,
+        file_size: details?.size,
+        aspect_ratio: shot.aspect_ratio || "16:9",
+        is_hero: existingTakes.length === 0 || !shot.hero_take_id
+      };
+
+      const updatedTakes = [...existingTakes, newTake];
+
+      shots[shotIdx] = {
+        ...shot,
+        status: "rendered",
+        takes: updatedTakes,
+        active_take_id: newTakeId,
+        hero_take_id: shot.hero_take_id || (newTake.is_hero ? newTakeId : undefined)
+      };
+
       return { ...prev, shots };
     });
-    addToast(`Render output pulled: ${filename}`, "success");
-  }, [setSceneProject, addToast]);
+
+    const takeLabel = createdTakeNumber ? `Take ${String(createdTakeNumber).padStart(2, "0")}` : "New Take";
+    const shotLabel = affectedShotNumber ? `Shot ${String(affectedShotNumber).padStart(2, "0")}` : "Shot";
+    addToast(`🎬 Ingested ${takeLabel} under ${shotLabel}: ${filename}`, "success");
+  }, [setSceneProject, activeShotId, addToast]);
 
   const handleExecutionStarted = useCallback((promptId: string) => {
     setSceneProject(prev => {

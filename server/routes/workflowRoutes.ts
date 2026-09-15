@@ -4,6 +4,7 @@ import path from "path";
 import { upload, LEGACY_WORKFLOWS_DIR, WORKFLOWS_DIR, formatSceneFolderName, getSceneDirectories, ASSETS_DIR } from "../config/constants";
 import { listWorkflows, parseWorkflowData } from "../services/workflowService";
 import { processAssetTransfer, processSceneTransfer } from "../services/executionService";
+import { listRemoteWorkflows } from "../services/remoteComfyService";
 
 const router = Router();
 
@@ -179,6 +180,22 @@ router.post("/stage-scene", async (req: Request, res: Response) => {
     console.error("[Workflow Route /stage-scene ERROR]:", err);
     const status = err.message && err.message.includes("is required") ? 400 : 500;
     res.status(status).json({ error: err.message || "Failed to stage scene." });
+  }
+});
+
+// Discover workflows available on remote ComfyUI installation (Passive Monitoring)
+router.post("/remote-list", async (req: Request, res: Response) => {
+  try {
+    console.log(`[Workflow Route] POST /api/workflow/remote-list from host "${req.body.remote_host || req.body.host || 'none'}"`);
+    const result = await listRemoteWorkflows(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error("[Workflow Route /remote-list ERROR]:", err);
+    res.status(500).json({
+      success: false,
+      workflows: [],
+      error: err.message || "Failed to query remote ComfyUI workflows."
+    });
   }
 });
 

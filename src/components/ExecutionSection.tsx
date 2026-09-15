@@ -8,6 +8,7 @@ import { ExecutionMonitor } from "./execution/ExecutionMonitor";
 import { SendShotPanel } from "./execution/SendShotPanel";
 import { SendScenePanel } from "./execution/SendScenePanel";
 import { ExecutionConsole } from "./execution/ExecutionConsole";
+import { RemoteWorkflowMonitorPanel } from "./execution/RemoteWorkflowMonitorPanel";
 
 interface ExecutionSectionProps {
   config: AppConfig;
@@ -360,6 +361,15 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
           handleSendScene={handleSendScene}
         />
       </div>
+
+      {/* Remote ComfyUI Workflow Monitoring & Discovery */}
+      <RemoteWorkflowMonitorPanel
+        config={config}
+        activeShot={activeShot}
+        sceneProject={sceneProject}
+        onUpdateShot={onUpdateShot}
+        onShowToast={onShowToast}
+      />
 
       <ExecutionConsole
         transferState={transferState}

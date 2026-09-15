@@ -115,6 +115,7 @@ export const TakeVideoLightbox: React.FC<TakeVideoLightboxProps> = ({
 
   const filename = currentTake.video_filename || formatTakeFilename(sceneName, shot.shot_number, currentTake.take_number, "mp4");
   const streamUrl = currentTake.video_url || `/api/outputs/stream/${encodeURIComponent(sceneName)}/${encodeURIComponent(filename)}`;
+  const isImage = /\.(png|jpg|jpeg|webp|avif)$/i.test(filename || streamUrl || "");
 
   const handleCopyFilename = () => {
     navigator.clipboard.writeText(filename);
@@ -267,17 +268,27 @@ export const TakeVideoLightbox: React.FC<TakeVideoLightboxProps> = ({
         {/* Video Canvas / Card */}
         <div className="relative w-full h-full max-h-[75vh] flex items-center justify-center bg-zinc-950 rounded-2xl border border-zinc-800/90 shadow-2xl overflow-hidden">
           {!videoError ? (
-            <video
-              ref={videoRef}
-              src={streamUrl}
-              controls
-              autoPlay
-              loop
-              playsInline
-              preload="auto"
-              onError={() => setVideoError(true)}
-              className="w-full h-full max-h-[75vh] object-contain rounded-xl"
-            />
+            isImage ? (
+              <img
+                src={streamUrl}
+                alt={filename}
+                onError={() => setVideoError(true)}
+                className="w-full h-full max-h-[75vh] object-contain rounded-xl"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <video
+                ref={videoRef}
+                src={streamUrl}
+                controls
+                autoPlay
+                loop
+                playsInline
+                preload="auto"
+                onError={() => setVideoError(true)}
+                className="w-full h-full max-h-[75vh] object-contain rounded-xl"
+              />
+            )
           ) : (
             <div className="flex flex-col items-center justify-center p-8 text-center max-w-md space-y-3">
               <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-full">

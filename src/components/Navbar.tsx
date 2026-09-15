@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { ToastMessage } from "../types";
-import { CheckCircle2, AlertCircle, Info, X, Sun, Moon, ChevronDown } from "lucide-react";
+import { ComfyMonitorState } from "../hooks/useComfyMonitor";
+import { CheckCircle2, AlertCircle, Info, X, Sun, Moon, ChevronDown, Radio, Activity } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useTheme } from "../context/ThemeContext";
 import { 
@@ -27,6 +28,7 @@ interface NavbarProps {
   onNewProject?: () => void;
   toasts?: ToastMessage[];
   onDismissToast?: (id: string) => void;
+  monitorState?: ComfyMonitorState;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ 
@@ -38,7 +40,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onLoadProject, 
   onNewProject, 
   toasts = [], 
-  onDismissToast 
+  onDismissToast,
+  monitorState
 }) => {
   const activeToast = toasts && toasts.length > 0 ? toasts[0] : null;
   const { resolvedTheme, toggleTheme } = useTheme();
@@ -81,8 +84,51 @@ export const Navbar: React.FC<NavbarProps> = ({
             {isDirty && <span className="text-xs text-amber-600 dark:text-amber-400 font-normal opacity-90">(Unsaved)</span>}
           </h1>
           
-          {/* Toast / Status Area Below Project Name */}
-          <div className="relative min-h-[20px] flex items-center mt-0.5 pointer-events-auto max-w-sm sm:max-w-md">
+          {/* Toast & ComfyUI Status Area Below Project Name */}
+          <div className="relative min-h-[20px] flex items-center gap-2 mt-0.5 pointer-events-auto max-w-sm sm:max-w-md">
+            {/* ComfyUI HUD Status Badge */}
+            {monitorState && monitorState.isConnected && (
+              <div 
+                id="comfy-monitor-hud"
+                className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-medium border shrink-0 select-none transition-all ${
+                  monitorState.isExecuting
+                    ? "bg-amber-500/15 text-amber-500 border-amber-500/40 shadow-xs shadow-amber-500/10"
+                    : monitorState.queueRemaining > 0
+                    ? "bg-sky-500/15 text-sky-400 border-sky-500/40"
+                    : "bg-zinc-800/80 text-zinc-400 border-zinc-700/60"
+                }`}
+                title={
+                  monitorState.isExecuting
+                    ? `Generating: ${monitorState.maxSteps > 0 ? `Step ${monitorState.currentStep}/${monitorState.maxSteps}` : 'Executing'}`
+                    : monitorState.queueRemaining > 0
+                    ? `Queue: ${monitorState.queueRemaining} items`
+                    : "ComfyUI Connected & Idle"
+                }
+              >
+                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                  monitorState.isExecuting
+                    ? "bg-amber-400 animate-pulse"
+                    : monitorState.queueRemaining > 0
+                    ? "bg-sky-400 animate-pulse"
+                    : "bg-emerald-500"
+                }`} />
+                <span className="font-semibold uppercase tracking-wider">
+                  {monitorState.isExecuting ? (
+                    <span>
+                      Generating{" "}
+                      <span className="font-mono text-[9px] lowercase opacity-90">
+                        (Node: {monitorState.activeNodeName || 'KSampler'} {monitorState.maxSteps > 0 ? `${Math.round((monitorState.currentStep / monitorState.maxSteps) * 100)}%` : ''})
+                      </span>
+                    </span>
+                  ) : monitorState.queueRemaining > 0 ? (
+                    <span>Queued ({monitorState.queueRemaining})</span>
+                  ) : (
+                    <span>Idle</span>
+                  )}
+                </span>
+              </div>
+            )}
+
             <AnimatePresence mode="wait">
               {!activeToast ? (
                 <motion.div 

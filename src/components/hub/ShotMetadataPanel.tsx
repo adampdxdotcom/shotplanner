@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { ShotItem } from "../../types";
 import { generateSaveVideoPrefix } from "../../types";
-import { Film, Hash, Camera, Move, Aperture, RectangleHorizontal, Clapperboard, Play, Star } from "lucide-react";
+import { Film, Hash, Camera, Move, Aperture, RectangleHorizontal, Clapperboard, Play, Star, Radio } from "lucide-react";
 import { TakeSelector } from "../TakeSelector";
 import { TakeVideoLightbox } from "../TakeVideoLightbox";
 import { formatTakeFilename } from "../../utils/formatters";
@@ -11,13 +11,15 @@ interface ShotMetadataPanelProps {
   sceneName?: string;
   onSetHeroTake: (takeId: string) => void;
   onReviewTake: (takeId: string | null) => void;
+  onCompareTakes?: () => void;
 }
 
 export const ShotMetadataPanel: React.FC<ShotMetadataPanelProps> = ({
   activeShot,
   sceneName = "Scene",
   onSetHeroTake,
-  onReviewTake
+  onReviewTake,
+  onCompareTakes
 }) => {
   const [selectedTakeId, setSelectedTakeId] = useState<string | null>(null);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
@@ -54,6 +56,8 @@ export const ShotMetadataPanel: React.FC<ShotMetadataPanelProps> = ({
     ? (activeTake.video_url || `/api/outputs/stream/${encodeURIComponent(sceneName)}/${encodeURIComponent(takeFilename)}`)
     : "";
 
+  const isImage = /\.(png|jpg|jpeg|webp|avif)$/i.test(takeFilename);
+
   return (
     <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-5 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3 pb-3.5 mb-3.5 border-b border-zinc-800/80">
@@ -67,6 +71,12 @@ export const ShotMetadataPanel: React.FC<ShotMetadataPanelProps> = ({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {activeShot.monitored_workflow && (
+            <span className="flex items-center gap-1.5 px-2.5 py-1 bg-cyan-950/70 border border-cyan-500/40 text-xs text-cyan-300 font-mono rounded-md shadow" title={`Assigned Remote Workflow for Monitoring: ${activeShot.monitored_workflow}`}>
+              <Radio className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
+              <span className="truncate max-w-[140px]">{activeShot.monitored_workflow.split("/").pop()}</span>
+            </span>
+          )}
           <span className="px-2.5 py-1 bg-zinc-950/80 border border-zinc-800 text-xs text-zinc-400 font-mono rounded-md shadow-inner">
             {generateSaveVideoPrefix(activeShot.shot_name || "", activeShot.shot_number)}
           </span>
@@ -150,13 +160,22 @@ export const ShotMetadataPanel: React.FC<ShotMetadataPanelProps> = ({
             {/* Very small thumbnail */}
             {activeTake ? (
               <div className="relative w-11 h-7 rounded bg-black border border-zinc-700/80 overflow-hidden shrink-0 group-hover:border-amber-400/80 transition-all flex items-center justify-center shadow-xs">
-                <video
-                  src={`${takeStreamUrl}#t=0.001`}
-                  preload="metadata"
-                  muted
-                  playsInline
-                  className="w-full h-full object-cover pointer-events-none"
-                />
+                {isImage ? (
+                  <img
+                    src={takeStreamUrl}
+                    alt={takeName}
+                    className="w-full h-full object-cover pointer-events-none"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <video
+                    src={`${takeStreamUrl}#t=0.001`}
+                    preload="metadata"
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover pointer-events-none"
+                  />
+                )}
                 <div className="absolute inset-0 bg-black/25 group-hover:bg-black/0 flex items-center justify-center transition-colors">
                   <Play className="w-3 h-3 text-white fill-white opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all drop-shadow-sm" />
                 </div>
@@ -218,6 +237,7 @@ export const ShotMetadataPanel: React.FC<ShotMetadataPanelProps> = ({
             onSelectTake={(tid) => setSelectedTakeId(tid)}
             onSetHeroTake={onSetHeroTake}
             onReviewTake={onReviewTake}
+            onCompareTakes={onCompareTakes}
           />
         </div>
       )}

@@ -1,5 +1,5 @@
 import React from "react";
-import { Camera, Terminal, UploadCloud, Zap } from "lucide-react";
+import { Camera, Terminal, UploadCloud, Zap, Radio } from "lucide-react";
 import { ShotItem } from "../../types";
 import { formatShotNumber } from "../../utils/formatters";
 
@@ -65,6 +65,16 @@ export const SendShotPanel: React.FC<SendShotPanelProps> = ({
               <span className="text-zinc-500">Active Assets:</span>
               <span className="text-zinc-800 dark:text-zinc-200 font-medium">{activeShotAssets.length} files</span>
             </div>
+            {activeShot.monitored_workflow && (
+              <div className="flex justify-between items-center bg-cyan-500/10 dark:bg-cyan-950/40 px-2 py-1 rounded border border-cyan-500/30">
+                <span className="text-cyan-700 dark:text-cyan-300 font-medium flex items-center gap-1 text-[11px]">
+                  <Radio className="w-3 h-3 text-cyan-500 shrink-0" /> Monitored WF:
+                </span>
+                <span className="text-cyan-800 dark:text-cyan-200 font-mono font-semibold truncate max-w-[160px] text-[11px]" title={activeShot.monitored_workflow}>
+                  {activeShot.monitored_workflow.split("/").pop()}
+                </span>
+              </div>
+            )}
             {activeShotAssets.length > 0 && (
               <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/50 text-[10px] text-zinc-600 dark:text-zinc-400 break-words font-mono">
                 {activeShotAssets.join(", ")}

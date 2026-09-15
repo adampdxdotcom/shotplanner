@@ -1,7 +1,9 @@
 
 import React, { useState, useMemo } from "react";
 import { SceneProjectFile, ShotItem, MediaAsset, AppConfig } from "../types";
+import { ComfyMonitorState } from "../hooks/useComfyMonitor";
 import { TakeReviewModal } from "./TakeReviewModal";
+import { TakeComparisonModal } from "./TakeComparisonModal";
 import { ShotCarousel } from "./hub/ShotCarousel";
 import { ShotMetadataPanel } from "./hub/ShotMetadataPanel";
 import { AssetMatrixPanel } from "./hub/AssetMatrixPanel";
@@ -22,6 +24,7 @@ interface Props {
   onAssetUploaded?: (asset: MediaAsset, targetSlotIndex?: number) => void;
   onUpdateSpecificShot?: (id: string, updater: (prev: ShotItem) => ShotItem) => void;
   onNavigate?: (section: string) => void;
+  monitorState?: ComfyMonitorState;
 }
 
 export default function SceneProjectHub({
@@ -37,9 +40,11 @@ export default function SceneProjectHub({
   onExpandPrompt,
   onAssetUploaded,
   onUpdateSpecificShot,
-  onNavigate
+  onNavigate,
+  monitorState
 }: Props) {
   const [reviewTakeId, setReviewTakeId] = useState<string | null>(null);
+  const [isComparisonOpen, setIsComparisonOpen] = useState(false);
   const [isStagingStudioOpen, setIsStagingStudioOpen] = useState(false);
   const [stagingStudioTab, setStagingStudioTab] = useState<"headshots" | "staging">("staging");
 
@@ -157,6 +162,7 @@ export default function SceneProjectHub({
         onDuplicateShot={handleDuplicateShot}
         onDeleteShot={handleDeleteShot}
         onReorderShots={handleReorderShots}
+        monitorState={monitorState}
       />
 
       {activeShot ? (
@@ -177,6 +183,7 @@ export default function SceneProjectHub({
               return { ...prev, shots };
             })}
             onReviewTake={setReviewTakeId}
+            onCompareTakes={() => setIsComparisonOpen(true)}
           />
 
           <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-0 items-stretch">
@@ -230,6 +237,66 @@ export default function SceneProjectHub({
               }
               return { ...prev, shots };
             });
+            onShowToast(`Take set as hero take`, "success");
+          }}
+          onUpdateRating={(rating) => {
+            onUpdateProject(prev => {
+              const shots = [...prev.shots];
+              const idx = shots.findIndex(s => s.id === activeShot.id);
+              if (idx !== -1) {
+                const updatedTakes = (shots[idx].takes || []).map(t => {
+                  if (t.id === reviewTakeId) {
+                    return {
+                      ...t,
+                      rating,
+                      review_status: rating === "good" ? "approved" as const : rating === "bad" ? "needs_work" as const : "unreviewed" as const
+                    };
+                  }
+                  return t;
+                });
+                shots[idx] = { ...shots[idx], takes: updatedTakes };
+              }
+              return { ...prev, shots };
+            });
+          }}
+          onUpdateNotes={(notes) => {
+            onUpdateProject(prev => {
+              const shots = [...prev.shots];
+              const idx = shots.findIndex(s => s.id === activeShot.id);
+              if (idx !== -1) {
+                const updatedTakes = (shots[idx].takes || []).map(t => {
+                  if (t.id === reviewTakeId) {
+                    return { ...t, notes };
+                  }
+                  return t;
+                });
+                shots[idx] = { ...shots[idx], takes: updatedTakes };
+              }
+              return { ...prev, shots };
+            });
+          }}
+        />
+      )}
+
+      {isComparisonOpen && activeShot && (
+        <TakeComparisonModal
+          shot={activeShot}
+          sceneName={project.scene_name}
+          onClose={() => setIsComparisonOpen(false)}
+          onSetHeroTake={(takeId) => {
+            onUpdateProject(prev => {
+              const shots = [...prev.shots];
+              const idx = shots.findIndex(s => s.id === activeShot.id);
+              if (idx !== -1) {
+                const updatedTakes = (shots[idx].takes || []).map(t => ({
+                  ...t,
+                  is_hero: t.id === takeId
+                }));
+                shots[idx] = { ...shots[idx], hero_take_id: takeId, takes: updatedTakes };
+              }
+              return { ...prev, shots };
+            });
+            onShowToast(`Hero take updated from Comparison`, "success");
           }}
         />
       )}

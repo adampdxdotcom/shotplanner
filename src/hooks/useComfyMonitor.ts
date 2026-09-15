@@ -7,15 +7,26 @@ export interface ComfyMonitorState {
   currentStep: number;
   maxSteps: number;
   activeNodeId: string | null;
+  activeNodeName?: string | null;
   elapsedMs: number;
   activePromptId: string | null;
+  lastError?: string | null;
+}
+
+export interface PulledOutputDetails {
+  promptId?: string;
+  nodeId?: string;
+  size?: number;
+  streamUrl?: string;
+  mediaType?: "video" | "image" | "other";
+  subfolder?: string;
 }
 
 export function useComfyMonitor(
   comfyApiUrl: string, 
   onShowToast?: (msg: string, type: "success" | "error" | "info") => void,
   activeSceneName?: string,
-  onOutputPulled?: (filename: string) => void,
+  onOutputPulled?: (filename: string, details?: PulledOutputDetails) => void,
   onExecutionStarted?: (promptId: string) => void
 ) {
   const [state, setState] = useState<ComfyMonitorState>({
@@ -25,8 +36,10 @@ export function useComfyMonitor(
     currentStep: 0,
     maxSteps: 0,
     activeNodeId: null,
+    activeNodeName: null,
     elapsedMs: 0,
     activePromptId: null,
+    lastError: null,
   });
 
   const wsRef = useRef<WebSocket | null>(null);
@@ -58,6 +71,7 @@ export function useComfyMonitor(
       currentStep: 0,
       maxSteps: 0,
       activeNodeId: null,
+      activeNodeName: null,
       elapsedMs: 0,
       activePromptId: null,
     }));
@@ -115,13 +129,20 @@ export function useComfyMonitor(
               onExecutionStarted?.(msg.data.prompt_id);
             } else if (msg.type === 'executing') {
               const node = msg.data.node;
+              const promptId = msg.data.prompt_id;
               if (node) {
                 setState(prev => {
                   if (!prev.isExecuting) {
                      startTimeRef.current = Date.now();
                      startTimer();
                   }
-                  return { ...prev, activeNodeId: node, isExecuting: true };
+                  return { 
+                    ...prev, 
+                    activeNodeId: String(node),
+                    activeNodeName: `KSampler`,
+                    activePromptId: promptId || prev.activePromptId,
+                    isExecuting: true 
+                  };
                 });
               } else {
                 // node is null when execution is finished for this prompt
@@ -133,15 +154,15 @@ export function useComfyMonitor(
               setState(prev => ({ ...prev, currentStep, maxSteps }));
               
               const now = Date.now();
-              if (now - toastThrottler.current > 3000) {
+              if (now - toastThrottler.current > 2000) {
                  toastThrottler.current = now;
-                 const pct = Math.round((currentStep / maxSteps) * 100);
-                 onShowToast?.(`⚙️ Sampling: Step ${currentStep}/${maxSteps} (${pct}%)`, 'info');
+                 const pct = maxSteps > 0 ? Math.round((currentStep / maxSteps) * 100) : 0;
+                 onShowToast?.(`Generating (Node: KSampler ${pct}%)`, 'info');
               }
             } else if (msg.type === 'execution_success') {
-              onShowToast?.('🎬 Shot Staging / Render Complete', 'success');
+              onShowToast?.('🎬 ComfyUI Execution Complete', 'success');
               resetState();
-                        } else if (msg.type === 'executed') {
+            } else if (msg.type === 'executed') {
               const nodeOutput = msg.data?.output;
               if (nodeOutput && activeSceneName) {
                 let files: any[] = [];
@@ -165,7 +186,14 @@ export function useComfyMonitor(
                       })
                     }).then(res => res.json()).then(data => {
                       if (data.status === "success" && onOutputPulled) {
-                        onOutputPulled(data.filename);
+                        onOutputPulled(data.filename, {
+                          promptId: msg.data?.prompt_id,
+                          nodeId: msg.data?.node ? String(msg.data.node) : undefined,
+                          size: data.size,
+                          streamUrl: data.stream_url,
+                          mediaType: data.media_type,
+                          subfolder: subf
+                        });
                       }
                     }).catch(err => console.error("Failed to pull output", err));
                   }
