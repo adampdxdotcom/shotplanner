@@ -1,7 +1,7 @@
 import React, { useState, useRef } from "react";
 import { ShotItem, MediaAsset } from "../../types";
 import { getAssetMediaUrl } from "../../utils/assetUrl";
-import { ChevronLeft, ChevronRight, Copy, Trash2, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Copy, Trash2, Plus, Sparkles } from "lucide-react";
 
 interface ShotCarouselProps {
   sceneName: string;
@@ -116,18 +116,38 @@ export const ShotCarousel: React.FC<ShotCarouselProps> = ({
                 >
                   Shot {shotNumberDisplay} - {currentSceneName}
                 </span>
-                <span className={`px-2 py-0.5 text-[10px] font-bold rounded shadow uppercase tracking-wider text-white ${
-                  shot.status === "rendered" ? "bg-purple-500/90" :
-                  shot.status === "rendering" ? "bg-indigo-500/90 animate-pulse" :
-                  shot.status === "staged" ? "bg-emerald-500/90" :
-                  "bg-orange-500/90"
-                }`}>
-                  {shot.status === "rendered" ? "✓ Rendered" :
-                   shot.status === "rendering" ? "⟳ Rendering" :
-                   shot.status === "staged" ? "✓ Staged" :
-                   "Unstaged"}
-                </span>
+                <div className="flex items-center gap-1 flex-wrap">
+                  <span className={`px-2 py-0.5 text-[10px] font-bold rounded shadow uppercase tracking-wider text-white ${
+                    shot.status === "rendered" ? "bg-purple-500/90" :
+                    shot.status === "rendering" ? "bg-indigo-500/90 animate-pulse" :
+                    shot.status === "staged" ? "bg-emerald-500/90" :
+                    "bg-orange-500/90"
+                  }`}>
+                    {shot.status === "rendered" ? "✓ Rendered" :
+                     shot.status === "rendering" ? "⟳ Rendering" :
+                     shot.status === "staged" ? "✓ Staged" :
+                     "Unstaged"}
+                  </span>
+                  {shot.prompt_variations && shot.prompt_variations.length > 0 && (
+                    <span className="flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-mono font-semibold bg-amber-500/90 text-zinc-950 rounded shadow" title={`${shot.prompt_variations.length} Prompt Variations`}>
+                      <Sparkles className="w-2.5 h-2.5 fill-current" />
+                      Var {(() => {
+                        const activeV = shot.prompt_variations.find(v => v.id === shot.active_variation_id);
+                        return activeV ? activeV.variation_number : shot.prompt_variations.length;
+                      })()}
+                    </span>
+                  )}
+                </div>
               </div>
+
+              {/* Bottom stub preview snippet */}
+              {shot.basic_stub && (
+                <div className="absolute bottom-1.5 left-2 right-2 z-10 pointer-events-none">
+                  <p className="text-[10px] text-zinc-200/90 bg-black/75 backdrop-blur-xs px-2 py-0.5 rounded truncate font-mono border border-white/10" title={shot.basic_stub}>
+                    {shot.basic_stub}
+                  </p>
+                </div>
+              )}
               
               <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                 <button

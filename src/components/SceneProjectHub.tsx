@@ -188,6 +188,16 @@ export default function SceneProjectHub({
             
             <PromptPreviewPanel 
               activeShot={activeShot}
+              onSelectVariation={(variation) => {
+                updateActiveShot(prev => ({
+                  ...prev,
+                  expanded_prompt: variation.expanded_prompt,
+                  basic_stub: variation.basic_stub || prev.basic_stub,
+                  active_variation_id: variation.id,
+                  status: "unstaged"
+                }));
+                onShowToast(`Active variation switched to ${variation.label || `Variation ${variation.variation_number}`}`, "info");
+              }}
               addToast={onShowToast}
             />
           </div>
