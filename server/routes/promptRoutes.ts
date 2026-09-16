@@ -1,8 +1,46 @@
 import { Router, Request, Response } from "express";
 import { expandPrompt, buildDefaultSystemPrompt } from "../services/llm_service";
 import { generateVisionCaption } from "../services/visionCaptionService";
+import { parseSceneSketch } from "../services/sceneSketchService";
 
 const router = Router();
+
+// Dedicated scene sketch text parser to break raw script beats into structured shots
+router.post(["/llm/parse-scene-sketch", "/scene-sketch/parse"], async (req: Request, res: Response) => {
+  try {
+    const {
+      sketch_text,
+      sketchText,
+      text,
+      lm_studio_url,
+      lmStudioUrl,
+      model,
+      provider,
+      temperature,
+      max_tokens
+    } = req.body || {};
+
+    const resolvedText = sketch_text || sketchText || text;
+
+    if (!resolvedText || !resolvedText.trim()) {
+      return res.status(400).json({ error: "Missing scene sketch text. Please provide 'sketch_text'." });
+    }
+
+    const result = await parseSceneSketch({
+      sketch_text: resolvedText,
+      lm_studio_url: lm_studio_url || lmStudioUrl,
+      model,
+      provider,
+      temperature,
+      max_tokens
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    console.error("[Scene Sketch Parse Error]:", err?.message || err);
+    res.status(500).json({ error: err.message || "Failed to parse scene sketch into shots." });
+  }
+});
 
 router.post(["/generate-prompt", "/llm/expand"], async (req: Request, res: Response) => {
   try {

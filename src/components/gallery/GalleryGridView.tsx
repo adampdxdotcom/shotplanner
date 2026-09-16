@@ -27,7 +27,7 @@ export const GalleryGridView: React.FC<GalleryGridViewProps> = ({
           <div key={idx} className="group relative bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden hover:border-zinc-700 transition-all shadow-sm flex flex-col h-full cursor-pointer"
                onClick={() => setLightboxAsset(asset)}>
             {/* Asset Preview */}
-            <div className="aspect-[4/3] bg-zinc-950 flex items-center justify-center relative overflow-hidden">
+            <div className="aspect-square bg-zinc-950 flex items-center justify-center relative overflow-hidden">
               {asset.media_type === "image" || (!asset.media_type && !isVideoOrAudio) ? (
                 <img
                   src={getAssetMediaUrl(asset, true)}

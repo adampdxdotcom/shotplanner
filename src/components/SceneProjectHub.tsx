@@ -1,6 +1,6 @@
 
-import React, { useState, useMemo } from "react";
-import { SceneProjectFile, ShotItem, MediaAsset, AppConfig } from "../types";
+import React, { useState, useMemo, useEffect } from "react";
+import { SceneProjectFile, ShotItem, MediaAsset, AppConfig, CharacterProfile, UniverseCharacterProfile } from "../types";
 import { ComfyMonitorState } from "../hooks/useComfyMonitor";
 import { TakeReviewModal } from "./TakeReviewModal";
 import { TakeComparisonModal } from "./TakeComparisonModal";
@@ -10,6 +10,9 @@ import { ShotCharacterRoster } from "./hub/ShotCharacterRoster";
 import { AssetMatrixPanel } from "./hub/AssetMatrixPanel";
 import { PromptPreviewPanel } from "./hub/PromptPreviewPanel";
 import { AiReferenceStagingStudioModal } from "./cast/AiReferenceStagingStudioModal";
+import { SceneSketchImportModal } from "./scenes/SceneSketchImportModal";
+import { fetchUniverseCharacters, fetchUniverseAssets } from "../utils/universeApi";
+import { Film, Sparkles, Plus } from "lucide-react";
 
 interface Props {
   project: SceneProjectFile;
@@ -48,6 +51,19 @@ export default function SceneProjectHub({
   const [isComparisonOpen, setIsComparisonOpen] = useState(false);
   const [isStagingStudioOpen, setIsStagingStudioOpen] = useState(false);
   const [stagingStudioTab, setStagingStudioTab] = useState<"headshots" | "staging">("staging");
+  
+  // Scene Sketch Import Modal State
+  const [isSketchImportOpen, setIsSketchImportOpen] = useState(false);
+  const [universeCharacters, setUniverseCharacters] = useState<Record<string, UniverseCharacterProfile>>({});
+  const [universeAssets, setUniverseAssets] = useState<MediaAsset[]>([]);
+
+  // Fetch universe roster & media pool whenever import modal is triggered
+  useEffect(() => {
+    if (isSketchImportOpen) {
+      fetchUniverseCharacters().then(chars => setUniverseCharacters(chars || {}));
+      fetchUniverseAssets().then(ass => setUniverseAssets(ass || []));
+    }
+  }, [isSketchImportOpen]);
 
   const activeShotIndex = project.shots.findIndex((s) => s.id === activeShotId);
   const activeShot = project.shots[activeShotIndex];
@@ -151,8 +167,168 @@ export default function SceneProjectHub({
     onUpdateProject(prev => ({ ...prev, shots: newShots }));
   };
 
+  const handleSketchImportSuccess = (payload: {
+    shotsToInsert: Partial<ShotItem>[];
+    importMode: "append" | "replace";
+    charactersToImport: UniverseCharacterProfile[];
+    assetsToImport: MediaAsset[];
+    sceneTitle?: string;
+  }) => {
+    const { shotsToInsert, importMode, charactersToImport, assetsToImport, sceneTitle } = payload;
+    if (!shotsToInsert || shotsToInsert.length === 0) return;
+
+    // Convert universe character profiles into scene character profiles
+    const importedCharactersMap: Record<string, CharacterProfile> = {};
+    charactersToImport.forEach((uChar) => {
+      importedCharactersMap[uChar.name] = {
+        id: uChar.id || `char_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        name: uChar.name,
+        notes: uChar.notes || "",
+        quick_slots: uChar.quick_slots || uChar.universe_slots || [],
+        scene_outfit_ref: uChar.scene_outfit_ref || uChar.default_outfit_ref || "",
+        is_location: uChar.is_location,
+        in_universe: true,
+        universe_slots: uChar.universe_slots || [],
+        default_outfit_ref: uChar.default_outfit_ref || "",
+        source_scene: uChar.source_scene,
+        created_at: uChar.created_at,
+        updated_at: new Date().toISOString()
+      };
+    });
+
+    // Upload / register universe assets into active scene asset pool if present
+    if (assetsToImport && assetsToImport.length > 0 && onAssetUploaded) {
+      assetsToImport.forEach(a => onAssetUploaded(a));
+    }
+
+    let firstNewShotId: string | null = null;
+
+    onUpdateProject((prev) => {
+      let nextShots: ShotItem[] = [];
+      if (importMode === "replace") {
+        nextShots = shotsToInsert.map((s, idx) => {
+          const item: ShotItem = {
+            id: s.id || `shot_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`,
+            shot_name: s.shot_name || `Shot ${idx + 1}`,
+            shot_number: idx + 1,
+            shot_type: s.shot_type || "Medium Shot",
+            camera_movement: s.camera_movement || "Locked Off",
+            lens_focal_length: s.lens_focal_length || "50mm Standard Prime",
+            aspect_ratio: s.aspect_ratio || "16:9 Widescreen",
+            basic_stub: s.basic_stub || "",
+            expanded_prompt: s.expanded_prompt || "",
+            prompt_variations: s.prompt_variations || [],
+            active_variation_id: s.active_variation_id,
+            characters: s.characters || [],
+            assigned_slots: s.assigned_slots || {},
+            status: s.status || "unstaged",
+            takes: s.takes || [],
+            updated_at: s.updated_at || new Date().toISOString()
+          };
+          if (idx === 0) firstNewShotId = item.id;
+          return item;
+        });
+      } else {
+        const existingLen = prev.shots.length;
+        const renumberedNewShots = shotsToInsert.map((s, idx) => {
+          const item: ShotItem = {
+            id: s.id || `shot_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`,
+            shot_name: s.shot_name || `Shot ${existingLen + idx + 1}`,
+            shot_number: existingLen + idx + 1,
+            shot_type: s.shot_type || "Medium Shot",
+            camera_movement: s.camera_movement || "Locked Off",
+            lens_focal_length: s.lens_focal_length || "50mm Standard Prime",
+            aspect_ratio: s.aspect_ratio || "16:9 Widescreen",
+            basic_stub: s.basic_stub || "",
+            expanded_prompt: s.expanded_prompt || "",
+            prompt_variations: s.prompt_variations || [],
+            active_variation_id: s.active_variation_id,
+            characters: s.characters || [],
+            assigned_slots: s.assigned_slots || {},
+            status: s.status || "unstaged",
+            takes: s.takes || [],
+            updated_at: s.updated_at || new Date().toISOString()
+          };
+          if (idx === 0) firstNewShotId = item.id;
+          return item;
+        });
+        nextShots = [...prev.shots, ...renumberedNewShots];
+      }
+
+      const updatedCharacters = {
+        ...(prev.characters || {}),
+        ...importedCharactersMap
+      };
+
+      const updatedSubjects = Array.from(
+        new Set([...(prev.subjects || []), ...Object.keys(importedCharactersMap)])
+      );
+
+      return {
+        ...prev,
+        scene_name: sceneTitle && sceneTitle.trim() ? sceneTitle.trim() : prev.scene_name,
+        shots: nextShots,
+        characters: updatedCharacters,
+        subjects: updatedSubjects
+      };
+    });
+
+    if (firstNewShotId) {
+      onSelectShot(firstNewShotId);
+    }
+
+    const charCount = charactersToImport.length;
+    if (charCount > 0) {
+      const charNames = charactersToImport.map(c => c.name).join(", ");
+      onShowToast(`Imported ${shotsToInsert.length} shot${shotsToInsert.length !== 1 ? "s" : ""} & synced ${charCount} Universe character${charCount !== 1 ? "s" : ""} (${charNames})`, "success");
+    } else {
+      onShowToast(`Successfully imported ${shotsToInsert.length} shot${shotsToInsert.length !== 1 ? "s" : ""} into scene`, "success");
+    }
+  };
+
   return (
-    <div className="flex flex-col h-full space-y-6">
+    <div className="flex flex-col h-full space-y-5">
+      {/* Scene Controls & Action Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-1">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400">
+            <Film className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
+                {project.scene_name || "Untitled Scene"}
+              </h1>
+              <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700">
+                {project.shots.length} {project.shots.length === 1 ? "Shot" : "Shots"}
+              </span>
+            </div>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              Manage shots, camera setups, reference assets, and prompts
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 self-end sm:self-auto">
+          <button
+            onClick={() => setIsSketchImportOpen(true)}
+            className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs transition-colors cursor-pointer"
+            title="Import text sketch or screenplay and parse into shots"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>Import Sketch</span>
+          </button>
+          <button
+            onClick={handleAddBlankShot}
+            className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700 shadow-xs transition-colors cursor-pointer"
+            title="Add a new blank shot to this scene"
+          >
+            <Plus className="w-4 h-4" />
+            <span>New Shot</span>
+          </button>
+        </div>
+      </div>
+
       <ShotCarousel 
         sceneName={project.scene_name}
         shots={project.shots}
@@ -325,6 +501,18 @@ export default function SceneProjectHub({
         onUpdateProject={onUpdateProject}
         onAssetSaved={onAssetUploaded}
         addToast={onShowToast}
+      />
+
+      <SceneSketchImportModal
+        isOpen={isSketchImportOpen}
+        onClose={() => setIsSketchImportOpen(false)}
+        existingShotsCount={project.shots.length}
+        sceneCast={project.characters || {}}
+        universeCast={universeCharacters}
+        universeAssets={universeAssets}
+        existingSceneAssets={assets}
+        lmStudioUrl={config.lm_studio_url}
+        onImportSuccess={handleSketchImportSuccess}
       />
     </div>
   );

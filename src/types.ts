@@ -504,5 +504,24 @@ export interface UniverseInspectionResult {
   total_conflicts: number;
 }
 
+export interface ParsedSceneSketchShot {
+  shot_number: number;
+  shot_name: string;
+  basic_stub: string;
+  detected_characters: string[];
+  shot_type: string;
+  camera_movement: string;
+  lens_focal_length: string;
+  aspect_ratio?: string;
+}
+
+export interface ParseSceneSketchResult {
+  scene_title: string;
+  shots: ParsedSceneSketchShot[];
+  raw_llm_output?: string;
+  model_used: string;
+  provider_used: string;
+}
+
 export { getAssetMediaUrl } from "./utils/assetUrl";
 

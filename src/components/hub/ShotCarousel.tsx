@@ -73,10 +73,10 @@ export const ShotCarousel: React.FC<ShotCarouselProps> = ({
   };
 
   return (
-    <div className="relative bg-zinc-900/50 p-4 rounded-xl border border-zinc-800 flex items-center">
+    <div className="relative bg-white dark:bg-zinc-900/50 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-xs flex items-center transition-colors">
       <button 
         onClick={() => scrollCarousel("left")} 
-        className="carousel-nav-btn p-2 text-zinc-400 hover:text-white rounded-lg transition-colors shrink-0"
+        className="carousel-nav-btn p-2 text-zinc-400 hover:text-zinc-800 dark:hover:text-white rounded-lg transition-colors shrink-0"
         title="Scroll Left"
         aria-label="Scroll Carousel Left"
       >
@@ -220,18 +220,18 @@ export const ShotCarousel: React.FC<ShotCarouselProps> = ({
 
         <button
           onClick={onAddBlankShot}
-          className="shot-add-btn snap-start shrink-0 w-64 aspect-video rounded-xl border-2 border-dashed border-zinc-700 hover:border-zinc-500 bg-zinc-900 hover:bg-zinc-800 flex flex-col items-center justify-center gap-2 transition-all group cursor-pointer"
+          className="shot-add-btn snap-start shrink-0 w-64 aspect-video rounded-xl border-2 border-dashed border-zinc-300 dark:border-zinc-700 hover:border-zinc-500 bg-zinc-50 dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 flex flex-col items-center justify-center gap-2 transition-all group cursor-pointer"
         >
-          <div className="p-3 bg-zinc-800 group-hover:bg-zinc-700 rounded-full text-zinc-400 group-hover:text-white transition-colors">
+          <div className="p-3 bg-zinc-200 dark:bg-zinc-800 group-hover:bg-zinc-300 dark:group-hover:bg-zinc-700 rounded-full text-zinc-600 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-white transition-colors">
             <Plus className="w-6 h-6" />
           </div>
-          <span className="text-sm font-medium text-zinc-400 group-hover:text-zinc-300">Add New Shot</span>
+          <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-zinc-300">Add New Shot</span>
         </button>
       </div>
 
       <button 
         onClick={() => scrollCarousel("right")} 
-        className="carousel-nav-btn p-2 text-zinc-400 hover:text-white rounded-lg transition-colors shrink-0"
+        className="carousel-nav-btn p-2 text-zinc-400 hover:text-zinc-800 dark:hover:text-white rounded-lg transition-colors shrink-0"
         title="Scroll Right"
         aria-label="Scroll Carousel Right"
       >
