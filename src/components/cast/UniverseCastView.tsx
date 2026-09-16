@@ -346,13 +346,13 @@ export const UniverseCastView: React.FC<UniverseCastViewProps> = ({
                             </div>
 
                             {asset.type && (
-                              <div className="absolute bottom-0 inset-x-0 bg-black/70 dark:bg-black/80 backdrop-blur-sm p-1.5 pointer-events-none">
-                                <p className="text-[9px] font-bold text-zinc-100 dark:text-zinc-300 truncate text-center">{asset.type}</p>
+                              <div className="absolute bottom-0 inset-x-0 bg-white/95 dark:bg-black/80 backdrop-blur-xs py-1 px-1.5 border-t border-zinc-200 dark:border-transparent pointer-events-none transition-colors">
+                                <p className="text-[10px] font-bold text-zinc-900 dark:text-zinc-200 truncate text-center tracking-tight">{asset.type}</p>
                               </div>
                             )}
                           </div>
                           {asset.description && (
-                            <p className="text-[10px] text-zinc-600 dark:text-zinc-500 line-clamp-2 leading-relaxed" title={asset.description}>{asset.description}</p>
+                            <p className="text-[10px] text-zinc-600 dark:text-zinc-400 line-clamp-2 leading-relaxed" title={asset.description}>{asset.description}</p>
                           )}
                         </div>
                       ))

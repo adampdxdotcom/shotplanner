@@ -152,17 +152,17 @@ export const KeyingCharacterAssetPicker: React.FC<KeyingCharacterAssetPickerProp
                   {/* Badge */}
                   <div className="absolute top-1 left-1">
                     {isPoseTag ? (
-                      <span className="bg-indigo-600 text-white text-[8px] font-bold px-1 py-0.5 rounded shadow">
+                      <span className="bg-indigo-600 text-white text-[8px] font-bold px-1.5 py-0.5 rounded shadow-xs">
                         Pose
                       </span>
                     ) : (
-                      <span className="bg-zinc-900/80 text-zinc-300 text-[8px] px-1 py-0.5 rounded">
+                      <span className="bg-white/95 text-zinc-900 border border-zinc-200 dark:bg-zinc-900/90 dark:text-zinc-300 dark:border-zinc-700 text-[8px] font-bold px-1.5 py-0.5 rounded shadow-xs">
                         {asset.type || "Ref"}
                       </span>
                     )}
                   </div>
 
-                  <div className="absolute inset-x-0 bottom-0 bg-black/80 px-1 py-0.5 text-[9px] text-zinc-300 text-center truncate">
+                  <div className="absolute inset-x-0 bottom-0 bg-white/95 dark:bg-black/80 px-1 py-0.5 text-[9px] font-medium text-zinc-900 dark:text-zinc-300 text-center truncate border-t border-zinc-200 dark:border-transparent">
                     {asset.description || asset.filename}
                   </div>
                 </div>

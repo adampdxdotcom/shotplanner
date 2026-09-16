@@ -559,20 +559,20 @@ export const SceneCharacterCard: React.FC<SceneCharacterCardProps> = ({
 
                       {/* Shared Universe Origin Badge */}
                       {asset.is_universe && (
-                        <div className="absolute bottom-6 left-1.5 px-1.5 py-0.5 rounded bg-amber-100/90 border border-amber-400 text-amber-900 dark:bg-amber-950/80 dark:border-amber-500/50 dark:text-amber-300 text-[9px] font-bold flex items-center gap-1 shadow pointer-events-none backdrop-blur-sm">
+                        <div className="absolute bottom-7 left-1.5 px-1.5 py-0.5 rounded bg-amber-100 border border-amber-300 text-amber-900 dark:bg-amber-950/90 dark:border-amber-500/50 dark:text-amber-300 text-[9px] font-bold flex items-center gap-1 shadow-xs pointer-events-none backdrop-blur-xs">
                           <Globe className="w-2.5 h-2.5" />
                           <span>Universe</span>
                         </div>
                       )}
 
                       {asset.type && (
-                        <div className="absolute bottom-0 inset-x-0 bg-black/70 dark:bg-black/80 backdrop-blur-sm p-1.5 pointer-events-none">
-                          <p className="text-[9px] font-bold text-zinc-100 dark:text-zinc-300 truncate text-center">{asset.type}</p>
+                        <div className="absolute bottom-0 inset-x-0 bg-white/95 dark:bg-black/80 backdrop-blur-xs py-1 px-1.5 border-t border-zinc-200 dark:border-transparent pointer-events-none transition-colors">
+                          <p className="text-[10px] font-bold text-zinc-900 dark:text-zinc-200 truncate text-center tracking-tight">{asset.type}</p>
                         </div>
                       )}
                     </div>
                     {asset.description && (
-                      <p className="text-[10px] text-zinc-600 dark:text-zinc-500 line-clamp-2 leading-relaxed" title={asset.description}>
+                      <p className="text-[10px] text-zinc-600 dark:text-zinc-400 line-clamp-2 leading-relaxed" title={asset.description}>
                         {asset.description}
                       </p>
                     )}
