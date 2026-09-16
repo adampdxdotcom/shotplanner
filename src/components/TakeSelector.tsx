@@ -26,8 +26,8 @@ export function TakeSelector({
   const currentActiveId = activeTakeId || shot.active_take_id || (sortedTakes.length > 0 ? sortedTakes[sortedTakes.length - 1].id : undefined);
 
   return (
-    <div className="flex items-center gap-2 overflow-x-auto pb-1.5 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
-      <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider shrink-0 mr-1">
+    <div className="flex items-center gap-2 overflow-x-auto pb-1.5 scrollbar-thin scrollbar-thumb-zinc-300 dark:scrollbar-thumb-zinc-700 scrollbar-track-transparent">
+      <span className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider shrink-0 mr-1">
         Takes ({sortedTakes.length})
       </span>
       
@@ -41,10 +41,10 @@ export function TakeSelector({
               key={take.id}
               className={`group relative flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-semibold cursor-pointer transition-all shrink-0 ${
                 isActive 
-                  ? "bg-indigo-600/30 border-indigo-400 text-indigo-200 shadow-sm" 
+                  ? "bg-indigo-50 border-indigo-500 text-indigo-700 dark:bg-indigo-600/30 dark:border-indigo-400 dark:text-indigo-200 shadow-xs" 
                   : isHero
-                  ? "bg-amber-500/10 border-amber-500/40 text-amber-300 hover:bg-amber-500/20"
-                  : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+                  ? "bg-amber-100/80 border-amber-300 text-amber-800 hover:bg-amber-100 dark:bg-amber-500/10 dark:border-amber-500/40 dark:text-amber-300 dark:hover:bg-amber-500/20"
+                  : "bg-white border-zinc-300 text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 shadow-2xs"
               }`}
               onClick={() => {
                 if (onSelectTake) {
@@ -58,14 +58,14 @@ export function TakeSelector({
               <span>Take {take.take_number}</span>
               
               {isHero && (
-                <Star className="w-3 h-3 text-amber-400 fill-amber-400 shrink-0" />
+                <Star className="w-3 h-3 text-amber-500 dark:text-amber-400 fill-amber-500 dark:fill-amber-400 shrink-0" />
               )}
               
               {take.review_status === "approved" && !isHero && (
-                <CheckCircle className="w-3 h-3 text-emerald-400 shrink-0" />
+                <CheckCircle className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
               )}
               {take.review_status === "needs_work" && !isHero && (
-                <Clock className="w-3 h-3 text-amber-400 shrink-0" />
+                <Clock className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
               )}
 
               {/* Action buttons on pill */}
@@ -77,7 +77,7 @@ export function TakeSelector({
                     onReviewTake(take.id);
                   }}
                   title="Inspect Prompt & Parameters"
-                  className="opacity-60 hover:opacity-100 p-0.5 hover:text-white transition-opacity"
+                  className="opacity-60 hover:opacity-100 p-0.5 hover:text-zinc-900 dark:hover:text-white transition-opacity"
                 >
                   <Eye className="w-3 h-3" />
                 </button>
@@ -89,7 +89,7 @@ export function TakeSelector({
                       onSetHeroTake(take.id);
                     }}
                     title="Set as Hero Take"
-                    className="opacity-0 group-hover:opacity-100 hover:text-amber-400 p-0.5 transition-opacity"
+                    className="opacity-0 group-hover:opacity-100 hover:text-amber-600 dark:hover:text-amber-400 p-0.5 transition-opacity"
                   >
                     <Star className="w-3 h-3" />
                   </button>
@@ -104,7 +104,7 @@ export function TakeSelector({
         <button
           type="button"
           onClick={onCompareTakes}
-          className="ml-2 px-2.5 py-1 bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700/80 rounded-full text-[11px] font-semibold transition-colors shrink-0 flex items-center gap-1"
+          className="ml-2 px-2.5 py-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 hover:text-zinc-900 border border-zinc-300 dark:bg-zinc-800/80 dark:hover:bg-zinc-700 dark:text-zinc-300 dark:hover:text-white dark:border-zinc-700/80 rounded-full text-[11px] font-semibold transition-colors shrink-0 flex items-center gap-1 cursor-pointer"
         >
           Compare
         </button>

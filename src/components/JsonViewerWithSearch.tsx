@@ -110,49 +110,49 @@ export const JsonViewerWithSearch: React.FC<JsonViewerWithSearchProps> = ({
   };
 
   return (
-    <div className="p-3 rounded-lg bg-zinc-950 border-2 border-zinc-700 text-xs space-y-2.5">
+    <div className="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 text-xs space-y-2.5">
       {/* Header Info & Actions */}
-      <div className="flex flex-wrap items-center justify-between gap-2 text-zinc-300 border-b border-zinc-800/80 pb-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-zinc-700 dark:text-zinc-300 border-b border-zinc-200 dark:border-zinc-800/80 pb-2">
         <div className="flex flex-wrap items-center gap-2">
-          <FileJson className="w-4 h-4 text-amber-400 shrink-0" />
-          <span className="font-mono font-medium text-xs text-zinc-200">
+          <FileJson className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+          <span className="font-mono font-medium text-xs text-zinc-900 dark:text-zinc-200">
             {isVisualWorkflow
               ? `Live Injected Workflow Canvas (${nodeCount} nodes)`
               : `Live Injected Workflow Graph (${nodeCount} nodes)`}
           </span>
-          <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-mono">
+          <span className="text-[10px] px-2 py-0.5 rounded bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20 border font-mono">
             Active Shot #{String(activeShotNumber).padStart(2, "0")} Live Data
           </span>
-          <span className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono">
+          <span className="text-[10px] px-2 py-0.5 rounded bg-zinc-100 text-zinc-600 border border-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-transparent font-mono">
             {isVisualWorkflow ? "Visual UI Workflow JSON" : "API Prompt Format JSON"}
           </span>
         </div>
 
         <button
           onClick={handleCopy}
-          className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 text-zinc-200 border border-zinc-600 transition-colors"
+          className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md bg-white hover:bg-zinc-100 dark:bg-zinc-800 dark:hover:bg-zinc-700 active:bg-zinc-200 dark:active:bg-zinc-600 text-zinc-800 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-600 transition-colors cursor-pointer shadow-2xs"
           title="Copy live injected workflow JSON to clipboard"
         >
           {copied ? (
             <>
-              <Check className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="text-emerald-400 font-semibold">Copied!</span>
+              <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Copied!</span>
             </>
           ) : (
             <>
-              <Copy className="w-3.5 h-3.5 text-zinc-400" />
+              <Copy className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
               <span>Copy JSON</span>
             </>
           )}
         </button>
       </div>
 
-      <p className="text-[11px] text-zinc-400">
+      <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
         Live in-memory preview of the workflow JSON populated with the active shot's assigned assets, expanded prompt, and generation parameters.
       </p>
 
       {/* Interactive Search Bar */}
-      <div className="flex flex-wrap items-center gap-2 bg-zinc-900/90 p-2 rounded-md border border-zinc-800">
+      <div className="flex flex-wrap items-center gap-2 bg-white dark:bg-zinc-900/90 p-2 rounded-md border border-zinc-200 dark:border-zinc-800 shadow-2xs">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
@@ -162,7 +162,7 @@ export const JsonViewerWithSearch: React.FC<JsonViewerWithSearchProps> = ({
             onChange={(e) => setSearchTerm(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Search JSON (e.g. SaveVideo, node id, prompt, image, steps)..."
-            className="w-full bg-zinc-950 border border-zinc-700/80 focus:border-indigo-500 rounded pl-8 pr-7 py-1 text-xs text-zinc-200 font-mono placeholder:text-zinc-500 outline-none"
+            className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700/80 focus:border-indigo-500 rounded pl-8 pr-7 py-1 text-xs text-zinc-900 dark:text-zinc-200 font-mono placeholder:text-zinc-400 dark:placeholder:text-zinc-500 outline-none"
           />
           {searchTerm && (
             <button
@@ -170,7 +170,7 @@ export const JsonViewerWithSearch: React.FC<JsonViewerWithSearchProps> = ({
                 setSearchTerm("");
                 searchInputRef.current?.focus();
               }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-200"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer"
               title="Clear search"
             >
               <X className="w-3 h-3" />
@@ -184,8 +184,8 @@ export const JsonViewerWithSearch: React.FC<JsonViewerWithSearchProps> = ({
             <span
               className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
                 totalMatches > 0
-                  ? "bg-amber-950/40 text-amber-300 border-amber-600/30"
-                  : "bg-red-950/40 text-red-300 border-red-800/40"
+                  ? "bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-600/30"
+                  : "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800/40"
               }`}
             >
               {totalMatches > 0
@@ -193,7 +193,7 @@ export const JsonViewerWithSearch: React.FC<JsonViewerWithSearchProps> = ({
                 : "0 matches"}
             </span>
           ) : (
-            <span className="text-[10px] text-zinc-500 font-mono hidden sm:inline">
+            <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono hidden sm:inline">
               Press Enter for next match
             </span>
           )}
@@ -203,7 +203,7 @@ export const JsonViewerWithSearch: React.FC<JsonViewerWithSearchProps> = ({
             <button
               onClick={handlePrevMatch}
               disabled={totalMatches === 0}
-              className="p-1 rounded bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 disabled:hover:bg-zinc-800 text-zinc-300 border border-zinc-700 transition-colors"
+              className="p-1 rounded bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 disabled:opacity-40 disabled:hover:bg-zinc-100 dark:disabled:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 transition-colors cursor-pointer"
               title="Previous match (Shift + Enter)"
             >
               <ChevronUp className="w-3.5 h-3.5" />
@@ -211,7 +211,7 @@ export const JsonViewerWithSearch: React.FC<JsonViewerWithSearchProps> = ({
             <button
               onClick={handleNextMatch}
               disabled={totalMatches === 0}
-              className="p-1 rounded bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 disabled:hover:bg-zinc-800 text-zinc-300 border border-zinc-700 transition-colors"
+              className="p-1 rounded bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 disabled:opacity-40 disabled:hover:bg-zinc-100 dark:disabled:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 transition-colors cursor-pointer"
               title="Next match (Enter)"
             >
               <ChevronDown className="w-3.5 h-3.5" />
@@ -223,7 +223,7 @@ export const JsonViewerWithSearch: React.FC<JsonViewerWithSearchProps> = ({
       {/* JSON Display Area with Search Highlights */}
       <pre
         ref={scrollContainerRef}
-        className="max-h-72 overflow-auto font-mono text-[11px] text-zinc-300 bg-zinc-900/80 p-3 rounded-lg border border-zinc-800 select-text whitespace-pre leading-relaxed"
+        className="max-h-72 overflow-auto font-mono text-[11px] text-zinc-800 dark:text-zinc-300 bg-white dark:bg-zinc-900/80 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 select-text whitespace-pre leading-relaxed shadow-2xs"
       >
         {segments.map((seg, idx) => {
           if (!seg.isMatch) {
@@ -237,7 +237,7 @@ export const JsonViewerWithSearch: React.FC<JsonViewerWithSearchProps> = ({
               className={
                 isActive
                   ? "bg-amber-400 text-zinc-950 font-bold px-0.5 rounded shadow-sm ring-2 ring-amber-300"
-                  : "bg-yellow-500/30 text-yellow-200 px-0.5 rounded"
+                  : "bg-yellow-200 dark:bg-yellow-500/30 text-yellow-900 dark:text-yellow-200 px-0.5 rounded"
               }
             >
               {seg.text}

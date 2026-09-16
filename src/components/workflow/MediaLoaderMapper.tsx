@@ -29,11 +29,11 @@ export const MediaLoaderMapper: React.FC<MediaLoaderMapperProps> = ({
   return (
     <div className="space-y-2.5">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold text-zinc-200 flex items-center gap-1.5">
-          <Layers className="w-3.5 h-3.5 text-amber-400" />
+        <span className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
+          <Layers className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
           Dynamic Media Loader Node Mappings (inputs.image / inputs.video / inputs.audio)
         </span>
-        <span className="text-[11px] text-zinc-400">
+        <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
           {imageNodes.length + videoNodes.length + audioNodes.length} media loader node(s) detected
         </span>
       </div>
@@ -45,26 +45,26 @@ export const MediaLoaderMapper: React.FC<MediaLoaderMapperProps> = ({
           const mappedAsset = uploadedAssets.find(a => a.filename === assignedFile);
 
           return (
-            <div key={node.id} className="bg-zinc-950/60 p-3 rounded-lg border-2 border-zinc-700 space-y-2">
+            <div key={node.id} className="bg-white dark:bg-zinc-950/60 p-3 rounded-lg border border-zinc-200 dark:border-zinc-700 space-y-2 shadow-xs">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="p-1 rounded bg-amber-500/10 text-amber-400">
+                  <div className="p-1 rounded bg-amber-50 text-amber-600 border border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-transparent">
                     <ImageIcon className="w-3.5 h-3.5" />
                   </div>
                   <div>
-                    <p className="text-xs font-semibold text-zinc-200 font-mono">Node #{node.id} — {node.title}</p>
-                    <p className="text-[10px] text-zinc-400 font-mono">class_type: {node.class_type} | default: "{node.current_file || 'example.png'}"</p>
+                    <p className="text-xs font-semibold text-zinc-900 dark:text-zinc-200 font-mono">Node #{node.id} — {node.title}</p>
+                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono">class_type: {node.class_type} | default: "{node.current_file || 'example.png'}"</p>
                   </div>
                 </div>
               </div>
 
               <div className="flex items-center gap-2">
-                <ArrowRight className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                <ArrowRight className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 shrink-0" />
                 {mappedAsset && (
                   <img 
                     src={getAssetMediaUrl(mappedAsset, true)} 
                     alt={mappedAsset.subject_name} 
-                    className="w-7 h-7 rounded object-cover border border-zinc-700 shrink-0" 
+                    className="w-7 h-7 rounded object-cover border border-zinc-300 dark:border-zinc-700 shrink-0" 
                   />
                 )}
                 <select
@@ -82,7 +82,7 @@ export const MediaLoaderMapper: React.FC<MediaLoaderMapperProps> = ({
                       }));
                     }
                   }}
-                  className="flex-1 bg-zinc-900 border-2 border-zinc-700 focus:border-amber-500 rounded-md px-2.5 py-1.5 text-xs text-zinc-200 outline-none"
+                  className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 focus:border-amber-500 rounded-md px-2.5 py-1.5 text-xs text-zinc-900 dark:text-zinc-200 outline-none shadow-2xs"
                 >
                   <option key="empty" value="">-- Assign Uploaded Asset (or Use Bypass) --</option>
                   {uploadedAssets.map((asset, i) => (
@@ -100,25 +100,25 @@ export const MediaLoaderMapper: React.FC<MediaLoaderMapperProps> = ({
         {videoNodes.map((node) => {
           const assignedFile = nodeMappings[node.id] || "";
           return (
-            <div key={node.id} className="bg-zinc-950/60 p-3 rounded-lg border-2 border-zinc-700 space-y-2">
+            <div key={node.id} className="bg-white dark:bg-zinc-950/60 p-3 rounded-lg border border-zinc-200 dark:border-zinc-700 space-y-2 shadow-xs">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="p-1 rounded bg-indigo-500/10 text-indigo-400">
+                  <div className="p-1 rounded bg-indigo-50 text-indigo-600 border border-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-transparent">
                     <VideoIcon className="w-3.5 h-3.5" />
                   </div>
                   <div>
-                    <p className="text-xs font-semibold text-zinc-200 font-mono">Node #{node.id} — {node.title}</p>
-                    <p className="text-[10px] text-zinc-400 font-mono">class_type: {node.class_type}</p>
+                    <p className="text-xs font-semibold text-zinc-900 dark:text-zinc-200 font-mono">Node #{node.id} — {node.title}</p>
+                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono">class_type: {node.class_type}</p>
                   </div>
                 </div>
               </div>
 
               <div className="flex items-center gap-2">
-                <ArrowRight className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                <ArrowRight className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 shrink-0" />
                 <select
                   value={assignedFile}
                   onChange={(e) => onUpdateMapping(node.id, e.target.value)}
-                  className="flex-1 bg-zinc-900 border-2 border-zinc-700 focus:border-indigo-500 rounded-md px-2.5 py-1.5 text-xs text-zinc-200 outline-none"
+                  className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 focus:border-indigo-500 rounded-md px-2.5 py-1.5 text-xs text-zinc-900 dark:text-zinc-200 outline-none shadow-2xs"
                 >
                   <option key="empty" value="">-- Assign Uploaded Video --</option>
                   {uploadedAssets.filter(a => a.media_type === "video").map((asset, i) => (
@@ -136,25 +136,25 @@ export const MediaLoaderMapper: React.FC<MediaLoaderMapperProps> = ({
         {audioNodes.map((node) => {
           const assignedFile = nodeMappings[node.id] || "";
           return (
-            <div key={node.id} className="bg-zinc-950/60 p-3 rounded-lg border-2 border-zinc-700 space-y-2">
+            <div key={node.id} className="bg-white dark:bg-zinc-950/60 p-3 rounded-lg border border-zinc-200 dark:border-zinc-700 space-y-2 shadow-xs">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="p-1 rounded bg-emerald-500/10 text-emerald-400">
+                  <div className="p-1 rounded bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-transparent">
                     <Music className="w-3.5 h-3.5" />
                   </div>
                   <div>
-                    <p className="text-xs font-semibold text-zinc-200 font-mono">Node #{node.id} — {node.title}</p>
-                    <p className="text-[10px] text-zinc-400 font-mono">class_type: {node.class_type}</p>
+                    <p className="text-xs font-semibold text-zinc-900 dark:text-zinc-200 font-mono">Node #{node.id} — {node.title}</p>
+                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono">class_type: {node.class_type}</p>
                   </div>
                 </div>
               </div>
 
               <div className="flex items-center gap-2">
-                <ArrowRight className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                <ArrowRight className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 shrink-0" />
                 <select
                   value={assignedFile}
                   onChange={(e) => onUpdateMapping(node.id, e.target.value)}
-                  className="flex-1 bg-zinc-900 border-2 border-zinc-700 focus:border-emerald-500 rounded-md px-2.5 py-1.5 text-xs text-zinc-200 outline-none"
+                  className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 focus:border-emerald-500 rounded-md px-2.5 py-1.5 text-xs text-zinc-900 dark:text-zinc-200 outline-none shadow-2xs"
                 >
                   <option key="empty" value="">-- Assign Uploaded Audio --</option>
                   {uploadedAssets.filter(a => a.media_type === "audio").map((asset, i) => (

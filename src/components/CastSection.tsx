@@ -152,20 +152,20 @@ export const CastSection: React.FC<CastSectionProps> = ({
   return (
     <div className="flex flex-col h-full bg-transparent">
       {/* Header Bar with Roster Switcher */}
-      <div className="bg-zinc-900 border-b border-zinc-800 p-4 sticky top-0 z-10">
+      <div className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 p-4 sticky top-0 z-10 shadow-xs dark:shadow-none">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-indigo-900/50 rounded-xl flex items-center justify-center border border-indigo-800/50 shrink-0">
-              <Users className="w-5 h-5 text-indigo-400" />
+            <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-900/50 rounded-xl flex items-center justify-center border border-indigo-200 dark:border-indigo-800/50 shrink-0">
+              <Users className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
             </div>
             <div className="min-w-0">
-              <h2 className="text-xl font-bold text-zinc-100 flex items-center gap-2 flex-wrap">
+              <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2 flex-wrap">
                 Cast & Characters
-                <span className="text-xs font-medium text-zinc-500 bg-zinc-800 px-2 py-0.5 rounded-full">
+                <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-full border border-zinc-200 dark:border-zinc-700/60">
                   {activeRosterTab === "scene" ? `${renderedSubjects.length} scene subjects` : `${universeCount} universe entities`}
                 </span>
               </h2>
-              <p className="text-xs text-zinc-400 mt-0.5 truncate">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 truncate">
                 {activeRosterTab === "scene"
                   ? "Manage reference identities, traits, and outfits for the current scene"
                   : "Global reference pool that persists across all projects and scenes"}
@@ -175,20 +175,20 @@ export const CastSection: React.FC<CastSectionProps> = ({
 
           <div className="flex items-center gap-3">
             {/* Roster Switcher Toggle */}
-            <div className="flex items-center bg-zinc-950 border border-zinc-800 p-1 rounded-xl">
+            <div className="flex items-center bg-zinc-100 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 p-1 rounded-xl">
               <button
                 type="button"
                 onClick={() => setActiveRosterTab("scene")}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                   activeRosterTab === "scene"
                     ? "bg-indigo-600 text-white shadow-md shadow-indigo-900/30"
-                    : "text-zinc-400 hover:text-zinc-200"
+                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
                 }`}
               >
                 <Clapperboard className="w-3.5 h-3.5" />
                 <span>🎬 Scene Cast</span>
                 <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                  activeRosterTab === "scene" ? "bg-indigo-700 text-indigo-100" : "bg-zinc-800 text-zinc-400"
+                  activeRosterTab === "scene" ? "bg-indigo-700 text-indigo-100" : "bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"
                 }`}>
                   {renderedSubjects.length}
                 </span>
@@ -200,13 +200,13 @@ export const CastSection: React.FC<CastSectionProps> = ({
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                   activeRosterTab === "universe"
                     ? "bg-amber-500 text-zinc-950 shadow-md shadow-amber-900/30 font-extrabold"
-                    : "text-zinc-400 hover:text-zinc-200"
+                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
                 }`}
               >
                 <Globe className="w-3.5 h-3.5" />
                 <span>🌐 Universe Cast</span>
                 <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                  activeRosterTab === "universe" ? "bg-amber-600 text-zinc-950" : "bg-zinc-800 text-zinc-400"
+                  activeRosterTab === "universe" ? "bg-amber-600 text-zinc-950" : "bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"
                 }`}>
                   {universeCount}
                 </span>

@@ -42,12 +42,12 @@ export const SceneCastList: React.FC<SceneCastListProps> = ({
 }) => {
   if (renderedSubjects.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed border-zinc-800 rounded-xl bg-zinc-900/30">
-        <div className="w-16 h-16 bg-zinc-800/50 rounded-full flex items-center justify-center mb-4">
-          <Users className="w-8 h-8 text-zinc-600" />
+      <div className="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed border-zinc-300 dark:border-zinc-800 rounded-xl bg-zinc-50/60 dark:bg-zinc-900/30">
+        <div className="w-16 h-16 bg-zinc-200/80 dark:bg-zinc-800/50 rounded-full flex items-center justify-center mb-4">
+          <Users className="w-8 h-8 text-zinc-500 dark:text-zinc-600" />
         </div>
-        <h3 className="text-lg font-bold text-zinc-300 mb-2">No characters in scene</h3>
-        <p className="text-zinc-500 max-w-md mb-6 text-xs">
+        <h3 className="text-lg font-bold text-zinc-800 dark:text-zinc-300 mb-2">No characters in scene</h3>
+        <p className="text-zinc-600 dark:text-zinc-500 max-w-md mb-6 text-xs">
           Register characters for this scene, or switch to the Universe Cast tab to pull in characters from your global roster.
         </p>
         <div className="flex items-center gap-3">

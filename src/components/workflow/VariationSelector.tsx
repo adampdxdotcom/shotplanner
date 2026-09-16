@@ -20,8 +20,8 @@ export const VariationSelector: React.FC<VariationSelectorProps> = ({
   if (!variations || variations.length === 0) return null;
 
   return (
-    <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
-      <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-400 shrink-0">
+    <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-zinc-300 dark:scrollbar-thumb-zinc-700 scrollbar-track-transparent">
+      <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 dark:text-amber-400 shrink-0">
         <Sparkles className="w-3.5 h-3.5" />
         <span>{shotNumber !== undefined ? `Shot ${shotNumber} Variations` : "Prompt Variations"} ({variations.length}):</span>
       </div>
@@ -36,13 +36,13 @@ export const VariationSelector: React.FC<VariationSelectorProps> = ({
               key={v.id}
               className={`group flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-mono font-medium cursor-pointer transition-all ${
                 isActive
-                  ? "bg-amber-500/20 border-amber-500/60 text-amber-200 ring-1 ring-amber-500/30 shadow-xs"
-                  : "bg-zinc-900 border-zinc-700/80 text-zinc-400 hover:text-zinc-200 hover:border-zinc-600 hover:bg-zinc-800"
+                  ? "bg-amber-100 dark:bg-amber-500/20 border-amber-400 dark:border-amber-500/60 text-amber-900 dark:text-amber-200 ring-1 ring-amber-400/30 dark:ring-amber-500/30 shadow-xs"
+                  : "bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700/80 text-zinc-700 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:border-zinc-400 dark:hover:border-zinc-600 hover:bg-zinc-50 dark:hover:bg-zinc-800"
               }`}
               onClick={() => onSelectVariation(v)}
               title={`${shotNumber !== undefined ? `Shot ${shotNumber} - ` : ""}Variation ${v.variation_number}${v.provider ? ` (${v.provider})` : ""} - Click to inject into prompt editor`}
             >
-              {isActive && <Check className="w-3 h-3 text-amber-400 shrink-0" />}
+              {isActive && <Check className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />}
               <span>{label}</span>
               {v.provider && (
                 <span className="text-[10px] text-zinc-500 uppercase font-sans">
@@ -56,7 +56,7 @@ export const VariationSelector: React.FC<VariationSelectorProps> = ({
                     e.stopPropagation();
                     onDeleteVariation(v.id);
                   }}
-                  className="opacity-0 group-hover:opacity-100 hover:text-rose-400 p-0.5 transition-opacity"
+                  className="opacity-0 group-hover:opacity-100 hover:text-rose-600 dark:hover:text-rose-400 p-0.5 transition-opacity"
                   title="Delete variation"
                 >
                   <Trash2 className="w-2.5 h-2.5" />

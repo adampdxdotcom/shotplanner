@@ -182,7 +182,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
         activeShot={activeShot}
       />
 
-      <div className="bg-zinc-900/60 border-2 border-zinc-700 rounded-xl p-5 shadow-sm space-y-5">
+      <div className="bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-700 rounded-xl p-5 shadow-xs space-y-5">
         <WorkflowFileSelector 
           activeShotId={activeShotId}
           parsedWorkflow={parsedWorkflow}
@@ -200,16 +200,16 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
         />
 
         {!activeShotId ? (
-          <div className="flex flex-col items-center justify-center p-8 bg-zinc-950/50 border border-zinc-800 rounded-lg text-center space-y-2">
-            <Layers className="w-8 h-8 text-zinc-500" />
-            <h3 className="text-sm font-semibold text-zinc-300">Scene-Wide Workflow Active</h3>
-            <p className="text-xs text-zinc-400 max-w-md">
+          <div className="flex flex-col items-center justify-center p-8 bg-zinc-50 dark:bg-zinc-950/50 border border-zinc-200 dark:border-zinc-800 rounded-lg text-center space-y-2">
+            <Layers className="w-8 h-8 text-zinc-400 dark:text-zinc-500" />
+            <h3 className="text-sm font-semibold text-zinc-800 dark:text-zinc-300">Scene-Wide Workflow Active</h3>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-md">
               Workflows can be uploaded and inspected at any time. Select a shot above to map assets to node inputs and adjust per-shot generation parameters.
             </p>
           </div>
         ) : (
           parsedWorkflow && (
-            <div className="pt-2 border-t border-zinc-800/80 space-y-5">
+            <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/80 space-y-5">
               <GenerationParametersSection
                 generationParams={generationParams}
                 onUpdateParam={onUpdateParam}

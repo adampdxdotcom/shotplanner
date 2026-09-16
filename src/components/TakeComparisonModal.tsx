@@ -47,43 +47,43 @@ export function TakeComparisonModal({
   const isImageB = /\.(png|jpg|jpeg|webp|avif)$/i.test(takeB?.video_filename || urlB || "");
 
   return (
-    <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-[110] p-3 sm:p-6">
-      <div className="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-6xl flex flex-col max-h-[92vh] overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 bg-black/70 dark:bg-black/85 backdrop-blur-md flex items-center justify-center z-[110] p-3 sm:p-6">
+      <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl w-full max-w-6xl flex flex-col max-h-[92vh] overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
         
         {/* Modal Header */}
-        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-zinc-800 bg-zinc-900/60">
+        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/60">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-500/20 text-indigo-400 rounded-lg">
+            <div className="p-2 bg-indigo-50 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400 rounded-lg border border-indigo-200 dark:border-indigo-500/20">
               <ArrowRightLeft className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-mono font-bold bg-indigo-950 text-indigo-300 px-2 py-0.5 rounded uppercase">
+                <span className="text-xs font-mono font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 px-2 py-0.5 rounded uppercase">
                   Shot {paddedShot}
                 </span>
-                <h2 className="text-lg font-bold text-white">Compare Takes</h2>
+                <h2 className="text-lg font-bold text-zinc-900 dark:text-white">Compare Takes</h2>
               </div>
-              <p className="text-xs text-zinc-400">Side-by-side prompt and generation parameter diff</p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">Side-by-side prompt and generation parameter diff</p>
             </div>
           </div>
           
           <button 
             onClick={onClose} 
-            className="p-1.5 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition-colors"
+            className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-zinc-700 dark:hover:text-white transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Comparison Selector Bar */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-zinc-900/30 border-b border-zinc-800">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-zinc-50/50 dark:bg-zinc-900/30 border-b border-zinc-200 dark:border-zinc-800">
           {/* Select Take A */}
-          <div className="flex items-center gap-3 bg-zinc-900/80 p-2.5 rounded-xl border border-zinc-800">
-            <span className="text-xs font-bold uppercase tracking-wider text-indigo-400 shrink-0">Take A:</span>
+          <div className="flex items-center gap-3 bg-white dark:bg-zinc-900/80 p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-2xs">
+            <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 shrink-0">Take A:</span>
             <select
               value={takeAId}
               onChange={(e) => setTakeAId(e.target.value)}
-              className="flex-1 bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs font-semibold text-white focus:outline-none focus:border-indigo-500"
+              className="flex-1 bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-1.5 text-xs font-semibold text-zinc-900 dark:text-white focus:outline-none focus:border-indigo-500"
             >
               {takes.map(t => (
                 <option key={`a-${t.id}`} value={t.id}>
@@ -94,27 +94,27 @@ export function TakeComparisonModal({
             {takeA && !isHeroA && (
               <button
                 onClick={() => onSetHeroTake(takeA.id)}
-                className="px-2.5 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors shrink-0"
+                className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/20 dark:hover:bg-amber-500/30 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/30 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors shrink-0 cursor-pointer"
               >
                 <Star className="w-3.5 h-3.5" />
                 Set Hero
               </button>
             )}
             {isHeroA && (
-              <span className="text-xs font-bold text-amber-400 flex items-center gap-1 shrink-0 px-2">
-                <Star className="w-3.5 h-3.5 fill-amber-400" />
+              <span className="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1 shrink-0 px-2">
+                <Star className="w-3.5 h-3.5 fill-amber-500 dark:fill-amber-400" />
                 Hero
               </span>
             )}
           </div>
 
           {/* Select Take B */}
-          <div className="flex items-center gap-3 bg-zinc-900/80 p-2.5 rounded-xl border border-zinc-800">
-            <span className="text-xs font-bold uppercase tracking-wider text-emerald-400 shrink-0">Take B:</span>
+          <div className="flex items-center gap-3 bg-white dark:bg-zinc-900/80 p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-2xs">
+            <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 shrink-0">Take B:</span>
             <select
               value={takeBId}
               onChange={(e) => setTakeBId(e.target.value)}
-              className="flex-1 bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs font-semibold text-white focus:outline-none focus:border-emerald-500"
+              className="flex-1 bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-1.5 text-xs font-semibold text-zinc-900 dark:text-white focus:outline-none focus:border-emerald-500"
             >
               {takes.map(t => (
                 <option key={`b-${t.id}`} value={t.id}>
@@ -125,15 +125,15 @@ export function TakeComparisonModal({
             {takeB && !isHeroB && (
               <button
                 onClick={() => onSetHeroTake(takeB.id)}
-                className="px-2.5 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors shrink-0"
+                className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/20 dark:hover:bg-amber-500/30 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/30 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors shrink-0 cursor-pointer"
               >
                 <Star className="w-3.5 h-3.5" />
                 Set Hero
               </button>
             )}
             {isHeroB && (
-              <span className="text-xs font-bold text-amber-400 flex items-center gap-1 shrink-0 px-2">
-                <Star className="w-3.5 h-3.5 fill-amber-400" />
+              <span className="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1 shrink-0 px-2">
+                <Star className="w-3.5 h-3.5 fill-amber-500 dark:fill-amber-400" />
                 Hero
               </span>
             )}
@@ -145,11 +145,11 @@ export function TakeComparisonModal({
           {/* Side-by-Side Video Players */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs text-zinc-400 font-semibold px-1">
+              <div className="flex items-center justify-between text-xs text-zinc-600 dark:text-zinc-400 font-semibold px-1">
                 <span>Take {takeA?.take_number || 1} Output {isImageA ? "Image" : "Video"}</span>
                 <span className="font-mono text-zinc-500">{takeA?.video_filename || "output.mp4"}</span>
               </div>
-              <div className="bg-black border border-zinc-800 rounded-xl overflow-hidden aspect-video flex items-center justify-center relative">
+              <div className="bg-black border border-zinc-300 dark:border-zinc-800 rounded-xl overflow-hidden aspect-video flex items-center justify-center relative">
                 {urlA ? (
                   isImageA ? (
                     <img 
@@ -168,7 +168,7 @@ export function TakeComparisonModal({
                     />
                   )
                 ) : (
-                  <div className="text-zinc-600 text-xs flex flex-col items-center gap-1">
+                  <div className="text-zinc-500 dark:text-zinc-600 text-xs flex flex-col items-center gap-1">
                     <Film className="w-6 h-6" />
                     <span>No render output</span>
                   </div>
@@ -177,11 +177,11 @@ export function TakeComparisonModal({
             </div>
 
             <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs text-zinc-400 font-semibold px-1">
+              <div className="flex items-center justify-between text-xs text-zinc-600 dark:text-zinc-400 font-semibold px-1">
                 <span>Take {takeB?.take_number || 2} Output {isImageB ? "Image" : "Video"}</span>
                 <span className="font-mono text-zinc-500">{takeB?.video_filename || "output.mp4"}</span>
               </div>
-              <div className="bg-black border border-zinc-800 rounded-xl overflow-hidden aspect-video flex items-center justify-center relative">
+              <div className="bg-black border border-zinc-300 dark:border-zinc-800 rounded-xl overflow-hidden aspect-video flex items-center justify-center relative">
                 {urlB ? (
                   isImageB ? (
                     <img 
@@ -200,7 +200,7 @@ export function TakeComparisonModal({
                     />
                   )
                 ) : (
-                  <div className="text-zinc-600 text-xs flex flex-col items-center gap-1">
+                  <div className="text-zinc-500 dark:text-zinc-600 text-xs flex flex-col items-center gap-1">
                     <Film className="w-6 h-6" />
                     <span>No render output</span>
                   </div>
@@ -210,23 +210,23 @@ export function TakeComparisonModal({
           </div>
 
           {/* Parameter Diff Table */}
-          <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4 space-y-3">
-            <div className="flex items-center gap-2 text-xs font-bold text-zinc-300 uppercase tracking-wider">
-              <Sliders className="w-4 h-4 text-indigo-400" />
+          <div className="bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 space-y-3 shadow-2xs">
+            <div className="flex items-center gap-2 text-xs font-bold text-zinc-800 dark:text-zinc-300 uppercase tracking-wider">
+              <Sliders className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
               <span>Generation Parameters Comparison</span>
             </div>
 
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-zinc-800 text-zinc-400">
+                  <tr className="border-b border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400">
                     <th className="py-2 px-3 font-semibold">Parameter</th>
-                    <th className="py-2 px-3 font-semibold text-indigo-300">Take {takeA?.take_number}</th>
-                    <th className="py-2 px-3 font-semibold text-emerald-300">Take {takeB?.take_number}</th>
-                    <th className="py-2 px-3 font-semibold text-zinc-400">Difference Status</th>
+                    <th className="py-2 px-3 font-semibold text-indigo-700 dark:text-indigo-300">Take {takeA?.take_number}</th>
+                    <th className="py-2 px-3 font-semibold text-emerald-700 dark:text-emerald-300">Take {takeB?.take_number}</th>
+                    <th className="py-2 px-3 font-semibold text-zinc-500 dark:text-zinc-400">Difference Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-800/50 font-mono">
+                <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/50 font-mono">
                   {[
                     { label: "Sampling Steps", valA: takeA?.generation_params?.steps ?? takeA?.sampling_steps ?? 30, valB: takeB?.generation_params?.steps ?? takeB?.sampling_steps ?? 30 },
                     { label: "Resolution (Megapixels)", valA: takeA?.generation_params?.megapixels ?? 0.5, valB: takeB?.generation_params?.megapixels ?? 0.5 },
@@ -235,17 +235,17 @@ export function TakeComparisonModal({
                   ].map((row, idx) => {
                     const isDiff = String(row.valA) !== String(row.valB);
                     return (
-                      <tr key={idx} className={isDiff ? "bg-amber-500/5" : ""}>
-                        <td className="py-2 px-3 font-sans font-medium text-zinc-300">{row.label}</td>
-                        <td className="py-2 px-3 text-zinc-200">{String(row.valA)}</td>
-                        <td className="py-2 px-3 text-zinc-200">{String(row.valB)}</td>
+                      <tr key={idx} className={isDiff ? "bg-amber-500/10 dark:bg-amber-500/5" : ""}>
+                        <td className="py-2 px-3 font-sans font-medium text-zinc-800 dark:text-zinc-300">{row.label}</td>
+                        <td className="py-2 px-3 text-zinc-900 dark:text-zinc-200">{String(row.valA)}</td>
+                        <td className="py-2 px-3 text-zinc-900 dark:text-zinc-200">{String(row.valB)}</td>
                         <td className="py-2 px-3 font-sans">
                           {isDiff ? (
-                            <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded">
+                            <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/30 border rounded">
                               Modified
                             </span>
                           ) : (
-                            <span className="text-[10px] text-zinc-500">Identical</span>
+                            <span className="text-[10px] text-zinc-400 dark:text-zinc-500">Identical</span>
                           )}
                         </td>
                       </tr>
@@ -259,8 +259,8 @@ export function TakeComparisonModal({
           {/* Prompt Comparison */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             {/* Take A Prompt */}
-            <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4 space-y-2">
-              <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-indigo-300">
+            <div className="bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 space-y-2 shadow-2xs">
+              <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
                 <span className="flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5" />
                   Take {takeA?.take_number} Prompt Snapshot
@@ -269,26 +269,26 @@ export function TakeComparisonModal({
                   {takeA?.variation_id && (() => {
                     const varA = (shot.prompt_variations || []).find(v => v.id === takeA.variation_id);
                     return (
-                      <span className="text-[10px] font-mono font-medium text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                      <span className="text-[10px] font-mono font-medium text-amber-800 bg-amber-50 border-amber-200 dark:text-amber-300 dark:bg-amber-500/10 px-2 py-0.5 rounded border dark:border-amber-500/20">
                         {varA?.label || `Var ${varA?.variation_number}`}
                       </span>
                     );
                   })()}
                   {takeA?.basic_stub && (
-                    <span className="text-[10px] font-normal text-zinc-400 bg-zinc-950 px-2 py-0.5 rounded border border-zinc-800">
+                    <span className="text-[10px] font-normal text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-950 px-2 py-0.5 rounded border border-zinc-200 dark:border-zinc-800">
                       Stub: {takeA.basic_stub}
                     </span>
                   )}
                 </div>
               </div>
-              <div className="bg-zinc-950 p-3 rounded-lg border border-zinc-800 text-xs font-mono text-zinc-300 whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed">
+              <div className="bg-white dark:bg-zinc-950 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 text-xs font-mono text-zinc-800 dark:text-zinc-300 whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed shadow-2xs">
                 {takeA?.expanded_prompt || "No prompt snapshot recorded for this take."}
               </div>
             </div>
 
             {/* Take B Prompt */}
-            <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4 space-y-2">
-              <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-emerald-300">
+            <div className="bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 space-y-2 shadow-2xs">
+              <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
                 <span className="flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5" />
                   Take {takeB?.take_number} Prompt Snapshot
@@ -297,19 +297,19 @@ export function TakeComparisonModal({
                   {takeB?.variation_id && (() => {
                     const varB = (shot.prompt_variations || []).find(v => v.id === takeB.variation_id);
                     return (
-                      <span className="text-[10px] font-mono font-medium text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                      <span className="text-[10px] font-mono font-medium text-amber-800 bg-amber-50 border-amber-200 dark:text-amber-300 dark:bg-amber-500/10 px-2 py-0.5 rounded border dark:border-amber-500/20">
                         {varB?.label || `Var ${varB?.variation_number}`}
                       </span>
                     );
                   })()}
                   {takeB?.basic_stub && (
-                    <span className="text-[10px] font-normal text-zinc-400 bg-zinc-950 px-2 py-0.5 rounded border border-zinc-800">
+                    <span className="text-[10px] font-normal text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-950 px-2 py-0.5 rounded border border-zinc-200 dark:border-zinc-800">
                       Stub: {takeB.basic_stub}
                     </span>
                   )}
                 </div>
               </div>
-              <div className="bg-zinc-950 p-3 rounded-lg border border-zinc-800 text-xs font-mono text-zinc-300 whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed">
+              <div className="bg-white dark:bg-zinc-950 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 text-xs font-mono text-zinc-800 dark:text-zinc-300 whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed shadow-2xs">
                 {takeB?.expanded_prompt || "No prompt snapshot recorded for this take."}
               </div>
             </div>
@@ -317,13 +317,13 @@ export function TakeComparisonModal({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-zinc-800 bg-zinc-900/60 flex items-center justify-between">
+        <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/60 flex items-center justify-between">
           <p className="text-xs text-zinc-500">
-            Click <strong className="text-amber-400">Set Hero</strong> on any take to designate it for staging and final exports.
+            Click <strong className="text-amber-600 dark:text-amber-400">Set Hero</strong> on any take to designate it for staging and final exports.
           </p>
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-xs font-semibold transition-colors"
+            className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer"
           >
             Close Comparison
           </button>
