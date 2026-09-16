@@ -320,19 +320,23 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
       if (res.ok && data.expanded_prompt) {
         setPresentedFallbackNotice(null);
         
-        // Build new PromptVariation record
-        const newVariation: PromptVariation = {
-          id: "var_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
-          variation_number: ((targetShot?.prompt_variations || []).length) + 1,
-          created_at: new Date().toISOString(),
-          basic_stub: stubToUse,
-          expanded_prompt: data.expanded_prompt,
-          provider: data.provider || providerChoice,
-          label: `Variation ${((targetShot?.prompt_variations || []).length) + 1}`
-        };
-
+        let createdVariationNumber = 1;
         const updatedShotUpdater = (prev: import("../types").ShotItem): import("../types").ShotItem => {
           const currentVariations = prev.prompt_variations || [];
+          const nextVarNum = currentVariations.length + 1;
+          createdVariationNumber = nextVarNum;
+
+          // Build new PromptVariation record strictly scoped to this shot's history
+          const newVariation: PromptVariation = {
+            id: "var_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
+            variation_number: nextVarNum,
+            created_at: new Date().toISOString(),
+            basic_stub: stubToUse,
+            expanded_prompt: data.expanded_prompt,
+            provider: data.provider || providerChoice,
+            label: `Variation ${nextVarNum}`
+          };
+
           return {
             ...prev,
             expanded_prompt: data.expanded_prompt,
@@ -357,7 +361,7 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
         
         if (data.provider) setProviderUsed(data.provider);
         if (data.debug) setLastDebugInfo(data.debug);
-        onShowToast?.(`Prompt Variation ${newVariation.variation_number} generated successfully!`, "success");
+        onShowToast?.(`Shot ${targetShot?.shot_number || 1}: Prompt Variation ${createdVariationNumber} generated successfully!`, "success");
       } else {
         const errorMsg = data.error || `Failed to generate prompt with ${providerChoice === "gemini" ? "Google Gemini" : "LM Studio"}`;
         setError(errorMsg);
@@ -462,6 +466,7 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
           <VariationSelector
             variations={activeShot.prompt_variations}
             activeVariationId={activeShot.active_variation_id}
+            shotNumber={activeShot.shot_number}
             onSelectVariation={(variation) => {
               if (onUpdateSpecificShot && activeShotId) {
                 onUpdateSpecificShot(activeShotId, prev => ({
