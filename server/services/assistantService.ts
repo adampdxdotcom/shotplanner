@@ -98,12 +98,24 @@ function buildProjectDossier(
   }
 
   // 4. Scene Characters & Wardrobes
-  const sceneChars = sceneProject?.characters || (sceneProject as any)?.scene_characters || [];
-  if (Array.isArray(sceneChars) && sceneChars.length > 0) {
-    const charSummary = sceneChars.map((c: any) => {
+  const sceneCharsRaw = sceneProject?.characters || (sceneProject as any)?.scene_characters;
+  let charList: any[] = [];
+  if (Array.isArray(sceneCharsRaw)) {
+    charList = sceneCharsRaw;
+  } else if (sceneCharsRaw && typeof sceneCharsRaw === "object") {
+    charList = Object.keys(sceneCharsRaw).map(k => ({
+      name: k,
+      ...sceneCharsRaw[k]
+    }));
+  }
+
+  if (charList.length > 0) {
+    const charSummary = charList.map((c: any) => {
       const name = c.name || c.character_name || "Unknown";
-      const notes = c.wardrobe_notes || c.notes || c.visual_traits || "Standard scene attire";
-      return `- ${name}: ${notes}`;
+      const outfit = c.scene_outfit_ref ? `Outfit: ${c.scene_outfit_ref}` : null;
+      const notes = c.notes || c.wardrobe_notes || c.visual_traits || null;
+      const details = [outfit, notes ? `Notes: ${notes}` : null].filter(Boolean).join(" | ");
+      return `- ${name}: ${details || "Standard scene attire"}`;
     }).join("\n");
     sections.push(`### SCENE CAST & WARDROBE:\n${charSummary}`);
   }
@@ -190,7 +202,125 @@ BEHAVIOR GUIDELINES:
 - When referencing characters, shots, or camera settings, ground your answers in the Project Dossier above.
 - If asked for shot recommendations, provide specific cinematography parameters: Shot Type / Framing, Camera Movement, Lens Focal Length, and a brief description of the action.
 - Use clean formatting (bullet points, bold labels) for readability.
-- If the user asks something outside the known project data, politely acknowledge what is known and offer creative suggestions that match the established tone.`;
+- If the user asks something outside the known project data, politely acknowledge what is known and offer creative suggestions that match the established tone.
+
+PROPOSING ACTIONS & MUTATIONS:
+When you recommend changing scene planning, character profiles/wardrobe, existing shots, adding new shots, or when the user asks you to modify the project, you MUST append a structured action JSON block using triple backticks (\`\`\`action ... \`\`\`) at the very end of your response so the user can review and apply each change with one click (or apply all at once).
+
+Single or Multi-Action Array:
+You can output either a single JSON action object OR a JSON array of multiple coordinated actions (e.g. creating/updating a character and updating Shot #4 to include them).
+
+Action formats:
+
+1. Update Scene Planning:
+\`\`\`action
+{
+  "type": "update_scene_planning",
+  "title": "Establish Neo-Noir Rain Atmosphere",
+  "changes": {
+    "visual_theme": "Cyberpunk Neo-Noir, High Contrast Chiaroscuro",
+    "environment_description": "Rain-slicked alleyway in Sector 4 with flickering holographic ads",
+    "lighting_style": "Deep cyan ambient with warm neon amber highlights",
+    "camera_gear": "ARRI Alexa Mini LF with Cooke Anamorphic /i Full Frame Plus",
+    "audio_style": "Low industrial synth drone and persistent rhythmic rainfall",
+    "custom_instructions": "Focus on reflections in puddles and subtle lens flares"
+  }
+}
+\`\`\`
+
+2. Update Character Profile & Wardrobe:
+\`\`\`action
+{
+  "type": "update_character",
+  "character_name": "Elena",
+  "title": "Equip tactical cyberdeck and weatherworn trenchcoat",
+  "changes": {
+    "scene_outfit_ref": "Distressed graphite trenchcoat with glowing cyan collar embroidery and combat boots",
+    "notes": "Hardened freelance netrunner with visible titanium neural port at right temple"
+  }
+}
+\`\`\`
+
+3. Update Shot:
+\`\`\`action
+{
+  "type": "update_shot",
+  "shot_number": 1,
+  "title": "Switch to intimate portrait lens with slow push-in",
+  "changes": {
+    "shot_type": "Close-Up (CU)",
+    "lens_focal_length": "85mm Portrait Telephoto",
+    "camera_movement": "Slow Push In",
+    "lighting_setup": "Moody side rim light with deep shadows",
+    "basic_stub": "Elena gazes through the rain-streaked window as neon reflects across her titanium neural port."
+  }
+}
+\`\`\`
+
+4. Add Shot:
+\`\`\`action
+{
+  "type": "add_shot",
+  "title": "Establish the environment with wide anamorphic sweep",
+  "shot": {
+    "shot_name": "Wide establishing angle",
+    "shot_type": "Extreme Wide Shot (EWS)",
+    "lens_focal_length": "24mm Wide-Angle",
+    "camera_movement": "Pan Left",
+    "aspect_ratio": "16:9 Widescreen",
+    "basic_stub": "Wide shot across the neon rain-soaked alley as steam rises from subway vents."
+  }
+}
+\`\`\`
+
+5. Remote ComfyUI Staging:
+\`\`\`action
+{
+  "type": "stage_shot_assets",
+  "shot_number": 3,
+  "title": "Stage Shot #3 assets to remote ComfyUI host",
+  "destination_path": "/workspace/ComfyUI/input/scene_01"
+}
+\`\`\`
+
+6. Prompt Expansion Dispatcher:
+\`\`\`action
+{
+  "type": "expand_shot_prompt",
+  "shot_number": 2,
+  "title": "Dispatch LLM prompt expansion for Shot #2",
+  "guidance": "Synthesize anamorphic bokeh, rim lighting, and atmospheric rain droplets"
+}
+\`\`\`
+
+7. Multi-Action Coordinated Batch (Array format):
+\`\`\`action
+[
+  {
+    "type": "update_character",
+    "character_name": "Marcus",
+    "title": "Update tactical field operative attire",
+    "changes": {
+      "scene_outfit_ref": "Matte black tactical flak jacket with radio harness"
+    }
+  },
+  {
+    "type": "update_shot",
+    "shot_number": 2,
+    "title": "Frame Marcus stepping into the alley",
+    "changes": {
+      "basic_stub": "Marcus steps into the dim alleyway, radio harness catching the flickers of amber neon.",
+      "shot_type": "Medium Shot (MS)"
+    }
+  },
+  {
+    "type": "stage_shot_assets",
+    "shot_number": 2,
+    "title": "Stage Shot #2 assets to remote ComfyUI"
+  }
+]
+\`\`\`
+Only include fields that are changing or relevant. Always keep your conversational explanation before the code block.`;
 
   let reply = "";
   let modelUsed = model || "local-model";
@@ -212,10 +342,15 @@ BEHAVIOR GUIDELINES:
     // Format messages for OpenAI-compatible Local LLM endpoint
     const llmMessages = [
       { role: "system" as const, content: systemPrompt },
-      ...messages.map(m => ({
-        role: (m.role === "assistant" ? "assistant" : "user") as "assistant" | "user",
-        content: m.content
-      }))
+      ...messages.map(m => {
+        let role: "assistant" | "user" | "system" = "user";
+        if (m.role === "assistant") role = "assistant";
+        else if (m.role === "system") role = "system";
+        return {
+          role,
+          content: m.content
+        };
+      })
     ];
 
     const localRes = await callLocalLLM({

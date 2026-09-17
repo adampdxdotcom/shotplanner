@@ -1,7 +1,7 @@
 import { SceneProjectFile } from "../types";
 
 export interface AssistantChatMessage {
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "system";
   content: string;
 }
 

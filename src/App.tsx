@@ -312,6 +312,8 @@ export default function App() {
         sceneProject={sceneProject}
         activeShotId={activeShotId}
         activeSection={activeSection}
+        config={config}
+        assets={assets}
         lmStudioUrl={config.lm_studio_url}
         llmProvider={llmProvider}
         defaultLlmProvider={defaultLlmProvider}
@@ -320,6 +322,13 @@ export default function App() {
           setActiveConfigTab(tab);
           scrollToSection("config");
         }}
+        onUpdateProject={(updater) => {
+          setSceneProject(updater);
+          setIsDirty(true);
+        }}
+        onShowToast={addToast}
+        onStageShot={handleSceneTransfer}
+        onExpandPrompt={handleSceneExpandPrompt}
       />
 
       <AppModals 

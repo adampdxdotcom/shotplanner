@@ -61,6 +61,16 @@ export interface UniverseCharacterProfile extends CharacterProfile {
   default_outfit_ref?: string;
 }
 
+export interface ScenePlanningDetails {
+  visual_theme?: string;
+  environment_description?: string;
+  lighting_style?: string;
+  camera_gear?: string;
+  audio_style?: string;
+  custom_instructions?: string;
+  [key: string]: any;
+}
+
 export interface SceneProjectFile {
   schema_version: "1.0";
   scene_id: string;
@@ -76,6 +86,7 @@ export interface SceneProjectFile {
   assets?: MediaAsset[];
   subjects?: string[];
   characters?: Record<string, CharacterProfile>;
+  scene_planning?: ScenePlanningDetails;
   lm_studio_url?: string;
   local_llm_url?: string;
   vision_enabled?: boolean;
