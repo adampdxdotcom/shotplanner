@@ -660,13 +660,6 @@ export const AssistantFloatingChat: React.FC<AssistantFloatingChatProps> = ({
     });
   };
 
-  const starterSuggestions = [
-    "Recommend a cinematic 3-shot sequence for Elena discovering the encrypted terminal.",
-    "Tweak Scene Planning lighting to high-contrast neon rain reflections.",
-    "Stage Shot #1 assets to remote ComfyUI host.",
-    "Expand prompt for Shot #1 with rich anamorphic flare and texture."
-  ];
-
   const existingShotNumbers = (sceneProject.shots || []).map(s => s.shot_number);
 
   return (
@@ -697,35 +690,35 @@ export const AssistantFloatingChat: React.FC<AssistantFloatingChatProps> = ({
           }`}
         >
           {/* Header */}
-          <div className="px-4 py-3 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 shrink-0 select-none">
+          <div className="px-4 py-3 bg-white dark:bg-zinc-900 text-slate-900 dark:text-white flex items-center justify-between border-b border-slate-200 dark:border-zinc-800 shrink-0 select-none">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-indigo-600/90 flex items-center justify-center text-white shadow-inner">
+              <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white shadow-xs shrink-0">
                 <Bot className="w-4 h-4" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <h3 className="font-bold text-sm tracking-tight">AI Production Assistant</h3>
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-mono uppercase bg-indigo-950 text-indigo-300 border border-indigo-800/60 font-semibold">
+                  <h3 className="font-semibold text-sm tracking-tight text-slate-900 dark:text-zinc-100">AI Production Assistant</h3>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-mono uppercase bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950 dark:text-indigo-300 dark:border-indigo-800/60 font-semibold">
                     {effectiveDefault === "gemini" ? "Gemini" : "LM Studio"}
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-400 truncate max-w-[200px] sm:max-w-[240px]">
-                  Context: <strong className="text-slate-200 font-medium">{sceneProject.scene_name || "Untitled Scene"}</strong>
+                <p className="text-[11px] text-slate-500 dark:text-zinc-400 truncate max-w-[200px] sm:max-w-[260px]">
+                  Context: <strong className="text-slate-800 dark:text-zinc-200 font-medium">{sceneProject.scene_name || "Untitled Scene"}</strong>
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 shrink-0">
               <button
                 onClick={() => setIsExpanded(!isExpanded)}
-                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+                className="p-1.5 text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-zinc-100 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                 title={isExpanded ? "Collapse" : "Expand"}
               >
                 {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
               </button>
               <button
                 onClick={() => setIsOpen(false)}
-                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+                className="p-1.5 text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-zinc-100 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                 title="Close Assistant"
               >
                 <X className="w-4 h-4" />
@@ -735,9 +728,9 @@ export const AssistantFloatingChat: React.FC<AssistantFloatingChatProps> = ({
 
           {/* Connection Status Banner (if offline/failed) */}
           {isDefaultLlmConnected === false && (
-            <div className="bg-amber-500/15 border-b border-amber-500/30 px-3.5 py-2 flex items-center justify-between gap-2 text-xs text-amber-800 dark:text-amber-200 shrink-0">
+            <div className="bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-800/60 px-3.5 py-2 flex items-center justify-between gap-2 text-xs text-amber-900 dark:text-amber-200 shrink-0">
               <div className="flex items-center gap-1.5 truncate">
-                <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
+                <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
                 <span className="truncate">
                   LLM provider ({effectiveDefault}) seems offline or unreachable.
                 </span>
@@ -746,14 +739,14 @@ export const AssistantFloatingChat: React.FC<AssistantFloatingChatProps> = ({
                 <button
                   onClick={checkConnection}
                   disabled={isCheckingConnection}
-                  className="px-2 py-0.5 rounded bg-amber-200/80 hover:bg-amber-300 dark:bg-amber-900 dark:hover:bg-amber-800 text-[11px] font-medium transition-colors cursor-pointer disabled:opacity-50"
+                  className="px-2 py-1 rounded bg-amber-100 hover:bg-amber-200 dark:bg-amber-900 dark:hover:bg-amber-800 text-amber-800 dark:text-amber-200 text-[11px] font-medium transition-colors cursor-pointer disabled:opacity-50"
                   title="Retry connection"
                 >
                   <RefreshCw className={`w-3 h-3 ${isCheckingConnection ? "animate-spin" : ""}`} />
                 </button>
                 <button
                   onClick={handleGoToLlmSettings}
-                  className="px-2 py-0.5 rounded bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-medium transition-colors cursor-pointer"
+                  className="px-2.5 py-1 rounded bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-medium transition-colors cursor-pointer"
                 >
                   Settings
                 </button>
@@ -883,30 +876,6 @@ export const AssistantFloatingChat: React.FC<AssistantFloatingChatProps> = ({
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Quick Starter Suggestions */}
-          {messages.length <= 2 && (
-            <div className="p-2.5 bg-slate-100/80 dark:bg-zinc-900 border-t border-slate-200/80 dark:border-zinc-800">
-              <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block mb-1.5 px-1">
-                Suggested Directives
-              </span>
-              <div className="flex flex-col gap-1">
-                {starterSuggestions.map((suggestion, sIdx) => (
-                  <button
-                    key={sIdx}
-                    onClick={() => {
-                      setInputQuery(suggestion);
-                      inputRef.current?.focus();
-                    }}
-                    className="text-left text-xs px-2.5 py-1.5 rounded-lg bg-white dark:bg-zinc-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-slate-700 dark:text-zinc-300 border border-slate-200/70 dark:border-zinc-700/70 transition-colors truncate cursor-pointer flex items-center justify-between group"
-                  >
-                    <span className="truncate">{suggestion}</span>
-                    <ArrowRight className="w-3 h-3 text-slate-400 group-hover:text-indigo-600 shrink-0 ml-1" />
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* Input Area */}
           <div className="p-3 bg-white dark:bg-zinc-900 border-t border-slate-200/90 dark:border-zinc-800 shrink-0">
             <div className="relative flex items-end bg-slate-100 dark:bg-zinc-800 rounded-xl p-1.5 focus-within:ring-2 focus-within:ring-indigo-500/80 border border-slate-200 dark:border-zinc-700">
@@ -917,7 +886,7 @@ export const AssistantFloatingChat: React.FC<AssistantFloatingChatProps> = ({
                 onKeyDown={handleKeyDown}
                 placeholder="Ask assistant to update scene, stage assets, or expand prompts..."
                 rows={1}
-                className="w-full resize-none bg-transparent px-2.5 py-1.5 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none max-h-28"
+                className="w-full resize-none bg-transparent px-2.5 py-1.5 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:outline-none max-h-28"
                 style={{ height: "auto" }}
               />
               <button
@@ -930,11 +899,11 @@ export const AssistantFloatingChat: React.FC<AssistantFloatingChatProps> = ({
               </button>
             </div>
 
-            <div className="flex items-center justify-between mt-2 px-1 text-[11px] text-slate-400">
+            <div className="flex items-center justify-between mt-2 px-1 text-[11px] text-slate-400 dark:text-zinc-500">
               <span>Shift + Enter for new line</span>
               <button
                 onClick={handleResetChat}
-                className="hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                className="hover:text-slate-600 dark:hover:text-zinc-300 transition-colors cursor-pointer"
               >
                 Clear History
               </button>
