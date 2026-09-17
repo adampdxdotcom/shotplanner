@@ -40,11 +40,11 @@ export const AssetMatrixPanel: React.FC<AssetMatrixPanelProps> = ({
   });
 
   return (
-    <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-5 flex flex-col gap-4 overflow-y-auto h-full shadow-sm">
+    <div className="bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 flex flex-col gap-4 overflow-y-auto h-full shadow-xs">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-base font-semibold text-white">Asset Matrix</h2>
-          <p className="text-xs text-zinc-400">Assigned character & scene references</p>
+          <h2 className="text-base font-semibold text-zinc-900 dark:text-white">Asset Matrix</h2>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">Assigned character & scene references</p>
         </div>
         <span className="text-xs text-zinc-500 font-mono">
           {slotsToDisplay.length} Assigned
@@ -60,16 +60,16 @@ export const AssetMatrixPanel: React.FC<AssetMatrixPanelProps> = ({
             return (
               <div 
                 key={i} 
-                className={`relative aspect-square rounded-lg border flex flex-col items-center justify-center overflow-hidden ${
+                className={`relative aspect-square rounded-lg border flex flex-col items-center justify-center overflow-hidden shadow-2xs ${
                   isLocation 
-                    ? "border-amber-500/50 bg-amber-950/15" 
-                    : "border-zinc-800 bg-zinc-950/50"
+                    ? "border-amber-400 dark:border-amber-500/50 bg-amber-50 dark:bg-amber-950/15" 
+                    : "border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/50"
                 }`}
               >
                 {asset?.preview_url ? (
                   <>
                     <img src={asset.preview_url} className="absolute inset-0 w-full h-full object-cover" alt="" />
-                    <div className="absolute top-1 left-1 bg-black/70 backdrop-blur-xs text-zinc-300 text-[10px] font-mono px-1.5 py-0.5 rounded border border-white/10 z-10">
+                    <div className="absolute top-1 left-1 bg-black/70 backdrop-blur-xs text-zinc-200 text-[10px] font-mono px-1.5 py-0.5 rounded border border-white/10 z-10">
                       Slot {i + 1}
                     </div>
                     <button 
@@ -87,7 +87,7 @@ export const AssetMatrixPanel: React.FC<AssetMatrixPanelProps> = ({
                   </>
                 ) : (
                   <div className="flex flex-col items-center justify-center text-center p-2">
-                    <span className="text-zinc-500 text-xs font-mono">
+                    <span className="text-zinc-400 dark:text-zinc-500 text-xs font-mono">
                       Slot {i + 1}
                     </span>
                   </div>
@@ -102,9 +102,9 @@ export const AssetMatrixPanel: React.FC<AssetMatrixPanelProps> = ({
           })}
         </div>
       ) : (
-        <div className="flex-1 flex flex-col items-center justify-center p-6 border border-dashed border-zinc-800 rounded-lg text-center">
-          <p className="text-xs text-zinc-500 font-medium">No reference assets assigned to this shot</p>
-          <p className="text-[11px] text-zinc-600 mt-1">Assign characters or location references in the Assets or Staging tabs</p>
+        <div className="flex-1 flex flex-col items-center justify-center p-6 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-lg text-center">
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">No reference assets assigned to this shot</p>
+          <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-1">Assign characters or location references in the Assets or Staging tabs</p>
         </div>
       )}
     </div>

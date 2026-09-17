@@ -61,8 +61,8 @@ export function useShotOperations({
   const [scenePlanning, setScenePlanning] = useState<ScenePlanning>({
     scene_name: "",
     shot_number: "01",
-    shot_type: "Medium Shot (MS)",
-    camera_movement: "Locked Off (Static)",
+    shot_type: "Medium Shot",
+    camera_movement: "Locked Off",
     lens_focal_length: "50mm Standard Prime",
     aspect_ratio: "16:9 Widescreen"
   });
@@ -179,9 +179,38 @@ export function useShotOperations({
         }
         setBasicStub(shot.basic_stub || "");
         setExpandedPrompt(shot.expanded_prompt || "");
+
+        // Synchronize planning state with active shot's camera parameters
+        setScenePlanning(prev => {
+          const nextPlanning: ScenePlanning = {
+            scene_name: shot.shot_name || sceneProject.scene_name || prev.scene_name || "",
+            shot_number: shot.shot_number !== undefined ? String(shot.shot_number) : prev.shot_number,
+            shot_type: shot.shot_type || prev.shot_type,
+            camera_movement: shot.camera_movement || prev.camera_movement,
+            lens_focal_length: shot.lens_focal_length || prev.lens_focal_length,
+            aspect_ratio: shot.aspect_ratio || prev.aspect_ratio,
+            ots_anchor_subject: shot.ots_anchor_subject,
+            ots_focus_subject: shot.ots_focus_subject,
+            ots_side: shot.ots_side
+          };
+          if (
+            prev.scene_name !== nextPlanning.scene_name ||
+            prev.shot_number !== nextPlanning.shot_number ||
+            prev.shot_type !== nextPlanning.shot_type ||
+            prev.camera_movement !== nextPlanning.camera_movement ||
+            prev.lens_focal_length !== nextPlanning.lens_focal_length ||
+            prev.aspect_ratio !== nextPlanning.aspect_ratio ||
+            prev.ots_anchor_subject !== nextPlanning.ots_anchor_subject ||
+            prev.ots_focus_subject !== nextPlanning.ots_focus_subject ||
+            prev.ots_side !== nextPlanning.ots_side
+          ) {
+            return nextPlanning;
+          }
+          return prev;
+        });
       }
     }
-  }, [activeShotId, sceneProject.shots, setSelectedWorkflowFile, setSelectedPromptNodeId, setNodeMappings, setGenerationParams, setParameterNodeMappings]);
+  }, [activeShotId, sceneProject.shots, sceneProject.scene_name, setSelectedWorkflowFile, setSelectedPromptNodeId, setNodeMappings, setGenerationParams, setParameterNodeMappings]);
 
   const handleOutputPulled = useCallback((filename: string, details?: PulledOutputDetails) => {
     let affectedShotNumber: number | null = null;

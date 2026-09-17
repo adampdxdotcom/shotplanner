@@ -2,6 +2,14 @@ import React, { useState, useMemo } from "react";
 import { ScenePlanning, formatShotNumber, generateSaveVideoPrefix, sanitizeFilenamePart, generatePromptPrefix, assembleFinalPrompt } from "../types";
 import { copyToClipboard } from "../utils/clipboard";
 import { 
+  CAMERA_MOVEMENTS, 
+  SHOT_TYPES, 
+  LENS_PRESETS, 
+  normalizeCameraMovement, 
+  normalizeShotType, 
+  normalizeLensPreset 
+} from "../utils/cameraPresets";
+import { 
   Clapperboard, 
   Camera, 
   Film, 
@@ -9,52 +17,15 @@ import {
   Hash, 
   Copy, 
   Check, 
-  Sparkles,
-  Layers,
-  Video,
-  Aperture,
-  RectangleHorizontal
+  Sparkles, 
+  Layers, 
+  Video, 
+  Aperture, 
+  RectangleHorizontal 
 } from "lucide-react";
 
 export { formatShotNumber, generateSaveVideoPrefix, sanitizeFilenamePart, generatePromptPrefix, assembleFinalPrompt };
-
-export const SHOT_TYPES = [
-  { label: "Extreme Wide Shot (EWS)", value: "Extreme Wide Shot" },
-  { label: "Wide Shot (WS)", value: "Wide Shot" },
-  { label: "Medium Wide Shot (MWS)", value: "Medium Wide Shot" },
-  { label: "Medium Shot (MS)", value: "Medium Shot" },
-  { label: "Medium Close-Up (MCU)", value: "Medium Close-Up" },
-  { label: "Close-Up (CU)", value: "Close-Up" },
-  { label: "Extreme Close-Up (ECU)", value: "Extreme Close-Up" },
-  { label: "Over-the-shoulder (OTS)", value: "Over-the-shoulder (OTS)" },
-  { label: "Low Angle", value: "Low Angle" },
-  { label: "High Angle", value: "High Angle" },
-  { label: "Bird's Eye View", value: "Bird's Eye View" }
-];
-
-export const CAMERA_MOVEMENTS = [
-  { label: "Locked Off (Static)", value: "Locked Off" },
-  { label: "Slow Push In (Dolly In)", value: "Slow Push In" },
-  { label: "Pull Out (Dolly Out)", value: "Pull Out" },
-  { label: "Pan Left", value: "Pan Left" },
-  { label: "Pan Right", value: "Pan Right" },
-  { label: "Tilt Up", value: "Tilt Up" },
-  { label: "Tilt Down", value: "Tilt Down" },
-  { label: "Tracking Shot", value: "Tracking Shot" },
-  { label: "Handheld Drift", value: "Handheld Drift" },
-  { label: "Orbit Shot", value: "Orbit Shot" },
-  { label: "Zoom In", value: "Zoom In" },
-  { label: "Zoom Out", value: "Zoom Out" }
-];
-
-export const LENS_PRESETS = [
-  { label: "24mm Wide-Angle", value: "24mm Wide-Angle" },
-  { label: "35mm Natural", value: "35mm Natural" },
-  { label: "50mm Standard Prime", value: "50mm Standard Prime" },
-  { label: "85mm Portrait Telephoto", value: "85mm Portrait Telephoto" },
-  { label: "135mm Cinematic Compression", value: "135mm Cinematic Compression" },
-  { label: "Macro / Close-Up", value: "Macro / Close-Up" }
-];
+export { CAMERA_MOVEMENTS, SHOT_TYPES, LENS_PRESETS };
 
 export const ASPECT_RATIO_PRESETS = [
   { label: "16:9 Widescreen", value: "16:9 Widescreen" },
@@ -92,6 +63,10 @@ export const ScenePlanningHeader: React.FC<ScenePlanningHeaderProps> = ({
     if (prefixMatch) return prefixMatch.value;
     return current;
   }, [planning.aspect_ratio]);
+
+  const normalizedShotType = useMemo(() => normalizeShotType(planning.shot_type), [planning.shot_type]);
+  const normalizedCameraMovement = useMemo(() => normalizeCameraMovement(planning.camera_movement), [planning.camera_movement]);
+  const normalizedLens = useMemo(() => normalizeLensPreset(planning.lens_focal_length), [planning.lens_focal_length]);
 
   const handleSceneNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onChangePlanning({ ...planning, scene_name: e.target.value });
@@ -201,7 +176,7 @@ export const ScenePlanningHeader: React.FC<ScenePlanningHeaderProps> = ({
             <span>Shot Type</span>
           </label>
           <select
-            value={planning.shot_type === "Over-the-Shoulder" ? "Over-the-shoulder (OTS)" : planning.shot_type || "Medium Shot"}
+            value={normalizedShotType}
             onChange={handleShotTypeChange}
             className="w-full bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-700 focus:border-indigo-500 focus:outline-hidden text-zinc-900 dark:text-zinc-100 text-xs px-3 py-2 rounded-lg transition-colors cursor-pointer shadow-xs"
           >
@@ -210,6 +185,9 @@ export const ScenePlanningHeader: React.FC<ScenePlanningHeaderProps> = ({
                 {st.label}
               </option>
             ))}
+            {!SHOT_TYPES.some((st) => st.value === normalizedShotType) && (
+              <option value={normalizedShotType}>{normalizedShotType}</option>
+            )}
           </select>
         </div>
 
@@ -220,7 +198,7 @@ export const ScenePlanningHeader: React.FC<ScenePlanningHeaderProps> = ({
             <span>Camera Movement</span>
           </label>
           <select
-            value={planning.camera_movement || "Locked Off"}
+            value={normalizedCameraMovement}
             onChange={handleCameraMovementChange}
             className="w-full bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-700 focus:border-indigo-500 focus:outline-hidden text-zinc-900 dark:text-zinc-100 text-xs px-3 py-2 rounded-lg transition-colors cursor-pointer shadow-xs"
           >
@@ -229,6 +207,9 @@ export const ScenePlanningHeader: React.FC<ScenePlanningHeaderProps> = ({
                 {cm.label}
               </option>
             ))}
+            {!CAMERA_MOVEMENTS.some((cm) => cm.value === normalizedCameraMovement) && (
+              <option value={normalizedCameraMovement}>{normalizedCameraMovement}</option>
+            )}
           </select>
         </div>
 
@@ -239,7 +220,7 @@ export const ScenePlanningHeader: React.FC<ScenePlanningHeaderProps> = ({
             <span>Lens / Focal Length</span>
           </label>
           <select
-            value={planning.lens_focal_length || "50mm Standard Prime"}
+            value={normalizedLens}
             onChange={handleLensChange}
             className="w-full bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-700 focus:border-indigo-500 focus:outline-hidden text-zinc-900 dark:text-zinc-100 text-xs px-3 py-2 rounded-lg transition-colors cursor-pointer shadow-xs"
           >
@@ -248,6 +229,9 @@ export const ScenePlanningHeader: React.FC<ScenePlanningHeaderProps> = ({
                 {lp.label}
               </option>
             ))}
+            {!LENS_PRESETS.some((lp) => lp.value === normalizedLens) && (
+              <option value={normalizedLens}>{normalizedLens}</option>
+            )}
           </select>
         </div>
 

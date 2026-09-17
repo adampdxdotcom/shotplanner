@@ -113,7 +113,7 @@ export const ShotCarousel: React.FC<ShotCarouselProps> = ({
                   ? "border-amber-400 ring-4 ring-amber-400/40 shadow-lg shadow-amber-500/20"
                   : activeShotId === shot.id 
                   ? "border-indigo-500 ring-4 ring-indigo-500/20" 
-                  : "border-zinc-700 hover:border-zinc-500"
+                  : "border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500"
               }`}
             >
               {thumbnailUrl ? (
@@ -134,14 +134,14 @@ export const ShotCarousel: React.FC<ShotCarouselProps> = ({
                   />
                 )
               ) : (
-                <div className="absolute inset-0 bg-zinc-800 flex items-center justify-center">
-                  <span className="text-zinc-400 dark:text-zinc-600 text-sm font-medium">No Location</span>
+                <div className="absolute inset-0 bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
+                  <span className="text-zinc-400 dark:text-zinc-500 text-sm font-medium">No Location</span>
                 </div>
               )}
               
               <div className="absolute top-2 left-2 flex flex-col items-start gap-1 z-10 max-w-[calc(100%-4rem)]">
                 <span 
-                  className="shot-name-badge px-2 py-0.5 bg-black/80 backdrop-blur text-white text-xs font-semibold rounded shadow truncate max-w-full"
+                  className="shot-name-badge px-2 py-0.5 bg-black/75 dark:bg-black/80 backdrop-blur text-white text-xs font-semibold rounded shadow-xs truncate max-w-full"
                   title={`Shot ${shotNumberDisplay} - ${currentSceneName}`}
                 >
                   Shot {shotNumberDisplay} - {currentSceneName}
@@ -190,7 +190,7 @@ export const ShotCarousel: React.FC<ShotCarouselProps> = ({
               {/* Bottom stub preview snippet */}
               {shot.basic_stub && (
                 <div className="absolute bottom-1.5 left-2 right-2 z-10 pointer-events-none">
-                  <p className="text-[10px] text-zinc-200/90 bg-black/75 backdrop-blur-xs px-2 py-0.5 rounded truncate font-mono border border-white/10" title={shot.basic_stub}>
+                  <p className="text-[10px] text-zinc-800 dark:text-zinc-200/90 bg-white/90 dark:bg-black/75 backdrop-blur-xs px-2 py-0.5 rounded truncate font-mono border border-zinc-200/80 dark:border-white/10 shadow-xs" title={shot.basic_stub}>
                     {shot.basic_stub}
                   </p>
                 </div>

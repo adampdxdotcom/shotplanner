@@ -41,6 +41,7 @@ interface AssistantFloatingChatProps {
   onShowToast?: (text: string, type?: "success" | "error" | "info") => void;
   onStageShot?: (shot: ShotItem) => Promise<boolean>;
   onExpandPrompt?: (shot: ShotItem) => Promise<string>;
+  onSelectShot?: (shotId: string) => void;
 }
 
 export const AssistantFloatingChat: React.FC<AssistantFloatingChatProps> = ({
@@ -57,7 +58,8 @@ export const AssistantFloatingChat: React.FC<AssistantFloatingChatProps> = ({
   onUpdateProject,
   onShowToast,
   onStageShot,
-  onExpandPrompt
+  onExpandPrompt,
+  onSelectShot
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -279,6 +281,10 @@ export const AssistantFloatingChat: React.FC<AssistantFloatingChatProps> = ({
         return { ...prev, shots };
       });
 
+      if (onSelectShot && existingShot?.id) {
+        onSelectShot(existingShot.id);
+      }
+
       setAppliedActionKeys(prev => ({ ...prev, [actionKey]: true }));
       injectStateFeedback(`User applied proposed changes to Shot #${shotNumber}`);
       if (onShowToast) {
@@ -291,11 +297,12 @@ export const AssistantFloatingChat: React.FC<AssistantFloatingChatProps> = ({
       }
       const shotData = action.shot || (action as any).changes || {};
       const newShotNum = sceneProject.shots.length + 1;
+      const newShotId = "shot_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7);
 
       onUpdateProject(prev => {
         const targetNum = prev.shots.length + 1;
         const newShot: ShotItem = {
-          id: "shot_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7),
+          id: newShotId,
           shot_name: shotData.shot_name || `Shot #${targetNum}`,
           shot_number: targetNum,
           shot_type: shotData.shot_type || "Medium Shot",
@@ -314,6 +321,10 @@ export const AssistantFloatingChat: React.FC<AssistantFloatingChatProps> = ({
           shots: [...prev.shots, newShot]
         };
       });
+
+      if (onSelectShot) {
+        onSelectShot(newShotId);
+      }
 
       setAppliedActionKeys(prev => ({ ...prev, [actionKey]: true }));
       injectStateFeedback(`User created and added new Shot #${newShotNum} to the scene`);

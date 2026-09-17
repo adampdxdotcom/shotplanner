@@ -318,6 +318,7 @@ export default function App() {
         llmProvider={llmProvider}
         defaultLlmProvider={defaultLlmProvider}
         geminiApiKey={config.gemini_api_key}
+        onSelectShot={setActiveShotId}
         onNavigateToConfig={(tab = "llm") => {
           setActiveConfigTab(tab);
           scrollToSection("config");

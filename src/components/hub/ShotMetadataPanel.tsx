@@ -59,32 +59,32 @@ export const ShotMetadataPanel: React.FC<ShotMetadataPanelProps> = ({
   const isImage = /\.(png|jpg|jpeg|webp|avif)$/i.test(takeFilename);
 
   return (
-    <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-5 shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-3.5 mb-3.5 border-b border-zinc-800/80">
+    <div className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-xs">
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-3.5 mb-3.5 border-b border-zinc-200 dark:border-zinc-800/80">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-indigo-950/60 border border-indigo-800/60 text-indigo-400 rounded-lg">
+          <div className="p-2 bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800/60 text-indigo-600 dark:text-indigo-400 rounded-lg">
             <Film className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-base font-semibold text-white tracking-wide">Shot Context & References</h2>
-            <p className="text-xs text-zinc-400">Read-only shot metadata and camera framing specification</p>
+            <h2 className="text-base font-semibold text-zinc-900 dark:text-white tracking-wide">Shot Context & References</h2>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">Read-only shot metadata and camera framing specification</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           {activeShot.monitored_workflow && (
-            <span className="flex items-center gap-1.5 px-2.5 py-1 bg-cyan-950/70 border border-cyan-500/40 text-xs text-cyan-300 font-mono rounded-md shadow" title={`Assigned Remote Workflow for Monitoring: ${activeShot.monitored_workflow}`}>
-              <Radio className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
+            <span className="flex items-center gap-1.5 px-2.5 py-1 bg-cyan-50 dark:bg-cyan-950/70 border border-cyan-200 dark:border-cyan-500/40 text-xs text-cyan-800 dark:text-cyan-300 font-mono rounded-md shadow-xs" title={`Assigned Remote Workflow for Monitoring: ${activeShot.monitored_workflow}`}>
+              <Radio className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400 animate-pulse" />
               <span className="truncate max-w-[140px]">{activeShot.monitored_workflow.split("/").pop()}</span>
             </span>
           )}
-          <span className="px-2.5 py-1 bg-zinc-950/80 border border-zinc-800 text-xs text-zinc-400 font-mono rounded-md shadow-inner">
+          <span className="px-2.5 py-1 bg-zinc-100 dark:bg-zinc-950/80 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-600 dark:text-zinc-400 font-mono rounded-md shadow-2xs">
             {generateSaveVideoPrefix(activeShot.shot_name || "", activeShot.shot_number)}
           </span>
           <span className={`px-2.5 py-1 text-xs font-semibold rounded-md shadow uppercase tracking-wider ${
-            activeShot.status === "rendered" ? "bg-purple-500/20 text-purple-400 border border-purple-500/30" :
-            activeShot.status === "rendering" ? "bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 animate-pulse" :
-            activeShot.status === "staged" ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" :
-            "bg-orange-500/20 text-orange-400 border border-orange-500/30"
+            activeShot.status === "rendered" ? "bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-400 border border-purple-200 dark:border-purple-500/30" :
+            activeShot.status === "rendering" ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/30 animate-pulse" :
+            activeShot.status === "staged" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30" :
+            "bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-400 border border-orange-200 dark:border-orange-500/30"
           }`}>
             {activeShot.status === "rendered" ? "✓ Rendered" :
              activeShot.status === "rendering" ? "⟳ Rendering" :
@@ -95,22 +95,22 @@ export const ShotMetadataPanel: React.FC<ShotMetadataPanelProps> = ({
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
-        <div className="bg-zinc-950/70 border border-zinc-800/80 rounded-lg p-3">
-          <div className="flex items-center gap-1.5 text-zinc-400 text-xs font-medium mb-1">
-            <Film className="w-3.5 h-3.5 text-zinc-500" />
+        <div className="bg-zinc-50/80 dark:bg-zinc-950/70 border border-zinc-200 dark:border-zinc-800/80 rounded-lg p-3 shadow-2xs">
+          <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-xs font-medium mb-1">
+            <Film className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500" />
             <span>Shot Name</span>
           </div>
-          <div className="text-sm font-semibold text-white truncate" title={activeShot.shot_name || "Untitled Shot"}>
+          <div className="text-sm font-semibold text-zinc-900 dark:text-white truncate" title={activeShot.shot_name || "Untitled Shot"}>
             {activeShot.shot_name || "Untitled Shot"}
           </div>
         </div>
         
-        <div className="bg-zinc-950/70 border border-zinc-800/80 rounded-lg p-3">
-          <div className="flex items-center gap-1.5 text-zinc-400 text-xs font-medium mb-1">
-            <Hash className="w-3.5 h-3.5 text-zinc-500" />
+        <div className="bg-zinc-50/80 dark:bg-zinc-950/70 border border-zinc-200 dark:border-zinc-800/80 rounded-lg p-3 shadow-2xs">
+          <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-xs font-medium mb-1">
+            <Hash className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500" />
             <span>Shot Number</span>
           </div>
-          <div className="text-sm font-semibold text-white font-mono">
+          <div className="text-sm font-semibold text-zinc-900 dark:text-white font-mono">
             Shot {activeShot.shot_number.toString().padStart(2, "0")}
           </div>
         </div>
@@ -123,21 +123,21 @@ export const ShotMetadataPanel: React.FC<ShotMetadataPanelProps> = ({
               setIsLightboxOpen(true);
             }
           }}
-          className={`bg-zinc-950/70 border rounded-lg p-3 transition-all ${
+          className={`bg-zinc-50/80 dark:bg-zinc-950/70 border rounded-lg p-3 transition-all shadow-2xs ${
             activeTake 
-              ? "border-zinc-800/80 hover:border-amber-500/60 hover:bg-zinc-900/80 cursor-pointer group" 
-              : "border-zinc-800/80 opacity-80"
+              ? "border-zinc-200 dark:border-zinc-800/80 hover:border-amber-400 dark:hover:border-amber-500/60 hover:bg-amber-50/40 dark:hover:bg-zinc-900/80 cursor-pointer group" 
+              : "border-zinc-200 dark:border-zinc-800/80 opacity-80"
           }`}
           title={activeTake ? `Click to preview ${takeName} in video lightbox` : "No takes available"}
         >
-          <div className="flex items-center justify-between gap-1 text-zinc-400 text-xs font-medium mb-1">
+          <div className="flex items-center justify-between gap-1 text-zinc-500 dark:text-zinc-400 text-xs font-medium mb-1">
             <div className="flex items-center gap-1.5">
-              <Clapperboard className="w-3.5 h-3.5 text-amber-500" />
+              <Clapperboard className="w-3.5 h-3.5 text-amber-600 dark:text-amber-500" />
               <span>Take</span>
             </div>
             {isHero && (
               <span title="Hero Take" className="inline-flex">
-                <Star className="w-3 h-3 text-amber-400 fill-amber-400 shrink-0" />
+                <Star className="w-3 h-3 text-amber-500 fill-amber-500 dark:text-amber-400 dark:fill-amber-400 shrink-0" />
               </span>
             )}
           </div>
@@ -146,14 +146,14 @@ export const ShotMetadataPanel: React.FC<ShotMetadataPanelProps> = ({
             <div className="min-w-0 flex-1">
               <div 
                 className={`text-sm font-semibold truncate ${
-                  activeTake ? "text-white group-hover:text-amber-300 transition-colors" : "text-zinc-500"
+                  activeTake ? "text-zinc-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-300 transition-colors" : "text-zinc-400 dark:text-zinc-500"
                 }`}
                 title={takeName}
               >
                 {takeName}
               </div>
               {activeTake && (
-                <span className="text-[10px] text-zinc-400 block truncate group-hover:text-amber-400/80 transition-colors">
+                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 block truncate group-hover:text-amber-600 dark:group-hover:text-amber-400/80 transition-colors">
                   {isHero ? "Hero Take" : isGood ? "Good Take" : isBad ? "Needs Work" : "Preview"}
                 </span>
               )}
@@ -161,7 +161,7 @@ export const ShotMetadataPanel: React.FC<ShotMetadataPanelProps> = ({
 
             {/* Very small thumbnail */}
             {activeTake ? (
-              <div className="relative w-11 h-7 rounded bg-black border border-zinc-700/80 overflow-hidden shrink-0 group-hover:border-amber-400/80 transition-all flex items-center justify-center shadow-xs">
+              <div className="relative w-11 h-7 rounded bg-black border border-zinc-200 dark:border-zinc-700/80 overflow-hidden shrink-0 group-hover:border-amber-400/80 transition-all flex items-center justify-center shadow-xs">
                 {isImage ? (
                   <img
                     src={takeStreamUrl}
@@ -183,56 +183,56 @@ export const ShotMetadataPanel: React.FC<ShotMetadataPanelProps> = ({
                 </div>
               </div>
             ) : (
-              <div className="w-11 h-7 rounded bg-zinc-900 border border-zinc-800/80 flex items-center justify-center shrink-0 text-zinc-600">
+              <div className="w-11 h-7 rounded bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800/80 flex items-center justify-center shrink-0 text-zinc-400 dark:text-zinc-600">
                 <Film className="w-3.5 h-3.5" />
               </div>
             )}
           </div>
         </div>
         
-        <div className="bg-zinc-950/70 border border-zinc-800/80 rounded-lg p-3">
-          <div className="flex items-center gap-1.5 text-zinc-400 text-xs font-medium mb-1">
-            <Camera className="w-3.5 h-3.5 text-zinc-500" />
+        <div className="bg-zinc-50/80 dark:bg-zinc-950/70 border border-zinc-200 dark:border-zinc-800/80 rounded-lg p-3 shadow-2xs">
+          <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-xs font-medium mb-1">
+            <Camera className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500" />
             <span>Shot Type</span>
           </div>
-          <div className="text-sm font-medium text-zinc-200 truncate" title={activeShot.shot_type || "Medium Shot"}>
+          <div className="text-sm font-medium text-zinc-800 dark:text-zinc-200 truncate" title={activeShot.shot_type || "Medium Shot"}>
             {activeShot.shot_type || "Medium Shot"}
           </div>
         </div>
         
-        <div className="bg-zinc-950/70 border border-zinc-800/80 rounded-lg p-3">
-          <div className="flex items-center gap-1.5 text-zinc-400 text-xs font-medium mb-1">
-            <Move className="w-3.5 h-3.5 text-zinc-500" />
+        <div className="bg-zinc-50/80 dark:bg-zinc-950/70 border border-zinc-200 dark:border-zinc-800/80 rounded-lg p-3 shadow-2xs">
+          <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-xs font-medium mb-1">
+            <Move className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500" />
             <span>Camera Movement</span>
           </div>
-          <div className="text-sm font-medium text-zinc-200 truncate" title={activeShot.camera_movement || "Locked Off"}>
+          <div className="text-sm font-medium text-zinc-800 dark:text-zinc-200 truncate" title={activeShot.camera_movement || "Locked Off"}>
             {activeShot.camera_movement || "Locked Off"}
           </div>
         </div>
 
-        <div className="bg-zinc-950/70 border border-zinc-800/80 rounded-lg p-3">
-          <div className="flex items-center gap-1.5 text-zinc-400 text-xs font-medium mb-1">
-            <Aperture className="w-3.5 h-3.5 text-indigo-400" />
+        <div className="bg-zinc-50/80 dark:bg-zinc-950/70 border border-zinc-200 dark:border-zinc-800/80 rounded-lg p-3 shadow-2xs">
+          <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-xs font-medium mb-1">
+            <Aperture className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
             <span>Lens / Focal Length</span>
           </div>
-          <div className="text-sm font-medium text-zinc-200 truncate" title={activeShot.lens_focal_length || "50mm Standard Prime"}>
+          <div className="text-sm font-medium text-zinc-800 dark:text-zinc-200 truncate" title={activeShot.lens_focal_length || "50mm Standard Prime"}>
             {activeShot.lens_focal_length || "50mm Standard Prime"}
           </div>
         </div>
 
-        <div className="bg-zinc-950/70 border border-zinc-800/80 rounded-lg p-3">
-          <div className="flex items-center gap-1.5 text-zinc-400 text-xs font-medium mb-1">
-            <RectangleHorizontal className="w-3.5 h-3.5 text-indigo-400" />
+        <div className="bg-zinc-50/80 dark:bg-zinc-950/70 border border-zinc-200 dark:border-zinc-800/80 rounded-lg p-3 shadow-2xs">
+          <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-xs font-medium mb-1">
+            <RectangleHorizontal className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
             <span>Aspect Ratio</span>
           </div>
-          <div className="text-sm font-medium text-zinc-200 truncate" title={activeShot.aspect_ratio || "16:9 Widescreen"}>
+          <div className="text-sm font-medium text-zinc-800 dark:text-zinc-200 truncate" title={activeShot.aspect_ratio || "16:9 Widescreen"}>
             {activeShot.aspect_ratio || "16:9 Widescreen"}
           </div>
         </div>
       </div>
 
       {activeShot && activeShot.takes && activeShot.takes.length > 0 && (
-        <div className="mt-4 border-t border-zinc-800/80 pt-3">
+        <div className="mt-4 border-t border-zinc-200 dark:border-zinc-800/80 pt-3">
           <TakeSelector 
             shot={activeShot} 
             activeTakeId={activeTake?.id}

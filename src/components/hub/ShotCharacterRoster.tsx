@@ -153,23 +153,23 @@ export const ShotCharacterRoster: React.FC<ShotCharacterRosterProps> = ({
   };
 
   return (
-    <div id="shot-character-roster-panel" className="bg-zinc-900/60 border border-zinc-800/90 rounded-2xl p-5 shadow-lg flex flex-col gap-4">
+    <div id="shot-character-roster-panel" className="bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/90 rounded-2xl p-5 shadow-xs flex flex-col gap-4">
       {/* Header Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-zinc-800/80">
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-zinc-200 dark:border-zinc-800/80">
         <div className="flex items-center gap-2.5">
-          <div className="p-2 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-lg">
+          <div className="p-2 bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-lg">
             <Users className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-base font-bold text-white tracking-tight">
+              <h3 className="text-base font-bold text-zinc-900 dark:text-white tracking-tight">
                 Character Roster
               </h3>
-              <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-zinc-800 text-zinc-300 border border-zinc-700">
+              <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
                 {charactersInActiveShot.length} in Shot {shotNumberDisplay}
               </span>
             </div>
-            <p className="text-xs text-zinc-400">
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
               Cast member details, wardrobe descriptions, and scene appearances for this shot
             </p>
           </div>
@@ -184,13 +184,13 @@ export const ShotCharacterRoster: React.FC<ShotCharacterRosterProps> = ({
               <div
                 key={name}
                 id={`roster-char-${name.toLowerCase().replace(/[^a-z0-9]/g, "-")}`}
-                className="bg-zinc-950/80 border border-zinc-800 rounded-xl p-4 flex flex-col justify-between gap-3.5 shadow-sm"
+                className="bg-zinc-50/80 dark:bg-zinc-950/80 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 flex flex-col justify-between gap-3.5 shadow-xs"
               >
                 {/* Top Section: Avatar, Name & Link to Cast */}
                 <div className="flex items-start justify-between gap-3.5">
                   <div className="flex items-center gap-3.5 min-w-0">
                     {/* Headshot */}
-                    <div className="relative w-14 h-14 rounded-xl bg-zinc-900 border border-zinc-800 overflow-hidden shrink-0 flex items-center justify-center shadow-xs">
+                    <div className="relative w-14 h-14 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 overflow-hidden shrink-0 flex items-center justify-center shadow-xs">
                       {headshotUrl ? (
                         <img
                           src={headshotUrl}
@@ -199,7 +199,7 @@ export const ShotCharacterRoster: React.FC<ShotCharacterRosterProps> = ({
                           referrerPolicy="no-referrer"
                         />
                       ) : (
-                        <div className="flex flex-col items-center justify-center text-zinc-600">
+                        <div className="flex flex-col items-center justify-center text-zinc-400 dark:text-zinc-600">
                           <User className="w-6 h-6" />
                         </div>
                       )}
@@ -207,10 +207,10 @@ export const ShotCharacterRoster: React.FC<ShotCharacterRosterProps> = ({
 
                     {/* Character Name */}
                     <div className="min-w-0">
-                      <h4 className="text-base font-bold text-white truncate" title={name}>
+                      <h4 className="text-base font-bold text-zinc-900 dark:text-white truncate" title={name}>
                         {name}
                       </h4>
-                      <p className="text-xs text-zinc-400">
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400">
                         In {shotsWithChar.length} {shotsWithChar.length === 1 ? "shot" : "shots"} this scene
                       </p>
                     </div>
@@ -221,7 +221,7 @@ export const ShotCharacterRoster: React.FC<ShotCharacterRosterProps> = ({
                     <button
                       type="button"
                       onClick={() => handleNavigateToCastCard(name)}
-                      className="flex items-center gap-1 px-2.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-indigo-400 hover:text-indigo-300 rounded-lg text-xs font-semibold border border-zinc-800 hover:border-indigo-500/30 transition-all cursor-pointer shrink-0"
+                      className="flex items-center gap-1 px-2.5 py-1.5 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 rounded-lg text-xs font-semibold border border-zinc-200 dark:border-zinc-800 hover:border-indigo-300 dark:hover:border-indigo-500/30 transition-all cursor-pointer shrink-0"
                       title={`Open ${name} character card on the Cast page`}
                     >
                       <span>Cast Card</span>
@@ -233,36 +233,36 @@ export const ShotCharacterRoster: React.FC<ShotCharacterRosterProps> = ({
                 {/* Information Area: Scene Outfit & Character Notes */}
                 <div className="space-y-2 text-xs">
                   {/* Scene Outfit Description */}
-                  <div className="bg-zinc-900/70 border border-zinc-800/60 rounded-lg p-2.5">
-                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
-                      <Shirt className="w-3 h-3 text-amber-400 shrink-0" />
+                  <div className="bg-white dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800/60 rounded-lg p-2.5 shadow-2xs">
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1">
+                      <Shirt className="w-3 h-3 text-amber-500 dark:text-amber-400 shrink-0" />
                       <span>Scene Outfit</span>
                     </div>
-                    <p className="text-zinc-200 text-xs leading-relaxed">
+                    <p className="text-zinc-800 dark:text-zinc-200 text-xs leading-relaxed">
                       {outfitDescription ? outfitDescription : (
-                        <span className="text-zinc-500 italic">No scene outfit specified on Cast card</span>
+                        <span className="text-zinc-400 dark:text-zinc-500 italic">No scene outfit specified on Cast card</span>
                       )}
                     </p>
                   </div>
 
                   {/* Character Notes */}
-                  <div className="bg-zinc-900/70 border border-zinc-800/60 rounded-lg p-2.5">
-                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
-                      <FileText className="w-3 h-3 text-indigo-400 shrink-0" />
+                  <div className="bg-white dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800/60 rounded-lg p-2.5 shadow-2xs">
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1">
+                      <FileText className="w-3 h-3 text-indigo-500 dark:text-indigo-400 shrink-0" />
                       <span>Character Notes</span>
                     </div>
-                    <p className="text-zinc-200 text-xs leading-relaxed line-clamp-3">
+                    <p className="text-zinc-800 dark:text-zinc-200 text-xs leading-relaxed line-clamp-3">
                       {notes ? notes : (
-                        <span className="text-zinc-500 italic">No notes added on Cast card</span>
+                        <span className="text-zinc-400 dark:text-zinc-500 italic">No notes added on Cast card</span>
                       )}
                     </p>
                   </div>
                 </div>
 
                 {/* Bottom Area: List of Shots the Character is in (Pills) */}
-                <div className="pt-2 border-t border-zinc-800/70 flex flex-col gap-1.5">
-                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                    <Film className="w-3 h-3 text-zinc-500 shrink-0" />
+                <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/70 flex flex-col gap-1.5">
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                    <Film className="w-3 h-3 text-zinc-400 dark:text-zinc-500 shrink-0" />
                     <span>Scene Appearances</span>
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -274,10 +274,10 @@ export const ShotCharacterRoster: React.FC<ShotCharacterRosterProps> = ({
                           onClick={onSelectShot ? () => onSelectShot(shotItem.id) : undefined}
                           className={`px-2.5 py-1 text-xs font-semibold rounded-md border transition-colors ${
                             shotItem.isCurrent
-                              ? "bg-indigo-600/20 text-indigo-300 border-indigo-500/40"
+                              ? "bg-indigo-50 dark:bg-indigo-600/20 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-500/40"
                               : onSelectShot
-                              ? "bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-800 hover:border-zinc-700 cursor-pointer"
-                              : "bg-zinc-900 text-zinc-300 border-zinc-800"
+                              ? "bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 cursor-pointer"
+                              : "bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800"
                           }`}
                           title={onSelectShot ? `Switch to ${shotItem.display}` : undefined}
                         >
@@ -285,7 +285,7 @@ export const ShotCharacterRoster: React.FC<ShotCharacterRosterProps> = ({
                         </button>
                       ))
                     ) : (
-                      <span className="text-xs text-zinc-500 italic">No shots assigned</span>
+                      <span className="text-xs text-zinc-400 dark:text-zinc-500 italic">No shots assigned</span>
                     )}
                   </div>
                 </div>
@@ -295,11 +295,11 @@ export const ShotCharacterRoster: React.FC<ShotCharacterRosterProps> = ({
         </div>
       ) : (
         /* Empty State */
-        <div className="bg-zinc-950/60 border border-dashed border-zinc-800 rounded-xl p-6 flex flex-col items-center justify-center text-center gap-2">
-          <div className="p-2.5 bg-zinc-900 text-zinc-500 rounded-full">
+        <div className="bg-zinc-50/80 dark:bg-zinc-950/60 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl p-6 flex flex-col items-center justify-center text-center gap-2">
+          <div className="p-2.5 bg-zinc-100 dark:bg-zinc-900 text-zinc-400 dark:text-zinc-500 rounded-full">
             <Users className="w-5 h-5" />
           </div>
-          <p className="text-sm font-semibold text-zinc-300">
+          <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
             No characters detected in Shot {shotNumberDisplay}
           </p>
           <p className="text-xs text-zinc-500 max-w-sm">

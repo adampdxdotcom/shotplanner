@@ -74,29 +74,29 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
   // If safety validation failed (e.g. shot number does not exist in scene), render guardrail card
   if (validationError) {
     return (
-      <div className="mt-3 p-3 rounded-xl border border-amber-300 dark:border-amber-800/80 bg-amber-50/80 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 text-xs">
-        <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-amber-200 dark:border-amber-900">
-          <div className="flex items-center gap-1.5 font-semibold text-amber-900 dark:text-amber-100">
+      <div className="mt-3 p-3 rounded-xl border border-amber-300 dark:border-amber-800/80 bg-amber-50/80 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 text-xs w-full min-w-0 overflow-hidden">
+        <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-amber-200 dark:border-amber-900 min-w-0">
+          <div className="flex items-center gap-1.5 font-semibold text-amber-900 dark:text-amber-100 min-w-0 flex-1">
             <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-            <span>Target Not Found</span>
+            <span className="shrink-0">Target Not Found</span>
             {action.title && (
-              <span className="text-amber-700 dark:text-amber-300 font-normal truncate">
+              <span className="text-amber-700 dark:text-amber-300 font-normal truncate min-w-0 flex-1">
                 • {action.title}
               </span>
             )}
           </div>
-          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono uppercase font-semibold bg-amber-200 dark:bg-amber-900 text-amber-800 dark:text-amber-200">
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono uppercase font-semibold bg-amber-200 dark:bg-amber-900 text-amber-800 dark:text-amber-200 shrink-0 whitespace-nowrap">
             Guardrail
           </span>
         </div>
-        <p className="my-2 text-[11px] text-amber-800 dark:text-amber-300">
+        <p className="my-2 text-[11px] text-amber-800 dark:text-amber-300 break-words">
           {validationError}
         </p>
         {onDismiss && (
           <div className="mt-2 pt-1 border-t border-amber-200/80 dark:border-amber-900 flex justify-end">
             <button
               onClick={() => onDismiss(action)}
-              className="px-2 py-1 rounded bg-amber-200/80 hover:bg-amber-300 dark:bg-amber-900 dark:hover:bg-amber-800 text-amber-900 dark:text-amber-100 text-[10.5px] font-medium transition-colors cursor-pointer"
+              className="px-2 py-1 rounded bg-amber-200/80 hover:bg-amber-300 dark:bg-amber-900 dark:hover:bg-amber-800 text-amber-900 dark:text-amber-100 text-[10.5px] font-medium transition-colors cursor-pointer shrink-0"
             >
               Dismiss
             </button>
@@ -111,29 +111,29 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
     const changes = action.changes || {};
 
     return (
-      <div className={`mt-3 p-3 rounded-xl border transition-all text-xs ${
+      <div className={`mt-3 p-3 rounded-xl border transition-all text-xs w-full min-w-0 overflow-hidden ${
         isApplied 
           ? "bg-emerald-50/90 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-800/80 text-emerald-900 dark:text-emerald-200" 
           : "bg-slate-50 dark:bg-zinc-900/90 border-indigo-200/80 dark:border-indigo-500/30 shadow-xs"
       }`}>
-        <div className="flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-slate-200/70 dark:border-zinc-800">
-          <div className="flex items-center gap-1.5 font-semibold text-slate-900 dark:text-zinc-100">
+        <div className="flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-slate-200/70 dark:border-zinc-800 min-w-0">
+          <div className="flex items-center gap-1.5 font-semibold text-slate-900 dark:text-zinc-100 min-w-0 flex-1">
             <Camera className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-            <span>Update Shot #{shotNum}</span>
+            <span className="shrink-0">Update Shot #{shotNum}</span>
             {action.title && (
-              <span className="text-slate-500 dark:text-zinc-400 font-normal truncate">
+              <span className="text-slate-500 dark:text-zinc-400 font-normal truncate min-w-0 flex-1">
                 • {action.title}
               </span>
             )}
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono uppercase font-semibold bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono uppercase font-semibold bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 shrink-0 whitespace-nowrap">
               Shot Update
             </span>
             {!isApplied && onDismiss && (
               <button
                 onClick={() => onDismiss(action)}
-                className="p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 rounded transition-colors"
+                className="p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 rounded transition-colors shrink-0 cursor-pointer"
                 title="Dismiss suggestion"
               >
                 <X className="w-3.5 h-3.5" />
@@ -237,29 +237,29 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
     const shotData = action.shot || (action as any).changes || {};
 
     return (
-      <div className={`mt-3 p-3 rounded-xl border transition-all text-xs ${
+      <div className={`mt-3 p-3 rounded-xl border transition-all text-xs w-full min-w-0 overflow-hidden ${
         isApplied 
           ? "bg-emerald-50/90 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-800/80 text-emerald-900 dark:text-emerald-200" 
           : "bg-slate-50 dark:bg-zinc-900/90 border-emerald-200/80 dark:border-emerald-500/30 shadow-xs"
       }`}>
-        <div className="flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-slate-200/70 dark:border-zinc-800">
-          <div className="flex items-center gap-1.5 font-semibold text-slate-900 dark:text-zinc-100">
+        <div className="flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-slate-200/70 dark:border-zinc-800 min-w-0">
+          <div className="flex items-center gap-1.5 font-semibold text-slate-900 dark:text-zinc-100 min-w-0 flex-1">
             <PlusCircle className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-            <span>Add New Shot</span>
+            <span className="shrink-0">Add New Shot</span>
             {action.title && (
-              <span className="text-slate-500 dark:text-zinc-400 font-normal truncate">
+              <span className="text-slate-500 dark:text-zinc-400 font-normal truncate min-w-0 flex-1">
                 • {action.title}
               </span>
             )}
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono uppercase font-semibold bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono uppercase font-semibold bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 shrink-0 whitespace-nowrap">
               New Shot
             </span>
             {!isApplied && onDismiss && (
               <button
                 onClick={() => onDismiss(action)}
-                className="p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 rounded transition-colors"
+                className="p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 rounded transition-colors shrink-0 cursor-pointer"
                 title="Dismiss suggestion"
               >
                 <X className="w-3.5 h-3.5" />
@@ -350,29 +350,29 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
     const changes = action.changes || {};
 
     return (
-      <div className={`mt-3 p-3 rounded-xl border transition-all text-xs ${
+      <div className={`mt-3 p-3 rounded-xl border transition-all text-xs w-full min-w-0 overflow-hidden ${
         isApplied 
           ? "bg-emerald-50/90 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-800/80 text-emerald-900 dark:text-emerald-200" 
           : "bg-slate-50 dark:bg-zinc-900/90 border-amber-200/80 dark:border-amber-500/30 shadow-xs"
       }`}>
-        <div className="flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-slate-200/70 dark:border-zinc-800">
-          <div className="flex items-center gap-1.5 font-semibold text-slate-900 dark:text-zinc-100">
+        <div className="flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-slate-200/70 dark:border-zinc-800 min-w-0">
+          <div className="flex items-center gap-1.5 font-semibold text-slate-900 dark:text-zinc-100 min-w-0 flex-1">
             <BookOpen className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-            <span>Scene Planning & Context</span>
+            <span className="shrink-0">Scene Planning & Context</span>
             {action.title && (
-              <span className="text-slate-500 dark:text-zinc-400 font-normal truncate">
+              <span className="text-slate-500 dark:text-zinc-400 font-normal truncate min-w-0 flex-1">
                 • {action.title}
               </span>
             )}
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono uppercase font-semibold bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono uppercase font-semibold bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 shrink-0 whitespace-nowrap">
               Scene Planning
             </span>
             {!isApplied && onDismiss && (
               <button
                 onClick={() => onDismiss(action)}
-                className="p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 rounded transition-colors"
+                className="p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 rounded transition-colors shrink-0 cursor-pointer"
                 title="Dismiss suggestion"
               >
                 <X className="w-3.5 h-3.5" />
@@ -482,29 +482,29 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
     const changes = action.changes || {};
 
     return (
-      <div className={`mt-3 p-3 rounded-xl border transition-all text-xs ${
+      <div className={`mt-3 p-3 rounded-xl border transition-all text-xs w-full min-w-0 overflow-hidden ${
         isApplied 
           ? "bg-emerald-50/90 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-800/80 text-emerald-900 dark:text-emerald-200" 
           : "bg-slate-50 dark:bg-zinc-900/90 border-purple-200/80 dark:border-purple-500/30 shadow-xs"
       }`}>
-        <div className="flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-slate-200/70 dark:border-zinc-800">
-          <div className="flex items-center gap-1.5 font-semibold text-slate-900 dark:text-zinc-100">
+        <div className="flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-slate-200/70 dark:border-zinc-800 min-w-0">
+          <div className="flex items-center gap-1.5 font-semibold text-slate-900 dark:text-zinc-100 min-w-0 flex-1">
             <User className="w-3.5 h-3.5 text-purple-500 shrink-0" />
-            <span>Character / Cast: "{charName}"</span>
+            <span className="shrink-0 truncate max-w-[140px]">Character: "{charName}"</span>
             {action.title && (
-              <span className="text-slate-500 dark:text-zinc-400 font-normal truncate">
+              <span className="text-slate-500 dark:text-zinc-400 font-normal truncate min-w-0 flex-1">
                 • {action.title}
               </span>
             )}
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono uppercase font-semibold bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono uppercase font-semibold bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 shrink-0 whitespace-nowrap">
               Cast & Wardrobe
             </span>
             {!isApplied && onDismiss && (
               <button
                 onClick={() => onDismiss(action)}
-                className="p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 rounded transition-colors"
+                className="p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 rounded transition-colors shrink-0 cursor-pointer"
                 title="Dismiss suggestion"
               >
                 <X className="w-3.5 h-3.5" />
@@ -582,31 +582,31 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
     const isError = stagingProgress?.status === "error";
 
     return (
-      <div className={`mt-3 p-3 rounded-xl border transition-all text-xs ${
+      <div className={`mt-3 p-3 rounded-xl border transition-all text-xs w-full min-w-0 overflow-hidden ${
         isSuccess
           ? "bg-emerald-50/90 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-800/80 text-emerald-900 dark:text-emerald-200"
           : isError
           ? "bg-rose-50/90 dark:bg-rose-950/30 border-rose-300 dark:border-rose-800/80 text-rose-900 dark:text-rose-200"
           : "bg-slate-50 dark:bg-zinc-900/90 border-cyan-200/80 dark:border-cyan-500/30 shadow-xs"
       }`}>
-        <div className="flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-slate-200/70 dark:border-zinc-800">
-          <div className="flex items-center gap-1.5 font-semibold text-slate-900 dark:text-zinc-100">
+        <div className="flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-slate-200/70 dark:border-zinc-800 min-w-0">
+          <div className="flex items-center gap-1.5 font-semibold text-slate-900 dark:text-zinc-100 min-w-0 flex-1">
             <UploadCloud className="w-3.5 h-3.5 text-cyan-500 shrink-0" />
-            <span>Remote ComfyUI Staging</span>
+            <span className="shrink-0">Remote ComfyUI Staging</span>
             {action.title && (
-              <span className="text-slate-500 dark:text-zinc-400 font-normal truncate">
+              <span className="text-slate-500 dark:text-zinc-400 font-normal truncate min-w-0 flex-1">
                 • {action.title}
               </span>
             )}
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono uppercase font-semibold bg-cyan-100 dark:bg-cyan-950 text-cyan-700 dark:text-cyan-300">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono uppercase font-semibold bg-cyan-100 dark:bg-cyan-950 text-cyan-700 dark:text-cyan-300 shrink-0 whitespace-nowrap">
               Remote Staging
             </span>
             {!isSuccess && !isStaging && onDismiss && (
               <button
                 onClick={() => onDismiss(action)}
-                className="p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 rounded transition-colors"
+                className="p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 rounded transition-colors shrink-0 cursor-pointer"
                 title="Dismiss suggestion"
               >
                 <X className="w-3.5 h-3.5" />
@@ -703,31 +703,31 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
     const isError = expandingProgress?.status === "error";
 
     return (
-      <div className={`mt-3 p-3 rounded-xl border transition-all text-xs ${
+      <div className={`mt-3 p-3 rounded-xl border transition-all text-xs w-full min-w-0 overflow-hidden ${
         isSuccess
           ? "bg-emerald-50/90 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-800/80 text-emerald-900 dark:text-emerald-200"
           : isError
           ? "bg-rose-50/90 dark:bg-rose-950/30 border-rose-300 dark:border-rose-800/80 text-rose-900 dark:text-rose-200"
           : "bg-slate-50 dark:bg-zinc-900/90 border-blue-200/80 dark:border-blue-500/30 shadow-xs"
       }`}>
-        <div className="flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-slate-200/70 dark:border-zinc-800">
-          <div className="flex items-center gap-1.5 font-semibold text-slate-900 dark:text-zinc-100">
+        <div className="flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-slate-200/70 dark:border-zinc-800 min-w-0">
+          <div className="flex items-center gap-1.5 font-semibold text-slate-900 dark:text-zinc-100 min-w-0 flex-1">
             <Wand2 className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-            <span>Prompt Expansion Dispatcher</span>
+            <span className="shrink-0">Prompt Expansion Dispatcher</span>
             {action.title && (
-              <span className="text-slate-500 dark:text-zinc-400 font-normal truncate">
+              <span className="text-slate-500 dark:text-zinc-400 font-normal truncate min-w-0 flex-1">
                 • {action.title}
               </span>
             )}
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono uppercase font-semibold bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono uppercase font-semibold bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 shrink-0 whitespace-nowrap">
               Prompt Expansion
             </span>
             {!isSuccess && !isExpanding && onDismiss && (
               <button
                 onClick={() => onDismiss(action)}
-                className="p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 rounded transition-colors"
+                className="p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 rounded transition-colors shrink-0 cursor-pointer"
                 title="Dismiss suggestion"
               >
                 <X className="w-3.5 h-3.5" />

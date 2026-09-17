@@ -395,9 +395,9 @@ export default function SceneProjectHub({
           </div>
         </div>
       ) : (
-        <div className="flex-1 flex flex-col items-center justify-center p-12 bg-zinc-900/40 border border-zinc-800 rounded-xl min-h-[400px]">
-          <h2 className="text-xl font-semibold text-zinc-300 mb-2">No Shot Selected</h2>
-          <p className="text-sm text-zinc-500 text-center max-w-md">
+        <div className="flex-1 flex flex-col items-center justify-center p-12 bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-xl min-h-[400px] shadow-xs">
+          <h2 className="text-xl font-semibold text-zinc-800 dark:text-zinc-300 mb-2">No Shot Selected</h2>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center max-w-md">
             Select an existing shot card from the top carousel, or click the + button to create a new shot and assign camera planning.
           </p>
         </div>

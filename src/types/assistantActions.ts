@@ -1,3 +1,5 @@
+import { normalizeShotChanges } from "../utils/cameraPresets";
+
 /**
  * Assistant Action Protocol Types & Parser for Phases 1, 2, 3 & 4
  * Supports:
@@ -147,6 +149,7 @@ export function validateActionSafety(
 
 /**
  * Extracts ```action or ```json blocks from message content that contain valid assistant actions.
+ * Automatically normalizes camera, lens, framing, and movement changes into canonical presets.
  */
 export function parseAssistantActions(content: string): ParsedAssistantMessage {
   if (!content) return { cleanContent: "", actions: [] };
@@ -168,6 +171,7 @@ export function parseAssistantActions(content: string): ParsedAssistantMessage {
         let anyValid = false;
         parsed.forEach(item => {
           if (isValidAction(item)) {
+            normalizeActionInPlace(item);
             actions.push(item);
             anyValid = true;
           }
@@ -176,6 +180,7 @@ export function parseAssistantActions(content: string): ParsedAssistantMessage {
           cleanContent = cleanContent.replace(match[0], "").trim();
         }
       } else if (isValidAction(parsed)) {
+        normalizeActionInPlace(parsed);
         actions.push(parsed);
         cleanContent = cleanContent.replace(match[0], "").trim();
       }
@@ -184,7 +189,23 @@ export function parseAssistantActions(content: string): ParsedAssistantMessage {
     }
   }
 
+  // Remove any legacy "Suggested Directives" headings and bullet lists from message body
+  cleanContent = cleanContent
+    .replace(/(?:#{1,4}\s*)?Suggested Directives:?[\r\n]+(?:[-*•]\s*.*[\r\n]*)+/gi, "")
+    .replace(/\*\*Suggested Directives:?\*\*[\r\n]+(?:[-*•]\s*.*[\r\n]*)+/gi, "")
+    .replace(/(?:#{1,4}\s*)?Suggested Directives:?/gi, "")
+    .trim();
+
   return { cleanContent, actions };
+}
+
+function normalizeActionInPlace(action: AssistantAction) {
+  if (action.type === "update_shot" && action.changes) {
+    action.changes = normalizeShotChanges(action.changes) as any;
+  } else if (action.type === "add_shot") {
+    const raw = action.shot || (action as any).changes || {};
+    action.shot = normalizeShotChanges(raw) as any;
+  }
 }
 
 function isValidAction(obj: any): obj is AssistantAction {
