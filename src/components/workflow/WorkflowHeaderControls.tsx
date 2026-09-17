@@ -30,7 +30,7 @@ export const WorkflowHeaderControls: React.FC<WorkflowHeaderControlsProps> = ({
             <option value="">-- Select a Shot to configure --</option>
             {shots.map(shot => (
               <option key={shot.id} value={shot.id}>
-                Shot {shot.shot_number}: {shot.scene_name}
+                Shot {shot.shot_number}: {shot.shot_name || shot.basic_stub || `Shot #${shot.shot_number}`}
               </option>
             ))}
           </select>

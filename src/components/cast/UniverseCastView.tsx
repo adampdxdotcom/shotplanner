@@ -297,13 +297,13 @@ export const UniverseCastView: React.FC<UniverseCastViewProps> = ({
 
                 {/* Reference Assets Gallery Right Panel */}
                 <div className="p-4 md:p-6 flex-1 bg-zinc-50/50 dark:bg-zinc-950/30 overflow-x-auto min-w-0">
-                  <div className="flex items-start gap-4 min-w-max pb-2">
+                  <div className="flex items-start gap-3 min-w-max pb-2">
                     {charAssets.length === 0 ? (
                       <div className="flex items-center gap-3">
                         {[1, 2, 3].map(i => (
                           <div 
                             key={`placeholder-${i}`} 
-                            className="w-32 h-40 border-2 border-dashed border-zinc-300/80 dark:border-zinc-800/40 rounded-xl bg-zinc-100/50 dark:bg-zinc-900/20 shrink-0 flex flex-col items-center justify-center p-3 text-center"
+                            className="w-28 aspect-square border-2 border-dashed border-zinc-300/80 dark:border-zinc-800/40 rounded-xl bg-zinc-100/50 dark:bg-zinc-900/20 shrink-0 flex flex-col items-center justify-center p-3 text-center"
                           >
                             <span className="text-[11px] text-zinc-400 dark:text-zinc-600 font-medium">Slot {i}</span>
                           </div>
@@ -314,9 +314,9 @@ export const UniverseCastView: React.FC<UniverseCastViewProps> = ({
                         <div 
                           key={asset.filename || asset.id}
                           onClick={() => onOpenLightbox(asset)}
-                          className="w-32 shrink-0 group cursor-pointer"
+                          className="w-28 shrink-0 group cursor-pointer"
                         >
-                          <div className="w-32 h-40 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden mb-2 relative hover:border-amber-400 dark:hover:border-amber-500/50 transition-colors shadow-xs">
+                          <div className="w-28 aspect-square bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden mb-2 relative hover:border-amber-400 dark:hover:border-amber-500/50 transition-colors shadow-xs">
                             {asset.media_type === "image" || !asset.media_type || !/\.(mp4|mov|webm|mp3|wav)$/i.test(asset.filename) ? (
                               <img 
                                 src={getAssetMediaUrl(asset.filename, true)} 

@@ -17,7 +17,9 @@ router.post(["/llm/parse-scene-sketch", "/scene-sketch/parse"], async (req: Requ
       model,
       provider,
       temperature,
-      max_tokens
+      max_tokens,
+      clean_import,
+      cleanImport
     } = req.body || {};
 
     const resolvedText = sketch_text || sketchText || text;
@@ -32,7 +34,8 @@ router.post(["/llm/parse-scene-sketch", "/scene-sketch/parse"], async (req: Requ
       model,
       provider,
       temperature,
-      max_tokens
+      max_tokens,
+      clean_import: Boolean(clean_import ?? cleanImport)
     });
 
     res.json(result);

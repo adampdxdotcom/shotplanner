@@ -7,7 +7,7 @@ export interface SendScenePanelProps {
   sanitizedSceneName: string;
   allSceneAssets: string[];
   isTransferring: boolean;
-  lastAction: "shot" | "scene" | null;
+  lastAction: "shot" | "scene" | "execute_shot" | null;
   handleSendScene: () => void;
 }
 

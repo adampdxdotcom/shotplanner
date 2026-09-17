@@ -13,6 +13,7 @@ interface UseConfigSectionStateProps {
   onChangeProvider?: (provider: LLMProvider) => void;
   onSetDefaultProvider?: (provider: LLMProvider) => void;
   onShowToast?: (text: string, type: "success" | "error" | "info") => void;
+  initialTab?: ConfigTab;
 }
 
 export function useConfigSectionState({
@@ -22,10 +23,17 @@ export function useConfigSectionState({
   defaultLlmProvider,
   onChangeProvider,
   onSetDefaultProvider,
-  onShowToast
+  onShowToast,
+  initialTab = "llm"
 }: UseConfigSectionStateProps) {
   // Active Configuration Tab
-  const [activeTab, setActiveTab] = useState<ConfigTab>("llm");
+  const [activeTab, setActiveTab] = useState<ConfigTab>(initialTab);
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
 
   // Remote SSH Testing state
   const [testingSSH, setTestingSSH] = useState(false);

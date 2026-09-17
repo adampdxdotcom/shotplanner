@@ -56,9 +56,9 @@ export const SceneCharacterCard: React.FC<SceneCharacterCardProps> = ({
     (a) => (a.subject_name || "").trim().toLowerCase() === subject.trim().toLowerCase()
   );
 
-  const profile = characters[subject] || 
+  const profile: CharacterProfile = characters[subject] || 
     Object.entries(characters || {}).find(([k]) => k.toLowerCase() === subject.toLowerCase())?.[1] || 
-    { name: subject, notes: "", quick_slots: [], scene_outfit_ref: "" };
+    { id: `char_${subject.toLowerCase().replace(/\s+/g, '_')}`, name: subject, notes: "", quick_slots: [], scene_outfit_ref: "" };
 
   const isLoc = isLocationEntity(subject, profile, charAssets);
 
@@ -412,7 +412,7 @@ export const SceneCharacterCard: React.FC<SceneCharacterCardProps> = ({
                       className="w-full h-full flex flex-col items-center justify-center cursor-grab active:cursor-grabbing"
                       title={`Slot ${slotNumber}: ${filename} (Drag to swap with another slot)`}
                     >
-                      <div className="w-full h-24 rounded-lg overflow-hidden bg-zinc-100 dark:bg-zinc-950 mb-1.5 relative border border-zinc-200 dark:border-zinc-800">
+                      <div className="w-full aspect-square rounded-lg overflow-hidden bg-zinc-100 dark:bg-zinc-950 mb-1.5 relative border border-zinc-200 dark:border-zinc-800">
                         <img
                           src={previewUrl}
                           alt={`Slot ${slotNumber}`}
@@ -440,12 +440,17 @@ export const SceneCharacterCard: React.FC<SceneCharacterCardProps> = ({
                     </div>
                   ) : (
                     /* Empty Slot Drop Target */
-                    <div className="flex flex-col items-center justify-center gap-1.5 py-3 text-zinc-500 dark:text-zinc-600 group-hover:text-zinc-700 dark:group-hover:text-zinc-400 transition-colors pointer-events-none">
-                      <div className="w-7 h-7 rounded-full bg-zinc-200/70 border border-zinc-300 dark:bg-zinc-900 dark:border-zinc-800 flex items-center justify-center text-zinc-500">
-                        <Plus className="w-3.5 h-3.5" />
+                    <div className="w-full flex flex-col items-center justify-center">
+                      <div className="w-full aspect-square rounded-lg border-2 border-dashed border-zinc-300 dark:border-zinc-800 bg-zinc-100/50 dark:bg-zinc-950/40 flex flex-col items-center justify-center gap-1 text-zinc-500 dark:text-zinc-600 group-hover:text-zinc-700 dark:group-hover:text-zinc-400 transition-colors pointer-events-none mb-1.5">
+                        <div className="w-7 h-7 rounded-full bg-zinc-200/70 border border-zinc-300 dark:bg-zinc-900 dark:border-zinc-800 flex items-center justify-center text-zinc-500">
+                          <Plus className="w-3.5 h-3.5" />
+                        </div>
+                        <span className="text-[10px] font-medium text-zinc-500">
+                          Drop
+                        </span>
                       </div>
-                      <span className="text-[11px] font-medium text-zinc-500">
-                        Drop into {slotNumber}
+                      <span className="text-[10px] text-zinc-400 font-mono">
+                        Slot {slotNumber}
                       </span>
                     </div>
                   )}
@@ -474,8 +479,10 @@ export const SceneCharacterCard: React.FC<SceneCharacterCardProps> = ({
                   {[1, 2, 3].map((i) => (
                     <div 
                       key={`placeholder-${i}`} 
-                      className="w-32 h-40 border-2 border-dashed border-zinc-300/70 dark:border-zinc-800/30 rounded-xl bg-zinc-100/40 dark:bg-zinc-900/10 shrink-0"
-                    />
+                      className="w-28 aspect-square border-2 border-dashed border-zinc-300/70 dark:border-zinc-800/30 rounded-xl bg-zinc-100/40 dark:bg-zinc-900/10 shrink-0 flex items-center justify-center text-[10px] text-zinc-400 font-medium"
+                    >
+                      Empty
+                    </div>
                   ))}
                 </>
               )}
@@ -491,9 +498,9 @@ export const SceneCharacterCard: React.FC<SceneCharacterCardProps> = ({
                     onDragStart={(e) => handleDragStartFromGallery(e, asset.filename)}
                     onDragEnd={handleDragEnd}
                     onClick={() => onOpenLightbox(asset)}
-                    className="w-32 shrink-0 group cursor-grab active:cursor-grabbing select-none"
+                    className="w-28 shrink-0 group cursor-grab active:cursor-grabbing select-none"
                   >
-                    <div className={`w-32 h-40 bg-zinc-100 dark:bg-zinc-900 border rounded-xl overflow-hidden mb-2 relative transition-all ${
+                    <div className={`w-28 aspect-square bg-zinc-100 dark:bg-zinc-900 border rounded-xl overflow-hidden mb-2 relative transition-all ${
                       isAssigned 
                         ? "border-indigo-500 ring-2 ring-indigo-500/20 dark:border-indigo-500/60 dark:ring-1 dark:ring-indigo-500/30" 
                         : "border-zinc-200 hover:border-zinc-300 dark:border-zinc-800 dark:hover:border-zinc-700 shadow-xs"

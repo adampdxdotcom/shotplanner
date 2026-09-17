@@ -363,7 +363,7 @@ export const CharacterReferencePackGrid: React.FC<CharacterReferencePackGridProp
                 <input
                   type="file"
                   accept="image/*"
-                  ref={(el) => (fileInputRefs.current[slot.id] = el)}
+                  ref={(el) => { fileInputRefs.current[slot.id] = el; }}
                   onChange={(e) => handleFileChange(e, slot.id)}
                   className="hidden"
                   disabled={disabled}

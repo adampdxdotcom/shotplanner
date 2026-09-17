@@ -51,6 +51,16 @@ export interface SceneProjectFile {
     is_location?: boolean;
   }[];
   shots: ShotItem[];
+  characters?: Record<string, CharacterProfile> | any[];
+  scene_planning?: {
+    visual_theme?: string;
+    environment_description?: string;
+    lighting_style?: string;
+    camera_gear?: string;
+    audio_style?: string;
+    custom_instructions?: string;
+    [key: string]: any;
+  };
 }
 
 export interface ShotItem {
@@ -60,6 +70,9 @@ export interface ShotItem {
   shot_type?: string;
   camera_movement?: string;
   lens_focal_length?: string;
+  camera_angle?: string;
+  dialogue_line?: string;
+  lighting_setup?: string;
   aspect_ratio?: string;
   basic_stub?: string;
   expanded_prompt?: string;
@@ -98,6 +111,8 @@ export interface AssetRecord {
   path?: string;
   is_universe?: boolean;
 }
+
+export type MediaAsset = AssetRecord;
 
 export interface WorkflowNodeInfo {
   id: string;

@@ -19,6 +19,7 @@ export interface ParseSceneSketchResult {
   raw_llm_output?: string;
   model_used: string;
   provider_used: string;
+  clean_import?: boolean;
 }
 
 export interface ParseSceneSketchOptions {
@@ -28,6 +29,7 @@ export interface ParseSceneSketchOptions {
   provider?: string;
   temperature?: number;
   max_tokens?: number;
+  clean_import?: boolean;
 }
 
 const ALLOWED_SHOT_TYPES = [
@@ -69,21 +71,47 @@ const ALLOWED_LENS_PRESETS = [
 ];
 
 /**
- * Builds the strict structural scene breakdown prompt for the local LLM.
+ * Builds the structural scene breakdown prompt for the LLM.
+ * When cleanImport is false (default), the LLM acts as an Artistic Director, creatively choosing framing, movement, and lens.
+ * When cleanImport is true, the LLM disables creative guessing and only extracts explicitly specified cinematography, defaulting to neutral Medium Shot / Locked Off / 50mm.
  */
-export function buildSceneSketchPrompt(sketchText: string): { systemPrompt: string; userPrompt: string } {
-  const systemPrompt = `You are an expert film director and cinematography scene breakdown assistant.
-Your task is to take raw, freeform scene sketch text or script beats and parse it into an array of sequential visual shots.
+export function buildSceneSketchPrompt(sketchText: string, cleanImport: boolean = false): { systemPrompt: string; userPrompt: string } {
+  let systemPrompt: string;
 
-CRITICAL RULES:
-1. FAITHFUL EXTRACTION ONLY: Do NOT write flowery creative prose or expand prompts. Extract the user's action/beat faithfully into "basic_stub". Keep the user's original words, dialogue, and specific staging intact.
-2. CINEMATOGRAPHY SELECTION: For each shot, select the most appropriate option from the canonical allowed lists below:
+  if (cleanImport) {
+    systemPrompt = `You are a precise, literal scene breakdown assistant operating in CLEAN IMPORT mode (strict extraction, no creative embellishment).
+Your task is to take raw scene sketch text or script beats and parse it into an array of sequential visual shots with strict literal fidelity.
+
+CRITICAL RULES FOR CLEAN IMPORT:
+1. FAITHFUL EXTRACTION OF BEATS: Extract the user's action/beat faithfully into "basic_stub". Keep the user's original words, dialogue, and specific staging intact. Do NOT expand prompts or write creative prose.
+2. STRICT CINEMATOGRAPHY EXTRACTION (NO CREATIVE GUESSING):
+   - Do NOT invent or deduce camera framing, camera movement, or lens focal length if they are not in the text.
+   - ONLY assign a specific shot_type, camera_movement, or lens_focal_length if the user's sketch text EXPLICITLY states it (e.g., "wide shot", "close-up", "tracking shot", "push in", "85mm").
+   - If the text does NOT explicitly specify framing, YOU MUST SET "shot_type": "Medium Shot".
+   - If the text does NOT explicitly specify camera movement, YOU MUST SET "camera_movement": "Locked Off".
+   - If the text does NOT explicitly specify lens/focal length, YOU MUST SET "lens_focal_length": "50mm Standard Prime".
+   Canonical allowed options if explicitly specified:
+   - Allowed shot_type: ${JSON.stringify(ALLOWED_SHOT_TYPES)}
+   - Allowed camera_movement: ${JSON.stringify(ALLOWED_CAMERA_MOVEMENTS)}
+   - Allowed lens_focal_length: ${JSON.stringify(ALLOWED_LENS_PRESETS)}
+3. ENTITY & CHARACTER EXTRACTION: In "detected_characters", list all proper names of characters, people, or distinct named entities explicitly mentioned in that shot (e.g. ["Marcus", "Elena"]). Do NOT guess or invent characters. If none mentioned, return an empty array [].
+4. SHOT NAMES: Provide a concise 2-4 word descriptor in "shot_name" (e.g. "Shot 1", "Hallway Standoff").
+5. OUTPUT FORMAT: Output ONLY valid JSON matching the exact JSON schema provided below. Do not wrap in markdown quotes if possible, and output no commentary before or after.`;
+  } else {
+    systemPrompt = `You are an expert film director and cinematography scene breakdown assistant operating in ARTISTIC DIRECTOR mode.
+Your task is to take raw scene sketch text or script beats and parse it into an array of sequential visual shots.
+
+CRITICAL RULES FOR ARTISTIC DIRECTOR:
+1. FAITHFUL EXTRACTION OF BEATS: Extract the user's action/beat faithfully into "basic_stub". Keep the user's original words, dialogue, and specific staging intact. Do NOT write flowery prose or modify the core action.
+2. ARTISTIC DIRECTOR CINEMATOGRAPHY (CREATIVE SELECTION):
+   - As an experienced cinematic director, analyze the dramatic tone, narrative beats, character emotion, and pacing to thoughtfully choose the most impactful camera framing, movement, and lens for each shot from the canonical allowed lists below.
    - Allowed shot_type: ${JSON.stringify(ALLOWED_SHOT_TYPES)}
    - Allowed camera_movement: ${JSON.stringify(ALLOWED_CAMERA_MOVEMENTS)}
    - Allowed lens_focal_length: ${JSON.stringify(ALLOWED_LENS_PRESETS)}
 3. ENTITY & CHARACTER EXTRACTION: In "detected_characters", list all proper names of characters, people, or distinct named entities mentioned in that shot (e.g. ["Marcus", "Elena"]). Do NOT guess IDs or traits. If no named character is mentioned, return an empty array [].
 4. SHOT NAMES: Provide a concise 2-4 word descriptor in "shot_name" (e.g. "Hallway Standoff", "Reactor Close-up", "Elena Enters").
 5. OUTPUT FORMAT: Output ONLY valid JSON matching the exact JSON schema provided below. Do not wrap in markdown quotes if possible, and output no commentary before or after.`;
+  }
 
   const userPrompt = `Break down the following scene sketch text into sequential shots according to the schema.
 
@@ -201,13 +229,14 @@ function normalizeShot(rawShot: any, index: number): ParsedSceneSketchShot {
  * Main service function to parse scene sketch text into structured shots using Local LLM (or Gemini).
  */
 export async function parseSceneSketch(options: ParseSceneSketchOptions): Promise<ParseSceneSketchResult> {
-  const { sketch_text, lm_studio_url, model, provider, temperature, max_tokens } = options;
+  const { sketch_text, lm_studio_url, model, provider, temperature, max_tokens, clean_import } = options;
 
   if (!sketch_text || !sketch_text.trim()) {
     throw new Error("Scene sketch text is required.");
   }
 
-  const { systemPrompt, userPrompt } = buildSceneSketchPrompt(sketch_text);
+  const isClean = Boolean(clean_import);
+  const { systemPrompt, userPrompt } = buildSceneSketchPrompt(sketch_text, isClean);
   const effectiveTemp = typeof temperature === "number" ? temperature : 0.2; // Low temperature for deterministic structuring
   const effectiveMaxTokens = typeof max_tokens === "number" ? max_tokens : 2048;
 
@@ -266,6 +295,7 @@ export async function parseSceneSketch(options: ParseSceneSketchOptions): Promis
     shots: normalizedShots,
     raw_llm_output: rawLlmOutput,
     model_used: modelUsed,
-    provider_used: providerUsed
+    provider_used: providerUsed,
+    clean_import: isClean
   };
 }

@@ -69,7 +69,7 @@ export const StagingEnvironmentControls: React.FC<StagingEnvironmentControlsProp
               <option value="">(None - Transparent)</option>
               {locationAssets.map(asset => (
                 <option key={asset.id || asset.filename} value={asset.filename}>
-                  {asset.subject || asset.filename}
+                  {asset.subject_name || asset.filename}
                 </option>
               ))}
             </select>

@@ -38,7 +38,7 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
   const [progressPercent, setProgressPercent] = useState(0);
   const [transferResult, setTransferResult] = useState<TransferResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [lastAction, setLastAction] = useState<"shot" | "scene" | null>(null);
+  const [lastAction, setLastAction] = useState<"shot" | "scene" | "execute_shot" | null>(null);
   const [lastStagedTime, setLastStagedTime] = useState<string | null>(null);
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);

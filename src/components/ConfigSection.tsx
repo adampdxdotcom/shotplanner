@@ -23,6 +23,7 @@ export interface ConfigSectionProps {
   onChangeProvider?: (provider: LLMProvider) => void;
   onSetDefaultProvider?: (provider: LLMProvider) => void;
   onShowToast?: (text: string, type: "success" | "error" | "info") => void;
+  initialTab?: ConfigTab;
 }
 
 export const ConfigSection: React.FC<ConfigSectionProps> = ({ 
@@ -32,7 +33,8 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({
   defaultLlmProvider,
   onChangeProvider,
   onSetDefaultProvider,
-  onShowToast
+  onShowToast,
+  initialTab
 }) => {
   const {
     activeTab,
@@ -67,7 +69,8 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({
     defaultLlmProvider,
     onChangeProvider,
     onSetDefaultProvider,
-    onShowToast
+    onShowToast,
+    initialTab
   });
 
   return (

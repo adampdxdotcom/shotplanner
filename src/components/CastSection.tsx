@@ -123,6 +123,7 @@ export const CastSection: React.FC<CastSectionProps> = ({
     onRegisterSubject(name);
     if (entityType === "location") {
       onUpdateCharacter?.({
+        id: `loc_${Date.now()}`,
         name,
         notes: "",
         quick_slots: [],

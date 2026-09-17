@@ -136,7 +136,9 @@ export const ShotMetadataPanel: React.FC<ShotMetadataPanelProps> = ({
               <span>Take</span>
             </div>
             {isHero && (
-              <Star className="w-3 h-3 text-amber-400 fill-amber-400 shrink-0" title="Hero Take" />
+              <span title="Hero Take" className="inline-flex">
+                <Star className="w-3 h-3 text-amber-400 fill-amber-400 shrink-0" />
+              </span>
             )}
           </div>
 

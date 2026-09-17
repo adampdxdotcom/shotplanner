@@ -712,14 +712,43 @@ html.light .prompt-generating-overlay p:last-of-type {
 
 html.light .prompt-generating-overlay button {
   background-color: #f1f5f9 !important;
-  color: #334155 !important;
-  border-color: #cbd5e1 !important;
 }
 
 html.light .prompt-generating-overlay button:hover {
   background-color: #e2e8f0 !important;
   color: #0f172a !important;
 }
+
+/* Assistant Chat Markdown Readability */
+html.light .markdown-body {
+  color: #1e293b;
+}
+
+html.light .markdown-body strong {
+  color: #0f172a;
+}
+
+html.light .markdown-body ul,
+html.light .markdown-body ol {
+  padding-left: 1.25rem;
+}
+
+html.light .markdown-body code {
+  background-color: #f1f5f9;
+  color: #4f46e5;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-size: 0.8em;
+}
+
+html.dark .markdown-body code {
+  background-color: #27272a;
+  color: #818cf8;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-size: 0.8em;
+}
+
 
 
 

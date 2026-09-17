@@ -141,7 +141,7 @@ export interface ShotTake {
   generation_params?: GenerationParameters;
   sampling_steps?: number;
   assigned_slots?: Record<number, string>;
-  review_status?: "unreviewed" | "approved" | "needs_work" | "good" | "bad";
+  review_status?: "unreviewed" | "approved" | "needs_work" | "good" | "bad" | string;
   rating?: "good" | "bad" | null;
   notes?: string;
   file_size?: number;
@@ -356,11 +356,13 @@ export interface MediaAsset {
   filename: string;
   media_type: "image" | "audio" | "video";
   type: string;
+  asset_type?: string;
   subject_name: string;
   description: string;
   tags?: string[];
   size_bytes: number;
   created_at: number;
+  uploaded_at?: number;
   preview_url?: string;
   thumbnail_url?: string;
   thumbnail_path?: string;
@@ -424,6 +426,8 @@ export interface ParameterNodeMappings {
 
 export interface ParsedWorkflow {
   filename: string;
+  is_visual?: boolean;
+  node_count?: number;
   detected_nodes?: DetectedNodes;
   detected_values?: Record<string, any>;
   nodes_info: {
@@ -471,6 +475,7 @@ export interface TransferResult {
   success: boolean;
   remote_dir: string;
   remote_workflow_path?: string;
+  remote_workflow_paths?: string[];
   staged_workflow_filename?: string;
   save_video_prefix?: string;
   transferred_count?: number;
@@ -521,6 +526,7 @@ export interface ParseSceneSketchResult {
   raw_llm_output?: string;
   model_used: string;
   provider_used: string;
+  clean_import?: boolean;
 }
 
 export { getAssetMediaUrl } from "./utils/assetUrl";

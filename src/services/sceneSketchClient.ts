@@ -7,6 +7,7 @@ export interface ParseSceneSketchRequestOptions {
   provider?: string;
   temperature?: number;
   max_tokens?: number;
+  clean_import?: boolean;
 }
 
 export async function requestSceneSketchParse(options: ParseSceneSketchRequestOptions): Promise<ParseSceneSketchResult> {

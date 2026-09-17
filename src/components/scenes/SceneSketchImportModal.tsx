@@ -82,6 +82,7 @@ export const SceneSketchImportModal: React.FC<SceneSketchImportModalProps> = ({
   const [stagedShots, setStagedShots] = useState<ParsedSceneSketchShot[]>([]);
   const [importMode, setImportMode] = useState<"append" | "replace">("append");
   const [providerUsed, setProviderUsed] = useState<string>("");
+  const [cleanImport, setCleanImport] = useState(false); // False = Artistic Director (default), True = Clean Import
 
   // Drag and drop state for file
   const [isDragging, setIsDragging] = useState(false);
@@ -133,7 +134,8 @@ export const SceneSketchImportModal: React.FC<SceneSketchImportModalProps> = ({
     try {
       const result: ParseSceneSketchResult = await requestSceneSketchParse({
         sketch_text: sketchText,
-        lm_studio_url: lmStudioUrl
+        lm_studio_url: lmStudioUrl,
+        clean_import: cleanImport
       });
 
       if (!result.shots || result.shots.length === 0) {
@@ -354,6 +356,58 @@ Marcus turns around slowly, looking exhausted. Elena steps closer and shows him 
                 />
               </div>
 
+              {/* Cinematography Mode: Artistic Director vs Clean Import */}
+              <div className="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/80 dark:bg-zinc-900/50 transition-all">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <div className={`p-2 rounded-lg mt-0.5 shrink-0 transition-colors ${
+                      !cleanImport
+                        ? "bg-amber-500/10 text-amber-500 border border-amber-500/20"
+                        : "bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-300 dark:border-zinc-700"
+                    }`}>
+                      {!cleanImport ? (
+                        <Sparkles className="w-5 h-5" />
+                      ) : (
+                        <Layers className="w-5 h-5" />
+                      )}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                          {!cleanImport ? "Artistic Director Mode" : "Clean Import Mode"}
+                        </span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                          !cleanImport
+                            ? "bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-800"
+                            : "bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-700"
+                        }`}>
+                          {!cleanImport ? "Active (Default)" : "Strict Literal"}
+                        </span>
+                      </div>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 max-w-xl leading-relaxed">
+                        {!cleanImport
+                          ? "AI acts as a director, intelligently proposing dramatic framing, camera movements, and lenses suited to the emotional pacing of each beat."
+                          : "Disables AI creativity. Only extracts framing, movement, and lenses if explicitly written in your text; all others default to neutral Medium Shot, Locked Off, 50mm Standard Prime."}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Clean Import Toggle */}
+                  <label className="flex items-center gap-2.5 cursor-pointer shrink-0 select-none self-start sm:self-center px-3 py-1.5 rounded-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors shadow-2xs">
+                    <input
+                      type="checkbox"
+                      checked={cleanImport}
+                      onChange={(e) => setCleanImport(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-zinc-300 dark:bg-zinc-700 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600 relative"></div>
+                    <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                      Clean Import
+                    </span>
+                  </label>
+                </div>
+              </div>
+
               {/* Error Message */}
               {parseError && (
                 <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 text-xs flex items-start gap-2.5">
@@ -380,7 +434,20 @@ Marcus turns around slowly, looking exhausted. Elena steps closer and shows him 
                   />
                 </div>
 
-                <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+                <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400 flex-wrap">
+                  <span className="px-2.5 py-1 rounded-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 font-medium flex items-center gap-1.5">
+                    {cleanImport ? (
+                      <>
+                        <Layers className="w-3.5 h-3.5 text-zinc-400" />
+                        <span>Clean Import (Neutral)</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                        <span className="text-amber-500 font-semibold">Artistic Director</span>
+                      </>
+                    )}
+                  </span>
                   <span className="px-2.5 py-1 rounded-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 font-medium">
                     Parsed via: <span className="font-semibold text-zinc-800 dark:text-zinc-200">{providerUsed}</span>
                   </span>

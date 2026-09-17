@@ -1,6 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import { Navbar } from "./components/Navbar";
-import { ConfigSection } from "./components/ConfigSection";
+import { ConfigSection, ConfigTab } from "./components/ConfigSection";
 import { WorkflowSection } from "./components/WorkflowSection";
 import { AssetManagerSection } from "./components/AssetManagerSection";
 import { CastSection } from "./components/CastSection";
@@ -10,6 +10,7 @@ import { ExecutionSection } from "./components/ExecutionSection";
 import { StagingSection } from "./components/StagingSection";
 import { AppModals } from "./components/AppModals";
 import SceneProjectHub from "./components/SceneProjectHub";
+import { AssistantFloatingChat } from "./components/assistant/AssistantFloatingChat";
 import { useAppLogic } from "./hooks/useAppLogic";
 
 export default function App() {
@@ -68,6 +69,8 @@ export default function App() {
     autosaveStatus,
     lastSavedAt
   } = useAppLogic();
+
+  const [activeConfigTab, setActiveConfigTab] = useState<ConfigTab>("llm");
 
   // Keep browser tab title synchronized with active scene or project name
   React.useEffect(() => {
@@ -284,6 +287,7 @@ export default function App() {
             llmProvider={llmProvider}
             defaultLlmProvider={defaultLlmProvider}
             onSetDefaultProvider={setDefaultLlmProvider}
+            initialTab={activeConfigTab}
             onChangeProvider={(provider) => {
               setLlmProvider(provider);
               setConfig(prev => ({ ...prev, llm_provider: provider }));
@@ -302,6 +306,21 @@ export default function App() {
         )}
 
       </main>
+
+      {/* Floating Production Assistant Chat */}
+      <AssistantFloatingChat
+        sceneProject={sceneProject}
+        activeShotId={activeShotId}
+        activeSection={activeSection}
+        lmStudioUrl={config.lm_studio_url}
+        llmProvider={llmProvider}
+        defaultLlmProvider={defaultLlmProvider}
+        geminiApiKey={config.gemini_api_key}
+        onNavigateToConfig={(tab = "llm") => {
+          setActiveConfigTab(tab);
+          scrollToSection("config");
+        }}
+      />
 
       <AppModals 
         isSaveModalOpen={isSaveModalOpen} setIsSaveModalOpen={setIsSaveModalOpen}

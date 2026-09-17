@@ -211,11 +211,11 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
           parsedWorkflow && (
             <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/80 space-y-5">
               <GenerationParametersSection
+                detectedNodes={parsedWorkflow.detected_nodes || parsedWorkflow.nodes_info?.detected_nodes}
                 generationParams={generationParams}
-                onUpdateParam={onUpdateParam}
+                onChangeParam={onUpdateParam}
                 parameterNodeMappings={parameterNodeMappings}
-                onUpdateParameterMapping={onUpdateParameterMapping}
-                parsedWorkflow={parsedWorkflow}
+                onChangeParameterMapping={onUpdateParameterMapping}
               />
 
               <PromptNodeSelector 
