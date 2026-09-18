@@ -36,7 +36,7 @@ interface AssetManagerSectionProps {
   onUpdateProject: (updater: (prev: SceneProjectFile) => SceneProjectFile) => void;
   subjects?: string[];
   characters?: Record<string, CharacterProfile>;
-  onUpdateCharacter?: (name: string, profile: CharacterProfile) => void;
+  onUpdateCharacter?: (profile: CharacterProfile, oldName?: string) => void;
   onRegisterSubject?: (name: string) => void;
   onAssetUploaded: (asset: MediaAsset, slotIndex?: number, type?: string) => void;
   onAssetDeleted: (filename: string) => void;

@@ -2,6 +2,7 @@ import React, { useEffect, useCallback } from 'react';
 import { SceneProjectFile, ScenePlanning, CharacterProfile } from '../../types';
 import { generateUUID } from '../../utils/formatters';
 import { toCanonicalSubjectName, findCanonicalSubject, normalizeProjectCastAndAssets } from '../../utils/subjectUtils';
+import { cascadeCharacterRename, sweepGhostReferences } from '../../utils/referentialIntegrity';
 
 interface UseCastManagementParams {
   sceneProject: SceneProjectFile;
@@ -82,14 +83,21 @@ export function useCastManagement({
     return canonicalName;
   }, [subjects, setSceneProject, setIsDirty]);
 
-  const handleUpdateCharacter = useCallback((profile: any) => {
+  const handleUpdateCharacter = useCallback((profile: any, oldName?: string) => {
     if (!profile || !profile.name) return;
     // Resolve against canonical character name
     const rawName = String(profile.name).trim();
     const canonicalName = findCanonicalSubject(rawName, subjects) || toCanonicalSubjectName(rawName) || rawName;
 
     setSceneProject(prev => {
-      const nextCharacters = { ...(prev.characters || {}) };
+      let currentProject = prev;
+      // If character was renamed, cascade rename through all shots, staging, OTS, and assets
+      if (oldName && oldName.trim().toLowerCase() !== canonicalName.toLowerCase()) {
+        const { updatedProject } = cascadeCharacterRename(prev, oldName, canonicalName);
+        currentProject = updatedProject;
+      }
+
+      const nextCharacters = { ...(currentProject.characters || {}) };
       // Remove any case variation keys
       Object.keys(nextCharacters).forEach(k => {
         if (k.toLowerCase() === canonicalName.toLowerCase() && k !== canonicalName) {
@@ -101,7 +109,7 @@ export function useCastManagement({
         name: canonicalName
       };
       return {
-        ...prev,
+        ...currentProject,
         characters: nextCharacters
       };
     });
@@ -201,6 +209,11 @@ export function useCastManagement({
           }
         }
 
+        // Clean characters array in shot
+        const nextChars = (shot.characters || []).filter(
+          c => (c || "").trim().toLowerCase() !== targetLower
+        );
+
         // Clean OTS anchor/focus subjects if they match the deleted character
         let otsAnchor = shot.ots_anchor_subject;
         let otsFocus = shot.ots_focus_subject;
@@ -211,11 +224,24 @@ export function useCastManagement({
           otsFocus = "";
         }
 
+        // Clean staging recipe actors
+        let nextStaging = shot.staging_recipe;
+        if (nextStaging && Array.isArray(nextStaging.actors)) {
+          const nextActors = nextStaging.actors.filter(
+            a => (a.characterName || "").trim().toLowerCase() !== targetLower
+          );
+          if (nextActors.length !== nextStaging.actors.length) {
+            nextStaging = { ...nextStaging, actors: nextActors };
+          }
+        }
+
         return {
           ...shot,
           assigned_slots: nextAssignedSlots,
+          characters: nextChars,
           ots_anchor_subject: otsAnchor,
-          ots_focus_subject: otsFocus
+          ots_focus_subject: otsFocus,
+          staging_recipe: nextStaging
         };
       });
 

@@ -1,5 +1,6 @@
 import React, { useCallback } from 'react';
 import { MediaAsset, SceneProjectFile, ParsedWorkflow } from '../../types';
+import { cascadeAssetDeletion, cascadeAssetRename } from '../../utils/referentialIntegrity';
 
 interface UseAssetManagementParams {
   setSceneProject: React.Dispatch<React.SetStateAction<SceneProjectFile>>;
@@ -65,13 +66,16 @@ export function useAssetManagement({
 
   const handleAssetUpdated = useCallback((oldFilename: string, newAsset: MediaAsset) => {
     setSceneProject(prev => {
-      const prevAssets = prev.assets || [];
-      return {
-        ...prev,
-        assets: prevAssets.map(a => a.filename === oldFilename ? { ...newAsset, slot_index: a.slot_index ?? newAsset.slot_index } : a)
-      };
+      const { updatedProject } = cascadeAssetRename(
+        prev, 
+        oldFilename, 
+        newAsset.filename, 
+        newAsset
+      );
+      return updatedProject;
     });
     setIsDirty(true);
+
     // Update nodeMappings if the filename changed
     if (oldFilename !== newAsset.filename) {
       setNodeMappings(prev => {
@@ -86,23 +90,11 @@ export function useAssetManagement({
 
   const handleAssetDeleted = useCallback((filename: string) => {
     setSceneProject(prev => {
-      const prevAssets = prev.assets || [];
-      const nextShots = (prev.shots || []).map(shot => {
-        const nextSlots = { ...(shot.assigned_slots || {}) };
-        for (const key of Object.keys(nextSlots)) {
-          if (nextSlots[key] === filename) {
-            delete nextSlots[key];
-          }
-        }
-        return { ...shot, assigned_slots: nextSlots };
-      });
-      return {
-        ...prev,
-        assets: prevAssets.filter(a => a.filename !== filename),
-        shots: nextShots
-      };
+      const { updatedProject } = cascadeAssetDeletion(prev, filename);
+      return updatedProject;
     });
     setIsDirty(true);
+
     // Clear mappings referencing this deleted asset
     setNodeMappings(prev => {
       const updated = { ...prev };

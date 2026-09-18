@@ -22,12 +22,13 @@ export const AssetMatrixPanel: React.FC<AssetMatrixPanelProps> = ({
     if (shotFilenameOverride) {
        const matchedAsset = assets.find(a => a.filename === shotFilenameOverride || (a as any).name === shotFilenameOverride);
        if (matchedAsset) {
-           return { ...matchedAsset, preview_url: getAssetMediaUrl(matchedAsset, true) };
+           return { ...matchedAsset, preview_url: getAssetMediaUrl(matchedAsset, true), isGhost: false };
        }
        return {
          filename: shotFilenameOverride,
-         preview_url: getAssetMediaUrl(shotFilenameOverride, true),
-         label: `Slot ${slotIndex + 1}`
+         preview_url: "",
+         isGhost: true,
+         label: `Missing: ${shotFilenameOverride}`
        } as any;
     }
     return null;
@@ -66,7 +67,22 @@ export const AssetMatrixPanel: React.FC<AssetMatrixPanelProps> = ({
                     : "border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/50"
                 }`}
               >
-                {asset?.preview_url ? (
+                {asset?.isGhost ? (
+                  <div className="flex flex-col items-center justify-center text-center p-2 bg-red-50/50 dark:bg-red-950/20 w-full h-full border border-red-200 dark:border-red-900/50 rounded-lg">
+                    <div className="absolute top-1 left-1 bg-red-600/80 text-white text-[9px] font-mono px-1 py-0.2 rounded z-10">
+                      Slot {i + 1}
+                    </div>
+                    <button 
+                      onClick={() => onClearSlot(i)}
+                      className="absolute top-1 right-1 bg-red-800/80 hover:bg-red-700 p-1 rounded-full text-white backdrop-blur z-10 transition-colors cursor-pointer"
+                      title="Clear ghost slot"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                    <span className="text-[10px] font-semibold text-red-600 dark:text-red-400">Missing Asset</span>
+                    <span className="text-[9px] font-mono text-zinc-500 truncate max-w-full px-1">{asset.filename}</span>
+                  </div>
+                ) : asset?.preview_url ? (
                   <>
                     <img src={asset.preview_url} className="absolute inset-0 w-full h-full object-cover" alt="" />
                     <div className="absolute top-1 left-1 bg-black/70 backdrop-blur-xs text-zinc-200 text-[10px] font-mono px-1.5 py-0.5 rounded border border-white/10 z-10">
