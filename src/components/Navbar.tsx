@@ -193,7 +193,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             }`}
           >
             <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-            Scenes
+            Scene
           </button>
           <button
             onClick={() => onNavigate("assets")}

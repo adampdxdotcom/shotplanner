@@ -44,6 +44,9 @@ function buildProjectDossier(
     sections.push(`### ACTIVE SCENE: "${sceneProject.scene_name}"`);
     const sp = sceneProject.scene_planning;
     if (sp) {
+      if (sp.overarching_goal) {
+        sections.push(`OVERARCHING SCENE GOAL & NARRATIVE OBJECTIVE:\n"${sp.overarching_goal}"`);
+      }
       const planDetails = [
         sp.visual_theme ? `Visual Theme: ${sp.visual_theme}` : null,
         sp.environment_description ? `Environment / Location: ${sp.environment_description}` : null,
@@ -223,6 +226,7 @@ ${projectDossier}
 BEHAVIOR GUIDELINES:
 - Be concise, cinematic, and directly helpful.
 - When referencing characters, shots, or camera settings, ground your answers in the Project Dossier above.
+- Overarching Scene Goal: If an Overarching Scene Goal is provided in the Project Dossier, use it as your creative north star. When the user asks for advice, critique, pacing feedback, or next-shot ideas, evaluate how each shot serves this overarching goal of the sequence, ensuring dramatic progression and visual cohesion.
 - Conversational Memory & Continuity: You have access to recent conversation history for this scene. Actively reference earlier decisions, shot critiques, alternative camera angles, wardrobe changes, and creative ideas discussed throughout this scene when answering questions or refining shots.
 - Reference Photos & Cast Awareness: Notice whether cast members have reference photos in their card slots 1–4. Prompt expansion relies on reference photos (<Picture 1>, <Picture 2>). When proposing or adding a shot featuring a character who has NO reference photos in slots 1–4, explicitly remind the user: "Note: [Character] does not yet have reference photos in slots 1–4 on their character card. You'll need to assign reference photos in the Cast or Asset Manager section before expanding the prompt."
 - If asked for shot recommendations, provide specific cinematography parameters: Shot Type / Framing, Camera Movement, Lens Focal Length, and a brief description of the action.
@@ -245,6 +249,7 @@ Action formats:
   "type": "update_scene_planning",
   "title": "Establish Neo-Noir Rain Atmosphere",
   "changes": {
+    "overarching_goal": "Elena tracks down the rogue courier in the alley, escalating from stealth surveillance to a tense confrontation.",
     "visual_theme": "Cyberpunk Neo-Noir, High Contrast Chiaroscuro",
     "environment_description": "Rain-slicked alleyway in Sector 4 with flickering holographic ads",
     "lighting_style": "Deep cyan ambient with warm neon amber highlights",

@@ -1,5 +1,5 @@
 import React from "react";
-import { BookOpen, Palette, MapPin, Sliders, Camera, Check, Undo2, Sparkles, ArrowRight, X } from "lucide-react";
+import { BookOpen, Palette, MapPin, Sliders, Camera, Check, Undo2, Sparkles, ArrowRight, X, Compass } from "lucide-react";
 import { UpdateScenePlanningAction, AssistantAction } from "../../../types/assistantActions";
 
 interface UpdateScenePlanningActionCardProps {
@@ -60,6 +60,17 @@ export const UpdateScenePlanningActionCard: React.FC<UpdateScenePlanningActionCa
           <div className="flex items-center gap-1.5 font-mono">
             <span className="text-slate-400 dark:text-zinc-500">Scene Name:</span>
             <strong className="text-slate-800 dark:text-zinc-200 font-medium">{changes.scene_name}</strong>
+          </div>
+        )}
+        {changes.overarching_goal && (
+          <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-950 dark:text-amber-200">
+            <div className="flex items-center gap-1 font-semibold text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-400 mb-0.5">
+              <Compass className="w-3 h-3" />
+              <span>Overarching Scene Goal</span>
+            </div>
+            <p className="font-sans text-[11px] leading-relaxed">
+              {changes.overarching_goal}
+            </p>
           </div>
         )}
         {changes.visual_theme && (

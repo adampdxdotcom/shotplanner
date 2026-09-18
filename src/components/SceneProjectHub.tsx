@@ -11,8 +11,9 @@ import { AssetMatrixPanel } from "./hub/AssetMatrixPanel";
 import { PromptPreviewPanel } from "./hub/PromptPreviewPanel";
 import { AiReferenceStagingStudioModal } from "./cast/AiReferenceStagingStudioModal";
 import { SceneSketchImportModal } from "./scenes/SceneSketchImportModal";
+import { ScenePlanModal } from "./scenes/ScenePlanModal";
 import { fetchUniverseCharacters, fetchUniverseAssets } from "../utils/universeApi";
-import { Film, Sparkles, Plus } from "lucide-react";
+import { Film, Sparkles, Plus, Compass } from "lucide-react";
 
 interface Props {
   project: SceneProjectFile;
@@ -54,8 +55,24 @@ export default function SceneProjectHub({
   
   // Scene Sketch Import Modal State
   const [isSketchImportOpen, setIsSketchImportOpen] = useState(false);
+  const [isScenePlanOpen, setIsScenePlanOpen] = useState(false);
   const [universeCharacters, setUniverseCharacters] = useState<Record<string, UniverseCharacterProfile>>({});
   const [universeAssets, setUniverseAssets] = useState<MediaAsset[]>([]);
+
+  const handleSaveScenePlan = (overarchingGoal: string) => {
+    onUpdateProject((prev) => ({
+      ...prev,
+      scene_planning: {
+        ...(prev.scene_planning || {}),
+        overarching_goal: overarchingGoal
+      },
+      updated_at: new Date().toISOString()
+    }));
+    onShowToast(
+      overarchingGoal ? "Scene Plan updated." : "Scene Plan cleared.",
+      "success"
+    );
+  };
 
   // Fetch universe roster & media pool whenever import modal is triggered
   useEffect(() => {
@@ -311,6 +328,18 @@ export default function SceneProjectHub({
 
         <div className="flex items-center gap-2 self-end sm:self-auto">
           <button
+            id="scene-plan-modal-btn"
+            onClick={() => setIsScenePlanOpen(true)}
+            className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700 shadow-xs transition-colors cursor-pointer"
+            title="Open Scene Plan & Narrative Goal"
+          >
+            <Compass className="w-4 h-4 text-amber-500" />
+            <span>Scene Plan</span>
+            {Boolean(project.scene_planning?.overarching_goal?.trim()) && (
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 ml-0.5" title="Scene Plan defined" />
+            )}
+          </button>
+          <button
             onClick={() => setIsSketchImportOpen(true)}
             className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs transition-colors cursor-pointer"
             title="Import text sketch or screenplay and parse into shots"
@@ -513,6 +542,14 @@ export default function SceneProjectHub({
         existingSceneAssets={assets}
         lmStudioUrl={config.lm_studio_url}
         onImportSuccess={handleSketchImportSuccess}
+      />
+
+      <ScenePlanModal
+        isOpen={isScenePlanOpen}
+        onClose={() => setIsScenePlanOpen(false)}
+        sceneName={project.scene_name}
+        scenePlanning={project.scene_planning}
+        onSave={handleSaveScenePlan}
       />
     </div>
   );

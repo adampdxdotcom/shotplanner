@@ -53,6 +53,7 @@ export interface SceneProjectFile {
   shots: ShotItem[];
   characters?: Record<string, CharacterProfile> | any[];
   scene_planning?: {
+    overarching_goal?: string;
     visual_theme?: string;
     environment_description?: string;
     lighting_style?: string;

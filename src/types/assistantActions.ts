@@ -59,6 +59,7 @@ export interface AddShotAction {
 }
 
 export interface UpdateScenePlanningChanges {
+  overarching_goal?: string;
   visual_theme?: string;
   environment_description?: string;
   lighting_style?: string;

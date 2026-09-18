@@ -62,6 +62,7 @@ export interface UniverseCharacterProfile extends CharacterProfile {
 }
 
 export interface ScenePlanningDetails {
+  overarching_goal?: string;
   visual_theme?: string;
   environment_description?: string;
   lighting_style?: string;
