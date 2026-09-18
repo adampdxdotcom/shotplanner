@@ -71,6 +71,11 @@ export interface ScenePlanningDetails {
   [key: string]: any;
 }
 
+export interface AssistantChatMessage {
+  role: "user" | "assistant" | "system";
+  content: string;
+}
+
 export interface SceneProjectFile {
   schema_version: "1.0";
   scene_id: string;
@@ -99,6 +104,7 @@ export interface SceneProjectFile {
   active_take_id?: string;
   hero_take_id?: string;
   staging_recipe?: StagingLayerRecipe;
+  assistant_chat_history?: AssistantChatMessage[];
 }
 
 export interface StagedActorRecipeItem {

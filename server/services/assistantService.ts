@@ -166,6 +166,22 @@ function buildProjectDossier(
 }
 
 /**
+ * Trims conversation messages to a rolling window (default 16 turns) to protect LLM context limits.
+ */
+function getRollingChatWindow<T extends { role: string; content: string }>(
+  messages: T[],
+  maxTurns = 16
+): T[] {
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return [];
+  }
+  if (messages.length <= maxTurns) {
+    return [...messages];
+  }
+  return messages.slice(-maxTurns);
+}
+
+/**
  * Main service method to process an assistant chat query.
  */
 export async function chatWithAssistant(options: AssistantChatOptions): Promise<AssistantChatResult> {
@@ -184,6 +200,9 @@ export async function chatWithAssistant(options: AssistantChatOptions): Promise<
   if (!messages || messages.length === 0) {
     throw new Error("Chat messages are required.");
   }
+
+  // Rolling window of recent conversation turns to keep LLM context limits safe
+  const windowedMessages = getRollingChatWindow(messages, 16);
 
   const projectDossier = buildProjectDossier(scene_project, active_shot_id, active_section);
 
@@ -204,6 +223,7 @@ ${projectDossier}
 BEHAVIOR GUIDELINES:
 - Be concise, cinematic, and directly helpful.
 - When referencing characters, shots, or camera settings, ground your answers in the Project Dossier above.
+- Conversational Memory & Continuity: You have access to recent conversation history for this scene. Actively reference earlier decisions, shot critiques, alternative camera angles, wardrobe changes, and creative ideas discussed throughout this scene when answering questions or refining shots.
 - Reference Photos & Cast Awareness: Notice whether cast members have reference photos in their card slots 1–4. Prompt expansion relies on reference photos (<Picture 1>, <Picture 2>). When proposing or adding a shot featuring a character who has NO reference photos in slots 1–4, explicitly remind the user: "Note: [Character] does not yet have reference photos in slots 1–4 on their character card. You'll need to assign reference photos in the Cast or Asset Manager section before expanding the prompt."
 - If asked for shot recommendations, provide specific cinematography parameters: Shot Type / Framing, Camera Movement, Lens Focal Length, and a brief description of the action.
 - Use standard camera movements: "Locked Off", "Slow Push In", "Pull Out", "Pan Left", "Pan Right", "Tilt Up", "Tilt Down", "Tracking Shot", "Crane / Jib Shot", "Handheld Organic".
@@ -340,18 +360,18 @@ Only include fields that are changing or relevant. Always keep your conversation
     if (!storedGeminiKey) {
       throw new Error("Google Gemini API key is not configured. Please save your API key in Settings.");
     }
-    // Assemble conversational history for Gemini
-    const conversationHistory = messages.map(m => `${m.role.toUpperCase()}: ${m.content}`).join("\n\n");
+    // Assemble conversational history for Gemini (using rolling window)
+    const conversationHistory = windowedMessages.map(m => `${m.role.toUpperCase()}: ${m.content}`).join("\n\n");
     const fullPrompt = `${systemPrompt}\n\nCONVERSATION HISTORY:\n${conversationHistory}\n\nASSISTANT:`;
     const result = await generateWithGeminiAPI(storedGeminiKey, fullPrompt);
     reply = result.text;
     modelUsed = result.modelUsed;
     providerUsed = `Gemini (${result.modelUsed})`;
   } else {
-    // Format messages for OpenAI-compatible Local LLM endpoint
+    // Format messages for OpenAI-compatible Local LLM endpoint (using rolling window)
     const llmMessages = [
       { role: "system" as const, content: systemPrompt },
-      ...messages.map(m => {
+      ...windowedMessages.map(m => {
         let role: "assistant" | "user" | "system" = "user";
         if (m.role === "assistant") role = "assistant";
         else if (m.role === "system") role = "system";

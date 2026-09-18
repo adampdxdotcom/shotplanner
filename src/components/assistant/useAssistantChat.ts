@@ -3,6 +3,13 @@ import { SceneProjectFile, LLMProvider } from "../../types";
 import { sendAssistantChatMessage, AssistantChatMessage } from "../../services/assistantClient";
 import { probeLMStudioConnection } from "../config/lmStudioProbe";
 import { probeGeminiConnection } from "../config/GeminiConfig";
+import {
+  getStoredAssistantChat,
+  saveStoredAssistantChat,
+  clearStoredAssistantChat,
+  createInitialAssistantMessage,
+  getRollingChatWindow
+} from "../../utils/assistantChatStore";
 
 export interface UseAssistantChatParams {
   sceneProject: SceneProjectFile;
@@ -12,11 +19,13 @@ export interface UseAssistantChatParams {
   effectiveDefault: LLMProvider;
   geminiApiKey?: string;
   isOpen: boolean;
+  onUpdateProject?: React.Dispatch<React.SetStateAction<SceneProjectFile>>;
+  onShowToast?: (text: string, type?: "success" | "error" | "info") => void;
 }
 
 /**
  * Custom hook managing assistant chat conversation history,
- * query submission, auto-scrolling, and connection probing.
+ * per-scene persistence, query submission, auto-scrolling, and connection probing.
  */
 export function useAssistantChat({
   sceneProject,
@@ -25,7 +34,9 @@ export function useAssistantChat({
   lmStudioUrl,
   effectiveDefault,
   geminiApiKey,
-  isOpen
+  isOpen,
+  onUpdateProject,
+  onShowToast
 }: UseAssistantChatParams) {
   const [inputQuery, setInputQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -34,24 +45,34 @@ export function useAssistantChat({
   const [isDefaultLlmConnected, setIsDefaultLlmConnected] = useState<boolean | null>(null);
   const [isCheckingConnection, setIsCheckingConnection] = useState<boolean>(false);
 
-  const initialWelcome = `Hello! I am your AI Production Assistant. I have full context of **${
-    sceneProject?.scene_name || "your active scene"
-  }**, including all **${sceneProject?.shots?.length || 0} shots**, world planning, cast profiles, and assets.\n\nAsk me for cinematography recommendations, scene lore, lighting setups, dialogue tweaks, or to stage assets and trigger prompt expansions.`;
+  // Initialize chat messages from per-scene stored history
+  const [messages, setMessages] = useState<AssistantChatMessage[]>(() =>
+    getStoredAssistantChat(sceneProject?.scene_id, sceneProject)
+  );
 
-  const [messages, setMessages] = useState<AssistantChatMessage[]>([
-    {
-      role: "assistant",
-      content: initialWelcome
-    }
-  ]);
-
+  const prevSceneIdRef = useRef<string | undefined>(sceneProject?.scene_id);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Update initial welcome message if scene context shifts
+  // Automatic Scene Switch Awareness:
+  // When active scene changes, switch to that scene's saved conversation history
+  useEffect(() => {
+    const currentSceneId = sceneProject?.scene_id;
+    if (currentSceneId && currentSceneId !== prevSceneIdRef.current) {
+      prevSceneIdRef.current = currentSceneId;
+      const sceneChat = getStoredAssistantChat(currentSceneId, sceneProject);
+      setMessages(sceneChat);
+      setErrorMessage(null);
+    }
+  }, [sceneProject?.scene_id, sceneProject]);
+
+  // Synchronize greeting if project starts fresh without messages
   useEffect(() => {
     if (messages.length === 1 && messages[0].role === "assistant") {
-      setMessages([{ role: "assistant", content: initialWelcome }]);
+      const refreshedGreeting = createInitialAssistantMessage(sceneProject);
+      if (messages[0].content !== refreshedGreeting.content) {
+        setMessages([refreshedGreeting]);
+      }
     }
   }, [sceneProject?.scene_name, sceneProject?.shots?.length]);
 
@@ -94,6 +115,20 @@ export function useAssistantChat({
     }
   }, [isOpen]);
 
+  const persistMessages = useCallback(
+    (newMessages: AssistantChatMessage[]) => {
+      if (sceneProject?.scene_id) {
+        saveStoredAssistantChat(sceneProject.scene_id, newMessages);
+      }
+      onUpdateProject?.((prev) => ({
+        ...prev,
+        assistant_chat_history: newMessages,
+        updated_at: new Date().toISOString()
+      }));
+    },
+    [sceneProject?.scene_id, onUpdateProject]
+  );
+
   const handleSendMessage = async () => {
     const trimmed = inputQuery.trim();
     if (!trimmed || isLoading) return;
@@ -105,12 +140,13 @@ export function useAssistantChat({
     ];
 
     setMessages(newMessages);
+    persistMessages(newMessages);
     setInputQuery("");
     setIsLoading(true);
 
     try {
       const response = await sendAssistantChatMessage({
-        messages: newMessages,
+        messages: getRollingChatWindow(newMessages, 16),
         scene_project: sceneProject,
         active_shot_id: activeShotId,
         active_section: activeSection,
@@ -119,10 +155,12 @@ export function useAssistantChat({
       });
 
       if (response && response.reply) {
-        setMessages([
+        const finalMessages: AssistantChatMessage[] = [
           ...newMessages,
           { role: "assistant", content: response.reply }
-        ]);
+        ];
+        setMessages(finalMessages);
+        persistMessages(finalMessages);
         setIsDefaultLlmConnected(true);
       } else {
         throw new Error("Received empty response from assistant.");
@@ -132,8 +170,8 @@ export function useAssistantChat({
       const errText = err.message || "Failed to communicate with LLM provider.";
       setErrorMessage(errText);
       setIsDefaultLlmConnected(false);
-      
-      setMessages([
+
+      const errorMessages: AssistantChatMessage[] = [
         ...newMessages,
         {
           role: "assistant",
@@ -141,7 +179,9 @@ export function useAssistantChat({
             effectiveDefault === "gemini" ? "Google Gemini API Key" : "LM Studio instance"
           }** is running and configured correctly in the settings.`
         }
-      ]);
+      ];
+      setMessages(errorMessages);
+      persistMessages(errorMessages);
     } finally {
       setIsLoading(false);
     }
@@ -154,20 +194,30 @@ export function useAssistantChat({
     }
   };
 
-  const handleResetChat = () => {
-    setMessages([{ role: "assistant", content: initialWelcome }]);
+  const handleResetChat = useCallback(() => {
+    const initialMsgs = clearStoredAssistantChat(sceneProject?.scene_id, sceneProject);
+    setMessages(initialMsgs);
+    persistMessages(initialMsgs);
     setErrorMessage(null);
-  };
+    onShowToast?.("Conversation history reset for this scene.", "info");
+  }, [sceneProject, persistMessages, onShowToast]);
 
-  const injectStateFeedback = useCallback((feedbackText: string) => {
-    setMessages((prev) => [
-      ...prev,
-      {
-        role: "system",
-        content: `[System: ${feedbackText}]`
-      }
-    ]);
-  }, []);
+  const injectStateFeedback = useCallback(
+    (feedbackText: string) => {
+      setMessages((prev) => {
+        const updated: AssistantChatMessage[] = [
+          ...prev,
+          {
+            role: "system",
+            content: `[System: ${feedbackText}]`
+          }
+        ];
+        persistMessages(updated);
+        return updated;
+      });
+    },
+    [persistMessages]
+  );
 
   return {
     inputQuery,

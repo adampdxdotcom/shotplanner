@@ -82,7 +82,9 @@ export const AssistantFloatingChat: React.FC<AssistantFloatingChatProps> = ({
     lmStudioUrl,
     effectiveDefault,
     geminiApiKey,
-    isOpen
+    isOpen,
+    onUpdateProject,
+    onShowToast
   });
 
   // Hook 2: Project mutation actions, batch execution, undo engine, and remote staging
@@ -139,6 +141,7 @@ export const AssistantFloatingChat: React.FC<AssistantFloatingChatProps> = ({
             isExpanded={isExpanded}
             onToggleExpand={() => setIsExpanded(!isExpanded)}
             onClose={() => setIsOpen(false)}
+            onResetChat={handleResetChat}
           />
 
           {/* Offline Connection Warning Banner */}

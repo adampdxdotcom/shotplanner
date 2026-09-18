@@ -1,9 +1,6 @@
-import { SceneProjectFile } from "../types";
+import { SceneProjectFile, AssistantChatMessage } from "../types";
 
-export interface AssistantChatMessage {
-  role: "user" | "assistant" | "system";
-  content: string;
-}
+export type { AssistantChatMessage };
 
 export interface AssistantChatRequest {
   messages: AssistantChatMessage[];
