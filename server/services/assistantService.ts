@@ -114,7 +114,11 @@ function buildProjectDossier(
       const name = c.name || c.character_name || "Unknown";
       const outfit = c.scene_outfit_ref ? `Outfit: ${c.scene_outfit_ref}` : null;
       const notes = c.notes || c.wardrobe_notes || c.visual_traits || null;
-      const details = [outfit, notes ? `Notes: ${notes}` : null].filter(Boolean).join(" | ");
+      const quickCount = Array.isArray(c.quick_slots) ? c.quick_slots.filter(Boolean).length : 0;
+      const refStatus = quickCount > 0 
+        ? `${quickCount}/4 reference photos configured in card slots 1-4 (${c.quick_slots.filter(Boolean).join(", ")})` 
+        : "NO reference photos in card slots 1-4 (User will need to assign reference photos before prompt expansion)";
+      const details = [outfit, notes ? `Notes: ${notes}` : null, `Photos: ${refStatus}`].filter(Boolean).join(" | ");
       return `- ${name}: ${details || "Standard scene attire"}`;
     }).join("\n");
     sections.push(`### SCENE CAST & WARDROBE:\n${charSummary}`);
@@ -200,6 +204,7 @@ ${projectDossier}
 BEHAVIOR GUIDELINES:
 - Be concise, cinematic, and directly helpful.
 - When referencing characters, shots, or camera settings, ground your answers in the Project Dossier above.
+- Reference Photos & Cast Awareness: Notice whether cast members have reference photos in their card slots 1–4. Prompt expansion relies on reference photos (<Picture 1>, <Picture 2>). When proposing or adding a shot featuring a character who has NO reference photos in slots 1–4, explicitly remind the user: "Note: [Character] does not yet have reference photos in slots 1–4 on their character card. You'll need to assign reference photos in the Cast or Asset Manager section before expanding the prompt."
 - If asked for shot recommendations, provide specific cinematography parameters: Shot Type / Framing, Camera Movement, Lens Focal Length, and a brief description of the action.
 - Use standard camera movements: "Locked Off", "Slow Push In", "Pull Out", "Pan Left", "Pan Right", "Tilt Up", "Tilt Down", "Tracking Shot", "Crane / Jib Shot", "Handheld Organic".
 - Never output sections or headings titled "Suggested Directives" or output generic prompt directive blocks; keep all suggestions grounded in concrete cinematography parameters and structured action blocks.
@@ -254,6 +259,7 @@ Action formats:
     "lens_focal_length": "85mm Portrait Telephoto",
     "camera_movement": "Slow Push In",
     "lighting_setup": "Moody side rim light with deep shadows",
+    "characters": ["Elena"],
     "basic_stub": "Elena gazes through the rain-streaked window as neon reflects across her titanium neural port."
   }
 }
@@ -263,14 +269,15 @@ Action formats:
 \`\`\`action
 {
   "type": "add_shot",
-  "title": "Establish the environment with wide anamorphic sweep",
+  "title": "Establish Elena in the rain with wide anamorphic sweep",
   "shot": {
     "shot_name": "Wide establishing angle",
+    "characters": ["Elena"],
     "shot_type": "Extreme Wide Shot (EWS)",
     "lens_focal_length": "24mm Wide-Angle",
     "camera_movement": "Pan Left",
     "aspect_ratio": "16:9 Widescreen",
-    "basic_stub": "Wide shot across the neon rain-soaked alley as steam rises from subway vents."
+    "basic_stub": "Wide shot across the neon rain-soaked alley as steam rises from subway vents and Elena walks into frame."
   }
 }
 \`\`\`

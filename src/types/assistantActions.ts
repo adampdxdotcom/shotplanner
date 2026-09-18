@@ -23,6 +23,9 @@ export interface UpdateShotActionChanges {
   lighting_setup?: string;
   camera_angle?: string;
   dialogue_line?: string;
+  characters?: string[];
+  character?: string;
+  assigned_slots?: Record<string | number, string>;
 }
 
 export interface UpdateShotAction {
@@ -48,6 +51,10 @@ export interface AddShotAction {
     lighting_setup?: string;
     camera_angle?: string;
     characters?: string[];
+    character?: string;
+    ots_anchor_subject?: string;
+    ots_focus_subject?: string;
+    assigned_slots?: Record<string | number, string>;
   };
 }
 

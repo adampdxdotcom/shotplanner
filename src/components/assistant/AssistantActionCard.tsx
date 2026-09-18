@@ -180,6 +180,18 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
               <span className="text-slate-800 dark:text-zinc-200">{changes.lighting_setup}</span>
             </div>
           )}
+          {changes.characters && changes.characters.length > 0 && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-slate-400 dark:text-zinc-500">Cast:</span>
+              <div className="flex flex-wrap gap-1">
+                {changes.characters.map((c, i) => (
+                  <span key={i} className="px-1.5 py-0.2 bg-slate-200/80 dark:bg-zinc-800 text-slate-800 dark:text-zinc-200 rounded text-[10px] font-sans font-medium">
+                    {c}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
           {changes.basic_stub && (
             <div className="mt-1 pt-1 border-t border-slate-200/50 dark:border-zinc-800">
               <span className="text-slate-400 dark:text-zinc-500 block mb-0.5">Prompt Stub:</span>
@@ -292,6 +304,18 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
             <div className="flex items-center gap-1.5">
               <span className="text-slate-400 dark:text-zinc-500">Aspect Ratio:</span>
               <strong className="text-slate-800 dark:text-zinc-200 font-medium">{shotData.aspect_ratio}</strong>
+            </div>
+          )}
+          {shotData.characters && shotData.characters.length > 0 && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-slate-400 dark:text-zinc-500">Cast:</span>
+              <div className="flex flex-wrap gap-1">
+                {shotData.characters.map((c, i) => (
+                  <span key={i} className="px-1.5 py-0.2 bg-slate-200/80 dark:bg-zinc-800 text-slate-800 dark:text-zinc-200 rounded text-[10px] font-sans font-medium">
+                    {c}
+                  </span>
+                ))}
+              </div>
             </div>
           )}
           {shotData.basic_stub && (

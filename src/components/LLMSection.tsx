@@ -42,7 +42,9 @@ import {
   Clock,
   Image as ImageIcon,
   Video as VideoIcon,
-  Music as MusicIcon
+  Music as MusicIcon,
+  AlertTriangle,
+  Plus
 } from "lucide-react";
 
 interface LLMSectionProps {
@@ -170,7 +172,8 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
 
   // Unique associated assets with their slot index for 3-wide thumbnail preview
   const displayAssociatedAssets = useMemo(() => {
-    const list = relevantAssets.length > 0 ? relevantAssets : assets;
+    // Only display assets actually relevant to the active shot (or all assets if no shot is selected)
+    const list = activeShot ? relevantAssets : assets;
     const seen = new Set<string>();
     const result: Array<MediaAsset & { slot_index?: number }> = [];
     list.forEach((item, idx) => {
@@ -182,7 +185,90 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
       }
     });
     return result.sort((a, b) => (a.slot_index ?? 0) - (b.slot_index ?? 0));
-  }, [relevantAssets, assets]);
+  }, [activeShot, relevantAssets, assets]);
+
+  // Analyze whether the active shot or its characters are missing reference photos
+  const missingPhotoInfo = useMemo(() => {
+    if (!activeShot) return null;
+    const assignedCount = relevantAssets.length;
+    const shotCharacters = activeShot.characters || [];
+    const allSceneChars = sceneProject.characters || {};
+
+    const charStatus = shotCharacters.map(charName => {
+      const profile = (allSceneChars as any)[charName] || 
+        Object.entries(allSceneChars).find(([k]) => k.toLowerCase() === charName.toLowerCase())?.[1];
+      const quickSlots = Array.isArray(profile?.quick_slots) ? profile.quick_slots.filter(Boolean) : [];
+      const charAssets = assets.filter(a => (a.subject_name || "").trim().toLowerCase() === charName.trim().toLowerCase());
+      const hasPhotos = quickSlots.length > 0 || charAssets.length > 0;
+      return {
+        name: charName,
+        hasPhotos,
+        quickSlots,
+        charAssets
+      };
+    });
+
+    const charactersWithoutPhotos = charStatus.filter(c => !c.hasPhotos);
+    const charactersWithPhotosUnassigned = charStatus.filter(c => c.hasPhotos && assignedCount === 0);
+
+    return {
+      assignedCount,
+      shotCharacters,
+      charStatus,
+      charactersWithoutPhotos,
+      charactersWithPhotosUnassigned,
+      isMissingAllReferences: assignedCount === 0
+    };
+  }, [activeShot, relevantAssets, sceneProject.characters, assets]);
+
+  // Auto-assign available reference photos for a character directly from prompt expansion view
+  const handleAutoAssignCharacterPhotos = (charName: string) => {
+    if (!activeShot || !onUpdateSpecificShot) return;
+    const allSceneChars = sceneProject.characters || {};
+    const profile = (allSceneChars as any)[charName] || 
+      Object.entries(allSceneChars).find(([k]) => k.toLowerCase() === charName.toLowerCase())?.[1];
+    
+    let candidateFilenames: string[] = [];
+    if (profile && Array.isArray(profile.quick_slots)) {
+      candidateFilenames = profile.quick_slots.filter(Boolean);
+    }
+    if (candidateFilenames.length === 0) {
+      candidateFilenames = assets
+        .filter(a => (a.subject_name || "").trim().toLowerCase() === charName.trim().toLowerCase())
+        .map(a => a.filename);
+    }
+
+    if (candidateFilenames.length === 0) {
+      onShowToast?.(`No reference photos found for character "${charName}".`, "error");
+      return;
+    }
+
+    onUpdateSpecificShot(activeShot.id, prev => {
+      const nextSlots = { ...(prev.assigned_slots || {}) };
+      let assigned = 0;
+      for (const fn of candidateFilenames) {
+        if (Object.values(nextSlots).includes(fn)) continue;
+        let targetSlot = -1;
+        for (let i = 0; i < 8; i++) {
+          if (!nextSlots[i] && !nextSlots[`slot_${i}`]) {
+            targetSlot = i;
+            break;
+          }
+        }
+        if (targetSlot !== -1) {
+          nextSlots[targetSlot] = fn;
+          assigned++;
+        }
+      }
+      return {
+        ...prev,
+        assigned_slots: nextSlots,
+        status: "unstaged"
+      };
+    });
+
+    onShowToast?.(`Assigned reference photo(s) for ${charName} to Shot #${activeShot.shot_number}.`, "success");
+  };
 
   const activeShotPrefix = activeShot 
     ? generatePromptPrefix({
@@ -270,6 +356,13 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
 
     if (!stubToUse) {
       setError("Please provide a basic prompt stub first.");
+      return;
+    }
+
+    if (relevantAssets.length === 0) {
+      const msg = "At least one reference photo is required to expand the prompt for this shot. Please assign reference photos in the Cast or Asset Manager tabs.";
+      setError(msg);
+      onShowToast?.(msg, "error");
       return;
     }
 
@@ -715,20 +808,62 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
             </div>
           </div>
 
+          {/* Missing Reference Photo Alert / Helper */}
+          {missingPhotoInfo?.isMissingAllReferences && (
+            <div className="mt-3 p-3 rounded-lg border border-amber-300 dark:border-amber-500/40 bg-amber-50/90 dark:bg-amber-950/40 text-amber-950 dark:text-amber-200 text-xs space-y-2">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                <div className="space-y-1 flex-1 min-w-0">
+                  <p className="font-semibold text-[11.5px]">Reference Photos Required</p>
+                  {missingPhotoInfo.charactersWithoutPhotos.length > 0 ? (
+                    <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
+                      Character <strong>{missingPhotoInfo.charactersWithoutPhotos.map(c => c.name).join(", ")}</strong> has no reference photos configured in slots 1–4 on their character card. Please assign reference photos in the Cast or Asset Manager tabs before expanding the prompt.
+                    </p>
+                  ) : missingPhotoInfo.charactersWithPhotosUnassigned.length > 0 ? (
+                    <div className="space-y-1.5">
+                      <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
+                        Reference photos exist on the character card for <strong>{missingPhotoInfo.charactersWithPhotosUnassigned.map(c => c.name).join(", ")}</strong>, but are not linked to this shot yet.
+                      </p>
+                      <div className="flex flex-wrap gap-1.5 pt-0.5">
+                        {missingPhotoInfo.charactersWithPhotosUnassigned.map(c => (
+                          <button
+                            key={c.name}
+                            type="button"
+                            onClick={() => handleAutoAssignCharacterPhotos(c.name)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-amber-600 hover:bg-amber-700 text-white font-semibold text-[10.5px] transition-colors cursor-pointer shadow-xs"
+                          >
+                            <Plus className="w-3 h-3" />
+                            <span>Link {c.name}'s Photos to Shot</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
+                      No reference assets are assigned to this shot. Prompt expansion builds prompt conditioning with reference photo tags (<span className="font-mono">&lt;Picture 1&gt;</span>). Please assign at least one reference photo.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           <button
             onClick={handleGeneratePrompt}
-            disabled={!generating && (!currentBasicStub.trim() || assets.length === 0)}
+            disabled={!generating && (!currentBasicStub.trim() || relevantAssets.length === 0)}
             title={
               generating 
                 ? "Click to cancel prompt expansion" 
-                : assets.length === 0 
-                ? "You must upload at least one asset to generate a prompt." 
+                : relevantAssets.length === 0 
+                ? "At least one reference photo is required to expand the prompt for this shot." 
+                : !currentBasicStub.trim()
+                ? "Please enter a basic prompt stub first."
                 : ""
             }
             className={`w-full mt-3 py-2.5 px-4 font-semibold rounded-lg text-xs transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer ${
               generating
                 ? "bg-red-50 hover:bg-red-100 text-red-700 border border-red-300 dark:bg-red-500/15 dark:hover:bg-red-500/25 dark:text-red-300 dark:border-red-500/40 active:scale-[0.99]"
-                : assets.length === 0 
+                : relevantAssets.length === 0 
                 ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 cursor-not-allowed border border-zinc-200 dark:border-zinc-700" 
                 : providerChoice === "gemini"
                 ? "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white disabled:opacity-50"
@@ -748,7 +883,9 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
                   <Bot className="w-4 h-4" />
                 )}
                 <span>
-                  {expandedPrompt && expandedPrompt.trim()
+                  {relevantAssets.length === 0
+                    ? "Add Reference Photos to Generate Prompt"
+                    : expandedPrompt && expandedPrompt.trim()
                     ? `Regenerate Prompt with ${providerChoice === "gemini" ? "Gemini 3.7 Flash" : "LM Studio"}`
                     : `Generate Prompt with ${providerChoice === "gemini" ? "Gemini 3.7 Flash" : "LM Studio"}`}
                 </span>

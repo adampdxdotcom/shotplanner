@@ -271,9 +271,41 @@ export const AssistantFloatingChat: React.FC<AssistantFloatingChatProps> = ({
         if (idx !== -1) {
           const current = shots[idx];
           const changes = action.changes || {};
+          const mergedCharacters = changes.characters || current.characters;
+          
+          // If characters are updated, also check if reference photos can be auto-linked
+          const updatedSlots = { ...(current.assigned_slots || {}) };
+          if (changes.characters && Array.isArray(changes.characters)) {
+            const allSceneChars = sceneProject.characters || {};
+            changes.characters.forEach(charName => {
+              const profile = (allSceneChars as any)[charName] || 
+                Object.entries(allSceneChars).find(([k]) => k.toLowerCase() === charName.toLowerCase())?.[1];
+              let candidatePhotos: string[] = [];
+              if (profile && Array.isArray(profile.quick_slots)) {
+                candidatePhotos = profile.quick_slots.filter(Boolean);
+              }
+              if (candidatePhotos.length === 0) {
+                candidatePhotos = (assets || [])
+                  .filter(a => (a.subject_name || "").trim().toLowerCase() === charName.trim().toLowerCase())
+                  .map(a => a.filename);
+              }
+              candidatePhotos.forEach(fn => {
+                if (Object.values(updatedSlots).includes(fn)) return;
+                for (let i = 0; i < 8; i++) {
+                  if (!updatedSlots[i] && !updatedSlots[`slot_${i}`]) {
+                    updatedSlots[i] = fn;
+                    break;
+                  }
+                }
+              });
+            });
+          }
+
           shots[idx] = {
             ...current,
             ...changes,
+            characters: mergedCharacters,
+            assigned_slots: updatedSlots,
             status: "unstaged",
             updated_at: new Date().toISOString()
           };
@@ -299,6 +331,60 @@ export const AssistantFloatingChat: React.FC<AssistantFloatingChatProps> = ({
       const newShotNum = sceneProject.shots.length + 1;
       const newShotId = "shot_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7);
 
+      // Resolve characters for this shot
+      let shotCharacters: string[] = [];
+      if (Array.isArray(shotData.characters)) {
+        shotCharacters = shotData.characters.filter(Boolean);
+      } else if (typeof shotData.characters === "string") {
+        shotCharacters = (shotData.characters as string).split(",").map(s => s.trim()).filter(Boolean);
+      } else if (shotData.character) {
+        shotCharacters = [shotData.character];
+      }
+      if (shotData.ots_anchor_subject && !shotCharacters.includes(shotData.ots_anchor_subject)) {
+        shotCharacters.push(shotData.ots_anchor_subject);
+      }
+      if (shotData.ots_focus_subject && !shotCharacters.includes(shotData.ots_focus_subject)) {
+        shotCharacters.push(shotData.ots_focus_subject);
+      }
+
+      // Auto-assign available reference photos for characters into assigned_slots
+      const assignedSlots: Record<string | number, string> = { ...(shotData.assigned_slots || {}) };
+      const missingPhotoChars: string[] = [];
+      const linkedPhotoChars: string[] = [];
+      let totalLinkedPhotos = 0;
+
+      const allSceneChars = sceneProject.characters || {};
+      shotCharacters.forEach(charName => {
+        const profile = (allSceneChars as any)[charName] || 
+          Object.entries(allSceneChars).find(([k]) => k.toLowerCase() === charName.toLowerCase())?.[1];
+        
+        let candidatePhotos: string[] = [];
+        if (profile && Array.isArray(profile.quick_slots)) {
+          candidatePhotos = profile.quick_slots.filter(Boolean);
+        }
+        if (candidatePhotos.length === 0) {
+          candidatePhotos = (assets || [])
+            .filter(a => (a.subject_name || "").trim().toLowerCase() === charName.trim().toLowerCase())
+            .map(a => a.filename);
+        }
+
+        if (candidatePhotos.length === 0) {
+          missingPhotoChars.push(charName);
+        } else {
+          linkedPhotoChars.push(charName);
+          candidatePhotos.forEach(fn => {
+            if (Object.values(assignedSlots).includes(fn)) return;
+            for (let i = 0; i < 8; i++) {
+              if (!assignedSlots[i] && !assignedSlots[`slot_${i}`]) {
+                assignedSlots[i] = fn;
+                totalLinkedPhotos++;
+                break;
+              }
+            }
+          });
+        }
+      });
+
       onUpdateProject(prev => {
         const targetNum = prev.shots.length + 1;
         const newShot: ShotItem = {
@@ -311,7 +397,8 @@ export const AssistantFloatingChat: React.FC<AssistantFloatingChatProps> = ({
           aspect_ratio: shotData.aspect_ratio || "16:9 Widescreen",
           basic_stub: shotData.basic_stub || "",
           expanded_prompt: shotData.expanded_prompt || "",
-          assigned_slots: {},
+          characters: shotCharacters.length > 0 ? shotCharacters : undefined,
+          assigned_slots: assignedSlots,
           status: "unstaged",
           updated_at: new Date().toISOString()
         };
@@ -329,7 +416,13 @@ export const AssistantFloatingChat: React.FC<AssistantFloatingChatProps> = ({
       setAppliedActionKeys(prev => ({ ...prev, [actionKey]: true }));
       injectStateFeedback(`User created and added new Shot #${newShotNum} to the scene`);
       if (onShowToast) {
-        onShowToast(`Added new Shot #${newShotNum} to scene.`, "success");
+        if (missingPhotoChars.length > 0) {
+          onShowToast(`Added Shot #${newShotNum}. Note: "${missingPhotoChars.join(", ")}" has no reference photos in slots 1–4 yet.`, "info");
+        } else if (totalLinkedPhotos > 0) {
+          onShowToast(`Added Shot #${newShotNum} with ${totalLinkedPhotos} reference photo(s) linked for ${linkedPhotoChars.join(", ")}.`, "success");
+        } else {
+          onShowToast(`Added new Shot #${newShotNum} to scene.`, "success");
+        }
       }
     } else if (action.type === "update_scene_planning") {
       if (!onUpdateProject) {
