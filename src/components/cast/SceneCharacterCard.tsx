@@ -277,7 +277,7 @@ export const SceneCharacterCard: React.FC<SceneCharacterCardProps> = ({
               }`}
               title={
                 isInUniverse
-                  ? "Open Sync & Diff Inspector for Universe"
+                  ? "Open Universe Importer for bidirectional sync"
                   : "Add this character & references to Global Universe"
               }
             >
