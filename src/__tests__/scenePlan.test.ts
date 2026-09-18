@@ -48,4 +48,44 @@ describe("scenePlan.test.ts - Scene Plan & Overarching Goal Integration", () => 
     );
     expect(action.changes.lighting_style).toBe("Low key neon green underglow");
   });
+
+  it("safely sanitizes downstream system messages for Jinja chat template compliance", () => {
+    // Simulates conversation messages where action application injected a system feedback message
+    const rawConversation = [
+      { role: "assistant", content: "I can help with Shot 5." },
+      { role: "user", content: "Please add Shot 5." },
+      { role: "assistant", content: "Shot 5 proposed." },
+      { role: "system", content: "User applied proposed changes to Shot #5" },
+      { role: "user", content: "Please add Nina to Shot 5." }
+    ];
+
+    const systemPrompt = "You are a cinematic assistant.";
+
+    const sanitizedForLlm = [
+      { role: "system" as const, content: systemPrompt },
+      ...rawConversation.map((m) => {
+        if (m.role === "assistant") {
+          return { role: "assistant" as const, content: m.content };
+        }
+        if (m.role === "system") {
+          return { role: "user" as const, content: `[System Notice]: ${m.content}` };
+        }
+        return { role: "user" as const, content: m.content };
+      })
+    ];
+
+    // Verify ONLY index 0 is role: "system"
+    expect(sanitizedForLlm[0].role).toBe("system");
+    const nonInitialSystemMsgs = sanitizedForLlm.slice(1).filter((m) => m.role === "system");
+    expect(nonInitialSystemMsgs).toHaveLength(0);
+
+    // Verify the feedback message was preserved with user role and notice prefix
+    const convertedNotice = sanitizedForLlm.find((m) =>
+      m.content.includes("User applied proposed changes to Shot #5")
+    );
+    expect(convertedNotice?.role).toBe("user");
+    expect(convertedNotice?.content).toBe(
+      "[System Notice]: User applied proposed changes to Shot #5"
+    );
+  });
 });

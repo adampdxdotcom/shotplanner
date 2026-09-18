@@ -57,16 +57,34 @@ export async function callLocalLLM(options: LocalLLMRequestOptions): Promise<Loc
   const timeoutMs = options.timeoutMs || 60000;
 
   // Build messages array if not provided directly
-  let messages = options.messages;
-  if (!messages || messages.length === 0) {
-    messages = [];
+  let rawMessages = options.messages;
+  if (!rawMessages || rawMessages.length === 0) {
+    rawMessages = [];
     if (options.systemPrompt) {
-      messages.push({ role: "system", content: options.systemPrompt });
+      rawMessages.push({ role: "system", content: options.systemPrompt });
     }
     if (options.userPrompt) {
-      messages.push({ role: "user", content: options.userPrompt });
+      rawMessages.push({ role: "user", content: options.userPrompt });
     }
   }
+
+  // Guard against Jinja chat template exceptions (e.g. Qwen/Llama in LM Studio:
+  // "Jinja Exception: System message must be at the beginning.")
+  // Ensure that 'system' role is ONLY used for index 0. Any subsequent system messages
+  // (such as state mutation feedback or project events) are converted to 'user' context notices.
+  const messages = rawMessages.map((m, idx) => {
+    if (idx === 0) {
+      return m;
+    }
+    if (m.role === "system") {
+      const textContent = typeof m.content === "string" ? m.content : JSON.stringify(m.content);
+      return {
+        role: "user" as const,
+        content: `[System Notice]: ${textContent}`
+      };
+    }
+    return m;
+  });
 
   const payload: Record<string, any> = {
     model,

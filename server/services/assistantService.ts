@@ -374,16 +374,19 @@ Only include fields that are changing or relevant. Always keep your conversation
     providerUsed = `Gemini (${result.modelUsed})`;
   } else {
     // Format messages for OpenAI-compatible Local LLM endpoint (using rolling window)
+    // LM Studio Jinja templates strictly enforce that ONLY index 0 can be role: "system".
+    // Subsequent system messages (such as state mutation feedback) are mapped to role: "user"
+    // with a [System Notice] prefix so conversation history remains compliant.
     const llmMessages = [
       { role: "system" as const, content: systemPrompt },
       ...windowedMessages.map(m => {
-        let role: "assistant" | "user" | "system" = "user";
-        if (m.role === "assistant") role = "assistant";
-        else if (m.role === "system") role = "system";
-        return {
-          role,
-          content: m.content
-        };
+        if (m.role === "assistant") {
+          return { role: "assistant" as const, content: m.content };
+        }
+        if (m.role === "system") {
+          return { role: "user" as const, content: `[System Notice]: ${m.content}` };
+        }
+        return { role: "user" as const, content: m.content };
       })
     ];
 
