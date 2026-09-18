@@ -92,7 +92,15 @@ export const AddCharacterToShotModal: React.FC<AddCharacterToShotModalProps> = (
           configuredImages = Array.from(new Set(prioritized)).slice(0, 4);
         }
 
+        const slot1Filename = rawQuickSlots[0] || (profile.quick_slots && profile.quick_slots[0]) || "";
+        const slot1Asset = slot1Filename
+          ? (charAssets.find(a => a.filename === slot1Filename) ||
+             assets.find(a => a.filename === slot1Filename) ||
+             ({ filename: slot1Filename, type: "Reference" } as MediaAsset))
+          : null;
+
         const headshotAsset = 
+          slot1Asset ||
           charAssets.find(a => a.type === "Headshot") ||
           charAssets.find(a => a.type === "Body Reference") ||
           charAssets[0];

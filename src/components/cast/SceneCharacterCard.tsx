@@ -71,13 +71,26 @@ export const SceneCharacterCard: React.FC<SceneCharacterCardProps> = ({
     quickSlots[3] || ""
   ];
 
-  const profilePic = isLoc
+  // The character icon is strictly the image in slot 1 of the card.
+  // If slot 1 is empty, fall back to other quick slots or tagged character assets.
+  const slot1Filename = normalizedSlots[0];
+  const slot1Asset = slot1Filename
+    ? (charAssets.find((a) => a.filename === slot1Filename) ||
+       assets.find((a) => a.filename === slot1Filename) ||
+       ({ filename: slot1Filename, type: "Reference" } as MediaAsset))
+    : null;
+
+  const fallbackPic = isLoc
     ? (charAssets.find((a) => a.type === "Scene Reference") ||
        charAssets.find((a) => a.type === "Body Reference") ||
-       charAssets.find((a) => a.media_type === "image"))
+       charAssets.find((a) => a.media_type === "image") ||
+       charAssets[0])
     : (charAssets.find((a) => a.type === "Headshot") ||
        charAssets.find((a) => a.type === "Body Reference") ||
-       charAssets.find((a) => a.media_type === "image"));
+       charAssets.find((a) => a.media_type === "image") ||
+       charAssets[0]);
+
+  const profilePic = slot1Asset || fallbackPic;
 
   // Helper to save quick slots
   const updateSlots = (newSlots: string[]) => {

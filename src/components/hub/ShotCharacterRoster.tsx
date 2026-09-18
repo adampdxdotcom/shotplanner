@@ -115,7 +115,16 @@ export const ShotCharacterRoster: React.FC<ShotCharacterRosterProps> = ({
           }))
           .sort((a, b) => a.shotNumber - b.shotNumber);
 
+        const quickSlots = Array.isArray(profile.quick_slots) ? profile.quick_slots : [];
+        const slot1Filename = quickSlots[0] || "";
+        const slot1Asset = slot1Filename
+          ? (charAssets.find(a => a.filename === slot1Filename) ||
+             assets.find(a => a.filename === slot1Filename) ||
+             ({ filename: slot1Filename, type: "Reference" } as MediaAsset))
+          : null;
+
         const headshotAsset = 
+          slot1Asset ||
           charAssets.find(a => a.type === "Headshot") ||
           charAssets.find(a => a.type === "Body Reference") ||
           charAssets.find(a => a.media_type === "image" || !a.media_type) ||

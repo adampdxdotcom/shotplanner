@@ -158,13 +158,25 @@ export const UniverseCastView: React.FC<UniverseCastViewProps> = ({
             // Get relevant assets across loaded assets
             const charAssets = assets.filter(a => (a.subject_name || "").trim().toLowerCase() === subject.trim().toLowerCase());
 
-            const profilePic = isLoc
+            const quickSlots = Array.isArray(char.quick_slots) ? char.quick_slots : [];
+            const slot1Filename = quickSlots[0] || "";
+            const slot1Asset = slot1Filename
+              ? (charAssets.find(a => a.filename === slot1Filename) ||
+                 assets.find(a => a.filename === slot1Filename) ||
+                 ({ filename: slot1Filename, type: "Reference" } as MediaAsset))
+              : null;
+
+            const fallbackPic = isLoc
               ? (charAssets.find(a => a.type === "Scene Reference") ||
                  charAssets.find(a => a.type === "Body Reference") ||
-                 charAssets.find(a => a.media_type === "image"))
+                 charAssets.find(a => a.media_type === "image") ||
+                 charAssets[0])
               : (charAssets.find(a => a.type === "Headshot") ||
                  charAssets.find(a => a.type === "Body Reference") ||
-                 charAssets.find(a => a.media_type === "image"));
+                 charAssets.find(a => a.media_type === "image") ||
+                 charAssets[0]);
+
+            const profilePic = slot1Asset || fallbackPic;
 
             return (
               <div 
