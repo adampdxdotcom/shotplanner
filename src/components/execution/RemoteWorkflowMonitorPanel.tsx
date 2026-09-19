@@ -8,6 +8,7 @@ import {
 import { formatShotNumber } from "../../utils/formatters";
 import { ComfyMonitorState } from "../../hooks/useComfyMonitor";
 import { useComfyQueue } from "../../hooks/useComfyQueue";
+import { filterRemoteWorkflows } from "../../utils/remoteWorkflowFilter";
 import { ActiveRunningJobCard } from "./ActiveRunningJobCard";
 import { PendingQueueJobCard } from "./PendingQueueJobCard";
 import { 
@@ -96,11 +97,12 @@ export const RemoteWorkflowMonitorPanel: React.FC<RemoteWorkflowMonitorPanelProp
       const data = await res.json();
 
       if (data.success && Array.isArray(data.workflows)) {
-        setRemoteWorkflows(data.workflows);
+        const cleaned = filterRemoteWorkflows(data.workflows);
+        setRemoteWorkflows(cleaned);
         setScanStatus("success");
-        setScanMessage(data.message || `Found ${data.workflows.length} workflows.`);
+        setScanMessage(data.message || `Found ${cleaned.length} workflows.`);
         setLastScannedAt(new Date().toLocaleTimeString());
-        onShowToast?.(`Discovered ${data.workflows.length} remote workflow(s)`, "success");
+        onShowToast?.(`Discovered ${cleaned.length} remote workflow(s)`, "success");
       } else {
         setScanStatus("error");
         setScanMessage(data.message || data.error || "Failed to scan remote ComfyUI.");
@@ -140,8 +142,8 @@ export const RemoteWorkflowMonitorPanel: React.FC<RemoteWorkflowMonitorPanelProp
     return sceneProject.shots.find(s => s.monitored_workflow === wfPath || s.monitored_workflow === wfPath.split("/").pop());
   };
 
-  // Filter workflows by search query
-  const filteredWorkflows = remoteWorkflows.filter(wf => {
+  // Filter workflows by search query and remove cache/temp workflows
+  const filteredWorkflows = filterRemoteWorkflows(remoteWorkflows).filter(wf => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     return wf.filename.toLowerCase().includes(q) || (wf.folder || "").toLowerCase().includes(q) || wf.path.toLowerCase().includes(q);
