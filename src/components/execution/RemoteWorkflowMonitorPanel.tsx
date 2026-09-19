@@ -1,6 +1,15 @@
-import React, { useState, useEffect } from "react";
-import { AppConfig, ShotItem, SceneProjectFile, RemoteWorkflowItem } from "../../types";
+import React, { useState } from "react";
+import { 
+  AppConfig, 
+  ShotItem, 
+  SceneProjectFile, 
+  RemoteWorkflowItem 
+} from "../../types";
 import { formatShotNumber } from "../../utils/formatters";
+import { ComfyMonitorState } from "../../hooks/useComfyMonitor";
+import { useComfyQueue } from "../../hooks/useComfyQueue";
+import { ActiveRunningJobCard } from "./ActiveRunningJobCard";
+import { PendingQueueJobCard } from "./PendingQueueJobCard";
 import { 
   Radio, 
   RefreshCw, 
@@ -10,14 +19,16 @@ import {
   Workflow, 
   Folder, 
   Cpu, 
-  ExternalLink,
-  SlidersHorizontal,
   XCircle,
-  Eye
+  Activity,
+  Layers,
+  Trash2,
+  Check
 } from "lucide-react";
 
 interface RemoteWorkflowMonitorPanelProps {
   config: AppConfig;
+  monitorState?: ComfyMonitorState;
   activeShot: ShotItem | null | undefined;
   sceneProject: SceneProjectFile;
   onUpdateShot: (updater: (prev: ShotItem) => ShotItem) => void;
@@ -26,6 +37,7 @@ interface RemoteWorkflowMonitorPanelProps {
 
 export const RemoteWorkflowMonitorPanel: React.FC<RemoteWorkflowMonitorPanelProps> = ({
   config,
+  monitorState,
   activeShot,
   sceneProject,
   onUpdateShot,
@@ -38,6 +50,25 @@ export const RemoteWorkflowMonitorPanel: React.FC<RemoteWorkflowMonitorPanelProp
   const [lastScannedAt, setLastScannedAt] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedWorkflowForAssign, setSelectedWorkflowForAssign] = useState<string>("");
+
+  // ComfyUI Queue and System Telemetry Hook
+  const {
+    queueStatus,
+    systemStats,
+    isLoading: isQueueLoading,
+    isInterrupting,
+    deletingPromptId,
+    isClearingQueue,
+    refreshQueue,
+    interruptExecution,
+    deleteJob,
+    clearPendingQueue
+  } = useComfyQueue({
+    apiUrl: config.comfyui_api_url,
+    authToken: config.remote_api_token,
+    enabled: true,
+    onShowToast
+  });
 
   // Scan remote ComfyUI installation for workflows via SSH and ComfyUI API
   const handleScanRemote = async () => {
@@ -117,10 +148,22 @@ export const RemoteWorkflowMonitorPanel: React.FC<RemoteWorkflowMonitorPanelProp
   });
 
   const activeMonitoredWorkflow = activeShot?.monitored_workflow;
+  const primaryDevice = systemStats?.devices?.[0] || null;
+
+  // Active running job info (from queue endpoint or synthesized from active monitor state)
+  const isExecuting = queueStatus.is_executing || Boolean(monitorState?.isExecuting);
+  const activeRunningJob = queueStatus.running[0] || (isExecuting ? {
+    index: 0,
+    prompt_id: monitorState?.activePromptId || "active-job",
+    status: "running" as const,
+    scene_name: sceneProject.scene_name,
+    shot_number: activeShot?.shot_number,
+    timestamp: Date.now()
+  } : null);
 
   return (
     <div className="bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 space-y-5 shadow-xs">
-      {/* Header */}
+      {/* Panel Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-200 dark:border-zinc-800/80 pb-4">
         <div className="flex items-start gap-3">
           <div className="p-2 rounded-lg bg-cyan-50 dark:bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-200 dark:border-cyan-500/20 shrink-0">
@@ -129,20 +172,29 @@ export const RemoteWorkflowMonitorPanel: React.FC<RemoteWorkflowMonitorPanelProp
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-                Remote ComfyUI Workflow Monitoring
+                Remote ComfyUI Live Monitor &amp; Workflows
               </h2>
               <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full bg-cyan-100 dark:bg-cyan-950/80 text-cyan-700 dark:text-cyan-300 border border-cyan-300 dark:border-cyan-800">
-                Phase 1: Discovery &amp; Association
+                Live Telemetry
               </span>
             </div>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-              Inspect workflows available on your remote ComfyUI installation and associate them with shots for passive monitoring.
+              Live ComfyUI queue monitoring, execution controls, and remote workflow association.
             </p>
           </div>
         </div>
 
-        {/* Scan Button */}
+        {/* Action Header Buttons */}
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => refreshQueue()}
+            disabled={isQueueLoading}
+            className="p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:text-cyan-500 border border-zinc-200 dark:border-zinc-700 transition-colors cursor-pointer"
+            title="Refresh ComfyUI Queue"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isQueueLoading ? "animate-spin text-cyan-400" : ""}`} />
+          </button>
+
           <button
             onClick={handleScanRemote}
             disabled={isScanning}
@@ -153,12 +205,114 @@ export const RemoteWorkflowMonitorPanel: React.FC<RemoteWorkflowMonitorPanelProp
             }`}
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isScanning ? "animate-spin text-cyan-400" : ""}`} />
-            <span>{isScanning ? "Scanning ComfyUI..." : "Scan Remote ComfyUI"}</span>
+            <span>{isScanning ? "Scanning Workflows..." : "Scan Remote ComfyUI"}</span>
           </button>
         </div>
       </div>
 
-      {/* Host & Scan Status Notification */}
+      {/* SECTION 1: LIVE JOB & QUEUE MONITOR */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Activity className="w-4 h-4 text-cyan-500" />
+            <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+              Live Queue &amp; Hardware Status
+            </h3>
+            {queueStatus.queue_remaining > 0 ? (
+              <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-500/10 text-amber-500 dark:text-amber-400 border border-amber-500/20">
+                {queueStatus.queue_remaining} Job{queueStatus.queue_remaining === 1 ? "" : "s"} in Queue
+              </span>
+            ) : (
+              <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                ● Server Idle
+              </span>
+            )}
+          </div>
+
+          {/* Clear All Queue Button */}
+          {queueStatus.pending.length > 0 && (
+            <button
+              onClick={clearPendingQueue}
+              disabled={isClearingQueue}
+              className="text-xs text-zinc-400 hover:text-red-400 flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+              title="Clear all pending jobs in queue"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>{isClearingQueue ? "Clearing..." : "Clear Pending Queue"}</span>
+            </button>
+          )}
+        </div>
+
+        {/* Active Running Job Card */}
+        {activeRunningJob ? (
+          <ActiveRunningJobCard
+            job={activeRunningJob}
+            currentStep={monitorState?.currentStep || 0}
+            maxSteps={monitorState?.maxSteps || 0}
+            activeNodeName={monitorState?.activeNodeName || null}
+            activeNodeId={monitorState?.activeNodeId || null}
+            elapsedMs={monitorState?.elapsedMs || 0}
+            device={primaryDevice}
+            isInterrupting={isInterrupting}
+            onInterrupt={interruptExecution}
+          />
+        ) : (
+          /* Server Idle State Card */
+          <div className="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-950/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 flex items-center justify-center shrink-0">
+                <Check className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
+                    ComfyUI Server Idle &amp; Ready
+                  </span>
+                  <span className="text-[10px] text-zinc-400 font-mono">
+                    ({config.comfyui_api_url || "http://127.0.0.1:8188"})
+                  </span>
+                </div>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                  No active executions in pipeline. Ready to receive shot prompts and recipes.
+                </p>
+              </div>
+            </div>
+
+            {primaryDevice && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs font-mono self-start sm:self-auto">
+                <Cpu className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                <span className="text-zinc-500 dark:text-zinc-400">{primaryDevice.name.replace(/NVIDIA /i, "")}:</span>
+                <span className="font-semibold text-emerald-500 dark:text-emerald-400">
+                  {primaryDevice.vram_free_gb} GB Free / {primaryDevice.vram_total_gb} GB Total
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Pending Queue List */}
+        {queueStatus.pending.length > 0 && (
+          <div className="space-y-2 pt-1">
+            <div className="flex items-center gap-2 text-xs font-bold text-zinc-700 dark:text-zinc-300">
+              <Layers className="w-3.5 h-3.5 text-amber-500" />
+              <span>Pending Queue ({queueStatus.pending.length})</span>
+            </div>
+            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+              {queueStatus.pending.map((pendingJob, idx) => (
+                <PendingQueueJobCard
+                  key={pendingJob.prompt_id || idx}
+                  job={pendingJob}
+                  rank={idx + 1}
+                  isDeleting={deletingPromptId === pendingJob.prompt_id}
+                  onDelete={deleteJob}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Host Status Row */}
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-950/60 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800/60">
         <div className="flex items-center gap-2 truncate">
           <Cpu className="w-4 h-4 text-zinc-400 shrink-0" />
@@ -192,7 +346,7 @@ export const RemoteWorkflowMonitorPanel: React.FC<RemoteWorkflowMonitorPanelProp
         </div>
       )}
 
-      {/* Active Shot Association Card */}
+      {/* SECTION 2: Active Shot Association Card */}
       <div className="p-4 rounded-xl border-2 border-cyan-500/30 bg-cyan-50/20 dark:bg-cyan-950/10 space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
@@ -280,7 +434,7 @@ export const RemoteWorkflowMonitorPanel: React.FC<RemoteWorkflowMonitorPanelProp
         )}
       </div>
 
-      {/* Discovered Remote Workflows Browser */}
+      {/* SECTION 3: Discovered Remote Workflows Browser */}
       <div className="space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div className="flex items-center gap-2">

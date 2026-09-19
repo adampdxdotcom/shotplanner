@@ -365,6 +365,7 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
       {/* Remote ComfyUI Workflow Monitoring & Discovery */}
       <RemoteWorkflowMonitorPanel
         config={config}
+        monitorState={monitorState}
         activeShot={activeShot}
         sceneProject={sceneProject}
         onUpdateShot={onUpdateShot}

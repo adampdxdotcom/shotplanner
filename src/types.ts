@@ -415,6 +415,49 @@ export interface RemoteWorkflowsResult {
   host?: string;
 }
 
+export interface ComfyQueueItem {
+  index: number;
+  prompt_id: string;
+  client_id?: string;
+  status: "running" | "pending";
+  scene_name?: string;
+  shot_number?: number | string;
+  nodes_count?: number;
+  output_prefix?: string;
+  timestamp?: number;
+}
+
+export interface ComfyQueueStatus {
+  success: boolean;
+  is_executing: boolean;
+  queue_remaining: number;
+  running: ComfyQueueItem[];
+  pending: ComfyQueueItem[];
+  error?: string;
+}
+
+export interface ComfyDeviceStats {
+  name: string;
+  type: string;
+  index: number;
+  vram_total: number;
+  vram_free: number;
+  vram_total_gb: string;
+  vram_free_gb: string;
+  vram_used_gb: string;
+  vram_usage_percent: number;
+  torch_vram_total?: number;
+  torch_vram_free?: number;
+}
+
+export interface ComfySystemStats {
+  success: boolean;
+  os?: string;
+  python_version?: string;
+  devices: ComfyDeviceStats[];
+  error?: string;
+}
+
 export interface WorkflowNodeInfo {
   id: string;
   class_type: string;

@@ -60,3 +60,15 @@ docker run -d \
 - **Automatic Asset Ingestion & Takes Cataloging**: Automated background listener capturing `SaveImage` and `SaveVideo` outputs from ComfyUI's `/view` API, archiving them to project storage with thumbnail generation and metadata logging (`Take 01`, `Take 02`, etc.).
 - **Take Review & Side-by-Side Comparison**: Comprehensive Take Review modal with video/image playback, director ratings ("Good" / "Needs Work"), notes logging, Hero Take designation, and side-by-side Take Comparison with generation parameter diffs.
 
+---
+
+## AI Production Assistant
+
+An intelligent, context-aware co-director embedded directly in your production workspace. Powered by local LLMs (LM Studio, Ollama, OpenAI-compatible APIs) or Google Gemini, it has live access to your scene dossier, character roster, and universe lore:
+
+- **Cinematography & Pacing**: Recommends framing, focal lengths, camera movements, and lighting schemes aligned with your scene's overarching narrative goal.
+- **Script Supervision & Continuity**: Monitors character presence, wardrobe consistency across shots, and alerts you if a character lacks required reference photos.
+- **One-Click Action Cards**: Proposes executable project changes—instantly add new shots, update camera settings, tweak scene plans, or modify cast wardrobe with single-click approval and full undo support.
+- **Prompt Crafting & Staging**: Expands simple shot stubs into detailed generative prompts (Wan 2.1, MiniMax, Flux) and can trigger asset staging to remote ComfyUI pods.
+- **Conversational Memory**: Retains scene context across your session for ongoing iterative direction and shot refinement.
+

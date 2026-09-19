@@ -16,6 +16,7 @@ import civitaiRoutes from "./server/routes/civitaiRoutes";
 import modelHubRoutes from "./server/routes/modelHubRoutes";
 import universeRoutes from "./server/routes/universeRoutes";
 import assistantRoutes from "./server/routes/assistantRoutes";
+import comfyRoutes from "./server/routes/comfyRoutes";
 
 // Re-export utility functions for external consumers
 export {
@@ -58,6 +59,7 @@ app.use("/api", outputRoutes);
 app.use("/api/headshots", headshotRoutes);
 app.use("/api/universe", universeRoutes);
 app.use("/api/assistant", assistantRoutes);
+app.use("/api/comfy", comfyRoutes);
 
 // Compatibility aliases for remote sync and staging
 app.post("/api/assets/sync_remote", handleAssetTransfer);

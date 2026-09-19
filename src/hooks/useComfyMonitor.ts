@@ -27,7 +27,8 @@ export function useComfyMonitor(
   onShowToast?: (msg: string, type: "success" | "error" | "info") => void,
   activeSceneName?: string,
   onOutputPulled?: (filename: string, details?: PulledOutputDetails) => void,
-  onExecutionStarted?: (promptId: string) => void
+  onExecutionStarted?: (promptId: string) => void,
+  onStatusUpdated?: () => void
 ) {
   const [state, setState] = useState<ComfyMonitorState>({
     isConnected: false,
@@ -114,6 +115,7 @@ export function useComfyMonitor(
                 }
                 return prev;
               });
+              onStatusUpdated?.();
             } else if (msg.type === 'execution_start') {
               setState(prev => ({
                 ...prev,
@@ -127,6 +129,7 @@ export function useComfyMonitor(
               startTimer();
               onShowToast?.('🎬 Execution Started', 'info');
               onExecutionStarted?.(msg.data.prompt_id);
+              onStatusUpdated?.();
             } else if (msg.type === 'executing') {
               const node = msg.data.node;
               const promptId = msg.data.prompt_id;
@@ -162,7 +165,9 @@ export function useComfyMonitor(
             } else if (msg.type === 'execution_success') {
               onShowToast?.('🎬 ComfyUI Execution Complete', 'success');
               resetState();
+              onStatusUpdated?.();
             } else if (msg.type === 'executed') {
+              onStatusUpdated?.();
               const nodeOutput = msg.data?.output;
               if (nodeOutput && activeSceneName) {
                 let files: any[] = [];
