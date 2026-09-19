@@ -12,7 +12,8 @@ export const IGNORED_JSON_FILENAMES = new Set([
   "characters.json",
   "package.json",
   "tsconfig.json",
-  "metadata.json"
+  "metadata.json",
+  "takes_manifest.json"
 ]);
 
 export const IGNORED_ASSET_DIRECTORIES = new Set([
