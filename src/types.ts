@@ -231,6 +231,8 @@ export interface AppConfig {
   comfyui_api_url: string;
   remote_api_token: string;
   lm_studio_url: string;
+  runpod_api_key?: string;
+  runpod_auto_connect?: boolean;
   gemini_api_key?: string;
   civitai_api_key?: string;
   huggingface_token?: string;
@@ -241,6 +243,29 @@ export interface AppConfig {
   llm_max_tokens?: number;
   vision_enabled?: boolean;
   auto_caption_enabled?: boolean;
+}
+
+export interface RunpodPodPort {
+  ip: string;
+  isIpPublic: boolean;
+  privatePort: number;
+  publicPort: number;
+  type: string;
+}
+
+export interface RunpodPodItem {
+  id: string;
+  name: string;
+  desiredStatus: string;
+  uptimeInSeconds?: number;
+  gpuCount?: number;
+  memoryInGb?: number;
+  vcpuCount?: number;
+  ip?: string;
+  sshPort?: number;
+  comfyUrl?: string;
+  proxyUrl?: string;
+  ports?: RunpodPodPort[];
 }
 
 export interface PromptDebugInfo {

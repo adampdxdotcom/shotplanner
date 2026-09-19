@@ -225,6 +225,7 @@ export default function App() {
             onUpdateShot={updateActiveShot}
             onUpdateSceneProject={setSceneProject}
             onShowToast={addToast}
+            onUpdateConfig={setConfig}
           />
         )}
 

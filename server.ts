@@ -17,6 +17,7 @@ import modelHubRoutes from "./server/routes/modelHubRoutes";
 import universeRoutes from "./server/routes/universeRoutes";
 import assistantRoutes from "./server/routes/assistantRoutes";
 import comfyRoutes from "./server/routes/comfyRoutes";
+import runpodRoutes from "./server/routes/runpodRoutes";
 
 // Re-export utility functions for external consumers
 export {
@@ -60,6 +61,7 @@ app.use("/api/headshots", headshotRoutes);
 app.use("/api/universe", universeRoutes);
 app.use("/api/assistant", assistantRoutes);
 app.use("/api/comfy", comfyRoutes);
+app.use("/api/runpod", runpodRoutes);
 
 // Compatibility aliases for remote sync and staging
 app.post("/api/assets/sync_remote", handleAssetTransfer);

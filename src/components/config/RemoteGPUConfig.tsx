@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { AppConfig } from "../../types";
 import { Terminal, Key, Sparkles, Copy, Check } from "lucide-react";
 import { copyToClipboard } from "../../utils/clipboard";
+import { RunpodPodManagerCard } from "./RunpodPodManagerCard";
 
 export interface RemoteGPUConfigProps {
   config: AppConfig;
@@ -9,6 +10,8 @@ export interface RemoteGPUConfigProps {
   handleGenerateKeyPair: () => void;
   isGeneratingKeyPair: boolean;
   generatedKeyPair?: { public_key: string; private_key: string } | null;
+  onShowToast?: (text: string, type: "success" | "error" | "info") => void;
+  handleTestSSH?: () => void;
 }
 
 export const RemoteGPUConfig: React.FC<RemoteGPUConfigProps> = ({
@@ -16,7 +19,9 @@ export const RemoteGPUConfig: React.FC<RemoteGPUConfigProps> = ({
   handleInputChange,
   handleGenerateKeyPair,
   isGeneratingKeyPair,
-  generatedKeyPair
+  generatedKeyPair,
+  onShowToast,
+  handleTestSSH
 }) => {
   const [copiedCommand, setCopiedCommand] = useState(false);
   const [copiedPublicKey, setCopiedPublicKey] = useState(false);
@@ -45,6 +50,15 @@ export const RemoteGPUConfig: React.FC<RemoteGPUConfigProps> = ({
 
   return (
     <div className="space-y-4">
+      {/* RunPod API & Auto-Connect Card */}
+      <RunpodPodManagerCard
+        config={config}
+        handleInputChange={handleInputChange}
+        onShowToast={onShowToast}
+        effectivePublicKey={effectivePublicKey}
+        handleTestSSH={handleTestSSH}
+      />
+
       {/* Remote Host, SSH Port, Username & Password settings */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* Remote GPU IP */}

@@ -77,6 +77,8 @@ export const RemoteServerTab: React.FC<RemoteServerTabProps> = ({
         handleGenerateKeyPair={handleGenerateKeyPair}
         isGeneratingKeyPair={isGeneratingKeyPair}
         generatedKeyPair={generatedKeyPair}
+        onShowToast={onShowToast}
+        handleTestSSH={handleTestSSH}
       />
 
       {/* Remote ComfyUI Paths & Endpoints */}

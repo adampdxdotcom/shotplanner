@@ -26,6 +26,8 @@ export function useAppConfig({ addToast, onUpdateProjectConfig }: UseAppConfigPa
     let savedVision = false;
     let savedAutoCaption = false;
     let savedLmStudioUrl = "http://localhost:1234/v1";
+    let savedRunpodApiKey = "";
+    let savedRunpodAutoConnect = false;
     try {
       savedPrompt = localStorage.getItem("llm_custom_system_prompt") || undefined;
       const t = localStorage.getItem("llm_temperature");
@@ -38,6 +40,8 @@ export function useAppConfig({ addToast, onUpdateProjectConfig }: UseAppConfigPa
       if (url && url.trim()) {
         savedLmStudioUrl = url.trim();
       }
+      savedRunpodApiKey = localStorage.getItem("runpod_api_key") || "";
+      savedRunpodAutoConnect = localStorage.getItem("runpod_auto_connect") === "true";
     } catch (e) {}
 
     return {
@@ -51,6 +55,8 @@ export function useAppConfig({ addToast, onUpdateProjectConfig }: UseAppConfigPa
       comfyui_api_url: "http://127.0.0.1:8188",
       remote_api_token: "",
       lm_studio_url: savedLmStudioUrl,
+      runpod_api_key: savedRunpodApiKey,
+      runpod_auto_connect: savedRunpodAutoConnect,
       default_llm_provider: getDefaultLlmProvider(),
       gemini_api_key: "",
       civitai_api_key: "",
@@ -74,6 +80,12 @@ export function useAppConfig({ addToast, onUpdateProjectConfig }: UseAppConfigPa
       }
       if (config.lm_studio_url && config.lm_studio_url.trim()) {
         localStorage.setItem("lm_studio_url", config.lm_studio_url.trim());
+      }
+      if (config.runpod_api_key !== undefined) {
+        localStorage.setItem("runpod_api_key", config.runpod_api_key);
+      }
+      if (config.runpod_auto_connect !== undefined) {
+        localStorage.setItem("runpod_auto_connect", String(config.runpod_auto_connect));
       }
     } catch (e) {}
   }, [config.vision_enabled, config.auto_caption_enabled, config.lm_studio_url]);

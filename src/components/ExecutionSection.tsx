@@ -10,6 +10,7 @@ import { SendShotPanel } from "./execution/SendShotPanel";
 import { SendScenePanel } from "./execution/SendScenePanel";
 import { ExecutionConsole } from "./execution/ExecutionConsole";
 import { RemoteWorkflowMonitorPanel } from "./execution/RemoteWorkflowMonitorPanel";
+import { RunpodQuickSyncBar } from "./execution/RunpodQuickSyncBar";
 
 interface ExecutionSectionProps {
   config: AppConfig;
@@ -21,6 +22,7 @@ interface ExecutionSectionProps {
   onUpdateShot: (updater: (prev: ShotItem) => ShotItem) => void;
   onUpdateSceneProject: (updater: (prev: SceneProjectFile) => SceneProjectFile) => void;
   onShowToast?: (text: string, type: "success" | "error" | "info") => void;
+  onUpdateConfig?: (newConfig: AppConfig) => void;
 }
 
 export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
@@ -32,7 +34,8 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
   onSelectShot,
   onUpdateShot,
   onUpdateSceneProject,
-  onShowToast
+  onShowToast,
+  onUpdateConfig
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<"stage" | "monitor">("stage");
   const [transferState, setTransferState] = useState<"idle" | "progress" | "error" | "success">("idle");
@@ -44,6 +47,50 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
   const [lastStagedTime, setLastStagedTime] = useState<string | null>(null);
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const hasAutoConnectedRef = useRef(false);
+
+  // Phase 2: Auto-connect to active pod on startup if enabled
+  useEffect(() => {
+    if (
+      config.runpod_auto_connect &&
+      config.runpod_api_key?.trim() &&
+      !hasAutoConnectedRef.current
+    ) {
+      hasAutoConnectedRef.current = true;
+      fetch("/api/runpod/pods", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ runpod_api_key: config.runpod_api_key.trim() })
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && data.pods && data.pods.length === 1) {
+            const pod = data.pods[0];
+            if (
+              pod.ip &&
+              (pod.ip !== config.remote_host ||
+                pod.sshPort !== config.ssh_port ||
+                pod.comfyUrl !== config.comfyui_api_url)
+            ) {
+              const updatedConfig: AppConfig = {
+                ...config,
+                remote_host: pod.ip || config.remote_host,
+                ssh_port: pod.sshPort || config.ssh_port,
+                comfyui_api_url: pod.comfyUrl || config.comfyui_api_url
+              };
+              onUpdateConfig?.(updatedConfig);
+              onShowToast?.(
+                `Auto-connected to RunPod '${pod.name}' (${pod.ip}:${pod.sshPort})`,
+                "success"
+              );
+            }
+          }
+        })
+        .catch((err) => {
+          console.warn("[RunPod Auto-Connect Error]", err);
+        });
+    }
+  }, [config.runpod_auto_connect, config.runpod_api_key, onUpdateConfig, onShowToast]);
 
   const activeShot = activeShotId ? sceneProject.shots.find(s => s.id === activeShotId) : null;
   const activeSceneName = sceneProject.scene_name || "Untitled_Scene";
@@ -341,6 +388,13 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
         activeShotId={activeShotId}
         sceneProject={sceneProject}
         onSelectShot={onSelectShot}
+      />
+
+      {/* Quick RunPod Sync & Status Bar */}
+      <RunpodQuickSyncBar
+        config={config}
+        onUpdateConfig={onUpdateConfig}
+        onShowToast={onShowToast}
       />
 
       {/* Segmented Sub-Tab Switcher */}
