@@ -5,13 +5,8 @@ import {
   AlertCircle, 
   Download, 
   Loader2, 
-  FileArchive, 
-  Film, 
-  CheckCircle2, 
   FolderArchive,
-  Info,
-  Sparkles,
-  Clapperboard
+  Info
 } from "lucide-react";
 
 interface ProjectTakesSummary {
@@ -49,6 +44,29 @@ function formatBytes(bytes: number): string {
   return `${mb.toFixed(1)} MB`;
 }
 
+const ToggleSwitch: React.FC<{
+  checked: boolean;
+  onChange: (val: boolean) => void;
+  id: string;
+}> = ({ checked, onChange, id }) => {
+  return (
+    <button
+      type="button"
+      id={id}
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-1 focus:ring-indigo-500/50 ${
+        checked ? "bg-indigo-600" : "bg-zinc-300 dark:bg-zinc-700"
+      }`}
+    >
+      <span
+        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition duration-200 ease-in-out ${
+          checked ? "translate-x-5" : "translate-x-0"
+        }`}
+      />
+    </button>
+  );
+};
+
 export const SaveProjectModal: React.FC<SaveProjectModalProps> = ({ 
   isOpen, 
   onClose, 
@@ -58,11 +76,15 @@ export const SaveProjectModal: React.FC<SaveProjectModalProps> = ({
 }) => {
   const [filename, setFilename] = useState("");
   const [saving, setSaving] = useState(false);
-  const [exportingProject, setExportingProject] = useState(false);
-  const [exportingTakes, setExportingTakes] = useState(false);
+  const [exportingZip, setExportingZip] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [takesSummary, setTakesSummary] = useState<ProjectTakesSummary | null>(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
+
+  // Export switches (Assets on by default, Renders off by default)
+  const [includeAssets, setIncludeAssets] = useState(true);
+  const [includeRenders, setIncludeRenders] = useState(false);
+  const [assetCount, setAssetCount] = useState<number | null>(null);
 
   useEffect(() => {
     if (isOpen && currentProjectName) {
@@ -71,8 +93,24 @@ export const SaveProjectModal: React.FC<SaveProjectModalProps> = ({
     } else if (isOpen) {
       setFilename("");
       setTakesSummary(null);
+      setAssetCount(null);
     }
   }, [isOpen, currentProjectName]);
+
+  const activeSceneName = takesSummary?.sceneName || sceneProject?.scene_name || "Scene_01";
+
+  // Fetch asset count whenever the active scene changes
+  useEffect(() => {
+    if (!isOpen || !activeSceneName) return;
+    fetch(`/api/assets?scene_name=${encodeURIComponent(activeSceneName)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && Array.isArray(data.assets)) {
+          setAssetCount(data.assets.length);
+        }
+      })
+      .catch(() => {});
+  }, [isOpen, activeSceneName]);
 
   const fetchSummary = async (name: string) => {
     const clean = name.trim().replace(/\.json$/, "");
@@ -97,7 +135,6 @@ export const SaveProjectModal: React.FC<SaveProjectModalProps> = ({
 
   // Calculate live take stats from sceneProject if available
   const localTakesCount = sceneProject?.shots?.reduce((acc: number, s: any) => acc + (s.takes?.length || 0), 0) ?? 0;
-  const localHeroCount = sceneProject?.shots?.reduce((acc: number, s: any) => acc + (s.hero_take_id || s.takes?.some((t: any) => t.is_hero) ? 1 : 0), 0) ?? 0;
 
   const handleSave = async () => {
     if (!filename.trim()) {
@@ -137,19 +174,20 @@ export const SaveProjectModal: React.FC<SaveProjectModalProps> = ({
     }
   };
 
-  const handleExportStandardZip = async () => {
+  const handleExportZip = async () => {
     if (!targetName) {
       setError("Please enter a project name before exporting.");
       return;
     }
-    setExportingProject(true);
+    setExportingZip(true);
     setError(null);
     try {
-      // Auto-save first to ensure server holds latest project state
+      // Auto-save first to ensure the backend holds the latest state
       await onSave(targetName);
 
-      // Download lightweight standard project archive
-      const response = await fetch(`/api/projects/${encodeURIComponent(targetName)}/export`);
+      // Trigger parameterized project archive download
+      const query = `include_assets=${includeAssets}&include_renders=${includeRenders}`;
+      const response = await fetch(`/api/projects/${encodeURIComponent(targetName)}/export?${query}`);
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
         throw new Error(errData.error || `Export failed (HTTP ${response.status})`);
@@ -167,78 +205,38 @@ export const SaveProjectModal: React.FC<SaveProjectModalProps> = ({
 
       onClose();
     } catch (err: any) {
-      setError(err.message || "Failed to export standard project ZIP.");
+      setError(err.message || "Failed to export project ZIP package.");
     } finally {
-      setExportingProject(false);
+      setExportingZip(false);
     }
   };
 
-  const handleExportTakesZip = async () => {
-    if (!targetName) {
-      setError("Please enter a project name before exporting takes.");
-      return;
-    }
-    setExportingTakes(true);
-    setError(null);
-    try {
-      // Auto-save first
-      await onSave(targetName);
-
-      // Download takes archive
-      const response = await fetch(`/api/projects/${encodeURIComponent(targetName)}/export-takes`);
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || `Export takes failed (HTTP ${response.status})`);
-      }
-
-      const blob = await response.blob();
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = downloadUrl;
-      const downloadFilename = takesSummary?.sceneName 
-        ? `${takesSummary.sceneName}_takes.zip` 
-        : `${targetName}_takes.zip`;
-      link.download = downloadFilename;
-      document.body.appendChild(link);
-      link.click();
-      window.URL.revokeObjectURL(downloadUrl);
-      link.remove();
-
-      onClose();
-    } catch (err: any) {
-      setError(err.message || "Failed to export video takes ZIP.");
-    } finally {
-      setExportingTakes(false);
-    }
-  };
-
-  const isBusy = saving || exportingProject || exportingTakes;
+  const isBusy = saving || exportingZip;
   const displayTakesCount = takesSummary?.totalTakes ?? localTakesCount;
-  const displayFoundFiles = takesSummary?.foundVideoFiles ?? 0;
   const displaySizeBytes = takesSummary?.totalSizeBytes ?? 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-      <div className="modal-dialog-surface bg-zinc-900 border border-zinc-700/80 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+      <div className="modal-dialog-surface bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700/80 rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] text-zinc-900 dark:text-zinc-100">
         {/* Header */}
-        <div className="modal-dialog-header flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-zinc-950/60">
+        <div className="modal-dialog-header flex items-center justify-between px-6 py-4 border-b border-zinc-150 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/60">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+            <div className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20 text-indigo-600 dark:text-indigo-400">
               <FolderArchive className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-zinc-100">
+              <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100 font-sans">
                 Save & Export Project
               </h3>
-              <p className="text-xs text-zinc-400">
-                Save changes to disk or export separate lightweight and media archives.
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                Save project state to disk or bundle files into a consolidated ZIP archive.
               </p>
             </div>
           </div>
           <button 
             onClick={onClose} 
             disabled={isBusy}
-            className="p-1 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition-colors disabled:opacity-50 cursor-pointer"
+            className="p-1 text-zinc-400 hover:text-zinc-800 dark:hover:text-white rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50 cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -247,8 +245,8 @@ export const SaveProjectModal: React.FC<SaveProjectModalProps> = ({
         {/* Scrollable Content */}
         <div className="p-6 space-y-6 overflow-y-auto">
           {/* Filename Input */}
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-2">
+          <div className="space-y-2">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
               Project Filename
             </label>
             <div className="relative">
@@ -263,151 +261,131 @@ export const SaveProjectModal: React.FC<SaveProjectModalProps> = ({
                 }}
                 disabled={isBusy}
                 placeholder="e.g. cyber_alley_scene_v1"
-                className="w-full bg-zinc-950 border border-zinc-700/80 focus:border-indigo-500 rounded-xl px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none transition-colors"
+                className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700/80 focus:border-indigo-500 rounded-xl px-4 py-2.5 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none transition-colors"
                 autoFocus
               />
-              <span className="absolute right-3.5 top-2.5 text-xs text-zinc-500 font-mono">
+              <span className="absolute right-3.5 top-2.5 text-xs text-zinc-400 dark:text-zinc-500 font-mono font-medium">
                 .json
               </span>
             </div>
           </div>
 
           {error && (
-            <div className="p-3.5 bg-rose-500/10 border border-rose-500/25 rounded-xl flex items-start gap-2.5 text-rose-400">
+            <div className="p-3.5 bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/25 rounded-xl flex items-start gap-2.5 text-rose-700 dark:text-rose-400">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
               <p className="text-xs leading-relaxed">{error}</p>
             </div>
           )}
 
-          {/* Export Options Section */}
+          {/* Redesigned Unified Export Option */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+            <div className="flex items-center justify-between pb-1">
+              <label className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
                 Export Options (Storage Optimization)
               </label>
-              <span className="text-[11px] text-zinc-500">
-                Choose separate archives to avoid large project file bloat
+              <span className="text-[11px] text-zinc-400 dark:text-zinc-500">
+                Choose assets to bundle in a single archive
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Option 1: Standard Project Archive */}
-              <div className="flex flex-col justify-between p-4 rounded-xl border border-zinc-800 bg-zinc-950/40 hover:border-indigo-500/50 transition-all group">
-                <div className="space-y-2.5">
-                  <div className="flex items-center justify-between">
+            <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-950/40 p-5 space-y-4">
+              <div className="flex items-center gap-2 pb-3 border-b border-zinc-150 dark:border-zinc-800/80">
+                <FolderArchive className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                <span className="text-sm font-bold text-zinc-850 dark:text-zinc-200">
+                  Export Project Package
+                </span>
+              </div>
+
+              <div className="space-y-4">
+                {/* Switch 1: Include Assets */}
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <FileArchive className="w-4 h-4 text-indigo-400" />
-                      <span className="text-sm font-bold text-zinc-200">
-                        Standard Archive
+                      <span className="text-xs font-bold text-zinc-850 dark:text-zinc-200">
+                        Include Assets
                       </span>
+                      {includeAssets && (
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/30">
+                          {assetCount !== null ? `${assetCount} assets` : "scanning..."}
+                        </span>
+                      )}
                     </div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-400 border border-indigo-500/30">
-                      Lightweight
-                    </span>
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed font-normal">
+                      Packages project media, character reference portraits, audio stubs, and workflow files.
+                    </p>
                   </div>
-
-                  <p className="text-xs text-zinc-400 leading-relaxed">
-                    Compact archive with project JSON, prompt templates, staged workflows, universe characters & asset metadata.
-                  </p>
-
-                  <ul className="text-[11px] text-zinc-400 space-y-1 pt-1">
-                    <li className="flex items-center gap-1.5 text-emerald-400/90">
-                      <CheckCircle2 className="w-3 h-3 shrink-0" />
-                      <span>Fast transfer & instant backup</span>
-                    </li>
-                    <li className="flex items-center gap-1.5 text-zinc-500">
-                      <span>• Excludes heavy .mp4 take files</span>
-                    </li>
-                  </ul>
+                  <ToggleSwitch
+                    id="switch-include-assets"
+                    checked={includeAssets}
+                    onChange={setIncludeAssets}
+                  />
                 </div>
 
-                <div className="pt-4 mt-2 border-t border-zinc-800/80">
-                  <button
-                    type="button"
-                    onClick={handleExportStandardZip}
-                    disabled={isBusy}
-                    className="w-full flex items-center justify-center gap-2 py-2 px-3 text-xs font-semibold rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 hover:text-white border border-zinc-700 transition-colors disabled:opacity-50 cursor-pointer"
-                  >
-                    {exportingProject ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-400" />
-                        <span>Packaging Project...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Download className="w-3.5 h-3.5 text-indigo-400" />
-                        <span>Export Project ZIP</span>
-                      </>
-                    )}
-                  </button>
+                {/* Switch 2: Include Renders */}
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-zinc-850 dark:text-zinc-200">
+                        Include Renders
+                      </span>
+                      {includeRenders && (
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30">
+                          {displayTakesCount} {displayTakesCount === 1 ? "take" : "takes"} • {formatBytes(displaySizeBytes)}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed font-normal">
+                      Packages generated video takes (.mp4) into organized shot folders.
+                    </p>
+                  </div>
+                  <ToggleSwitch
+                    id="switch-include-renders"
+                    checked={includeRenders}
+                    onChange={setIncludeRenders}
+                  />
                 </div>
               </div>
 
-              {/* Option 2: Takes Media Archive (Separate ZIP) */}
-              <div className="flex flex-col justify-between p-4 rounded-xl border border-zinc-800 bg-zinc-950/40 hover:border-amber-500/50 transition-all group">
-                <div className="space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Film className="w-4 h-4 text-amber-400" />
-                      <span className="text-sm font-bold text-zinc-200">
-                        Takes Media ZIP
+              {/* Dynamic Export Button */}
+              <div className="pt-4 border-t border-zinc-150 dark:border-zinc-800/80">
+                <button
+                  type="button"
+                  onClick={handleExportZip}
+                  disabled={isBusy}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-sm active:scale-[0.98] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {exportingZip ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-white" />
+                      <span>
+                        {includeAssets && includeRenders
+                          ? "Packaging Project, Assets & Renders..."
+                          : includeAssets
+                          ? "Packaging Project & Assets..."
+                          : includeRenders
+                          ? "Packaging Project & Renders..."
+                          : "Packaging Project Manifest..."}
                       </span>
-                    </div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30">
-                      Heavy Media
-                    </span>
-                  </div>
-
-                  <p className="text-xs text-zinc-400 leading-relaxed">
-                    Bundles all .mp4 video takes into organized shot folders (<code className="text-amber-300 font-mono text-[10px]">takes/Shot_01/</code>), with director notes log & manifest.
-                  </p>
-
-                  {/* Live Stats Badge */}
-                  <div className="p-2 rounded-lg bg-zinc-900/90 border border-zinc-800 text-[11px] text-zinc-300 flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <Clapperboard className="w-3 h-3 text-amber-400" />
-                      <span>{displayTakesCount} takes registered</span>
-                    </div>
-                    {displaySizeBytes > 0 && (
-                      <span className="font-mono text-zinc-400 text-[10px]">
-                        {formatBytes(displaySizeBytes)}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="pt-4 mt-2 border-t border-zinc-800/80">
-                  <button
-                    type="button"
-                    onClick={handleExportTakesZip}
-                    disabled={isBusy || displayTakesCount === 0}
-                    className="w-full flex items-center justify-center gap-2 py-2 px-3 text-xs font-semibold rounded-lg bg-amber-600/90 hover:bg-amber-600 text-white transition-colors disabled:opacity-50 disabled:bg-zinc-800 disabled:text-zinc-500 cursor-pointer"
-                  >
-                    {exportingTakes ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        <span>Packaging Takes...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Download className="w-3.5 h-3.5" />
-                        <span>Download Takes ZIP</span>
-                      </>
-                    )}
-                  </button>
-                </div>
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4 text-white" />
+                      <span>Download Project ZIP</span>
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>
         </div>
 
         {/* Footer / Standard Save actions */}
-        <div className="p-4 px-6 border-t border-zinc-800 bg-zinc-950/70 flex items-center justify-between gap-3">
+        <div className="p-4 px-6 border-t border-zinc-150 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/70 flex items-center justify-between gap-3">
           <button 
             type="button"
             onClick={onClose} 
             disabled={isBusy}
-            className="px-4 py-2 text-xs font-medium text-zinc-400 hover:text-white transition-colors disabled:opacity-50 cursor-pointer"
+            className="px-4 py-2 text-xs font-semibold text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-white transition-colors disabled:opacity-50 cursor-pointer"
           >
             Close
           </button>
@@ -418,7 +396,7 @@ export const SaveProjectModal: React.FC<SaveProjectModalProps> = ({
                 type="button"
                 onClick={handleSaveAs} 
                 disabled={isBusy}
-                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-zinc-200 hover:text-white text-xs font-semibold rounded-xl border border-zinc-700 transition-colors cursor-pointer"
+                className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-50 text-zinc-700 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-white text-xs font-semibold rounded-xl border border-zinc-200 dark:border-zinc-700 transition-colors cursor-pointer"
               >
                 Save As Copy
               </button>
@@ -448,5 +426,3 @@ export const SaveProjectModal: React.FC<SaveProjectModalProps> = ({
     </div>
   );
 };
-
-

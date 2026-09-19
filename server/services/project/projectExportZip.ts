@@ -23,14 +23,28 @@ function findAssetFile(filename: string): string | null {
   if (!filename) return null;
   const cleanFn = path.basename(filename.trim());
   if (!cleanFn || cleanFn === "thumbnails" || cleanFn === ".DS_Store") return null;
+
+  // 1. Primary check: Use the live database/disk path resolver from assetService
+  try {
+    const resolvedPath = assetService.getAssetFilePath(cleanFn);
+    if (resolvedPath && fs.existsSync(resolvedPath)) {
+      return resolvedPath;
+    }
+  } catch (e) {
+    console.warn(`Error using assetService path resolver for ${cleanFn}:`, e);
+  }
+
+  // 2. Fallback: Search standard candidate folders
   const candidateDirs = [
     UPLOADS_DIR,
     UNIVERSE_MEDIA_DIR,
     path.join(process.cwd(), "assets", "images"),
     path.join(process.cwd(), "assets", "videos"),
     path.join(process.cwd(), "assets", "audios"),
-    path.join(process.cwd(), "assets", "shared")
+    path.join(process.cwd(), "assets", "shared"),
+    path.join(ASSETS_DIR, "shared")
   ];
+
   for (const base of candidateDirs) {
     if (fs.existsSync(base)) {
       const direct = path.join(base, cleanFn);
@@ -78,7 +92,7 @@ function findWorkflowFile(wfFilename: string): string | null {
 export async function exportProjectZip(
   projectName: string, 
   res: Response, 
-  options: { includeTakes?: boolean } = {}
+  options: { includeAssets?: boolean; includeRenders?: boolean; includeTakes?: boolean } = {}
 ): Promise<void> {
   const filePath = findProjectFile(projectName);
 
@@ -90,6 +104,9 @@ export async function exportProjectZip(
   const projectData = JSON.parse(fs.readFileSync(filePath, "utf-8"));
   const rawName = path.parse(filePath).name;
   const cleanSceneName = sanitizeFilenamePart(projectData.scene_name || rawName || "Scene");
+
+  const includeAssets = options.includeAssets !== false; // Default: true
+  const includeRenders = options.includeRenders === true || options.includeTakes === true; // Default: false
 
   res.setHeader("Content-Type", "application/zip");
   res.setHeader("Content-Disposition", `attachment; filename="${rawName}.zip"`);
@@ -144,11 +161,12 @@ export async function exportProjectZip(
     }
   }
 
-  // 3. Add all project media assets into uploads/
+  // 3. Add all project media assets into uploads/ (if assets are enabled)
   const addedFiles = new Set<string>();
-  const rawDb = assetService.getRawDatabase();
+  const rawDb = assetService.getAllAssets(projectData.scene_name, { includeUniverse: true });
 
   const collectAsset = (filename?: string) => {
+    if (!includeAssets) return; // Skip if assets switch is disabled
     if (!filename || typeof filename !== "string") return;
     const cleanFn = path.basename(filename.trim());
     if (!cleanFn || addedFiles.has(cleanFn) || cleanFn === "thumbnails" || cleanFn === ".DS_Store") return;
@@ -207,7 +225,7 @@ export async function exportProjectZip(
   }
   addedFiles.add("empty.png");
 
-  if (addedFiles.size <= 1 && rawDb.length > 0) {
+  if (includeAssets && addedFiles.size <= 1 && rawDb.length > 0) {
     for (const asset of rawDb) {
       if (asset && asset.filename && !addedFiles.has(asset.filename)) {
         const foundPath = findAssetFile(asset.filename);
@@ -402,7 +420,7 @@ export async function exportProjectZip(
     });
 
     // Package output video for hero take only if explicitly requested (keeping standard archive lightweight)
-    if (options.includeTakes && heroTake) {
+    if (options.includeTakes && heroTake && !includeRenders) {
       const vidFilename = heroTake.video_filename || `${cleanSceneName}_Shot_${shotNumStr}_Take_${heroTake.take_number}.mp4`;
       const sceneFolder = formatSceneFolderName(cleanSceneName);
       const possibleOutputs = [
@@ -417,6 +435,177 @@ export async function exportProjectZip(
         }
       }
     }
+  }
+
+  // 6. Include full Renders package if explicitly requested (Unified single-download switch)
+  if (includeRenders) {
+    const addedRenders = new Set<string>();
+    const manifestShots: any[] = [];
+    const textLogLines: string[] = [
+      "================================================================================",
+      `DIRECTOR TAKES LOG - SCENE: ${cleanSceneName.toUpperCase()}`,
+      `Exported At: ${new Date().toLocaleString()}`,
+      `Project: ${rawName}.json`,
+      "================================================================================",
+      ""
+    ];
+
+    const candidateRendersDirs = [
+      path.join(ASSETS_DIR, formatSceneFolderName(cleanSceneName), "outputs"),
+      path.join(ASSETS_DIR, sanitizeFilenamePart(cleanSceneName), "outputs"),
+      path.join(ASSETS_DIR, cleanSceneName, "outputs"),
+      path.join(ASSETS_DIR, "outputs"),
+      UPLOADS_DIR
+    ];
+
+    let totalRendersPackaged = 0;
+
+    for (const shot of shotsList) {
+      if (!shot || typeof shot !== "object") continue;
+      const shotNumStr = formatShotNumber(shot.shot_number);
+      const shotFolder = `Shot_${shotNumStr}${shot.shot_name ? `_${sanitizeFilenamePart(shot.shot_name)}` : ""}`;
+      const takes = Array.isArray(shot.takes) ? shot.takes : [];
+
+      textLogLines.push(`--------------------------------------------------------------------------------`);
+      textLogLines.push(`SHOT ${shotNumStr}: ${shot.shot_name || "(Untitled)"} [${shot.shot_type || "Medium"} | ${shot.camera_movement || "Static"}]`);
+      if (shot.prompt_node_id || shot.expanded_prompt) {
+        textLogLines.push(`Prompt: ${shot.expanded_prompt || shot.basic_stub || ""}`);
+      }
+      textLogLines.push(`--------------------------------------------------------------------------------`);
+
+      const manifestTakes: any[] = [];
+
+      for (const take of takes) {
+        const takeNumStr = String(take.take_number || 1).padStart(2, "0");
+        const isHero = Boolean(take.is_hero || take.id === shot.hero_take_id);
+        const rating = take.rating || (take.review_status === "approved" ? "good" : take.review_status === "needs_work" ? "bad" : "unreviewed");
+
+        const possibleFilenames = [
+          take.video_filename,
+          `${cleanSceneName}_Shot_${shotNumStr}_Take_${take.take_number}.mp4`,
+          `${cleanSceneName}_Shot_${shotNumStr}_Take_${take.take_number}.webm`,
+          `take_${take.take_number}.mp4`
+        ].filter(Boolean);
+
+        let foundPath: string | null = null;
+        let matchedFilename = take.video_filename || `${cleanSceneName}_Shot_${shotNumStr}_Take_${takeNumStr}.mp4`;
+
+        if (take.video_path && fs.existsSync(take.video_path)) {
+          foundPath = take.video_path;
+          matchedFilename = path.basename(take.video_path);
+        } else {
+          for (const fn of possibleFilenames) {
+            for (const dir of candidateRendersDirs) {
+              const candidatePath = path.join(dir, fn);
+              if (fs.existsSync(candidatePath)) {
+                foundPath = candidatePath;
+                matchedFilename = fn;
+                break;
+              }
+            }
+            if (foundPath) break;
+          }
+        }
+
+        let zipEntryPath = "";
+        let fileSize = 0;
+
+        if (foundPath && fs.existsSync(foundPath)) {
+          zipEntryPath = `takes/${shotFolder}/${matchedFilename}`;
+          if (!addedRenders.has(zipEntryPath)) {
+            archive.file(foundPath, { name: zipEntryPath });
+            addedRenders.add(zipEntryPath);
+            totalRendersPackaged++;
+            try {
+              fileSize = fs.statSync(foundPath).size;
+            } catch (e) {}
+          }
+        }
+
+        manifestTakes.push({
+          id: take.id,
+          take_number: take.take_number,
+          is_hero: isHero,
+          rating,
+          review_status: take.review_status || (rating === "good" ? "approved" : rating === "bad" ? "needs_work" : "unreviewed"),
+          video_filename: matchedFilename,
+          archive_path: zipEntryPath || null,
+          file_size: fileSize,
+          file_found_on_disk: Boolean(foundPath),
+          notes: take.notes || "",
+          expanded_prompt: take.expanded_prompt || "",
+          generation_params: take.generation_params || null,
+          created_at: take.created_at || null
+        });
+
+        const heroTag = isHero ? " [HERO TAKE]" : "";
+        const ratingTag = rating === "good" ? " [GOOD]" : rating === "bad" ? " [NEEDS WORK]" : " [UNREVIEWED]";
+        textLogLines.push(`  * Take ${takeNumStr}${heroTag}${ratingTag}: ${matchedFilename} (${fileSize ? (fileSize / (1024*1024)).toFixed(1) + " MB" : "not on disk"})`);
+        if (take.notes) {
+          textLogLines.push(`    Notes: ${take.notes}`);
+        }
+        if (take.expanded_prompt) {
+          textLogLines.push(`    Take Prompt: ${take.expanded_prompt}`);
+        }
+      }
+
+      if (takes.length === 0) {
+        textLogLines.push(`  (No takes recorded for this shot)`);
+      }
+
+      textLogLines.push("");
+
+      manifestShots.push({
+        id: shot.id,
+        shot_number: shot.shot_number,
+        shot_name: shot.shot_name,
+        shot_type: shot.shot_type,
+        camera_movement: shot.camera_movement,
+        hero_take_id: shot.hero_take_id,
+        takes: manifestTakes
+      });
+    }
+
+    // Also scan scene output folders for any unlinked take files matching scene
+    for (const dir of candidateRendersDirs) {
+      if (fs.existsSync(dir)) {
+        try {
+          const files = fs.readdirSync(dir);
+          for (const file of files) {
+            if ((file.endsWith(".mp4") || file.endsWith(".webm")) && !file.startsWith(".")) {
+              let alreadyAdded = false;
+              for (const a of addedRenders) {
+                if (a.endsWith(`/${file}`)) {
+                  alreadyAdded = true;
+                  break;
+                }
+              }
+              if (!alreadyAdded) {
+                const fullP = path.join(dir, file);
+                const extraEntryPath = `takes/unassigned/${file}`;
+                archive.file(fullP, { name: extraEntryPath });
+                addedRenders.add(extraEntryPath);
+                totalRendersPackaged++;
+              }
+            }
+          }
+        } catch (e) {}
+      }
+    }
+
+    // Add director notes text log
+    archive.append(textLogLines.join("\n"), { name: "DIRECTOR_NOTES.txt" });
+
+    // Add JSON manifest
+    const manifest = {
+      scene_name: cleanSceneName,
+      project_name: rawName,
+      exported_at: new Date().toISOString(),
+      total_shots: shotsList.length,
+      total_takes_packaged: totalRendersPackaged,
+      shots: manifestShots
+    };
+    archive.append(JSON.stringify(manifest, null, 2), { name: "takes_manifest.json" });
   }
 
   await archive.finalize();

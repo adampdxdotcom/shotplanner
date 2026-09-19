@@ -51,8 +51,13 @@ router.get("/:filename", (req: Request, res: Response) => {
 // Export standard project as ZIP (lightweight JSON + assets)
 router.get("/:filename/export", async (req: Request, res: Response) => {
   try {
-    const includeTakes = req.query.include_takes === "true";
-    await exportProjectZip(req.params.filename, res, { includeTakes });
+    const includeAssets = req.query.include_assets !== "false"; // default true
+    const includeRenders = req.query.include_renders === "true" || req.query.include_takes === "true"; // default false
+    await exportProjectZip(req.params.filename, res, { 
+      includeAssets, 
+      includeRenders,
+      includeTakes: includeRenders 
+    });
   } catch (err: any) {
     console.error("Export error:", err);
     if (!res.headersSent) {
