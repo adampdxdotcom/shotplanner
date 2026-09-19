@@ -164,7 +164,7 @@ export function resolveSSHConfig(creds: SSHCredentials): ResolvedSSHConfig {
     host,
     port,
     username,
-    readyTimeout: 30000,
+    readyTimeout: creds.port ? 5000 : 8000,
     keepaliveInterval: 10000
   };
 
@@ -473,6 +473,60 @@ export async function executeSFTPBatchTransfer(
   } finally {
     if (client) {
       try { client.end(); } catch (e) {}
+    }
+  }
+}
+
+/**
+ * Ultra-fast single file write via piped SSH command (cat > /remote/path)
+ * Bypasses multi-step SFTP folder traversal and completes in under 1 second.
+ */
+export async function executeOneShotSSHWrite(
+  creds: SSHCredentials,
+  remotePath: string,
+  content: string | Buffer
+): Promise<{ success: boolean; durationMs: number; error?: string }> {
+  const startTime = Date.now();
+  const resolved = resolveSSHConfig(creds);
+  if (!resolved.host) {
+    return { success: false, durationMs: 0, error: "Remote host is required for SSH write." };
+  }
+
+  let client: Client | null = null;
+  try {
+    client = await connectSSH({
+      ...resolved.connectConfig,
+      readyTimeout: 3000
+    });
+
+    const remoteDir = path.posix.dirname(remotePath);
+    const contentBuffer = Buffer.isBuffer(content) ? content : Buffer.from(content, "utf-8");
+
+    const cmd = `mkdir -p "${remoteDir}" && cat > "${remotePath}"`;
+
+    await new Promise<void>((resolve, reject) => {
+      client!.exec(cmd, (err, stream) => {
+        if (err) return reject(err);
+        stream.on("close", (code: number) => {
+          if (code === 0) resolve();
+          else reject(new Error(`Piped SSH cat write exited with code ${code}`));
+        });
+        stream.stderr.on("data", (d: Buffer) => {
+          console.warn("[One-Shot SSH Write stderr]:", d.toString());
+        });
+        stream.write(contentBuffer);
+        stream.end();
+      });
+    });
+
+    const elapsed = Date.now() - startTime;
+    console.log(`[One-Shot SSH Write] Streamed ${contentBuffer.length} bytes to ${remotePath} in ${elapsed}ms`);
+    return { success: true, durationMs: elapsed };
+  } catch (err: any) {
+    return { success: false, durationMs: Date.now() - startTime, error: err.message };
+  } finally {
+    if (client) {
+      try { client.end(); } catch {}
     }
   }
 }

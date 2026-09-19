@@ -219,7 +219,7 @@ print(json.dumps(results))
   if (comfyApiUrl) {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 4000);
+      const timeout = setTimeout(() => controller.abort(), 1500);
 
       // Query ComfyUI userdata / workflows API endpoints
       const testUrls = [
@@ -435,7 +435,7 @@ export async function getRemoteComfyObjectInfo(
   if (comfyApiUrl) {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 6000);
+      const timeout = setTimeout(() => controller.abort(), 1500);
       const res = await fetch(`${comfyApiUrl}/object_info`, { signal: controller.signal });
       clearTimeout(timeout);
       if (res.ok) {
@@ -516,7 +516,7 @@ export async function queuePromptToRemoteComfy(
       }
 
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 6000);
+      const timeout = setTimeout(() => controller.abort(), 1500);
 
       const res = await fetch(`${comfyApiUrl}/prompt`, {
         method: "POST",

@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { AppConfig, SceneProjectFile, ShotItem, TransferResult, generateSaveVideoPrefix, formatShotNumber } from "../types";
 import { ComfyMonitorState } from "../hooks/useComfyMonitor";
+import { Send, Activity } from "lucide-react";
 
 import { ExecutionHeader } from "./execution/ExecutionHeader";
 import { ExecutionMonitor } from "./execution/ExecutionMonitor";
@@ -33,6 +34,7 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
   onUpdateSceneProject,
   onShowToast
 }) => {
+  const [activeSubTab, setActiveSubTab] = useState<"stage" | "monitor">("stage");
   const [transferState, setTransferState] = useState<"idle" | "progress" | "error" | "success">("idle");
   const [progressStep, setProgressStep] = useState<string>("");
   const [progressPercent, setProgressPercent] = useState(0);
@@ -341,58 +343,106 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
         onSelectShot={onSelectShot}
       />
 
-      {monitorState && (monitorState.isExecuting || monitorState.queueRemaining > 0) && (
-        <ExecutionMonitor monitorState={monitorState} />
-      )}
+      {/* Segmented Sub-Tab Switcher */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-zinc-100 dark:bg-zinc-900/90 p-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-2xs">
+        <div className="flex items-center gap-1.5 w-full sm:w-auto">
+          <button
+            onClick={() => setActiveSubTab("stage")}
+            className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+              activeSubTab === "stage"
+                ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs border border-zinc-200 dark:border-zinc-700"
+                : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/40"
+            }`}
+          >
+            <Send className="w-3.5 h-3.5 text-indigo-500" />
+            <span>Send Shot / Send Scene</span>
+          </button>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <SendShotPanel
-          activeShot={activeShot}
-          sanitizedSceneName={sanitizedSceneName}
-          activeShotAssets={activeShotAssets}
-          isTransferring={isTransferring && lastAction === "shot"}
-          isExecuting={isTransferring && lastAction === "execute_shot"}
-          lastAction={lastAction as "shot" | "scene" | "execute_shot" | null}
-          handleSendShot={handleSendShot}
-          handleExecuteShot={handleExecuteShot}
-        />
-        <SendScenePanel
-          sceneProject={sceneProject}
-          sanitizedSceneName={sanitizedSceneName}
-          allSceneAssets={allSceneAssets}
-          isTransferring={isTransferring}
-          lastAction={lastAction}
-          handleSendScene={handleSendScene}
-        />
+          <button
+            onClick={() => setActiveSubTab("monitor")}
+            className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer relative ${
+              activeSubTab === "monitor"
+                ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs border border-zinc-200 dark:border-zinc-700"
+                : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/40"
+            }`}
+          >
+            <Activity className="w-3.5 h-3.5 text-emerald-500" />
+            <span>ComfyUI Monitor</span>
+            {monitorState?.isExecuting && (
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+              </span>
+            )}
+          </button>
+        </div>
+
+        <div className="hidden md:flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400 px-2 font-medium">
+          {activeSubTab === "stage" ? "Stage and dispatch workflows and assets over SSH" : "Live remote execution queue, active jobs & system telemetry"}
+        </div>
       </div>
 
-      {/* Remote ComfyUI Workflow Monitoring & Discovery */}
-      <RemoteWorkflowMonitorPanel
-        config={config}
-        monitorState={monitorState}
-        activeShot={activeShot}
-        sceneProject={sceneProject}
-        onUpdateShot={onUpdateShot}
-        onUpdateProject={onUpdateSceneProject}
-        onExecuteShot={handleExecuteShot}
-        onShowToast={onShowToast}
-      />
+      {/* SUB-TAB 1: Stage & Dispatch */}
+      {activeSubTab === "stage" && (
+        <div className="space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <SendShotPanel
+              activeShot={activeShot}
+              sanitizedSceneName={sanitizedSceneName}
+              activeShotAssets={activeShotAssets}
+              isTransferring={isTransferring && lastAction === "shot"}
+              isExecuting={isTransferring && lastAction === "execute_shot"}
+              lastAction={lastAction as "shot" | "scene" | "execute_shot" | null}
+              handleSendShot={handleSendShot}
+              handleExecuteShot={handleExecuteShot}
+            />
+            <SendScenePanel
+              sceneProject={sceneProject}
+              sanitizedSceneName={sanitizedSceneName}
+              allSceneAssets={allSceneAssets}
+              isTransferring={isTransferring}
+              lastAction={lastAction}
+              handleSendScene={handleSendScene}
+            />
+          </div>
 
-      <ExecutionConsole
-        transferState={transferState}
-        progressStep={progressStep}
-        progressPercent={progressPercent}
-        transferResult={transferResult}
-        error={error}
-        lastAction={lastAction}
-        lastStagedTime={lastStagedTime}
-        activeShot={activeShot}
-        sceneProject={sceneProject}
-        sanitizedSceneName={sanitizedSceneName}
-        handleSendShot={handleSendShot}
-        handleSendScene={handleSendScene}
-        handleDismissError={handleDismissError}
-      />
+          <ExecutionConsole
+            transferState={transferState}
+            progressStep={progressStep}
+            progressPercent={progressPercent}
+            transferResult={transferResult}
+            error={error}
+            lastAction={lastAction}
+            lastStagedTime={lastStagedTime}
+            activeShot={activeShot}
+            sceneProject={sceneProject}
+            sanitizedSceneName={sanitizedSceneName}
+            handleSendShot={handleSendShot}
+            handleSendScene={handleSendScene}
+            handleDismissError={handleDismissError}
+          />
+        </div>
+      )}
+
+      {/* SUB-TAB 2: Live Monitor & Queue */}
+      {activeSubTab === "monitor" && (
+        <div className="space-y-5">
+          {monitorState && (
+            <ExecutionMonitor monitorState={monitorState} />
+          )}
+
+          <RemoteWorkflowMonitorPanel
+            config={config}
+            monitorState={monitorState}
+            activeShot={activeShot}
+            sceneProject={sceneProject}
+            onUpdateShot={onUpdateShot}
+            onUpdateProject={onUpdateSceneProject}
+            onExecuteShot={handleExecuteShot}
+            onShowToast={onShowToast}
+          />
+        </div>
+      )}
     </div>
   );
 };

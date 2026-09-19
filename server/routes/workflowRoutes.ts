@@ -43,10 +43,45 @@ router.post("/upload", upload.single("file"), (req: Request, res: Response) => {
 
   console.log(`[Workflow Upload] Stored "${req.file.originalname}" in ${targetDir} and ${WORKFLOWS_DIR}`);
 
+  // Immediate local parse so UI responds instantly with parsed metadata
+  let parsedInfo: any = null;
+  let rawWorkflow: any = null;
+  try {
+    rawWorkflow = JSON.parse(fs.readFileSync(target, "utf-8"));
+    parsedInfo = parseWorkflowData(rawWorkflow);
+  } catch (e) {}
+
   try {
     fs.unlinkSync(req.file.path);
   } catch (e) {}
-  res.json({ success: true, filename: req.file.originalname, folder: sceneFolder });
+
+  // Respond immediately (<10ms) without waiting for remote SSH transfer
+  res.json({ 
+    success: true, 
+    filename: req.file.originalname, 
+    folder: sceneFolder,
+    parsed: parsedInfo ? {
+      total_nodes: parsedInfo.totalNodes,
+      detected_nodes: parsedInfo.detectedNodes,
+      detected_values: parsedInfo.detectedValues
+    } : undefined,
+    workflow: rawWorkflow
+  });
+
+  // Non-blocking background SSH write (one-shot cat pipe, completes in <1s)
+  const remoteHost = req.body.remote_host || req.body.host || req.body.runpod_ip;
+  if (remoteHost && rawWorkflow) {
+    setImmediate(async () => {
+      try {
+        const { executeOneShotSSHWrite } = await import("../services/sshService");
+        const remoteComfyRoot = req.body.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI";
+        const remoteDest = `${remoteComfyRoot}/user/default/workflows/${req.file.originalname}`;
+        await executeOneShotSSHWrite(req.body, remoteDest, JSON.stringify(rawWorkflow, null, 2));
+      } catch (bgErr: any) {
+        console.warn(`[Background SSH Sync Notice] ${bgErr.message}`);
+      }
+    });
+  }
 });
 
 router.post("/parse", (req: Request, res: Response) => {

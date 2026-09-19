@@ -237,7 +237,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             }`}
           >
             <Cpu className="w-3.5 h-3.5 text-indigo-400" />
-            Upload
+            ComfyUI
           </button>
           <button
             onClick={() => onNavigate("gallery")}
