@@ -8,8 +8,9 @@ import {
 import { formatShotNumber } from "../../utils/formatters";
 import { ComfyMonitorState } from "../../hooks/useComfyMonitor";
 import { useComfyQueue } from "../../hooks/useComfyQueue";
+import { useAutoWorkflowSync } from "../../hooks/useAutoWorkflowSync";
 import { filterRemoteWorkflows } from "../../utils/remoteWorkflowFilter";
-import { ActiveRunningJobCard } from "./ActiveRunningJobCard";
+import { ShotWorkflowMonitorCard } from "./ShotWorkflowMonitorCard";
 import { PendingQueueJobCard } from "./PendingQueueJobCard";
 import { 
   Radio, 
@@ -22,7 +23,8 @@ import {
   Activity,
   Layers,
   Trash2,
-  Check
+  Check,
+  Play
 } from "lucide-react";
 
 interface RemoteWorkflowMonitorPanelProps {
@@ -31,6 +33,8 @@ interface RemoteWorkflowMonitorPanelProps {
   activeShot: ShotItem | null | undefined;
   sceneProject: SceneProjectFile;
   onUpdateShot: (updater: (prev: ShotItem) => ShotItem) => void;
+  onUpdateProject?: (updater: (prev: SceneProjectFile) => SceneProjectFile) => void;
+  onExecuteShot?: () => void;
   onShowToast?: (msg: string, type: "success" | "error" | "info") => void;
 }
 
@@ -40,16 +44,29 @@ export const RemoteWorkflowMonitorPanel: React.FC<RemoteWorkflowMonitorPanelProp
   activeShot,
   sceneProject,
   onUpdateShot,
+  onUpdateProject,
+  onExecuteShot,
   onShowToast
 }) => {
-  const [isScanning, setIsScanning] = useState(false);
-  const [remoteWorkflows, setRemoteWorkflows] = useState<RemoteWorkflowItem[]>([]);
-  const [scanMessage, setScanMessage] = useState<string | null>(null);
-  const [scanStatus, setScanStatus] = useState<"idle" | "success" | "error">("idle");
-  const [lastScannedAt, setLastScannedAt] = useState<string | null>(null);
   const [selectedWorkflowForAssign, setSelectedWorkflowForAssign] = useState<string>("");
 
-  // ComfyUI Queue and System Telemetry Hook
+  // Automated background workflow discovery & shot matching (scans every 8 seconds)
+  const {
+    remoteWorkflows,
+    isScanning: isAutoScanning,
+    lastAutoScannedAt,
+    autoMatchedCount,
+    scanNow
+  } = useAutoWorkflowSync({
+    config,
+    sceneProject,
+    enabled: true,
+    pollIntervalMs: 8000,
+    onUpdateProject,
+    onShowToast
+  });
+
+  // ComfyUI Queue and System Telemetry Hook (polling ComfyUI queue)
   const {
     queueStatus,
     systemStats,
@@ -69,54 +86,7 @@ export const RemoteWorkflowMonitorPanel: React.FC<RemoteWorkflowMonitorPanelProp
     onShowToast
   });
 
-  // Scan remote ComfyUI installation for workflows via SSH and ComfyUI API
-  const handleScanRemote = async () => {
-    setIsScanning(true);
-    setScanStatus("idle");
-    setScanMessage(null);
-
-    try {
-      const res = await fetch("/api/workflow/remote-list", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          remote_host: config.remote_host,
-          ssh_port: config.ssh_port,
-          ssh_username: config.ssh_username,
-          ssh_password: config.ssh_password,
-          ssh_key_path: config.ssh_key_path,
-          ssh_private_key: config.ssh_private_key,
-          remote_comfyui_root: config.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI",
-          comfyui_api_url: config.comfyui_api_url,
-          remote_api_token: config.remote_api_token,
-          project_name: sceneProject.scene_name || ""
-        })
-      });
-
-      const data = await res.json();
-
-      if (data.success && Array.isArray(data.workflows)) {
-        const cleaned = filterRemoteWorkflows(data.workflows);
-        setRemoteWorkflows(cleaned);
-        setScanStatus("success");
-        setScanMessage(data.message || `Found ${cleaned.length} workflows.`);
-        setLastScannedAt(new Date().toLocaleTimeString());
-        onShowToast?.(`Discovered ${cleaned.length} remote workflow(s)`, "success");
-      } else {
-        setScanStatus("error");
-        setScanMessage(data.message || data.error || "Failed to scan remote ComfyUI.");
-        onShowToast?.(data.message || "Remote scan returned no workflows.", "info");
-      }
-    } catch (err: any) {
-      setScanStatus("error");
-      setScanMessage(err.message || "Failed to connect to remote host.");
-      onShowToast?.("Error scanning remote ComfyUI", "error");
-    } finally {
-      setIsScanning(false);
-    }
-  };
-
-  // Assign a remote workflow to the active shot for passive monitoring
+  // Assign a remote workflow to the active shot
   const handleAssignWorkflow = (workflowPath: string) => {
     if (!activeShot) return;
     onUpdateShot(prev => ({
@@ -139,18 +109,18 @@ export const RemoteWorkflowMonitorPanel: React.FC<RemoteWorkflowMonitorPanelProp
   const activeMonitoredWorkflow = activeShot?.monitored_workflow;
   const primaryDevice = systemStats?.devices?.[0] || null;
 
-  // Active running job info (from queue endpoint or synthesized from active monitor state)
+  // Derive execution state seamlessly: True if queue poller has a running job OR websocket is active
   const isExecuting = queueStatus.is_executing || Boolean(monitorState?.isExecuting);
   const activeRunningJob = queueStatus.running[0] || (isExecuting ? {
     index: 0,
-    prompt_id: monitorState?.activePromptId || "active-job",
+    prompt_id: monitorState?.activePromptId || (activeShot?.latest_prompt_id || "active-job"),
     status: "running" as const,
     scene_name: sceneProject.scene_name,
     shot_number: activeShot?.shot_number,
     timestamp: Date.now()
   } : null);
 
-  // Clean, genuine workflows for the dropdown
+  // Filtered clean workflows for display
   const cleanedWorkflows = filterRemoteWorkflows(remoteWorkflows);
 
   return (
@@ -169,9 +139,13 @@ export const RemoteWorkflowMonitorPanel: React.FC<RemoteWorkflowMonitorPanelProp
               <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full bg-cyan-100 dark:bg-cyan-950/80 text-cyan-700 dark:text-cyan-300 border border-cyan-300 dark:border-cyan-800">
                 Live Telemetry
               </span>
+              <span className="px-2 py-0.5 text-[10px] font-medium rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                Auto-Sync Active (8s)
+              </span>
             </div>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-              Live ComfyUI queue monitoring, execution controls, and remote workflow association.
+              Unified queue poller &amp; workflow executor. Automatically links shot workflows and monitors live generation.
             </p>
           </div>
         </div>
@@ -188,27 +162,28 @@ export const RemoteWorkflowMonitorPanel: React.FC<RemoteWorkflowMonitorPanelProp
           </button>
 
           <button
-            onClick={handleScanRemote}
-            disabled={isScanning}
+            onClick={() => scanNow()}
+            disabled={isAutoScanning}
             className={`px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all shadow-xs ${
-              isScanning
+              isAutoScanning
                 ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-400 cursor-not-allowed"
                 : "bg-cyan-600 hover:bg-cyan-500 text-white cursor-pointer active:scale-95"
             }`}
+            title="Force immediate scan of remote ComfyUI workflows"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isScanning ? "animate-spin text-cyan-400" : ""}`} />
-            <span>{isScanning ? "Scanning Workflows..." : "Scan Remote Workflows"}</span>
+            <RefreshCw className={`w-3.5 h-3.5 ${isAutoScanning ? "animate-spin text-cyan-400" : ""}`} />
+            <span>{isAutoScanning ? "Syncing..." : "Scan Workflows Now"}</span>
           </button>
         </div>
       </div>
 
-      {/* SECTION 1: LIVE JOB & QUEUE MONITOR */}
+      {/* SECTION 1: PERMANENT SHOT WORKFLOW & EXECUTION CARD */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Activity className="w-4 h-4 text-cyan-500" />
             <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
-              Live Queue &amp; Hardware Status
+              Shot Execution &amp; Live Monitor
             </h3>
             {queueStatus.queue_remaining > 0 ? (
               <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-500/10 text-amber-500 dark:text-amber-400 border border-amber-500/20">
@@ -216,7 +191,7 @@ export const RemoteWorkflowMonitorPanel: React.FC<RemoteWorkflowMonitorPanelProp
               </span>
             ) : (
               <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                ● Server Idle
+                ● Server Ready
               </span>
             )}
           </div>
@@ -235,54 +210,26 @@ export const RemoteWorkflowMonitorPanel: React.FC<RemoteWorkflowMonitorPanelProp
           )}
         </div>
 
-        {/* Active Running Job Card */}
-        {activeRunningJob ? (
-          <ActiveRunningJobCard
-            job={activeRunningJob}
-            currentStep={monitorState?.currentStep || 0}
-            maxSteps={monitorState?.maxSteps || 0}
-            activeNodeName={monitorState?.activeNodeName || null}
-            activeNodeId={monitorState?.activeNodeId || null}
-            elapsedMs={monitorState?.elapsedMs || 0}
-            device={primaryDevice}
-            isInterrupting={isInterrupting}
-            onInterrupt={interruptExecution}
-          />
-        ) : (
-          /* Server Idle State Card */
-          <div className="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-950/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 flex items-center justify-center shrink-0">
-                <Check className="w-4 h-4" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
-                    ComfyUI Server Idle &amp; Ready
-                  </span>
-                  <span className="text-[10px] text-zinc-400 font-mono">
-                    ({config.comfyui_api_url || "http://127.0.0.1:8188"})
-                  </span>
-                </div>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                  No active executions in pipeline. Ready to receive shot prompts and recipes.
-                </p>
-              </div>
-            </div>
+        {/* Permanent Interactive Card: Shows Workflow, Run Button, Stop Button, Stats & Live Steps */}
+        <ShotWorkflowMonitorCard
+          activeShot={activeShot}
+          activeWorkflowPath={activeMonitoredWorkflow}
+          job={activeRunningJob}
+          isExecuting={isExecuting}
+          currentStep={monitorState?.currentStep || 0}
+          maxSteps={monitorState?.maxSteps || 0}
+          activeNodeName={monitorState?.activeNodeName || (isExecuting ? "Processing Nodes" : null)}
+          activeNodeId={monitorState?.activeNodeId || null}
+          elapsedMs={monitorState?.elapsedMs || 0}
+          device={primaryDevice}
+          isInterrupting={isInterrupting}
+          isRunningDisabled={!onExecuteShot || !activeShot}
+          onRunWorkflow={() => onExecuteShot?.()}
+          onInterrupt={interruptExecution}
+          comfyUrl={config.comfyui_api_url}
+        />
 
-            {primaryDevice && (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs font-mono self-start sm:self-auto">
-                <Cpu className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                <span className="text-zinc-500 dark:text-zinc-400">{primaryDevice.name.replace(/NVIDIA /i, "")}:</span>
-                <span className="font-semibold text-emerald-500 dark:text-emerald-400">
-                  {primaryDevice.vram_free_gb} GB Free / {primaryDevice.vram_total_gb} GB Total
-                </span>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Pending Queue List */}
+        {/* Pending Queue List (if any jobs are queued behind active) */}
         {queueStatus.pending.length > 0 && (
           <div className="space-y-2 pt-1">
             <div className="flex items-center gap-2 text-xs font-bold text-zinc-700 dark:text-zinc-300">
@@ -304,41 +251,25 @@ export const RemoteWorkflowMonitorPanel: React.FC<RemoteWorkflowMonitorPanelProp
         )}
       </div>
 
-      {/* Host Status Row */}
+      {/* Host Status & Telemetry Row */}
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-950/60 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800/60">
         <div className="flex items-center gap-2 truncate">
           <Cpu className="w-4 h-4 text-zinc-400 shrink-0" />
           <span>Remote Target:</span>
           <span className="font-mono font-medium text-zinc-700 dark:text-zinc-300 truncate">
-            {config.remote_host ? `${config.ssh_username || "root"}@${config.remote_host}:${config.ssh_port || 22}` : "No SSH host set (Configure in Settings)"}
+            {config.remote_host ? `${config.ssh_username || "root"}@${config.remote_host}:${config.ssh_port || 22}` : "No SSH host set"}
           </span>
         </div>
 
-        {lastScannedAt && (
-          <span className="text-[11px] text-zinc-400">
-            Last scan: {lastScannedAt} ({cleanedWorkflows.length} workflows)
-          </span>
-        )}
+        <div className="flex items-center gap-3 text-[11px] text-zinc-400">
+          <span>{cleanedWorkflows.length} discovered workflow(s)</span>
+          {lastAutoScannedAt && (
+            <span>Last checked: {new Date(lastAutoScannedAt).toLocaleTimeString()}</span>
+          )}
+        </div>
       </div>
 
-      {scanMessage && (
-        <div className={`text-xs p-3 rounded-lg border flex items-start gap-2 ${
-          scanStatus === "success" 
-            ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/50" 
-            : scanStatus === "error"
-            ? "bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/50"
-            : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-300 dark:border-zinc-700"
-        }`}>
-          {scanStatus === "success" ? (
-            <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-emerald-500" />
-          ) : (
-            <AlertCircle className="w-4 h-4 mt-0.5 shrink-0 text-amber-500" />
-          )}
-          <div className="flex-1">{scanMessage}</div>
-        </div>
-      )}
-
-      {/* SECTION 2: Active Shot Workflow Selection & Monitoring */}
+      {/* SECTION 2: Active Shot Workflow Assignment / Override */}
       <div className="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/40 dark:bg-zinc-950/30 space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -368,7 +299,7 @@ export const RemoteWorkflowMonitorPanel: React.FC<RemoteWorkflowMonitorPanelProp
                     </span>
                   </div>
                   <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                    Passive monitoring active for this shot. Renders from this workflow will be captured as takes automatically.
+                    Auto-linked &amp; active. Renders from this workflow will be captured as takes automatically.
                   </p>
                 </div>
 
@@ -383,10 +314,10 @@ export const RemoteWorkflowMonitorPanel: React.FC<RemoteWorkflowMonitorPanelProp
               </div>
             ) : null}
 
-            {/* Workflow Selection Dropdown */}
+            {/* Workflow Selection / Override Dropdown */}
             <div className="space-y-2">
               <label className="text-xs text-zinc-600 dark:text-zinc-400 block">
-                {activeMonitoredWorkflow ? "Change Assigned Workflow:" : "Select Remote Workflow for Active Shot:"}
+                {activeMonitoredWorkflow ? "Override Assigned Workflow:" : "Select Remote Workflow for Active Shot:"}
               </label>
 
               {cleanedWorkflows.length > 0 ? (
@@ -423,14 +354,14 @@ export const RemoteWorkflowMonitorPanel: React.FC<RemoteWorkflowMonitorPanelProp
                 </div>
               ) : (
                 <div className="text-xs text-zinc-500 dark:text-zinc-400 italic bg-zinc-100 dark:bg-zinc-900/50 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800">
-                  No workflows scanned yet. Click &ldquo;Scan Remote Workflows&rdquo; to scan ComfyUI/user/default/workflows.
+                  Scanning remote ComfyUI in background... Uploaded workflows matching shot names will appear here automatically.
                 </div>
               )}
             </div>
           </div>
         ) : (
           <p className="text-xs text-zinc-500 dark:text-zinc-400 italic">
-            Select a shot from the carousel to assign a workflow.
+            Select a shot to assign or verify workflow.
           </p>
         )}
       </div>

@@ -369,6 +369,8 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
         activeShot={activeShot}
         sceneProject={sceneProject}
         onUpdateShot={onUpdateShot}
+        onUpdateProject={onUpdateSceneProject}
+        onExecuteShot={handleExecuteShot}
         onShowToast={onShowToast}
       />
 
