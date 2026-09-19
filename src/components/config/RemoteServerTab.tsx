@@ -1,9 +1,7 @@
 import React from "react";
-import { Server, RefreshCw, CheckCircle2, AlertCircle, Info } from "lucide-react";
+import { Server, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
 import { AppConfig } from "../../types";
 import { RemoteGPUConfig } from "./RemoteGPUConfig";
-import { ComfyUIConfig } from "./ComfyUIConfig";
-import { RemoteSSHPrimerCard } from "../RemoteSSHPrimerCard";
 
 interface RemoteServerTabProps {
   config: AppConfig;
@@ -70,7 +68,7 @@ export const RemoteServerTab: React.FC<RemoteServerTabProps> = ({
         </div>
       )}
 
-      {/* SSH Connection Credentials */}
+      {/* SSH Connection Credentials & Manual Settings Accordion */}
       <RemoteGPUConfig 
         config={config}
         handleInputChange={handleInputChange}
@@ -80,24 +78,6 @@ export const RemoteServerTab: React.FC<RemoteServerTabProps> = ({
         onShowToast={onShowToast}
         handleTestSSH={handleTestSSH}
       />
-
-      {/* Remote ComfyUI Paths & Endpoints */}
-      <ComfyUIConfig 
-        config={config}
-        handleInputChange={handleInputChange}
-        onShowToast={onShowToast}
-      />
-
-      {/* Informational Callout */}
-      <div className="text-[11px] text-zinc-600 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-950/40 p-3.5 rounded-lg border-2 border-zinc-200 dark:border-zinc-700/60 flex items-center gap-2.5">
-        <Info className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
-        <span>During execution, media assets are pushed via Paramiko SCP into <code className="text-zinc-900 dark:text-zinc-200 bg-zinc-200/80 dark:bg-zinc-800 px-1.5 py-0.5 rounded font-mono">{config.remote_comfyui_root ? `${config.remote_comfyui_root.replace(/\/$/, '')}/input/` : "/workspace/remote-slim/ComfyUI/input/"}</code>, and modified JSON graphs are submitted to <code className="text-zinc-900 dark:text-zinc-200 bg-zinc-200/80 dark:bg-zinc-800 px-1.5 py-0.5 rounded font-mono">/prompt</code>.</span>
-      </div>
-
-      {/* Expandable Guide Accordion nested at bottom */}
-      <div id="remote-ssh-guide" className="pt-3 border-t border-zinc-200 dark:border-zinc-800">
-        <RemoteSSHPrimerCard publicKey={generatedKeyPair?.public_key || config.ssh_public_key || undefined} />
-      </div>
     </section>
   );
 };
