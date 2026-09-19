@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
-import { fetchRunpodPods, addSSHKeyToRunpodAccount } from "../services/runpodService";
+import { fetchRunpodPods } from "../services/runpodService";
+import { appendAuthorizedKeyToPod } from "../services/sshService";
 
 const router = Router();
 
@@ -37,20 +38,13 @@ router.post("/pods", async (req: Request, res: Response) => {
 
 /**
  * POST /api/runpod/add-key
- * Register public SSH key to RunPod account
+ * Authorize SSH public key directly on a running pod over SSH
  */
 router.post("/add-key", async (req: Request, res: Response) => {
   try {
-    const { runpod_api_key, apiKey, public_key, publicKey } = req.body || {};
-    const keyToUse = runpod_api_key || apiKey || process.env.RUNPOD_API_KEY;
+    const { public_key, publicKey, remote_host, host, ip, ssh_port, port, ssh_password, password } = req.body || {};
     const pubKeyToUse = public_key || publicKey;
-
-    if (!keyToUse || typeof keyToUse !== "string" || !keyToUse.trim()) {
-      return res.status(400).json({
-        success: false,
-        error: "RunPod API Key is required."
-      });
-    }
+    const targetHost = remote_host || host || ip;
 
     if (!pubKeyToUse || typeof pubKeyToUse !== "string" || !pubKeyToUse.trim()) {
       return res.status(400).json({
@@ -59,17 +53,29 @@ router.post("/add-key", async (req: Request, res: Response) => {
       });
     }
 
-    await addSSHKeyToRunpodAccount(keyToUse.trim(), pubKeyToUse.trim());
+    if (!targetHost || typeof targetHost !== "string" || !targetHost.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: "Target Pod Host IP is required to push SSH key directly to pod."
+      });
+    }
+
+    const result = await appendAuthorizedKeyToPod({
+      remote_host: targetHost.trim(),
+      ssh_port: ssh_port || port || 22,
+      ssh_username: "root",
+      ssh_password: ssh_password || password || ""
+    }, pubKeyToUse.trim());
 
     res.json({
       success: true,
-      message: "Public SSH Key successfully registered with your RunPod account! Future pods will automatically authorize this key."
+      message: result.message || "SSH Public Key successfully authorized on target Pod!"
     });
   } catch (err: any) {
-    console.error("[RunPod Key Registration Error]", err.message);
+    console.error("[RunPod Key Push Error]", err.message);
     res.status(400).json({
       success: false,
-      error: err.message || "Failed to register SSH key with RunPod."
+      error: err.message || "Failed to authorize SSH key on target Pod."
     });
   }
 });

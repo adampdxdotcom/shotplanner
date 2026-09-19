@@ -103,39 +103,50 @@ export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
   };
 
   const handleRegisterAccountKey = async () => {
-    if (!apiKey.trim()) {
-      setError("RunPod API Key is required to register SSH key.");
-      return;
-    }
     if (!effectivePublicKey) {
       setError("No SSH public key found. Click 'Generate' under SSH Private Key first.");
       return;
     }
+
+    const targetHost = config.remote_host || activeSelectedPod?.ip || "";
 
     setIsRegisteringKey(true);
     setError(null);
     setSuccessMsg(null);
 
     try {
-      const res = await fetch("/api/runpod/add-key", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          runpod_api_key: apiKey.trim(),
-          public_key: effectivePublicKey.trim()
-        })
-      });
+      // 1. Always copy key to clipboard for easy account-level pasting in RunPod Console
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(effectivePublicKey.trim());
+      }
 
-      const data = await res.json();
-      if (data.success) {
-        setSuccessMsg(data.message || "SSH Public Key registered to RunPod account!");
-        onShowToast?.("SSH Key registered to RunPod account!", "success");
+      if (targetHost) {
+        // Push key directly to the active pod over SSH
+        const res = await fetch("/api/runpod/add-key", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            public_key: effectivePublicKey.trim(),
+            remote_host: targetHost,
+            ssh_port: config.ssh_port || 22,
+            ssh_password: config.ssh_password || ""
+          })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          setSuccessMsg(`SSH Key authorized on Pod (${targetHost}) & copied to clipboard!`);
+          onShowToast?.("SSH Key authorized on Pod & copied to clipboard!", "success");
+        } else {
+          throw new Error(data.error || "Failed to authorize SSH Key on Pod");
+        }
       } else {
-        throw new Error(data.error || "Failed to register SSH Key");
+        setSuccessMsg("Public SSH Key copied to clipboard! Paste it into RunPod Console → Settings → SSH Public Keys.");
+        onShowToast?.("SSH Key copied to clipboard for RunPod Console!", "info");
       }
     } catch (err: any) {
-      setError(err.message || "Key registration failed");
-      onShowToast?.(err.message || "RunPod key registration failed", "error");
+      setError(err.message || "Key push failed. Public key copied to clipboard for manual paste.");
+      onShowToast?.(err.message || "Key push failed", "error");
     } finally {
       setIsRegisteringKey(false);
     }
@@ -165,12 +176,12 @@ export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
           <button
             type="button"
             onClick={handleRegisterAccountKey}
-            disabled={isRegisteringKey || !apiKey.trim()}
+            disabled={isRegisteringKey}
             className="px-3 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg transition-all flex items-center gap-1.5 cursor-pointer shadow-xs self-start sm:self-auto shrink-0"
-            title="Register app public SSH key with your RunPod account so future pods auto-authorize it"
+            title="Push SSH key directly to target running pod, and copy to clipboard for RunPod account settings"
           >
             <ShieldCheck className={`w-3.5 h-3.5 ${isRegisteringKey ? "animate-spin" : ""}`} />
-            <span>{isRegisteringKey ? "Registering..." : "Register Key to RunPod"}</span>
+            <span>{isRegisteringKey ? "Pushing Key..." : "Authorize Key on Pod"}</span>
           </button>
         )}
       </div>

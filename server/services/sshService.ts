@@ -530,3 +530,32 @@ export async function executeOneShotSSHWrite(
     }
   }
 }
+
+/**
+ * Append SSH public key directly to a running pod's ~/.ssh/authorized_keys over SSH
+ */
+export async function appendAuthorizedKeyToPod(
+  credentials: SSHCredentials,
+  publicKey: string
+): Promise<{ success: boolean; message: string }> {
+  if (!publicKey || !publicKey.trim()) {
+    throw new Error("Public SSH Key is required.");
+  }
+  const cleanKey = publicKey.trim();
+  const config = resolveSSHConfig(credentials);
+  const conn = await connectSSH(config.connectConfig);
+
+  try {
+    const cmd = `mkdir -p ~/.ssh && chmod 700 ~/.ssh && touch ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys && (grep -qF "${cleanKey}" ~/.ssh/authorized_keys || echo "${cleanKey}" >> ~/.ssh/authorized_keys)`;
+    const result = await execSSHCommand(conn, cmd);
+    if (result.code !== 0) {
+      throw new Error(`Command failed with code ${result.code}: ${result.stderr}`);
+    }
+    return {
+      success: true,
+      message: `SSH key authorized on pod at ${config.host}:${config.port}`
+    };
+  } finally {
+    try { conn.end(); } catch (e) {}
+  }
+}
