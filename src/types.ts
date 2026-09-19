@@ -259,8 +259,13 @@ export interface RunpodPodItem {
   desiredStatus: string;
   uptimeInSeconds?: number;
   gpuCount?: number;
+  gpuDisplayName?: string;
   memoryInGb?: number;
   vcpuCount?: number;
+  imageName?: string;
+  volumeInGb?: number;
+  containerDiskInGb?: number;
+  costPerHr?: number;
   ip?: string;
   sshPort?: number;
   comfyUrl?: string;

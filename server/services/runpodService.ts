@@ -63,8 +63,13 @@ export interface RunpodPodItem {
   desiredStatus: string;
   uptimeInSeconds?: number;
   gpuCount?: number;
+  gpuDisplayName?: string;
   memoryInGb?: number;
   vcpuCount?: number;
+  imageName?: string;
+  volumeInGb?: number;
+  containerDiskInGb?: number;
+  costPerHr?: number;
   ip?: string;
   sshPort?: number;
   comfyUrl?: string;
@@ -97,9 +102,16 @@ export async function fetchRunpodPods(apiKey?: string): Promise<RunpodPodItem[]>
           id
           name
           desiredStatus
+          imageName
+          volumeInGb
+          containerDiskInGb
+          costPerHr
           gpuCount
           memoryInGb
           vcpuCount
+          machine {
+            gpuDisplayName
+          }
           runtime {
             uptimeInSeconds
             ports {
@@ -162,8 +174,13 @@ export async function fetchRunpodPods(apiKey?: string): Promise<RunpodPodItem[]>
       desiredStatus: pod.desiredStatus || "UNKNOWN",
       uptimeInSeconds: pod.runtime?.uptimeInSeconds || 0,
       gpuCount: pod.gpuCount,
+      gpuDisplayName: pod.machine?.gpuDisplayName || (pod.gpuCount ? `${pod.gpuCount}x GPU` : undefined),
       memoryInGb: pod.memoryInGb,
       vcpuCount: pod.vcpuCount,
+      imageName: pod.imageName,
+      volumeInGb: pod.volumeInGb,
+      containerDiskInGb: pod.containerDiskInGb,
+      costPerHr: pod.costPerHr,
       ip,
       sshPort,
       comfyUrl: comfyUrl || proxyUrl,

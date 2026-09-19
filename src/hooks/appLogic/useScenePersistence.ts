@@ -324,7 +324,10 @@ export function useScenePersistence({
           lm_studio_url: restoredLlmUrl || data.config?.lm_studio_url || prev.lm_studio_url,
           vision_enabled: isVision !== undefined ? isVision : prev.vision_enabled,
           auto_caption_enabled: isVision !== undefined ? (isVision ? Boolean(isAutoCaption) : false) : prev.auto_caption_enabled,
-          gemini_api_key: ""
+          gemini_api_key: "",
+          civitai_api_key: prev.civitai_api_key,
+          huggingface_token: prev.huggingface_token,
+          runpod_api_key: prev.runpod_api_key
         }));
       }
 
@@ -412,6 +415,8 @@ export function useScenePersistence({
         ...data.config,
         gemini_api_key: "",
         civitai_api_key: data.config.civitai_api_key || prev.civitai_api_key || "",
+        huggingface_token: prev.huggingface_token || "",
+        runpod_api_key: prev.runpod_api_key || "",
         remote_host: data.config.remote_host || data.config.runpod_ip || prev.remote_host,
         remote_api_token: data.config.remote_api_token || data.config.runpod_api_token || prev.remote_api_token,
         remote_comfyui_root: data.config.remote_comfyui_root || (data.config.remote_input_dir ? data.config.remote_input_dir.replace(/\/input\/?$/, "") : null) || prev.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI"

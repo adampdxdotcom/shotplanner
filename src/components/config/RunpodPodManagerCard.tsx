@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { AppConfig, RunpodPodItem } from "../../types";
 import { Cpu, RefreshCw, Check, AlertCircle, Zap, ShieldCheck } from "lucide-react";
+import { RunpodPodStatsCard } from "./RunpodPodStatsCard";
 
 interface RunpodPodManagerCardProps {
   config: AppConfig;
@@ -24,6 +25,9 @@ export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isRegisteringKey, setIsRegisteringKey] = useState(false);
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState(true);
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
+  const hasInitialFetchedRef = React.useRef(false);
 
   // Sync state if config.runpod_api_key changes externally
   React.useEffect(() => {
@@ -35,37 +39,81 @@ export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
   const handleApiKeyChange = (val: string) => {
     setApiKey(val);
     handleInputChange("runpod_api_key", val);
-    fetch("/api/settings/runpod", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ runpod_api_key: val.trim() })
-    }).catch(() => {});
   };
 
-  const handleFetchPods = async () => {
-    if (!apiKey.trim()) {
-      setError("Please enter a RunPod API Key first.");
+  const handleSaveApiKey = async () => {
+    const cleanKey = apiKey.trim();
+    if (!cleanKey) {
+      setError("Please enter a valid RunPod API Key.");
       return;
     }
-    setIsLoadingPods(true);
     setError(null);
     setSuccessMsg(null);
+    try {
+      handleInputChange("runpod_api_key", cleanKey);
+      const res = await fetch("/api/settings/runpod", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ runpod_api_key: cleanKey })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSuccessMsg("RunPod API Key saved to program settings!");
+        onShowToast?.("RunPod API Key saved to program settings", "success");
+        // Trigger immediate fetch upon saving key
+        handleFetchPods(false);
+      } else {
+        throw new Error(data.error || "Failed to save key");
+      }
+    } catch (e: any) {
+      setError(e.message || "Failed to save RunPod API Key.");
+      onShowToast?.("Failed to save RunPod API Key", "error");
+    }
+  };
+
+  const handleFetchPods = async (silent: boolean = false) => {
+    const keyToUse = apiKey.trim() || config.runpod_api_key?.trim() || "";
+    if (!keyToUse) {
+      if (!silent) setError("Please enter a RunPod API Key first.");
+      return;
+    }
+    if (!silent) setIsLoadingPods(true);
+    if (!silent) {
+      setError(null);
+      setSuccessMsg(null);
+    }
 
     try {
       const res = await fetch("/api/runpod/pods", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ runpod_api_key: apiKey.trim() })
+        body: JSON.stringify({ runpod_api_key: keyToUse })
       });
 
       const data = await res.json();
       if (data.success) {
-        setPods(data.pods || []);
-        if (data.pods && data.pods.length > 0) {
-          setSelectedPodId(data.pods[0].id);
-          setSuccessMsg(`Found ${data.pods.length} active RunPod pod(s).`);
-          onShowToast?.(`Discovered ${data.pods.length} RunPod pod(s)`, "success");
-        } else {
+        const discoveredPods: RunpodPodItem[] = data.pods || [];
+        setPods(discoveredPods);
+        setLastSyncedAt(new Date());
+
+        if (discoveredPods.length > 0) {
+          if (!selectedPodId || !discoveredPods.some(p => p.id === selectedPodId)) {
+            setSelectedPodId(discoveredPods[0].id);
+          }
+
+          // Auto-connect if enabled or if remote_host is missing
+          const activePod = discoveredPods.find(p => p.id === selectedPodId) || discoveredPods[0];
+          if (
+            activePod &&
+            activePod.ip &&
+            (config.runpod_auto_connect || !config.remote_host || config.remote_host !== activePod.ip)
+          ) {
+            handleConnectPod(activePod, silent);
+          } else if (!silent) {
+            setSuccessMsg(`Found ${discoveredPods.length} active RunPod pod(s).`);
+            onShowToast?.(`Discovered ${discoveredPods.length} RunPod pod(s)`, "success");
+          }
+        } else if (!silent) {
           setSuccessMsg("No active running pods found on your RunPod account.");
           onShowToast?.("No active pods found on RunPod", "info");
         }
@@ -73,14 +121,33 @@ export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
         throw new Error(data.error || "Failed to fetch pods");
       }
     } catch (err: any) {
-      setError(err.message || "Failed to connect to RunPod API");
-      onShowToast?.(err.message || "RunPod query failed", "error");
+      if (!silent) {
+        setError(err.message || "Failed to connect to RunPod API");
+        onShowToast?.(err.message || "RunPod query failed", "error");
+      }
     } finally {
-      setIsLoadingPods(false);
+      if (!silent) setIsLoadingPods(false);
     }
   };
 
-  const handleConnectPod = (pod: RunpodPodItem) => {
+  // Phase 1: Auto-fetch on mount if key exists
+  React.useEffect(() => {
+    if (!hasInitialFetchedRef.current && (apiKey.trim() || config.runpod_api_key?.trim())) {
+      hasInitialFetchedRef.current = true;
+      handleFetchPods(true);
+    }
+  }, [apiKey, config.runpod_api_key]);
+
+  // Phase 1: Periodic 15-second background auto-refresh
+  React.useEffect(() => {
+    if (!autoSyncEnabled || !(apiKey.trim() || config.runpod_api_key?.trim())) return;
+    const interval = setInterval(() => {
+      handleFetchPods(true);
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [autoSyncEnabled, apiKey, config.runpod_api_key, selectedPodId, config.remote_host]);
+
+  const handleConnectPod = (pod: RunpodPodItem, silent: boolean = false) => {
     if (!pod) return;
 
     if (pod.ip) {
@@ -93,10 +160,13 @@ export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
       handleInputChange("comfyui_api_url", pod.comfyUrl);
     }
 
-    const msg = `Applied settings from Pod '${pod.name}': Host ${pod.ip}:${pod.sshPort}, ComfyUI ${pod.comfyUrl}`;
-    setSuccessMsg(msg);
-    onShowToast?.(`Connected Pod '${pod.name}' (${pod.ip}:${pod.sshPort})`, "success");
+    const msg = `Connected Pod '${pod.name}': Host ${pod.ip}:${pod.sshPort}, ComfyUI ${pod.comfyUrl}`;
+    if (!silent) {
+      setSuccessMsg(msg);
+      onShowToast?.(`Connected Pod '${pod.name}' (${pod.ip}:${pod.sshPort})`, "success");
+    }
 
+    // Trigger live SSH test immediately when connected
     if (handleTestSSH && pod.ip) {
       setTimeout(() => handleTestSSH(), 300);
     }
@@ -186,9 +256,9 @@ export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
         )}
       </div>
 
-      {/* API Key Input & Fetch Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="sm:col-span-2 space-y-1.5">
+      {/* API Key Input & Action Buttons Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+        <div className="sm:col-span-7 space-y-1.5">
           <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
             RunPod API Key
           </label>
@@ -201,21 +271,32 @@ export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
           />
         </div>
 
-        <div className="flex items-end">
+        <div className="sm:col-span-5 flex items-end gap-2">
           <button
             type="button"
-            onClick={handleFetchPods}
+            onClick={handleSaveApiKey}
+            disabled={!apiKey.trim()}
+            className="px-3 py-2 text-xs font-bold bg-zinc-800 hover:bg-zinc-700 dark:bg-zinc-800 dark:hover:bg-zinc-700 disabled:opacity-50 text-white rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs shrink-0"
+            title="Save RunPod API Key to program settings"
+          >
+            <Check className="w-3.5 h-3.5" />
+            <span>Save Key</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleFetchPods(false)}
             disabled={isLoadingPods || !apiKey.trim()}
-            className="w-full py-2 px-3 text-xs font-bold bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+            className="flex-1 py-2 px-3 text-xs font-bold bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs shrink-0"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isLoadingPods ? "animate-spin" : ""}`} />
-            <span>{isLoadingPods ? "Fetching Pods..." : "Fetch Active Pods"}</span>
+            <span>{isLoadingPods ? "Fetching..." : "Fetch Pods"}</span>
           </button>
         </div>
       </div>
 
-      {/* Auto-Connect Toggle Option */}
-      <div className="flex items-center justify-between pt-1">
+      {/* Auto-Connect & Auto-Sync Toggle Row */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 border-t border-zinc-100 dark:border-zinc-800/80">
         <label className="flex items-center gap-2 text-xs text-zinc-700 dark:text-zinc-300 cursor-pointer select-none">
           <input
             type="checkbox"
@@ -223,11 +304,26 @@ export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
             onChange={(e) => handleInputChange("runpod_auto_connect", e.target.checked)}
             className="w-3.5 h-3.5 rounded border-zinc-300 dark:border-zinc-700 text-blue-600 focus:ring-blue-500 cursor-pointer"
           />
-          <span className="font-medium">Auto-connect to active pod on startup</span>
+          <span className="font-medium">Auto-connect to active pod on discovery</span>
         </label>
-        <span className="text-[11px] text-zinc-500 dark:text-zinc-400 hidden sm:inline">
-          Automatically connects if exactly one active pod is found
-        </span>
+
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-1.5 text-xs text-zinc-600 dark:text-zinc-400 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={autoSyncEnabled}
+              onChange={(e) => setAutoSyncEnabled(e.target.checked)}
+              className="w-3.5 h-3.5 rounded border-zinc-300 dark:border-zinc-700 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+            />
+            <span>Auto-refresh (15s)</span>
+          </label>
+
+          {lastSyncedAt && (
+            <span className="text-[10px] font-mono text-zinc-400 dark:text-zinc-500">
+              Synced {lastSyncedAt.toLocaleTimeString()}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Status Notifications */}
@@ -253,6 +349,12 @@ export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
               <Cpu className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
               <span>Discovered Active Pods ({pods.length})</span>
             </span>
+            {autoSyncEnabled && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/50">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                Live Sync Active
+              </span>
+            )}
           </div>
 
           <div className="flex flex-col sm:flex-row items-center gap-2">
@@ -269,36 +371,37 @@ export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
             </select>
 
             {activeSelectedPod && (
-              <button
-                type="button"
-                onClick={() => handleConnectPod(activeSelectedPod)}
-                className="w-full sm:w-auto px-4 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white rounded-lg shrink-0 transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
-              >
-                <Zap className="w-3.5 h-3.5" />
-                <span>Connect &amp; Auto-Fill Settings</span>
-              </button>
+              <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleConnectPod(activeSelectedPod, false)}
+                  className="flex-1 sm:flex-none px-3.5 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>Connect Pod</span>
+                </button>
+
+                {handleTestSSH && (
+                  <button
+                    type="button"
+                    onClick={handleTestSSH}
+                    className="px-3 py-2 text-xs font-semibold bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
+                    title="Test SSH connection to current remote host"
+                  >
+                    <span>Test SSH</span>
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
-          {/* Detailed Selected Pod Card */}
+          {/* Detailed Selected Pod Hardware & Container Stats Card */}
           {activeSelectedPod && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-zinc-200 dark:border-zinc-800 text-[11px] font-mono text-zinc-600 dark:text-zinc-400">
-              <div>
-                <span className="text-zinc-500 dark:text-zinc-500 block">Host IP:</span>
-                <span className="text-zinc-900 dark:text-zinc-200 font-bold">{activeSelectedPod.ip || "N/A"}</span>
-              </div>
-              <div>
-                <span className="text-zinc-500 dark:text-zinc-500 block">SSH Port:</span>
-                <span className="text-blue-600 dark:text-blue-400 font-bold">{activeSelectedPod.sshPort || "22"}</span>
-              </div>
-              <div>
-                <span className="text-zinc-500 dark:text-zinc-500 block">ComfyUI URL:</span>
-                <span className="text-teal-600 dark:text-cyan-400 truncate block">{activeSelectedPod.comfyUrl || "N/A"}</span>
-              </div>
-              <div>
-                <span className="text-zinc-500 dark:text-zinc-500 block">Status:</span>
-                <span className="text-emerald-600 dark:text-emerald-400 font-bold">{activeSelectedPod.desiredStatus}</span>
-              </div>
+            <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800">
+              <RunpodPodStatsCard
+                pod={activeSelectedPod}
+                isConnected={config.remote_host === activeSelectedPod.ip}
+              />
             </div>
           )}
         </div>
