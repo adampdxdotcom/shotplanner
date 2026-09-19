@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { AppConfig, RunpodPodItem } from "../../types";
-import { Cpu, RefreshCw, Check, AlertCircle, Zap, ShieldCheck } from "lucide-react";
+import { Cpu, RefreshCw, Check, CheckCircle2, AlertCircle, Zap } from "lucide-react";
 import { RunpodPodStatsCard } from "./RunpodPodStatsCard";
 
 interface RunpodPodManagerCardProps {
@@ -8,15 +8,15 @@ interface RunpodPodManagerCardProps {
   handleInputChange: (field: keyof AppConfig, value: any) => void;
   onShowToast?: (text: string, type: "success" | "error" | "info") => void;
   effectivePublicKey?: string;
-  handleTestSSH?: () => void;
 }
+
+type ConnectionStatus = "untested" | "testing" | "connected" | "error";
 
 export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
   config,
   handleInputChange,
   onShowToast,
-  effectivePublicKey,
-  handleTestSSH
+  effectivePublicKey
 }) => {
   const [apiKey, setApiKey] = useState<string>(config.runpod_api_key || "");
   const [isLoadingPods, setIsLoadingPods] = useState(false);
@@ -24,9 +24,9 @@ export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
   const [selectedPodId, setSelectedPodId] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  const [isRegisteringKey, setIsRegisteringKey] = useState(false);
   const [autoSyncEnabled, setAutoSyncEnabled] = useState(true);
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("untested");
   const hasInitialFetchedRef = React.useRef(false);
 
   // Sync state if config.runpod_api_key changes externally
@@ -39,12 +39,70 @@ export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
   const handleApiKeyChange = (val: string) => {
     setApiKey(val);
     handleInputChange("runpod_api_key", val);
+    setConnectionStatus("untested");
+    setError(null);
+  };
+
+  const handleTestApiConnection = async () => {
+    const keyToUse = apiKey.trim() || config.runpod_api_key?.trim() || "";
+    if (!keyToUse) {
+      setError("Please enter a valid RunPod API Key first.");
+      setConnectionStatus("error");
+      onShowToast?.("Missing RunPod API Key", "error");
+      return;
+    }
+
+    setConnectionStatus("testing");
+    setError(null);
+    setSuccessMsg(null);
+
+    try {
+      const res = await fetch("/api/runpod/pods", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ runpod_api_key: keyToUse })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        const discoveredPods: RunpodPodItem[] = data.pods || [];
+        setPods(discoveredPods);
+        setLastSyncedAt(new Date());
+        setConnectionStatus("connected");
+
+        if (discoveredPods.length > 0) {
+          if (!selectedPodId || !discoveredPods.some(p => p.id === selectedPodId)) {
+            setSelectedPodId(discoveredPods[0].id);
+          }
+          const activePod = discoveredPods.find(p => p.id === selectedPodId) || discoveredPods[0];
+          if (
+            activePod &&
+            activePod.ip &&
+            (config.runpod_auto_connect || !config.remote_host || config.remote_host !== activePod.ip)
+          ) {
+            handleConnectPod(activePod, true);
+          }
+          setSuccessMsg(`RunPod API Connected! Discovered ${discoveredPods.length} active pod(s).`);
+          onShowToast?.(`API Connected! Found ${discoveredPods.length} active pod(s)`, "success");
+        } else {
+          setSuccessMsg("RunPod API Connected! No active running pods found on your account.");
+          onShowToast?.("API Connected (No active pods found)", "info");
+        }
+      } else {
+        throw new Error(data.error || "Failed to connect to RunPod API");
+      }
+    } catch (err: any) {
+      setConnectionStatus("error");
+      setError(err.message || "Connection Error: Failed to reach RunPod API");
+      onShowToast?.(err.message || "RunPod Connection Error", "error");
+    }
   };
 
   const handleSaveApiKey = async () => {
     const cleanKey = apiKey.trim();
     if (!cleanKey) {
       setError("Please enter a valid RunPod API Key.");
+      setConnectionStatus("error");
       return;
     }
     setError(null);
@@ -60,13 +118,14 @@ export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
       if (data.success) {
         setSuccessMsg("RunPod API Key saved to program settings!");
         onShowToast?.("RunPod API Key saved to program settings", "success");
-        // Trigger immediate fetch upon saving key
+        // Trigger immediate fetch & test upon saving key
         handleFetchPods(false);
       } else {
         throw new Error(data.error || "Failed to save key");
       }
     } catch (e: any) {
       setError(e.message || "Failed to save RunPod API Key.");
+      setConnectionStatus("error");
       onShowToast?.("Failed to save RunPod API Key", "error");
     }
   };
@@ -74,7 +133,10 @@ export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
   const handleFetchPods = async (silent: boolean = false) => {
     const keyToUse = apiKey.trim() || config.runpod_api_key?.trim() || "";
     if (!keyToUse) {
-      if (!silent) setError("Please enter a RunPod API Key first.");
+      if (!silent) {
+        setError("Please enter a RunPod API Key first.");
+        setConnectionStatus("error");
+      }
       return;
     }
     if (!silent) setIsLoadingPods(true);
@@ -95,6 +157,7 @@ export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
         const discoveredPods: RunpodPodItem[] = data.pods || [];
         setPods(discoveredPods);
         setLastSyncedAt(new Date());
+        setConnectionStatus("connected");
 
         if (discoveredPods.length > 0) {
           if (!selectedPodId || !discoveredPods.some(p => p.id === selectedPodId)) {
@@ -122,6 +185,7 @@ export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
       }
     } catch (err: any) {
       if (!silent) {
+        setConnectionStatus("error");
         setError(err.message || "Failed to connect to RunPod API");
         onShowToast?.(err.message || "RunPod query failed", "error");
       }
@@ -130,7 +194,7 @@ export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
     }
   };
 
-  // Phase 1: Auto-fetch on mount if key exists
+  // Auto-fetch on mount if key exists
   React.useEffect(() => {
     if (!hasInitialFetchedRef.current && (apiKey.trim() || config.runpod_api_key?.trim())) {
       hasInitialFetchedRef.current = true;
@@ -138,7 +202,7 @@ export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
     }
   }, [apiKey, config.runpod_api_key]);
 
-  // Phase 1: Periodic 15-second background auto-refresh
+  // Periodic 15-second background auto-refresh
   React.useEffect(() => {
     if (!autoSyncEnabled || !(apiKey.trim() || config.runpod_api_key?.trim())) return;
     const interval = setInterval(() => {
@@ -165,68 +229,14 @@ export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
       setSuccessMsg(msg);
       onShowToast?.(`Connected Pod '${pod.name}' (${pod.ip}:${pod.sshPort})`, "success");
     }
-
-    // Trigger live SSH test immediately when connected
-    if (handleTestSSH && pod.ip) {
-      setTimeout(() => handleTestSSH(), 300);
-    }
-  };
-
-  const handleRegisterAccountKey = async () => {
-    if (!effectivePublicKey) {
-      setError("No SSH public key found. Click 'Generate' under SSH Private Key first.");
-      return;
-    }
-
-    const targetHost = config.remote_host || activeSelectedPod?.ip || "";
-
-    setIsRegisteringKey(true);
-    setError(null);
-    setSuccessMsg(null);
-
-    try {
-      // 1. Always copy key to clipboard for easy account-level pasting in RunPod Console
-      if (navigator.clipboard) {
-        await navigator.clipboard.writeText(effectivePublicKey.trim());
-      }
-
-      if (targetHost) {
-        // Push key directly to the active pod over SSH
-        const res = await fetch("/api/runpod/add-key", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            public_key: effectivePublicKey.trim(),
-            remote_host: targetHost,
-            ssh_port: config.ssh_port || 22,
-            ssh_password: config.ssh_password || ""
-          })
-        });
-
-        const data = await res.json();
-        if (data.success) {
-          setSuccessMsg(`SSH Key authorized on Pod (${targetHost}) & copied to clipboard!`);
-          onShowToast?.("SSH Key authorized on Pod & copied to clipboard!", "success");
-        } else {
-          throw new Error(data.error || "Failed to authorize SSH Key on Pod");
-        }
-      } else {
-        setSuccessMsg("Public SSH Key copied to clipboard! Paste it into RunPod Console → Settings → SSH Public Keys.");
-        onShowToast?.("SSH Key copied to clipboard for RunPod Console!", "info");
-      }
-    } catch (err: any) {
-      setError(err.message || "Key push failed. Public key copied to clipboard for manual paste.");
-      onShowToast?.(err.message || "Key push failed", "error");
-    } finally {
-      setIsRegisteringKey(false);
-    }
   };
 
   const activeSelectedPod = pods.find(p => p.id === selectedPodId) || (pods.length > 0 ? pods[0] : null);
+  const hasApiKey = Boolean(apiKey.trim() || config.runpod_api_key?.trim());
 
   return (
-    <div className="bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 space-y-4 shadow-sm transition-colors">
-      {/* Header */}
+    <div className="bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 space-y-4 shadow-xs transition-colors">
+      {/* Card Header & Dynamic Status Action Button */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-3">
         <div className="flex items-center gap-2.5">
           <div className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/50 shrink-0">
@@ -237,23 +247,52 @@ export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
               RunPod API &amp; Auto-Sync
             </h3>
             <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-              Auto-detect running pods, fetch host IP &amp; mapped SSH/HTTP ports, and register SSH account keys.
+              Auto-detect running pods, fetch host IP &amp; mapped SSH/HTTP ports, and monitor instance health.
             </p>
           </div>
         </div>
 
-        {effectivePublicKey && (
-          <button
-            type="button"
-            onClick={handleRegisterAccountKey}
-            disabled={isRegisteringKey}
-            className="px-3 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg transition-all flex items-center gap-1.5 cursor-pointer shadow-xs self-start sm:self-auto shrink-0"
-            title="Push SSH key directly to target running pod, and copy to clipboard for RunPod account settings"
-          >
-            <ShieldCheck className={`w-3.5 h-3.5 ${isRegisteringKey ? "animate-spin" : ""}`} />
-            <span>{isRegisteringKey ? "Pushing Key..." : "Authorize Key on Pod"}</span>
-          </button>
-        )}
+        {/* Dynamic Connection Status Button */}
+        <button
+          type="button"
+          onClick={handleTestApiConnection}
+          disabled={!hasApiKey || connectionStatus === "testing"}
+          className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 shadow-xs self-start sm:self-auto shrink-0 ${
+            !hasApiKey
+              ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 cursor-not-allowed opacity-60"
+              : connectionStatus === "connected"
+              ? "bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer"
+              : connectionStatus === "error"
+              ? "bg-red-600 hover:bg-red-500 text-white cursor-pointer"
+              : connectionStatus === "testing"
+              ? "bg-amber-600 text-white opacity-90 cursor-wait"
+              : "bg-amber-600 hover:bg-amber-500 text-white cursor-pointer"
+          }`}
+          title={
+            !hasApiKey
+              ? "Enter a RunPod API key first to enable connection testing"
+              : "Click to test RunPod API key & server connectivity"
+          }
+        >
+          {connectionStatus === "testing" ? (
+            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+          ) : connectionStatus === "connected" ? (
+            <CheckCircle2 className="w-3.5 h-3.5" />
+          ) : connectionStatus === "error" ? (
+            <AlertCircle className="w-3.5 h-3.5" />
+          ) : (
+            <Zap className="w-3.5 h-3.5" />
+          )}
+          <span>
+            {connectionStatus === "testing"
+              ? "Testing Connection..."
+              : connectionStatus === "connected"
+              ? "API Connected"
+              : connectionStatus === "error"
+              ? "Connection Error"
+              : "Test API Connection"}
+          </span>
+        </button>
       </div>
 
       {/* API Key Input & Action Buttons Row */}
@@ -326,18 +365,24 @@ export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
         </div>
       </div>
 
-      {/* Status Notifications */}
+      {/* Status Notifications & Error Display below API key entry */}
       {error && (
-        <div className="p-2.5 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/60 text-xs text-red-700 dark:text-red-300 flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
-          <span>{error}</span>
+        <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950/40 border-2 border-red-200 dark:border-red-800/60 text-xs text-red-800 dark:text-red-300 flex items-start gap-2.5 font-medium shadow-2xs">
+          <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+          <div className="space-y-0.5">
+            <p className="font-bold">Connection Error</p>
+            <p className="text-[11px] opacity-90">{error}</p>
+          </div>
         </div>
       )}
 
       {successMsg && !error && (
-        <div className="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-xs text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
-          <Check className="w-4 h-4 text-emerald-500 shrink-0" />
-          <span>{successMsg}</span>
+        <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border-2 border-emerald-200 dark:border-emerald-800/60 text-xs text-emerald-800 dark:text-emerald-300 flex items-start gap-2.5 font-medium shadow-2xs">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+          <div className="space-y-0.5">
+            <p className="font-bold">Connection Verified</p>
+            <p className="text-[11px] opacity-90">{successMsg}</p>
+          </div>
         </div>
       )}
 
@@ -380,17 +425,6 @@ export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
                   <Zap className="w-3.5 h-3.5" />
                   <span>Connect Pod</span>
                 </button>
-
-                {handleTestSSH && (
-                  <button
-                    type="button"
-                    onClick={handleTestSSH}
-                    className="px-3 py-2 text-xs font-semibold bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
-                    title="Test SSH connection to current remote host"
-                  >
-                    <span>Test SSH</span>
-                  </button>
-                )}
               </div>
             )}
           </div>

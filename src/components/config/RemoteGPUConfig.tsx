@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { AppConfig } from "../../types";
-import { Terminal, Key, Sparkles, Copy, Check, ChevronDown, ChevronRight, Sliders } from "lucide-react";
+import { Terminal, Key, Sparkles, Copy, Check, ChevronDown, ChevronRight, Sliders, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
 import { copyToClipboard } from "../../utils/clipboard";
 import { RunpodPodManagerCard } from "./RunpodPodManagerCard";
 import { ComfyUIConfig } from "./ComfyUIConfig";
@@ -15,23 +15,84 @@ export interface RemoteGPUConfigProps {
   handleTestSSH?: () => void;
 }
 
+type SSHConnectionStatus = "untested" | "testing" | "connected" | "error";
+
 export const RemoteGPUConfig: React.FC<RemoteGPUConfigProps> = ({
   config,
   handleInputChange,
   handleGenerateKeyPair,
   isGeneratingKeyPair,
   generatedKeyPair,
-  onShowToast,
-  handleTestSSH
+  onShowToast
 }) => {
   const [copiedCommand, setCopiedCommand] = useState(false);
   const [copiedPublicKey, setCopiedPublicKey] = useState(false);
   const [isManualCollapsed, setIsManualCollapsed] = useState(true);
 
+  // SSH Testing States
+  const [sshStatus, setSshStatus] = useState<SSHConnectionStatus>("untested");
+  const [sshError, setSshError] = useState<string | null>(null);
+  const [sshSuccessMsg, setSshSuccessMsg] = useState<string | null>(null);
+
   const effectivePublicKey = generatedKeyPair?.public_key?.trim() || config.ssh_public_key?.trim() || "";
+  const hasSshKey = Boolean(config.ssh_private_key?.trim() || effectivePublicKey);
+
   const authCommandOneLiner = effectivePublicKey
     ? `mkdir -p ~/.ssh && echo "${effectivePublicKey}" >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys`
     : `mkdir -p ~/.ssh && echo "YOUR_PUBLIC_KEY" >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys`;
+
+  // Reset SSH test status if private key or remote host changes
+  useEffect(() => {
+    setSshStatus("untested");
+    setSshError(null);
+    setSshSuccessMsg(null);
+  }, [config.ssh_private_key, config.remote_host, config.ssh_port]);
+
+  const handleRunSshTest = async () => {
+    if (!hasSshKey) {
+      setSshError("No SSH key present. Please generate or paste a private key first.");
+      setSshStatus("error");
+      onShowToast?.("Missing SSH Key", "error");
+      return;
+    }
+
+    setSshStatus("testing");
+    setSshError(null);
+    setSshSuccessMsg(null);
+
+    try {
+      const payload = {
+        host: config.remote_host ? config.remote_host.trim() : "",
+        port: Number(config.ssh_port) || 22,
+        username: config.ssh_username ? config.ssh_username.trim() : "root",
+        password: config.ssh_password || "",
+        key_path: config.ssh_key_path || "",
+        ssh_private_key: config.ssh_private_key || "",
+        remote_dir: config.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI/input/"
+      };
+
+      const res = await fetch("/api/ssh/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setSshStatus("connected");
+        const msg = data.message || "SSH Connection Verified Successfully!";
+        setSshSuccessMsg(msg);
+        onShowToast?.("SSH Connected Successfully", "success");
+      } else {
+        throw new Error(data.message || data.error || "Failed to establish SSH connection");
+      }
+    } catch (err: any) {
+      setSshStatus("error");
+      const errMsg = err.message || "SSH Connection Failed";
+      setSshError(errMsg);
+      onShowToast?.(errMsg, "error");
+    }
+  };
 
   const handleCopyCommand = async () => {
     const success = await copyToClipboard(authCommandOneLiner);
@@ -60,7 +121,6 @@ export const RemoteGPUConfig: React.FC<RemoteGPUConfigProps> = ({
         handleInputChange={handleInputChange}
         onShowToast={onShowToast}
         effectivePublicKey={effectivePublicKey}
-        handleTestSSH={handleTestSSH}
       />
 
       {/* SSH Private & Public Key Management Card */}
@@ -78,8 +138,50 @@ export const RemoteGPUConfig: React.FC<RemoteGPUConfigProps> = ({
             ) : null}
           </div>
 
-          {/* Key Actions */}
+          {/* Key Actions & Dynamic Test SSH Button */}
           <div className="flex items-center gap-2">
+            {/* Dynamic Test SSH Button */}
+            <button
+              type="button"
+              onClick={handleRunSshTest}
+              disabled={!hasSshKey || sshStatus === "testing"}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 shadow-xs shrink-0 ${
+                !hasSshKey
+                  ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 cursor-not-allowed opacity-60"
+                  : sshStatus === "connected"
+                  ? "bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer"
+                  : sshStatus === "error"
+                  ? "bg-red-600 hover:bg-red-500 text-white cursor-pointer"
+                  : sshStatus === "testing"
+                  ? "bg-amber-600 text-white opacity-90 cursor-wait"
+                  : "bg-amber-600 hover:bg-amber-500 text-white cursor-pointer"
+              }`}
+              title={
+                !hasSshKey
+                  ? "Generate or paste an SSH key first to enable SSH testing"
+                  : "Test SSH connection to current Remote GPU host"
+              }
+            >
+              {sshStatus === "testing" ? (
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              ) : sshStatus === "connected" ? (
+                <CheckCircle2 className="w-3.5 h-3.5" />
+              ) : sshStatus === "error" ? (
+                <AlertCircle className="w-3.5 h-3.5" />
+              ) : (
+                <Terminal className="w-3.5 h-3.5" />
+              )}
+              <span>
+                {sshStatus === "testing"
+                  ? "Testing SSH..."
+                  : sshStatus === "connected"
+                  ? "SSH Connected"
+                  : sshStatus === "error"
+                  ? "SSH Error"
+                  : "Test SSH"}
+              </span>
+            </button>
+
             <button
               type="button"
               onClick={handleGenerateKeyPair}
@@ -123,6 +225,27 @@ export const RemoteGPUConfig: React.FC<RemoteGPUConfigProps> = ({
             spellCheck={false}
           />
         </div>
+
+        {/* SSH Error Display directly below Key Inputs */}
+        {sshError && (
+          <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950/40 border-2 border-red-200 dark:border-red-800/60 text-xs text-red-800 dark:text-red-300 flex items-start gap-2.5 font-medium shadow-2xs">
+            <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+            <div className="space-y-0.5">
+              <p className="font-bold">SSH Connection Error</p>
+              <p className="text-[11px] opacity-90">{sshError}</p>
+            </div>
+          </div>
+        )}
+
+        {sshSuccessMsg && !sshError && (
+          <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border-2 border-emerald-200 dark:border-emerald-800/60 text-xs text-emerald-800 dark:text-emerald-300 flex items-start gap-2.5 font-medium shadow-2xs">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+            <div className="space-y-0.5">
+              <p className="font-bold">SSH Connection Verified</p>
+              <p className="text-[11px] opacity-90">{sshSuccessMsg}</p>
+            </div>
+          </div>
+        )}
 
         {/* Public Key & Terminal Command Action Bar */}
         <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/80 space-y-1.5">

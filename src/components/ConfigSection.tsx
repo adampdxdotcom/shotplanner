@@ -8,7 +8,6 @@ import {
   LLMSetupTab,
   RemoteServerTab,
   ModelHubConfig,
-  SSHKeypairModal,
   GeneralSettingsTab
 } from "./config";
 
@@ -140,16 +139,6 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({
           <GeneralSettingsTab />
         </section>
       )}
-
-      {/* SSH Keypair Modal */}
-      <SSHKeypairModal 
-        showPublicKeyModal={showPublicKeyModal}
-        generatedKeyPair={generatedKeyPair}
-        hasCopiedPublicKey={hasCopiedPublicKey}
-        onCopyPublicKey={handleCopyPublicKey}
-        onDownloadFile={handleDownloadFile}
-        onClose={() => setShowPublicKeyModal(false)}
-      />
     </div>
   );
 };

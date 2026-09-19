@@ -258,8 +258,11 @@ export function useConfigSectionState({
           ssh_public_key: data.public_key
         });
         setGeneratedKeyPair(data);
-        setShowPublicKeyModal(true);
+        setShowPublicKeyModal(false);
         setHasCopiedPublicKey(false);
+        if (onShowToast) {
+          onShowToast("Generated fresh SSH keypair! Fields updated below.", "success");
+        }
       }
     } catch (err: any) {
       alert("Failed to generate SSH key pair: " + (err.message || "Unknown error"));
