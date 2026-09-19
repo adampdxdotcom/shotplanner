@@ -1,4 +1,11 @@
-import fetch from "node-fetch";
+import nodeFetchModule from "node-fetch";
+
+const getFetch = (): typeof fetch => {
+  if (typeof globalThis.fetch === "function") {
+    return globalThis.fetch as typeof fetch;
+  }
+  return ((nodeFetchModule as any).default || nodeFetchModule) as typeof fetch;
+};
 
 export interface RunpodPodPort {
   ip: string;
@@ -61,7 +68,8 @@ export async function fetchRunpodPods(apiKey: string): Promise<RunpodPodItem[]> 
     }
   `;
 
-  const response = await fetch(graphqlEndpoint, {
+  const fetchFn = getFetch();
+  const response = await fetchFn(graphqlEndpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -144,7 +152,8 @@ export async function addSSHKeyToRunpodAccount(apiKey: string, publicKey: string
     }
   `;
 
-  const response = await fetch(graphqlEndpoint, {
+  const fetchFn = getFetch();
+  const response = await fetchFn(graphqlEndpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

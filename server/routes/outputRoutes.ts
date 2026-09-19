@@ -1,7 +1,14 @@
 import { Router, Request, Response } from "express";
 import fs from "fs";
 import path from "path";
-import fetch from "node-fetch";
+import nodeFetchModule from "node-fetch";
+
+const getFetch = (): typeof fetch => {
+  if (typeof globalThis.fetch === "function") {
+    return globalThis.fetch as typeof fetch;
+  }
+  return ((nodeFetchModule as any).default || nodeFetchModule) as typeof fetch;
+};
 import { ASSETS_DIR, upload, formatSceneFolderName, ensureSceneDirectories } from "../config/constants";
 import { sanitizeFilenamePart } from "../utils/formatters";
 import { generateThumbnailFile } from "../services/thumbnailService";

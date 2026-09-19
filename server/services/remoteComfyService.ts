@@ -1,7 +1,14 @@
 import fs from "fs";
 import path from "path";
 import { Client } from "ssh2";
-import fetch from "node-fetch";
+import nodeFetchModule from "node-fetch";
+
+const getFetch = (): typeof fetch => {
+  if (typeof globalThis.fetch === "function") {
+    return globalThis.fetch as typeof fetch;
+  }
+  return ((nodeFetchModule as any).default || nodeFetchModule) as typeof fetch;
+};
 import { SSHCredentials, resolveSSHConfig, connectSSH, execSSHCommand } from "./sshService";
 import { isCacheOrTempWorkflow } from "../utils/workflowFilter";
 import { WORKFLOWS_DIR, getSceneDirectories, formatSceneFolderName } from "../config/constants";

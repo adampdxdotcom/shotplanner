@@ -1,4 +1,11 @@
-import fetch from "node-fetch";
+import nodeFetchModule from "node-fetch";
+
+const getFetch = (): typeof fetch => {
+  if (typeof globalThis.fetch === "function") {
+    return globalThis.fetch as typeof fetch;
+  }
+  return ((nodeFetchModule as any).default || nodeFetchModule) as typeof fetch;
+};
 
 export interface ComfyQueueItem {
   index: number;
@@ -130,7 +137,8 @@ export async function fetchComfyQueue(
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
-    const res = await fetch(queueUrl, {
+    const fetchFn = getFetch();
+    const res = await fetchFn(queueUrl, {
       method: "GET",
       headers,
       signal: controller.signal
@@ -188,7 +196,8 @@ export async function interruptComfyExecution(
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 6000);
 
-    const res = await fetch(interruptUrl, {
+    const fetchFn = getFetch();
+    const res = await fetchFn(interruptUrl, {
       method: "POST",
       headers,
       body: JSON.stringify({}),
