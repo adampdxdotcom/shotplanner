@@ -83,7 +83,14 @@ export const WorkflowFileSelector: React.FC<WorkflowFileSelectorProps> = ({
       {/* Target Base Workflow Selector */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-center">
         <div className="md:col-span-2 space-y-1">
-          <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Active Workflow Graph</label>
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Active Workflow Graph</label>
+            {parsedWorkflow && (
+              <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono">
+                {parsedWorkflow.nodes_info?.total_nodes || parsedWorkflow.detected_nodes?.length || 0} nodes · {parsedWorkflow.nodes_info?.image_loader_nodes?.length || 0} images · {parsedWorkflow.nodes_info?.video_loader_nodes?.length || 0} videos
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <select
               value={selectedWorkflowFile}

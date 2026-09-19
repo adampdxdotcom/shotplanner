@@ -190,6 +190,39 @@ export function useWorkflowManagement({
     handleUpdateParam,
     handleUpdateParameterMapping,
     handleUpdateMapping,
-    fetchWorkflows
+    fetchWorkflows,
+    syncRemoteWorkflow: async (remotePath: string, config: any) => {
+      try {
+        const activeName = activeSceneName || "Untitled_Scene";
+        const res = await fetch("/api/workflows/sync-remote", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            remote_path: remotePath,
+            scene_name: activeName,
+            remote_host: config.remote_host,
+            ssh_port: config.ssh_port,
+            ssh_username: config.ssh_username,
+            ssh_password: config.ssh_password,
+            ssh_key_path: config.ssh_key_path,
+            ssh_private_key: config.ssh_private_key,
+            remote_comfyui_root: config.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI",
+            comfyui_api_url: config.comfyui_api_url,
+            remote_api_token: config.remote_api_token
+          })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          await fetchWorkflows();
+          if (data.filename) {
+            setSelectedWorkflowFile(data.filename);
+          }
+          return { success: true, data };
+        }
+        return { success: false, error: data.error || "Failed to sync remote workflow" };
+      } catch (err: any) {
+        return { success: false, error: err.message || "Failed to sync remote workflow" };
+      }
+    }
   };
 }

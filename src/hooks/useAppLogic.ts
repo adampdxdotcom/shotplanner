@@ -55,7 +55,8 @@ export function useAppLogic() {
     handleUpdateParam,
     handleUpdateParameterMapping,
     handleUpdateMapping,
-    fetchWorkflows
+    fetchWorkflows,
+    syncRemoteWorkflow
   } = useWorkflowManagement({
     activeSceneName: "",
     onUpdateActiveShotParams: handleUpdateActiveShotParams
@@ -229,6 +230,7 @@ export function useAppLogic() {
     handleUpdateCharacter,
     handleDeleteCharacter,
     fetchWorkflows,
+    syncRemoteWorkflow,
     handleUpdateParam,
     handleUpdateParameterMapping,
     handleSceneExpandPrompt,

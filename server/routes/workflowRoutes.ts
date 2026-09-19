@@ -4,7 +4,7 @@ import path from "path";
 import { upload, LEGACY_WORKFLOWS_DIR, WORKFLOWS_DIR, formatSceneFolderName, getSceneDirectories, ASSETS_DIR } from "../config/constants";
 import { listWorkflows, parseWorkflowData } from "../services/workflowService";
 import { processAssetTransfer, processSceneTransfer } from "../services/executionService";
-import { listRemoteWorkflows } from "../services/remoteComfyService";
+import { listRemoteWorkflows, fetchRemoteWorkflowJson, syncRemoteWorkflowToLocal, getRemoteComfyObjectInfo } from "../services/remoteComfyService";
 
 const router = Router();
 
@@ -196,6 +196,132 @@ router.post("/remote-list", async (req: Request, res: Response) => {
       workflows: [],
       error: err.message || "Failed to query remote ComfyUI workflows."
     });
+  }
+});
+
+// Fetch raw remote workflow content
+router.post("/remote-get", async (req: Request, res: Response) => {
+  try {
+    const { remote_path, ...creds } = req.body;
+    if (!remote_path) {
+      return res.status(400).json({ success: false, error: "remote_path is required" });
+    }
+    const result = await fetchRemoteWorkflowJson(creds as any, remote_path);
+    if (!result.success) {
+      return res.status(404).json(result);
+    }
+    const parsed = parseWorkflowData(result.data);
+    res.json({
+      success: true,
+      data: result.data,
+      parsed: {
+        detected_nodes: parsed.detectedNodes,
+        detected_values: parsed.detectedValues,
+        nodes_info: {
+          prompt_nodes: parsed.promptNodes,
+          image_loader_nodes: parsed.imageLoaderNodes,
+          video_loader_nodes: parsed.videoLoaderNodes,
+          audio_loader_nodes: parsed.audioLoaderNodes,
+          detected_nodes: parsed.detectedNodes,
+          total_nodes: parsed.totalNodes
+        }
+      }
+    });
+  } catch (err: any) {
+    console.error("[Workflow Route /remote-get ERROR]:", err);
+    res.status(500).json({ success: false, error: err.message || "Failed to fetch remote workflow." });
+  }
+});
+
+// Sync remote workflow directly to local scene storage & catalog
+router.post("/sync-remote", async (req: Request, res: Response) => {
+  try {
+    const { remote_path, scene_name, ...creds } = req.body;
+    if (!remote_path) {
+      return res.status(400).json({ success: false, error: "remote_path is required" });
+    }
+    const result = await syncRemoteWorkflowToLocal(creds as any, remote_path, scene_name || "scene01");
+    if (!result.success) {
+      return res.status(500).json(result);
+    }
+    res.json(result);
+  } catch (err: any) {
+    console.error("[Workflow Route /sync-remote ERROR]:", err);
+    res.status(500).json({ success: false, error: err.message || "Failed to sync remote workflow." });
+  }
+});
+
+// Inspect remote ComfyUI available nodes and embeddings
+router.post("/remote-object-info", async (req: Request, res: Response) => {
+  try {
+    const result = await getRemoteComfyObjectInfo(req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error("[Workflow Route /remote-object-info ERROR]:", err);
+    res.status(500).json({ success: false, error: err.message || "Failed to query ComfyUI object info." });
+  }
+});
+
+// Preview shot parameter and media injection
+router.post("/preview-shot-injection", async (req: Request, res: Response) => {
+  try {
+    const { workflow_filename, raw_workflow, shot, project_data } = req.body;
+    let workflow = raw_workflow;
+
+    if (!workflow && workflow_filename) {
+      const cleanFilename = path.basename(workflow_filename);
+      const searchPaths = [
+        path.join(WORKFLOWS_DIR, cleanFilename),
+        path.join(LEGACY_WORKFLOWS_DIR, cleanFilename),
+      ];
+      for (const p of searchPaths) {
+        if (fs.existsSync(p)) {
+          workflow = JSON.parse(fs.readFileSync(p, "utf-8"));
+          break;
+        }
+      }
+    }
+
+    if (!workflow) {
+      return res.status(400).json({ success: false, error: "Workflow file or raw workflow JSON is required." });
+    }
+
+    const { buildShotWorkflow, injectAndPrepareWorkflowData } = await import("../services/workflowService");
+    let injected: any = null;
+
+    if (raw_workflow) {
+      injected = injectAndPrepareWorkflowData(
+        raw_workflow,
+        shot?.prompt_node_id,
+        shot?.expanded_prompt || shot?.basic_stub || "",
+        shot?.node_mappings || {},
+        true,
+        "empty.png",
+        shot?.generation_params || {},
+        shot?.parameter_node_mappings || {}
+      );
+    } else {
+      injected = buildShotWorkflow(project_data || {}, shot || {}, project_data?.scene_name);
+    }
+
+    const parsed = parseWorkflowData(injected);
+
+    res.json({
+      success: true,
+      injected_workflow: injected,
+      summary: {
+        total_nodes: parsed.totalNodes,
+        detected_nodes: parsed.detectedNodes,
+        detected_values: parsed.detectedValues,
+        prompt_nodes_count: parsed.promptNodes.length,
+        image_loaders_count: parsed.imageLoaderNodes.length,
+        video_loaders_count: parsed.videoLoaderNodes.length,
+        audio_loaders_count: parsed.audioLoaderNodes.length
+      }
+    });
+  } catch (err: any) {
+    console.error("[Workflow Route /preview-shot-injection ERROR]:", err);
+    res.status(500).json({ success: false, error: err.message || "Failed to preview shot injection." });
   }
 });
 

@@ -98,7 +98,7 @@ export function isExactPromptNode(classType: string, title?: string): boolean {
   const ct = (classType || "").trim();
   const t = (title || "").trim().toLowerCase();
 
-  if (t.includes("negative") || t.includes("neg prompt")) {
+  if (t.includes("negative") || t.includes("neg prompt") || t.includes("neg_prompt") || t.includes("unwanted")) {
     return false;
   }
 
@@ -118,6 +118,41 @@ export function isExactPromptNode(classType: string, title?: string): boolean {
   }
 
   return false;
+}
+
+// Helper to accurately identify negative prompt nodes
+export function isExactNegativePromptNode(classType: string, title?: string): boolean {
+  const ct = (classType || "").trim();
+  const t = (title || "").trim().toLowerCase();
+
+  if (t.includes("negative") || t.includes("neg prompt") || t.includes("neg_prompt") || t.includes("unwanted")) {
+    return true;
+  }
+
+  if (ct === "CLIPTextEncode" && (t.includes("neg") || t === "negative")) {
+    return true;
+  }
+
+  return false;
+}
+
+// Helper to calculate pixel dimensions from aspect ratio and megapixels
+export function getDimensionsFromAspectRatio(aspectRatio?: string, megapixels: number = 1.0): { width: number; height: number } {
+  const ar = (aspectRatio || "16:9").trim().toLowerCase();
+  const totalPixels = Math.round((megapixels || 1.0) * 1024 * 1024);
+  let ratio = 16 / 9;
+  if (ar === "9:16" || ar === "vertical") ratio = 9 / 16;
+  else if (ar === "1:1" || ar === "square") ratio = 1 / 1;
+  else if (ar === "4:3") ratio = 4 / 3;
+  else if (ar === "3:4") ratio = 3 / 4;
+  else if (ar === "2.39:1" || ar === "2.35:1" || ar === "cinemascope") ratio = 2.39;
+  else if (ar === "21:9") ratio = 21 / 9;
+
+  let width = Math.round(Math.sqrt(totalPixels * ratio));
+  let height = Math.round(totalPixels / width);
+  width = Math.max(256, Math.round(width / 64) * 64);
+  height = Math.max(256, Math.round(height / 64) * 64);
+  return { width, height };
 }
 
 // Helper to accurately identify save video output nodes
@@ -461,4 +496,130 @@ export function generateLiveInjectedWorkflow(
   }
 
   return cloned;
+}
+
+export interface WorkflowInspectionAnalysis {
+  isValid: boolean;
+  promptInjected: string;
+  saveVideoPrefix: string;
+  totalNodes: number;
+  mappedLoadersCount: number;
+  unmappedLoadersCount: number;
+  loaders: {
+    nodeId: string;
+    title: string;
+    classType: string;
+    assignedAsset: string;
+    status: "assigned" | "bypassed" | "empty";
+  }[];
+  appliedParameters: {
+    name: string;
+    value: any;
+    targetNodeId: string;
+  }[];
+  warnings: string[];
+}
+
+/**
+ * Validates and inspects an injected workflow graph for debugging and user preview.
+ */
+export function inspectWorkflowGraph(
+  injectedJson: any,
+  rawJson: any,
+  activeShot?: ShotItem
+): WorkflowInspectionAnalysis {
+  const warnings: string[] = [];
+  const loaders: WorkflowInspectionAnalysis["loaders"] = [];
+  const appliedParameters: WorkflowInspectionAnalysis["appliedParameters"] = [];
+
+  let promptInjected = "";
+  let saveVideoPrefix = "";
+  let totalNodes = 0;
+
+  if (!injectedJson) {
+    return {
+      isValid: false,
+      promptInjected: "",
+      saveVideoPrefix: "",
+      totalNodes: 0,
+      mappedLoadersCount: 0,
+      unmappedLoadersCount: 0,
+      loaders: [],
+      appliedParameters: [],
+      warnings: ["No workflow JSON provided."]
+    };
+  }
+
+  if (Array.isArray(injectedJson.nodes)) {
+    totalNodes = injectedJson.nodes.length;
+    for (const node of injectedJson.nodes) {
+      if (!node) continue;
+      const strId = String(node.id ?? "");
+      const classType = String(node.type ?? "");
+      const title = String(node.title ?? classType);
+
+      if (isExactPromptNode(classType, title)) {
+        promptInjected = node.widgets_values?.[0] || node.widgets_values_named?.value || node.widgets_values_named?.text || "";
+      } else if (isSaveVideoNode(classType, title)) {
+        saveVideoPrefix = node.widgets_values?.[0] || node.widgets_values_named?.filename_prefix || "";
+      } else if (isExactImageLoader(classType, title) || isExactVideoLoader(classType, title) || isExactAudioLoader(classType, title)) {
+        const val = node.widgets_values?.[0] || node.widgets_values_named?.image || node.widgets_values_named?.video || node.widgets_values_named?.audio || "";
+        const isBypassed = val === "empty.png" || !val;
+        loaders.push({
+          nodeId: strId,
+          title,
+          classType,
+          assignedAsset: val || "",
+          status: isBypassed ? (val === "empty.png" ? "bypassed" : "empty") : "assigned"
+        });
+      }
+    }
+  } else if (typeof injectedJson === "object") {
+    const entries = Object.entries<any>(injectedJson);
+    totalNodes = entries.length;
+    for (const [nodeId, nodeData] of entries) {
+      if (!nodeData || typeof nodeData !== "object") continue;
+      const classType = nodeData.class_type || "";
+      const title = nodeData._meta?.title || classType;
+      const inputs = nodeData.inputs || {};
+
+      if (isExactPromptNode(classType, title)) {
+        promptInjected = inputs.text || inputs.value || "";
+      } else if (isSaveVideoNode(classType, title)) {
+        saveVideoPrefix = inputs.filename_prefix || "";
+      } else if (isExactImageLoader(classType, title) || isExactVideoLoader(classType, title) || isExactAudioLoader(classType, title)) {
+        const val = inputs.image || inputs.video || inputs.audio || "";
+        const isBypassed = val === "empty.png" || !val;
+        loaders.push({
+          nodeId,
+          title,
+          classType,
+          assignedAsset: val || "",
+          status: isBypassed ? (val === "empty.png" ? "bypassed" : "empty") : "assigned"
+        });
+      }
+    }
+  }
+
+  const mappedLoadersCount = loaders.filter(l => l.status === "assigned").length;
+  const unmappedLoadersCount = loaders.filter(l => l.status !== "assigned").length;
+
+  if (!promptInjected && activeShot?.basic_stub) {
+    warnings.push("No prompt node detected in workflow graph.");
+  }
+  if (unmappedLoadersCount > 0) {
+    warnings.push(`${unmappedLoadersCount} media loader(s) unassigned (bypassed with placeholders).`);
+  }
+
+  return {
+    isValid: totalNodes > 0,
+    promptInjected,
+    saveVideoPrefix,
+    totalNodes,
+    mappedLoadersCount,
+    unmappedLoadersCount,
+    loaders,
+    appliedParameters,
+    warnings
+  };
 }

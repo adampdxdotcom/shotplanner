@@ -1,7 +1,11 @@
+import fs from "fs";
+import path from "path";
 import { Client } from "ssh2";
 import fetch from "node-fetch";
 import { SSHCredentials, resolveSSHConfig, connectSSH, execSSHCommand } from "./sshService";
 import { isCacheOrTempWorkflow } from "../utils/workflowFilter";
+import { WORKFLOWS_DIR, getSceneDirectories, formatSceneFolderName } from "../config/constants";
+import { parseWorkflowData } from "./workflowService";
 
 export interface RemoteWorkflowItem {
   filename: string;
@@ -281,4 +285,193 @@ print(json.dumps(results))
       : "No remote GPU host configured. Enter your RunPod / SSH credentials in Settings to scan remote ComfyUI workflows.",
     source: "none"
   };
+}
+
+/**
+ * Fetches the raw JSON content of a remote workflow file.
+ */
+export async function fetchRemoteWorkflowJson(
+  creds: SSHCredentials & { comfyui_api_url?: string },
+  remotePath: string
+): Promise<{ success: boolean; data?: any; error?: string }> {
+  const resolved = resolveSSHConfig(creds);
+  const comfyApiUrl = (creds.comfyui_api_url || "http://127.0.0.1:8188").replace(/\/$/, "");
+  const root = resolved.remoteComfyUIRoot || "/workspace/runpod-slim/ComfyUI";
+
+  // 1. Try SSH fetch
+  if (resolved.host && resolved.authMethod !== "None") {
+    let client: Client | null = null;
+    try {
+      client = await connectSSH(resolved.connectConfig);
+      const fullPath = remotePath.startsWith("/") ? remotePath : `${root}/${remotePath}`;
+      const escapedPath = fullPath.replace(/"/g, '\\"');
+      const { stdout, code } = await execSSHCommand(client, `cat "${escapedPath}"`);
+      try { client.end(); } catch {}
+
+      if (code === 0 && stdout.trim()) {
+        try {
+          const parsed = JSON.parse(stdout.trim());
+          return { success: true, data: parsed };
+        } catch (e: any) {
+          return { success: false, error: `Invalid JSON returned from remote file: ${e.message}` };
+        }
+      }
+    } catch (sshErr: any) {
+      console.warn(`[Remote ComfyUI] SSH fetch failed for ${remotePath}: ${sshErr.message}`);
+    } finally {
+      if (client) {
+        try { client.end(); } catch {}
+      }
+    }
+  }
+
+  // 2. Try HTTP API fetch
+  if (comfyApiUrl) {
+    const cleanPath = remotePath.replace(/^\//, "");
+    const testUrls = [
+      `${comfyApiUrl}/api/userdata/workflows/${cleanPath}`,
+      `${comfyApiUrl}/userdata?file=workflows/${cleanPath}`,
+      `${comfyApiUrl}/userdata?file=${cleanPath}`,
+      `${comfyApiUrl}/api/view?filename=${cleanPath}&type=workflow`
+    ];
+
+    for (const url of testUrls) {
+      try {
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && typeof data === "object") {
+            return { success: true, data };
+          }
+        }
+      } catch {}
+    }
+  }
+
+  return {
+    success: false,
+    error: `Could not fetch remote workflow at '${remotePath}'. Check connection settings.`
+  };
+}
+
+/**
+ * Synchronizes a remote workflow file to local disk and parses schema metadata.
+ */
+export async function syncRemoteWorkflowToLocal(
+  creds: SSHCredentials & { comfyui_api_url?: string },
+  remotePath: string,
+  sceneName: string = "scene01"
+): Promise<{
+  success: boolean;
+  filename: string;
+  folder: string;
+  parsed?: any;
+  raw_workflow?: any;
+  error?: string;
+}> {
+  const fetchRes = await fetchRemoteWorkflowJson(creds, remotePath);
+  if (!fetchRes.success || !fetchRes.data) {
+    return {
+      success: false,
+      filename: path.basename(remotePath),
+      folder: "workflows",
+      error: fetchRes.error || "Failed to download remote workflow."
+    };
+  }
+
+  const rawWorkflow = fetchRes.data;
+  const filename = path.basename(remotePath);
+  const sceneFolder = formatSceneFolderName(sceneName);
+
+  const sceneWfDir = getSceneDirectories(sceneName).workflows;
+  const globalSceneWfDir = path.join(WORKFLOWS_DIR, sceneFolder);
+
+  if (!fs.existsSync(sceneWfDir)) fs.mkdirSync(sceneWfDir, { recursive: true });
+  if (!fs.existsSync(globalSceneWfDir)) fs.mkdirSync(globalSceneWfDir, { recursive: true });
+  if (!fs.existsSync(WORKFLOWS_DIR)) fs.mkdirSync(WORKFLOWS_DIR, { recursive: true });
+
+  const targetScenePath = path.join(sceneWfDir, filename);
+  const targetGlobalScenePath = path.join(globalSceneWfDir, filename);
+  const targetRootPath = path.join(WORKFLOWS_DIR, filename);
+
+  const jsonContent = JSON.stringify(rawWorkflow, null, 2);
+  fs.writeFileSync(targetScenePath, jsonContent, "utf-8");
+  fs.writeFileSync(targetGlobalScenePath, jsonContent, "utf-8");
+  fs.writeFileSync(targetRootPath, jsonContent, "utf-8");
+
+  const parsed = parseWorkflowData(rawWorkflow);
+
+  console.log(`[Remote Workflow Sync] Successfully synced "${filename}" for scene "${sceneFolder}"`);
+
+  return {
+    success: true,
+    filename,
+    folder: sceneFolder,
+    parsed: {
+      detected_nodes: parsed.detectedNodes,
+      detected_values: parsed.detectedValues,
+      nodes_info: {
+        prompt_nodes: parsed.promptNodes,
+        image_loader_nodes: parsed.imageLoaderNodes,
+        video_loader_nodes: parsed.videoLoaderNodes,
+        audio_loader_nodes: parsed.audioLoaderNodes,
+        detected_nodes: parsed.detectedNodes,
+        total_nodes: parsed.totalNodes
+      }
+    },
+    raw_workflow: rawWorkflow
+  };
+}
+
+/**
+ * Queries remote ComfyUI's /object_info endpoint for complete node schema discovery.
+ */
+export async function getRemoteComfyObjectInfo(
+  creds: SSHCredentials & { comfyui_api_url?: string }
+): Promise<{ success: boolean; object_info?: any; embeddings?: any; error?: string }> {
+  const comfyApiUrl = (creds.comfyui_api_url || "http://127.0.0.1:8188").replace(/\/$/, "");
+
+  // 1. Direct HTTP call if reachable
+  if (comfyApiUrl) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 6000);
+      const res = await fetch(`${comfyApiUrl}/object_info`, { signal: controller.signal });
+      clearTimeout(timeout);
+      if (res.ok) {
+        const objectInfo = await res.json();
+        let embeddings: any = [];
+        try {
+          const embRes = await fetch(`${comfyApiUrl}/embeddings`, { signal: controller.signal });
+          if (embRes.ok) embeddings = await embRes.json();
+        } catch {}
+        return { success: true, object_info: objectInfo, embeddings };
+      }
+    } catch {}
+  }
+
+  // 2. SSH fallback
+  const resolved = resolveSSHConfig(creds);
+  if (resolved.host && resolved.authMethod !== "None") {
+    let client: Client | null = null;
+    try {
+      client = await connectSSH(resolved.connectConfig);
+      const { stdout, code } = await execSSHCommand(client, `curl -s "http://127.0.0.1:8188/object_info"`);
+      try { client.end(); } catch {}
+      if (code === 0 && stdout.trim()) {
+        try {
+          const parsed = JSON.parse(stdout.trim());
+          return { success: true, object_info: parsed };
+        } catch {}
+      }
+    } catch (e: any) {
+      return { success: false, error: `SSH object_info query failed: ${e.message}` };
+    } finally {
+      if (client) {
+        try { client.end(); } catch {}
+      }
+    }
+  }
+
+  return { success: false, error: "Could not query ComfyUI /object_info endpoint." };
 }
