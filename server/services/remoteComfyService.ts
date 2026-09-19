@@ -24,46 +24,60 @@ export interface RemoteWorkflowsResult {
 /**
  * Discovers workflows available on the remote ComfyUI installation.
  * Queries via SSH (primary) and falls back to ComfyUI HTTP API.
- * Automatically excludes cache, autosaves, temp files, and checkpoints.
+ * Focused specifically on user workflow directories:
+ *   - ComfyUI/user/default/workflows/{project_name}
+ *   - ComfyUI/user/default/workflows
+ *   - ComfyUI/workflows
+ *
+ * Automatically strictly excludes non-workflow metadata (comfy.settings, custom_nodes, node_db, cache).
  */
 export async function listRemoteWorkflows(
-  creds: SSHCredentials & { comfyui_api_url?: string }
+  creds: SSHCredentials & { comfyui_api_url?: string; project_name?: string }
 ): Promise<RemoteWorkflowsResult> {
   const resolved = resolveSSHConfig(creds);
   const comfyApiUrl = (creds.comfyui_api_url || "http://127.0.0.1:8188").replace(/\/$/, "");
+  const projectName = creds.project_name ? creds.project_name.trim().replace(/[^a-zA-Z0-9_-]/g, "_") : "";
 
   // 1. Try SSH discovery if host is configured
   if (resolved.host && resolved.authMethod !== "None") {
     let client: Client | null = null;
     try {
-      console.log(`[Remote ComfyUI] Scanning workflows on ${resolved.username}@${resolved.host}:${resolved.port}...`);
+      console.log(`[Remote ComfyUI] Scanning workflow directories on ${resolved.username}@${resolved.host}:${resolved.port}...`);
       client = await connectSSH(resolved.connectConfig);
 
       const root = resolved.remoteComfyUIRoot || "/workspace/runpod-slim/ComfyUI";
 
-      // Execute Python discovery script for clean scanning, filtering cache/temp files
+      // Focus search dirs specifically on workflows and user workflows
       const pyScript = `
 import os, json
 
 root = os.path.expanduser("${root}")
-search_dirs = [
-    os.path.join(root, "user", "default", "workflows"),
-    os.path.join(root, "user"),
-    os.path.join(root, "workflows"),
-    os.path.join(root, "custom_nodes"),
-    root
-]
+project_name = "${projectName}"
 
-# Excluded directory names
+# Priority search directories specifically for workflows
+search_dirs = []
+if project_name:
+    search_dirs.append(os.path.join(root, "user", "default", "workflows", project_name))
+    search_dirs.append(os.path.join(root, "workflows", project_name))
+
+search_dirs.extend([
+    os.path.join(root, "user", "default", "workflows"),
+    os.path.join(root, "workflows"),
+    os.path.join(root, "user", "default"),
+    os.path.join(root, "user")
+])
+
+# Strict directory exclusion - never scan custom nodes, manager db, cache, or models
 exclude_dirs = {
     ".git", "node_modules", "models", "venv", ".venv", "env",
     "__pycache__", "input", "output", ".cache", "cache", "dist",
-    "temp", "tmp", ".temp", ".tmp", "logs"
+    "temp", "tmp", ".temp", ".tmp", "logs", "custom_nodes",
+    "comfyui-manager", "node_db", ".vscode", ".idea"
 }
 
 # Excluded filename prefixes or patterns
 exclude_prefixes = ("autosave", "auto_save", "temp_", "tmp_", "cache_", "backup_", ".", "~", "_", "preview_")
-exclude_substrings = (".cache.", ".bak", ".backup", "-checkpoint", ".tmp.", ".swp")
+exclude_substrings = (".cache.", ".bak", ".backup", "-checkpoint", ".tmp.", ".swp", "settings", "model-list", "github-stats", "extras", "extension-node-map", "custom-node-list", "alter-list")
 
 results = []
 seen = set()
@@ -81,7 +95,7 @@ for sdir in search_dirs:
                 continue
             if any(sub in f_lower for sub in exclude_substrings):
                 continue
-            if f_lower in {"comfyui.json", "package.json", "tsconfig.json"}:
+            if f_lower in {"comfy.settings.json", "comfyui.json", "package.json", "tsconfig.json"}:
                 continue
 
             fp = os.path.join(r, f)
@@ -91,23 +105,32 @@ for sdir in search_dirs:
             try:
                 stat = os.stat(fp)
                 node_count = 0
+                is_valid_workflow = False
                 try:
                     with open(fp, "r", encoding="utf-8", errors="ignore") as jf:
                         data = json.load(jf)
                         if isinstance(data, dict):
+                            # ComfyUI UI format: has 'nodes' array
                             if "nodes" in data and isinstance(data["nodes"], list):
                                 node_count = len(data["nodes"])
-                            else:
+                                is_valid_workflow = True
+                            # ComfyUI API / prompt format: dictionary of node IDs with 'class_type'
+                            elif any(isinstance(v, dict) and "class_type" in v for v in data.values()):
                                 node_count = sum(1 for v in data.values() if isinstance(v, dict) and "class_type" in v)
+                                is_valid_workflow = True
                 except:
                     pass
                 
+                # Only include files verified to contain ComfyUI workflow structures
+                if not is_valid_workflow:
+                    continue
+
                 rel = os.path.relpath(fp, root)
                 folder = os.path.dirname(rel)
                 results.append({
                     "filename": f,
                     "path": rel,
-                    "folder": folder if folder and folder != "." else "root",
+                    "folder": folder if folder and folder != "." else "workflows",
                     "size_bytes": stat.st_size,
                     "modified_at": int(stat.st_mtime),
                     "node_count": node_count,
@@ -115,11 +138,11 @@ for sdir in search_dirs:
                 })
             except:
                 pass
-            if len(results) >= 150:
+            if len(results) >= 100:
                 break
-        if len(results) >= 150:
+        if len(results) >= 100:
             break
-    if len(results) >= 150:
+    if len(results) >= 100:
         break
 
 print(json.dumps(results))
@@ -134,13 +157,12 @@ print(json.dumps(results))
         try {
           const parsed = JSON.parse(stdout.trim());
           if (Array.isArray(parsed) && parsed.length > 0) {
-            // Apply second-pass sanitizer filter to ensure no cache items sneak through
             const cleanedWorkflows = parsed.filter((w: any) => !isCacheOrTempWorkflow(w.filename, w.folder, w.path));
-            console.log(`[Remote ComfyUI] Found ${cleanedWorkflows.length} non-cache workflows via SSH.`);
+            console.log(`[Remote ComfyUI] Found ${cleanedWorkflows.length} genuine workflows via SSH.`);
             return {
               success: true,
               workflows: cleanedWorkflows,
-              message: `Discovered ${cleanedWorkflows.length} workflow(s) in remote ComfyUI (${root}).`,
+              message: `Discovered ${cleanedWorkflows.length} workflow(s) in remote ComfyUI.`,
               source: "ssh",
               host: resolved.host
             };
@@ -150,9 +172,9 @@ print(json.dumps(results))
         }
       }
 
-      // Fallback shell find command if Python was not available or output was empty
+      // Fallback shell find command specifically in workflows directory
       client = await connectSSH(resolved.connectConfig);
-      const findCmd = `find "${root}/user" "${root}/workflows" "${root}" -maxdepth 4 -name "*.json" -not -path "*/.git/*" -not -path "*/node_modules/*" -not -path "*/models/*" -not -path "*/.cache/*" -not -path "*/cache/*" -not -name "autosave*" -not -name "temp_*" -not -name ".*" 2>/dev/null | head -n 80`;
+      const findCmd = `find "${root}/user/default/workflows" "${root}/workflows" -maxdepth 3 -name "*.json" -not -path "*/.git/*" -not -path "*/custom_nodes/*" -not -name "autosave*" -not -name "temp_*" -not -name ".*" -not -name "comfy.settings*" 2>/dev/null | head -n 50`;
       const findRes = await execSSHCommand(client, findCmd);
       try { client.end(); } catch {}
 
@@ -162,7 +184,7 @@ print(json.dumps(results))
           .map((fullPath) => {
             const filename = fullPath.split("/").pop() || "workflow.json";
             const rel = fullPath.startsWith(root) ? fullPath.slice(root.length).replace(/^\//, "") : filename;
-            const folder = rel.includes("/") ? rel.slice(0, rel.lastIndexOf("/")) : "root";
+            const folder = rel.includes("/") ? rel.slice(0, rel.lastIndexOf("/")) : "workflows";
             return {
               filename,
               path: rel,
@@ -175,7 +197,7 @@ print(json.dumps(results))
         return {
           success: true,
           workflows,
-          message: `Discovered ${workflows.length} workflow(s) in remote ComfyUI (${root}).`,
+          message: `Discovered ${workflows.length} workflow(s) in remote ComfyUI.`,
           source: "ssh",
           host: resolved.host
         };

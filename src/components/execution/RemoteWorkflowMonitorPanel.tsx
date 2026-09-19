@@ -14,11 +14,9 @@ import { PendingQueueJobCard } from "./PendingQueueJobCard";
 import { 
   Radio, 
   RefreshCw, 
-  Search, 
   CheckCircle2, 
   AlertCircle, 
   Workflow, 
-  Folder, 
   Cpu, 
   XCircle,
   Activity,
@@ -49,7 +47,6 @@ export const RemoteWorkflowMonitorPanel: React.FC<RemoteWorkflowMonitorPanelProp
   const [scanMessage, setScanMessage] = useState<string | null>(null);
   const [scanStatus, setScanStatus] = useState<"idle" | "success" | "error">("idle");
   const [lastScannedAt, setLastScannedAt] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
   const [selectedWorkflowForAssign, setSelectedWorkflowForAssign] = useState<string>("");
 
   // ComfyUI Queue and System Telemetry Hook
@@ -67,6 +64,7 @@ export const RemoteWorkflowMonitorPanel: React.FC<RemoteWorkflowMonitorPanelProp
   } = useComfyQueue({
     apiUrl: config.comfyui_api_url,
     authToken: config.remote_api_token,
+    sceneName: sceneProject.scene_name,
     enabled: true,
     onShowToast
   });
@@ -90,7 +88,8 @@ export const RemoteWorkflowMonitorPanel: React.FC<RemoteWorkflowMonitorPanelProp
           ssh_private_key: config.ssh_private_key,
           remote_comfyui_root: config.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI",
           comfyui_api_url: config.comfyui_api_url,
-          remote_api_token: config.remote_api_token
+          remote_api_token: config.remote_api_token,
+          project_name: sceneProject.scene_name || ""
         })
       });
 
@@ -137,18 +136,6 @@ export const RemoteWorkflowMonitorPanel: React.FC<RemoteWorkflowMonitorPanelProp
     onShowToast?.(`Removed monitored workflow from Shot ${formatShotNumber(activeShot.shot_number)}.`, "info");
   };
 
-  // Helper to find which shot is currently monitoring a given workflow
-  const getMonitoringShotForWorkflow = (wfPath: string): ShotItem | undefined => {
-    return sceneProject.shots.find(s => s.monitored_workflow === wfPath || s.monitored_workflow === wfPath.split("/").pop());
-  };
-
-  // Filter workflows by search query and remove cache/temp workflows
-  const filteredWorkflows = filterRemoteWorkflows(remoteWorkflows).filter(wf => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    return wf.filename.toLowerCase().includes(q) || (wf.folder || "").toLowerCase().includes(q) || wf.path.toLowerCase().includes(q);
-  });
-
   const activeMonitoredWorkflow = activeShot?.monitored_workflow;
   const primaryDevice = systemStats?.devices?.[0] || null;
 
@@ -163,6 +150,9 @@ export const RemoteWorkflowMonitorPanel: React.FC<RemoteWorkflowMonitorPanelProp
     timestamp: Date.now()
   } : null);
 
+  // Clean, genuine workflows for the dropdown
+  const cleanedWorkflows = filterRemoteWorkflows(remoteWorkflows);
+
   return (
     <div className="bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 space-y-5 shadow-xs">
       {/* Panel Header */}
@@ -174,7 +164,7 @@ export const RemoteWorkflowMonitorPanel: React.FC<RemoteWorkflowMonitorPanelProp
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-                Remote ComfyUI Live Monitor &amp; Workflows
+                Remote ComfyUI Live Monitor
               </h2>
               <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full bg-cyan-100 dark:bg-cyan-950/80 text-cyan-700 dark:text-cyan-300 border border-cyan-300 dark:border-cyan-800">
                 Live Telemetry
@@ -207,7 +197,7 @@ export const RemoteWorkflowMonitorPanel: React.FC<RemoteWorkflowMonitorPanelProp
             }`}
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isScanning ? "animate-spin text-cyan-400" : ""}`} />
-            <span>{isScanning ? "Scanning Workflows..." : "Scan Remote ComfyUI"}</span>
+            <span>{isScanning ? "Scanning Workflows..." : "Scan Remote Workflows"}</span>
           </button>
         </div>
       </div>
@@ -326,7 +316,7 @@ export const RemoteWorkflowMonitorPanel: React.FC<RemoteWorkflowMonitorPanelProp
 
         {lastScannedAt && (
           <span className="text-[11px] text-zinc-400">
-            Last scan: {lastScannedAt} ({remoteWorkflows.length} workflows)
+            Last scan: {lastScannedAt} ({cleanedWorkflows.length} workflows)
           </span>
         )}
       </div>
@@ -348,53 +338,58 @@ export const RemoteWorkflowMonitorPanel: React.FC<RemoteWorkflowMonitorPanelProp
         </div>
       )}
 
-      {/* SECTION 2: Active Shot Association Card */}
-      <div className="p-4 rounded-xl border-2 border-cyan-500/30 bg-cyan-50/20 dark:bg-cyan-950/10 space-y-3">
+      {/* SECTION 2: Active Shot Workflow Selection & Monitoring */}
+      <div className="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/40 dark:bg-zinc-950/30 space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div>
-            <span className="text-xs font-semibold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">
-              Active Shot Association
+          <div className="flex items-center gap-2">
+            <Workflow className="w-4 h-4 text-cyan-500" />
+            <span className="text-xs font-semibold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+              Shot Workflow Assignment
             </span>
-            <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-              {activeShot ? `Shot ${formatShotNumber(activeShot.shot_number)}: ${activeShot.shot_name || "Untitled Shot"}` : "No Shot Selected"}
-            </h3>
           </div>
 
-          {activeMonitoredWorkflow && (
-            <button
-              onClick={handleClearAssignment}
-              className="text-xs text-red-600 hover:text-red-500 dark:text-red-400 dark:hover:text-red-300 flex items-center gap-1.5 transition-colors self-start sm:self-auto cursor-pointer"
-              title="Remove monitored workflow assignment"
-            >
-              <XCircle className="w-3.5 h-3.5" />
-              <span>Unassign Workflow</span>
-            </button>
-          )}
+          <div className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+            {activeShot ? `Shot ${formatShotNumber(activeShot.shot_number)}: ${activeShot.shot_name || "Untitled Shot"}` : "No Shot Selected"}
+          </div>
         </div>
 
         {activeShot ? (
-          activeMonitoredWorkflow ? (
-            <div className="bg-white dark:bg-zinc-950 border border-cyan-500/40 rounded-lg p-3.5 space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="relative flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500"></span>
-                </span>
-                <span className="text-xs font-bold text-cyan-700 dark:text-cyan-300 font-mono">
-                  {activeMonitoredWorkflow}
-                </span>
-              </div>
-              <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                <strong>Passive Monitoring Active:</strong> ShotPlanner is bound to monitor this workflow in remote ComfyUI. Any generated renders from this workflow will be captured as takes for this shot.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                No remote workflow currently assigned for monitoring. Select a discovered workflow below to bind this shot:
-              </p>
+          <div className="space-y-3">
+            {activeMonitoredWorkflow ? (
+              <div className="bg-white dark:bg-zinc-950 border border-cyan-500/40 rounded-lg p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
+                    </span>
+                    <span className="text-xs font-bold text-cyan-700 dark:text-cyan-300 font-mono">
+                      {activeMonitoredWorkflow}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                    Passive monitoring active for this shot. Renders from this workflow will be captured as takes automatically.
+                  </p>
+                </div>
 
-              {remoteWorkflows.length > 0 && (
+                <button
+                  onClick={handleClearAssignment}
+                  className="px-3 py-1.5 text-xs text-red-600 hover:text-red-500 dark:text-red-400 dark:hover:text-red-300 bg-red-50 dark:bg-red-950/30 hover:bg-red-100 dark:hover:bg-red-950/50 border border-red-200 dark:border-red-900/50 rounded-lg flex items-center justify-center gap-1.5 transition-colors self-start sm:self-auto cursor-pointer"
+                  title="Remove monitored workflow assignment"
+                >
+                  <XCircle className="w-3.5 h-3.5" />
+                  <span>Unassign</span>
+                </button>
+              </div>
+            ) : null}
+
+            {/* Workflow Selection Dropdown */}
+            <div className="space-y-2">
+              <label className="text-xs text-zinc-600 dark:text-zinc-400 block">
+                {activeMonitoredWorkflow ? "Change Assigned Workflow:" : "Select Remote Workflow for Active Shot:"}
+              </label>
+
+              {cleanedWorkflows.length > 0 ? (
                 <div className="flex flex-col sm:flex-row items-center gap-2">
                   <select
                     value={selectedWorkflowForAssign}
@@ -402,9 +397,9 @@ export const RemoteWorkflowMonitorPanel: React.FC<RemoteWorkflowMonitorPanelProp
                     className="flex-1 w-full bg-white dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-800 dark:text-zinc-200 outline-none focus:border-cyan-500"
                   >
                     <option value="">-- Choose Discovered Workflow --</option>
-                    {remoteWorkflows.map((wf, idx) => (
+                    {cleanedWorkflows.map((wf, idx) => (
                       <option key={`${wf.path}-${idx}`} value={wf.path}>
-                        {wf.folder && wf.folder !== "root" ? `[${wf.folder}] ` : ""}{wf.filename} {wf.node_count ? `(${wf.node_count} nodes)` : ""}
+                        {wf.folder && wf.folder !== "workflows" && wf.folder !== "root" ? `[${wf.folder}] ` : ""}{wf.filename} {wf.node_count ? `(${wf.node_count} nodes)` : ""}
                       </option>
                     ))}
                   </select>
@@ -426,123 +421,17 @@ export const RemoteWorkflowMonitorPanel: React.FC<RemoteWorkflowMonitorPanelProp
                     Assign to Shot {formatShotNumber(activeShot.shot_number)}
                   </button>
                 </div>
+              ) : (
+                <div className="text-xs text-zinc-500 dark:text-zinc-400 italic bg-zinc-100 dark:bg-zinc-900/50 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800">
+                  No workflows scanned yet. Click &ldquo;Scan Remote Workflows&rdquo; to scan ComfyUI/user/default/workflows.
+                </div>
               )}
             </div>
-          )
+          </div>
         ) : (
           <p className="text-xs text-zinc-500 dark:text-zinc-400 italic">
             Select a shot from the carousel to assign a workflow.
           </p>
-        )}
-      </div>
-
-      {/* SECTION 3: Discovered Remote Workflows Browser */}
-      <div className="space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Workflow className="w-4 h-4 text-zinc-400" />
-            <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200">
-              Discovered Remote Workflows ({filteredWorkflows.length})
-            </span>
-          </div>
-
-          {/* Search Filter */}
-          {remoteWorkflows.length > 0 && (
-            <div className="relative w-full sm:w-64">
-              <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Search workflows..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs text-zinc-800 dark:text-zinc-200 placeholder-zinc-400 outline-none focus:border-cyan-500"
-              />
-            </div>
-          )}
-        </div>
-
-        {remoteWorkflows.length === 0 ? (
-          <div className="text-center py-8 px-4 rounded-xl border border-dashed border-zinc-300 dark:border-zinc-800 space-y-2">
-            <Radio className="w-8 h-8 text-zinc-400 dark:text-zinc-600 mx-auto" />
-            <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-              No Remote Workflows Scanned Yet
-            </h4>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-md mx-auto">
-              Click &ldquo;Scan Remote ComfyUI&rdquo; above to query your remote ComfyUI machine for workflows in user folders or workflows directory.
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto pr-1">
-            {filteredWorkflows.map((wf, idx) => {
-              const monitoringShot = getMonitoringShotForWorkflow(wf.path);
-              const isAssignedToActive = activeShot && (activeShot.monitored_workflow === wf.path || activeShot.monitored_workflow === wf.filename);
-
-              return (
-                <div
-                  key={`${wf.path}-${idx}`}
-                  className={`p-3.5 rounded-lg border transition-all flex flex-col justify-between gap-3 ${
-                    isAssignedToActive
-                      ? "bg-cyan-500/10 border-cyan-500/60 shadow-xs"
-                      : "bg-zinc-50 dark:bg-zinc-950/60 border-zinc-200 dark:border-zinc-800/80 hover:border-zinc-400 dark:hover:border-zinc-700"
-                  }`}
-                >
-                  <div className="space-y-1.5">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 font-mono truncate block" title={wf.filename}>
-                          {wf.filename}
-                        </span>
-                        <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 dark:text-zinc-400 truncate mt-0.5">
-                          <Folder className="w-3 h-3 shrink-0" />
-                          <span className="truncate">{wf.folder || "workflows"}</span>
-                        </div>
-                      </div>
-
-                      {wf.node_count !== undefined && wf.node_count > 0 && (
-                        <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 shrink-0">
-                          {wf.node_count} nodes
-                        </span>
-                      )}
-                    </div>
-
-                    {monitoringShot && (
-                      <div className="flex items-center gap-1.5 text-[11px] font-semibold text-cyan-600 dark:text-cyan-400">
-                        <Radio className="w-3 h-3 shrink-0 animate-pulse" />
-                        <span>
-                          {isAssignedToActive ? "Assigned to this Shot" : `Assigned to Shot ${formatShotNumber(monitoringShot.shot_number)}`}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-zinc-200 dark:border-zinc-800/60">
-                    <span className="text-[10px] text-zinc-400 font-mono truncate">
-                      {wf.path}
-                    </span>
-
-                    {activeShot && (
-                      <button
-                        onClick={() => {
-                          if (isAssignedToActive) {
-                            handleClearAssignment();
-                          } else {
-                            handleAssignWorkflow(wf.path);
-                          }
-                        }}
-                        className={`px-2.5 py-1 text-[11px] font-medium rounded transition-colors shrink-0 cursor-pointer ${
-                          isAssignedToActive
-                            ? "bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/30"
-                            : "bg-cyan-600 hover:bg-cyan-500 text-white"
-                        }`}
-                      >
-                        {isAssignedToActive ? "Unassign" : `Assign to Shot ${formatShotNumber(activeShot.shot_number)}`}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
         )}
       </div>
     </div>

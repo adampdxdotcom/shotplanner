@@ -1,9 +1,8 @@
 /**
- * Utility functions to filter out cache, temporary, autosave, and backup files
- * from discovered remote ComfyUI workflows.
+ * Utility functions to filter and strictly validate ComfyUI workflow files.
  */
 
-// Patterns indicating cache or temporary folders/files
+// Patterns for folder names that should never be searched or accepted
 const EXCLUDED_FOLDER_NAMES = [
   ".git",
   ".cache",
@@ -23,7 +22,10 @@ const EXCLUDED_FOLDER_NAMES = [
   ".tmp",
   "logs",
   ".vscode",
-  ".idea"
+  ".idea",
+  "custom_nodes",
+  "comfyui-manager",
+  "node_db"
 ];
 
 // Patterns for filenames that should be ignored
@@ -46,11 +48,31 @@ const EXCLUDED_FILENAME_SUBSTRINGS = [
   ".backup",
   "-checkpoint",
   ".tmp.",
-  ".swp"
+  ".swp",
+  "settings",
+  "model-list",
+  "github-stats",
+  "extras",
+  "extension-node-map",
+  "custom-node-list",
+  "alter-list"
 ];
 
+const KNOWN_NON_WORKFLOW_FILENAMES = new Set([
+  "comfy.settings.json",
+  "comfyui.json",
+  "package.json",
+  "tsconfig.json",
+  "model-list.json",
+  "github-stats.json",
+  "extras.json",
+  "extension-node-map.json",
+  "custom-node-list.json",
+  "alter-list.json"
+]);
+
 /**
- * Returns true if a workflow file path or filename represents a cache, autosave, or temp file.
+ * Returns true if a workflow file path or filename represents a cache, autosave, temp, or non-workflow system file.
  */
 export function isCacheOrTempWorkflow(filename: string, folder?: string, fullPath?: string): boolean {
   const cleanFilename = (filename || "").toLowerCase().trim();
@@ -62,37 +84,32 @@ export function isCacheOrTempWorkflow(filename: string, folder?: string, fullPat
     return true;
   }
 
-  // 2. Check filename prefixes
+  // 2. Explicit known non-workflow filenames
+  if (KNOWN_NON_WORKFLOW_FILENAMES.has(cleanFilename)) {
+    return true;
+  }
+
+  // 3. Check filename prefixes
   for (const prefix of EXCLUDED_FILENAME_PREFIXES) {
     if (cleanFilename.startsWith(prefix)) {
       return true;
     }
   }
 
-  // 3. Check filename substrings
+  // 4. Check filename substrings
   for (const sub of EXCLUDED_FILENAME_SUBSTRINGS) {
     if (cleanFilename.includes(sub)) {
       return true;
     }
   }
 
-  // 4. Check folder segments
+  // 5. Check folder segments
   const pathParts = cleanPath.split("/").concat(cleanFolder.split("/"));
   for (const part of pathParts) {
     if (!part) continue;
     if (EXCLUDED_FOLDER_NAMES.includes(part) || part.startsWith(".")) {
       return true;
     }
-  }
-
-  // 5. Exclude ComfyUI internal system files
-  if (
-    cleanFilename === "extra_model_paths.yaml.example" ||
-    cleanFilename === "comfyui.json" ||
-    cleanFilename === "package.json" ||
-    cleanFilename === "tsconfig.json"
-  ) {
-    return true;
   }
 
   return false;

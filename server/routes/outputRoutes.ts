@@ -5,6 +5,10 @@ import fetch from "node-fetch";
 import { ASSETS_DIR, upload, formatSceneFolderName, ensureSceneDirectories } from "../config/constants";
 import { sanitizeFilenamePart } from "../utils/formatters";
 import { generateThumbnailFile } from "../services/thumbnailService";
+import { 
+  downloadAndIngestTake, 
+  syncComfyOutputsFromHistory 
+} from "../services/outputIngestionService";
 
 const router = Router();
 
@@ -92,74 +96,61 @@ router.delete(["/outputs/:scene_name/:filename", "/outputs/:filename"], (req: Re
 
 router.post("/outputs/pull", async (req: Request, res: Response) => {
   try {
-    const { scene_name, filename, subfolder, comfyui_api_url } = req.body;
+    const { scene_name, filename, subfolder, comfyui_api_url, remote_api_token, prompt_id, shot_number } = req.body;
     if (!scene_name || !filename) {
       return res.status(400).json({ error: "Missing required parameters: scene_name and filename are required" });
     }
-    
-    const safeSceneName = formatSceneFolderName(scene_name) || sanitizeFilenamePart(scene_name) || "scene01";
-    const outputDir = path.join(ASSETS_DIR, safeSceneName, "outputs");
-    
-    if (!fs.existsSync(outputDir)) {
-      fs.mkdirSync(outputDir, { recursive: true });
-    }
-    
-    const filePath = path.join(outputDir, filename);
-    const configuredApiUrl = comfyui_api_url || process.env.COMFYUI_API_URL || "http://127.0.0.1:8188";
-    const baseUrl = configuredApiUrl.replace(/\/$/, "");
-    let downloadUrl = `${baseUrl}/view?filename=${encodeURIComponent(filename)}&type=output`;
-    if (subfolder) {
-      downloadUrl += `&subfolder=${encodeURIComponent(subfolder)}`;
-    }
-    
-    console.log(`[Output Ingestion] Requesting output from ComfyUI: ${downloadUrl}`);
-    const response = await fetch(downloadUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to download from ComfyUI (${response.status} ${response.statusText})`);
-    }
-    
-    const arrayBuf = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuf);
-    fs.writeFileSync(filePath, buffer);
-    const fileSize = buffer.length;
 
-    // Detect media type
-    const isVideo = /\.(mp4|mov|webm|mkv|avi)$/i.test(filename);
-    const isImage = /\.(png|jpg|jpeg|webp|avif)$/i.test(filename);
-    const mediaType = isVideo ? "video" : isImage ? "image" : "other";
-
-    // Also persist into the scene's project asset storage
-    const sceneDirs = ensureSceneDirectories(safeSceneName);
-    const targetAssetDir = isVideo ? sceneDirs.videos : sceneDirs.images;
-    if (!fs.existsSync(targetAssetDir)) {
-      fs.mkdirSync(targetAssetDir, { recursive: true });
-    }
-    const assetPath = path.join(targetAssetDir, filename);
-    try {
-      fs.writeFileSync(assetPath, buffer);
-      if (isImage) {
-        generateThumbnailFile(assetPath).catch(() => {});
-      }
-    } catch (copyErr) {
-      console.warn("[Output Ingestion] Failed to copy output to scene asset storage:", copyErr);
-    }
-
-    const streamUrl = `/api/outputs/stream/${encodeURIComponent(safeSceneName)}/${encodeURIComponent(filename)}`;
-
-    console.log(`[Output Ingestion] Output successfully saved: ${filePath} (${fileSize} bytes)`);
+    const result = await downloadAndIngestTake({
+      scene_name,
+      filename,
+      subfolder,
+      comfyui_api_url: comfyui_api_url || process.env.COMFYUI_API_URL,
+      auth_token: remote_api_token,
+      prompt_id,
+      shot_number: typeof shot_number === "number" ? shot_number : undefined
+    });
 
     return res.json({
       status: "success",
-      filename,
-      path: filePath,
-      asset_path: assetPath,
-      size: fileSize,
-      stream_url: streamUrl,
-      media_type: mediaType
+      filename: result.filename,
+      size: result.size,
+      stream_url: result.stream_url,
+      media_type: result.media_type,
+      shot_number: result.shot_number,
+      take_number: result.take_number,
+      take_id: result.take_id,
+      saved_to_project: result.saved_to_project
     });
   } catch (error: any) {
     console.error("[Output Ingestion Error]:", error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/outputs/sync-history
+ * Proactively checks ComfyUI /history on the backend and downloads newly completed takes
+ */
+router.post("/outputs/sync-history", async (req: Request, res: Response) => {
+  try {
+    const { scene_name, comfyui_api_url, remote_api_token, prompt_id, max_prompts } = req.body;
+    if (!scene_name) {
+      return res.status(400).json({ error: "Missing scene_name" });
+    }
+
+    const result = await syncComfyOutputsFromHistory({
+      scene_name,
+      comfyui_api_url: comfyui_api_url || process.env.COMFYUI_API_URL,
+      auth_token: remote_api_token,
+      prompt_id,
+      max_prompts: typeof max_prompts === "number" ? max_prompts : 5
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    console.error("[Output Sync Error]:", err);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 

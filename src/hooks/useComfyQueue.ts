@@ -4,17 +4,21 @@ import { ComfyQueueStatus, ComfySystemStats } from "../types";
 interface UseComfyQueueOptions {
   apiUrl: string;
   authToken?: string;
+  sceneName?: string;
   autoPollIntervalMs?: number; // default 3000ms when queue active, 10000ms when idle
   enabled?: boolean;
   onShowToast?: (msg: string, type: "success" | "error" | "info") => void;
+  onTakesIngested?: (count: number) => void;
 }
 
 export function useComfyQueue({
   apiUrl,
   authToken,
+  sceneName,
   autoPollIntervalMs,
   enabled = true,
-  onShowToast
+  onShowToast,
+  onTakesIngested
 }: UseComfyQueueOptions) {
   const [queueStatus, setQueueStatus] = useState<ComfyQueueStatus>({
     success: false,
@@ -30,8 +34,42 @@ export function useComfyQueue({
   const [deletingPromptId, setDeletingPromptId] = useState<string | null>(null);
   const [isClearingQueue, setIsClearingQueue] = useState<boolean>(false);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<number | null>(null);
+  const prevQueueRemaining = useRef<number>(0);
+  const isSyncingHistory = useRef<boolean>(false);
 
   const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  /**
+   * Sync newly completed takes from ComfyUI history directly on the backend
+   */
+  const syncHistoryTakes = useCallback(async (promptId?: string) => {
+    if (!apiUrl || !sceneName || isSyncingHistory.current) return;
+    isSyncingHistory.current = true;
+
+    try {
+      const res = await fetch("/api/outputs/sync-history", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scene_name: sceneName,
+          comfyui_api_url: apiUrl,
+          remote_api_token: authToken,
+          prompt_id: promptId,
+          max_prompts: 5
+        })
+      });
+
+      const data = await res.json();
+      if (data.success && data.ingested_count > 0) {
+        onShowToast?.(`🎬 Ingested ${data.ingested_count} take(s) from ComfyUI`, "success");
+        onTakesIngested?.(data.ingested_count);
+      }
+    } catch {
+      // Soft fail
+    } finally {
+      isSyncingHistory.current = false;
+    }
+  }, [apiUrl, authToken, sceneName, onShowToast, onTakesIngested]);
 
   /**
    * Fetch live queue status from /api/comfy/queue
@@ -56,6 +94,12 @@ export function useComfyQueue({
       const data: ComfyQueueStatus = await res.json();
       setQueueStatus(data);
       setLastRefreshedAt(Date.now());
+
+      // If previous queue had items and now has fewer or 0 items, check backend history for finished takes
+      if (prevQueueRemaining.current > data.queue_remaining || (data.queue_remaining === 0 && prevQueueRemaining.current > 0)) {
+        syncHistoryTakes();
+      }
+      prevQueueRemaining.current = data.queue_remaining;
     } catch (err: any) {
       setQueueStatus(prev => ({
         ...prev,
@@ -65,7 +109,7 @@ export function useComfyQueue({
     } finally {
       if (!quiet) setIsLoading(false);
     }
-  }, [apiUrl, authToken, enabled]);
+  }, [apiUrl, authToken, enabled, syncHistoryTakes]);
 
   /**
    * Fetch hardware VRAM stats from /api/comfy/system-stats

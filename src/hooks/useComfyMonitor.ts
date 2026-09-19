@@ -166,43 +166,45 @@ export function useComfyMonitor(
               onShowToast?.('🎬 ComfyUI Execution Complete', 'success');
               resetState();
               onStatusUpdated?.();
+              // Proactively trigger backend history sync
+              if (activeSceneName) {
+                fetch('/api/outputs/sync-history', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    scene_name: activeSceneName,
+                    comfyui_api_url: comfyApiUrl,
+                    max_prompts: 5
+                  })
+                }).catch(() => {});
+              }
             } else if (msg.type === 'executed') {
               onStatusUpdated?.();
-              const nodeOutput = msg.data?.output;
-              if (nodeOutput && activeSceneName) {
-                let files: any[] = [];
-                if (Array.isArray(nodeOutput.videos)) files.push(...nodeOutput.videos);
-                if (Array.isArray(nodeOutput.gifs)) files.push(...nodeOutput.gifs);
-                if (Array.isArray(nodeOutput.images)) files.push(...nodeOutput.images);
-                if (Array.isArray(nodeOutput.files)) files.push(...nodeOutput.files);
-                
-                files.forEach((file: any) => {
-                  const fname = typeof file === "string" ? file : file?.filename;
-                  const subf = typeof file === "object" ? file?.subfolder : undefined;
-                  if (fname) {
-                    fetch('/api/outputs/pull', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        scene_name: activeSceneName,
-                        filename: fname,
-                        subfolder: subf,
-                        comfyui_api_url: comfyApiUrl
-                      })
-                    }).then(res => res.json()).then(data => {
-                      if (data.status === "success" && onOutputPulled) {
-                        onOutputPulled(data.filename, {
-                          promptId: msg.data?.prompt_id,
-                          nodeId: msg.data?.node ? String(msg.data.node) : undefined,
-                          size: data.size,
-                          streamUrl: data.stream_url,
-                          mediaType: data.media_type,
-                          subfolder: subf
-                        });
-                      }
-                    }).catch(err => console.error("Failed to pull output", err));
+              // Trigger backend history sync for prompt completion
+              if (activeSceneName) {
+                fetch('/api/outputs/sync-history', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    scene_name: activeSceneName,
+                    comfyui_api_url: comfyApiUrl,
+                    prompt_id: msg.data?.prompt_id,
+                    max_prompts: 3
+                  })
+                }).then(res => res.json()).then(data => {
+                  if (data?.ingested_count > 0 && onOutputPulled) {
+                    data.ingested.forEach((item: any) => {
+                      onOutputPulled(item.filename, {
+                        promptId: msg.data?.prompt_id,
+                        nodeId: msg.data?.node ? String(msg.data.node) : undefined,
+                        size: item.size,
+                        streamUrl: item.stream_url,
+                        mediaType: item.media_type,
+                        subfolder: item.subfolder
+                      });
+                    });
                   }
-                });
+                }).catch(() => {});
               }
             } else if (msg.type === 'execution_error') {
               onShowToast?.(`⚠️ ComfyUI Error: ${msg.data?.exception_message || 'Unknown error'}`, 'error');
