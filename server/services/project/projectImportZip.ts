@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import unzipper from "unzipper";
-import { ensureSceneDirectories, formatSceneFolderName, ASSETS_DIR, ASSET_DB_FILE } from "../../config/constants";
+import { ensureSceneDirectories, formatSceneFolderName, ASSETS_DIR, ASSET_DB_FILE, UNIVERSE_MEDIA_DIR } from "../../config/constants";
 import { universeService } from "../universeService";
 import { sanitizeProjectName, IGNORED_JSON_FILENAMES } from "./projectCrud";
 
@@ -191,19 +191,33 @@ export async function importProjectZip(
       console.log(`[ZIP Import] Extracted workflow: "${normPath}" -> "${destPath}"`);
     } else if (normPath.startsWith("uploads/")) {
       const mType = mediaTypeMap[fname] || "image";
-      const targetDir = (sceneDirs as any)[`${mType}s`] || sceneDirs.images;
-      if (!fs.existsSync(targetDir)) {
-        fs.mkdirSync(targetDir, { recursive: true });
+      const meta = metaLookup.get(fname.toLowerCase());
+      const isUniverse = !!(meta?.is_universe || meta?.scene_name === "universe" || meta?.scene_name === "Universe");
+
+      let destPath: string;
+      if (isUniverse) {
+        if (!fs.existsSync(UNIVERSE_MEDIA_DIR)) {
+          fs.mkdirSync(UNIVERSE_MEDIA_DIR, { recursive: true });
+        }
+        destPath = path.join(UNIVERSE_MEDIA_DIR, fname);
+        console.log(`[ZIP Import] Extracted global universe asset: "${normPath}" -> "${destPath}"`);
+      } else {
+        const targetDir = (sceneDirs as any)[`${mType}s`] || sceneDirs.images;
+        if (!fs.existsSync(targetDir)) {
+          fs.mkdirSync(targetDir, { recursive: true });
+        }
+        destPath = path.join(targetDir, fname);
+        console.log(`[ZIP Import] Extracted upload: "${normPath}" -> "${destPath}"`);
       }
-      const destPath = path.join(targetDir, fname);
+
       fs.writeFileSync(destPath, buffer);
-      console.log(`[ZIP Import] Extracted upload: "${normPath}" -> "${destPath}"`);
 
       // Track the asset to register in the central assets database later
       registeredAssets.push({
         filename: fname,
         path: destPath,
-        mediaType: mType
+        mediaType: mType,
+        isUniverse: isUniverse
       });
     } else if (normPath.startsWith("takes/") || normPath.startsWith("outputs/")) {
       const outputsDir = path.join(sceneDirs.base, "outputs");
@@ -271,7 +285,8 @@ export async function importProjectZip(
           description: meta?.description || "",
           tags: Array.isArray(meta?.tags) ? meta.tags : [],
           size_bytes: size,
-          scene_name: sceneDirName,
+          scene_name: item.isUniverse ? "universe" : sceneDirName,
+          is_universe: !!item.isUniverse,
           preview_url: `/api/uploads/${item.filename}`,
           path: item.path
         });
