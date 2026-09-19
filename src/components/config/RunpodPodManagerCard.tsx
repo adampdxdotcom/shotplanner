@@ -35,6 +35,11 @@ export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
   const handleApiKeyChange = (val: string) => {
     setApiKey(val);
     handleInputChange("runpod_api_key", val);
+    fetch("/api/settings/runpod", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ runpod_api_key: val.trim() })
+    }).catch(() => {});
   };
 
   const handleFetchPods = async () => {

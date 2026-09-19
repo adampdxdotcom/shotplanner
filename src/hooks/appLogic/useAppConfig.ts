@@ -69,7 +69,7 @@ export function useAppConfig({ addToast, onUpdateProjectConfig }: UseAppConfigPa
     };
   });
 
-  // Sync vision and LM Studio settings to localStorage
+  // Sync settings to localStorage and server
   useEffect(() => {
     try {
       if (config.vision_enabled !== undefined) {
@@ -88,7 +88,19 @@ export function useAppConfig({ addToast, onUpdateProjectConfig }: UseAppConfigPa
         localStorage.setItem("runpod_auto_connect", String(config.runpod_auto_connect));
       }
     } catch (e) {}
-  }, [config.vision_enabled, config.auto_caption_enabled, config.lm_studio_url]);
+  }, [config.vision_enabled, config.auto_caption_enabled, config.lm_studio_url, config.runpod_api_key, config.runpod_auto_connect]);
+
+  // Fetch program-level RunPod API key from server on mount
+  useEffect(() => {
+    fetch("/api/settings/runpod")
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.api_key) {
+          setConfig(prev => ({ ...prev, runpod_api_key: data.api_key }));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const setDefaultLlmProvider = useCallback((provider: LLMProvider) => {
     try {

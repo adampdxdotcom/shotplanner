@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import { getStoredGeminiKey, saveGeminiKey, removeGeminiKey, generateWithGeminiAPI } from "../services/geminiService";
 import { getStoredCivitaiKey, saveCivitaiKey } from "../services/civitaiService";
 import { getStoredHuggingFaceToken, saveHuggingFaceToken } from "../services/huggingfaceService";
+import { getStoredRunpodApiKey, saveRunpodApiKey, removeRunpodApiKey } from "../services/runpodService";
 
 const router = Router();
 
@@ -60,6 +61,37 @@ router.post("/huggingface", (req: Request, res: Response) => {
   const { token, api_token, apiKey } = req.body || {};
   saveHuggingFaceToken(token || api_token || apiKey || "");
   res.json({ success: true });
+});
+
+/**
+ * Get stored RunPod API key status & masked value
+ */
+router.get("/runpod", (req: Request, res: Response) => {
+  const key = getStoredRunpodApiKey();
+  const maskedKey = key && key.length > 8 ? `${key.slice(0, 4)}...${key.slice(-4)}` : key ? "***" : null;
+  res.json({ configured: !!key, api_key: key || null, masked_key: maskedKey });
+});
+
+/**
+ * Save RunPod API key
+ */
+router.post("/runpod", (req: Request, res: Response) => {
+  const { runpod_api_key, api_key, apiKey } = req.body || {};
+  const val = (runpod_api_key || api_key || apiKey || "").trim();
+  if (val) {
+    saveRunpodApiKey(val);
+  } else {
+    removeRunpodApiKey();
+  }
+  res.json({ success: true });
+});
+
+/**
+ * Delete RunPod API key
+ */
+router.delete("/runpod", (req: Request, res: Response) => {
+  removeRunpodApiKey();
+  res.json({ success: true, message: "RunPod API key removed." });
 });
 
 /**

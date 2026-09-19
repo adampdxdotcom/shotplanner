@@ -1,4 +1,7 @@
+import fs from "fs";
+import path from "path";
 import nodeFetchModule from "node-fetch";
+import { RUNPOD_CONFIG_FILE } from "../config/constants";
 
 const getFetch = (): typeof fetch => {
   if (typeof globalThis.fetch === "function") {
@@ -6,6 +9,45 @@ const getFetch = (): typeof fetch => {
   }
   return ((nodeFetchModule as any).default || nodeFetchModule) as typeof fetch;
 };
+
+export function getStoredRunpodApiKey(): string | null {
+  if (process.env.RUNPOD_API_KEY && process.env.RUNPOD_API_KEY.trim()) {
+    return process.env.RUNPOD_API_KEY.trim();
+  }
+  try {
+    if (fs.existsSync(RUNPOD_CONFIG_FILE)) {
+      const data = JSON.parse(fs.readFileSync(RUNPOD_CONFIG_FILE, "utf-8"));
+      if (data && typeof data.api_key === "string" && data.api_key.trim()) {
+        return data.api_key.trim();
+      }
+    }
+  } catch (err) {
+    console.error("[RunPod] Error reading runpod_config.json:", err);
+  }
+  return null;
+}
+
+export function saveRunpodApiKey(apiKey: string): void {
+  try {
+    const dir = path.dirname(RUNPOD_CONFIG_FILE);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(RUNPOD_CONFIG_FILE, JSON.stringify({ api_key: apiKey.trim() }, null, 2), "utf-8");
+  } catch (err) {
+    console.error("[RunPod] Error saving runpod_config.json:", err);
+  }
+}
+
+export function removeRunpodApiKey(): void {
+  try {
+    if (fs.existsSync(RUNPOD_CONFIG_FILE)) {
+      fs.unlinkSync(RUNPOD_CONFIG_FILE);
+    }
+  } catch (err) {
+    console.error("[RunPod] Error removing runpod_config.json:", err);
+  }
+}
 
 export interface RunpodPodPort {
   ip: string;
@@ -33,12 +75,17 @@ export interface RunpodPodItem {
 /**
  * Fetch list of active pods from RunPod GraphQL API
  */
-export async function fetchRunpodPods(apiKey: string): Promise<RunpodPodItem[]> {
-  if (!apiKey || !apiKey.trim()) {
+export async function fetchRunpodPods(apiKey?: string): Promise<RunpodPodItem[]> {
+  const effectiveKey = (apiKey && apiKey.trim()) || getStoredRunpodApiKey() || "";
+  if (!effectiveKey) {
     throw new Error("RunPod API Key is required.");
   }
 
-  const cleanKey = apiKey.trim();
+  if (apiKey && apiKey.trim()) {
+    saveRunpodApiKey(apiKey.trim());
+  }
+
+  const cleanKey = effectiveKey.trim();
   const graphqlEndpoint = `https://api.runpod.io/graphql?api_key=${cleanKey}`;
 
   const query = `
@@ -131,15 +178,20 @@ export async function fetchRunpodPods(apiKey: string): Promise<RunpodPodItem[]> 
 /**
  * Register an SSH Public Key with RunPod user account
  */
-export async function addSSHKeyToRunpodAccount(apiKey: string, publicKey: string): Promise<boolean> {
-  if (!apiKey || !apiKey.trim()) {
+export async function addSSHKeyToRunpodAccount(apiKey: string | undefined, publicKey: string): Promise<boolean> {
+  const effectiveKey = (apiKey && apiKey.trim()) || getStoredRunpodApiKey() || "";
+  if (!effectiveKey) {
     throw new Error("RunPod API Key is required.");
   }
   if (!publicKey || !publicKey.trim()) {
     throw new Error("Public SSH Key is required.");
   }
 
-  const cleanKey = apiKey.trim();
+  if (apiKey && apiKey.trim()) {
+    saveRunpodApiKey(apiKey.trim());
+  }
+
+  const cleanKey = effectiveKey.trim();
   const cleanPubKey = publicKey.trim();
   const graphqlEndpoint = `https://api.runpod.io/graphql?api_key=${cleanKey}`;
 

@@ -110,7 +110,8 @@ export function useDebouncedProjectAutosave({
           auto_caption_enabled: Boolean(latestConfigRef.current.auto_caption_enabled),
           gemini_api_key: "",
           civitai_api_key: "",
-          huggingface_token: ""
+          huggingface_token: "",
+          runpod_api_key: ""
         },
         llm_provider: currentLlmProvider,
         parameter_node_mappings: latestMappingsRef.current,

@@ -8,6 +8,7 @@ export const IGNORED_JSON_FILENAMES = new Set([
   "civitai_config.json",
   "civitai_favorites.json",
   "huggingface_config.json",
+  "runpod_config.json",
   "characters.json",
   "package.json",
   "tsconfig.json",
