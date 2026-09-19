@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { EMPTY_1X1_PNG_BUFFER, UPLOADS_DIR, WORKFLOWS_DIR, getSceneDirectories } from "../config/constants";
+import { ASSETS_DIR, EMPTY_1X1_PNG_BUFFER, UPLOADS_DIR, WORKFLOWS_DIR, getSceneDirectories } from "../config/constants";
 import { ExecutionStepLog, ScenePlanningDTO, TransferFileSummary } from "../types";
 import {
   generatePromptPrefix,
@@ -597,10 +597,6 @@ export async function executeWorkflow(options: ExecuteWorkflowOptions) {
     dry_run_only = false
   } = options;
 
-  if (!workflow_filename) {
-    throw new Error("Workflow filename is required");
-  }
-
   const cleanScene = sanitizeFilenamePart(scene_name ?? scene_planning?.scene_name ?? planning?.scene_name ?? "Scene");
   const rawShotNum = shot_number ?? scene_planning?.shot_number ?? planning?.shot_number ?? "1";
   const formattedShot = formatShotNumber(rawShotNum);
@@ -630,9 +626,44 @@ export async function executeWorkflow(options: ExecuteWorkflowOptions) {
       aspect_ratio
     });
 
-  const workflowPath = path.join(WORKFLOWS_DIR, workflow_filename);
+  // Robust workflow resolution: check explicit filename, monitored_workflow, or conventional shot workflow
+  let resolvedWorkflowFilename = (
+    workflow_filename ||
+    (options as any).monitored_workflow ||
+    (options as any).workflow_file ||
+    `${cleanScene}_Shot_${formattedShot}.json`
+  );
+
+  // If path was passed (e.g. /workspace/.../nina_doll_Shot_07.json), extract basename
+  if (resolvedWorkflowFilename.includes("/")) {
+    resolvedWorkflowFilename = path.basename(resolvedWorkflowFilename);
+  }
+
+  // Search for the workflow in WORKFLOWS_DIR, scene subdirectory, ASSETS_DIR, or root
+  let workflowPath = path.join(WORKFLOWS_DIR, resolvedWorkflowFilename);
   if (!fs.existsSync(workflowPath)) {
-    throw new Error(`Workflow ${workflow_filename} not found`);
+    const sceneWfPath = path.join(WORKFLOWS_DIR, cleanScene, resolvedWorkflowFilename);
+    const assetsWfPath = path.join(ASSETS_DIR, cleanScene, "workflows", resolvedWorkflowFilename);
+    const rootWfPath = path.join(process.cwd(), "workflows", resolvedWorkflowFilename);
+
+    if (fs.existsSync(sceneWfPath)) {
+      workflowPath = sceneWfPath;
+    } else if (fs.existsSync(assetsWfPath)) {
+      workflowPath = assetsWfPath;
+    } else if (fs.existsSync(rootWfPath)) {
+      workflowPath = rootWfPath;
+    } else if (fs.existsSync(WORKFLOWS_DIR)) {
+      // Find any json file in WORKFLOWS_DIR as fallback if specific one missing
+      const allWfs = fs.readdirSync(WORKFLOWS_DIR).filter(f => f.endsWith(".json"));
+      if (allWfs.length > 0) {
+        workflowPath = path.join(WORKFLOWS_DIR, allWfs[0]);
+        resolvedWorkflowFilename = allWfs[0];
+      }
+    }
+  }
+
+  if (!fs.existsSync(workflowPath)) {
+    throw new Error(`Workflow ${resolvedWorkflowFilename} not found locally or in project workflows directory`);
   }
 
   const workflow = JSON.parse(fs.readFileSync(workflowPath, "utf-8"));
@@ -666,7 +697,7 @@ export async function executeWorkflow(options: ExecuteWorkflowOptions) {
     step: "B",
     title: "Workflow Loaded",
     status: "success",
-    detail: `Parsed '${workflow_filename}' (${parsedOriginal.totalNodes} nodes). Retaining all graph loader nodes without pruning.`
+    detail: `Parsed '${resolvedWorkflowFilename}' (${parsedOriginal.totalNodes} nodes). Retaining all graph loader nodes without pruning.`
   });
 
   // Step C: Summary

@@ -106,12 +106,13 @@ export function useAutoWorkflowSync({
                 return true; // Match on shot number if in user workflows
               });
 
-              if (matchingWf && matchingWf.path !== shot.monitored_workflow) {
+              if (matchingWf && (matchingWf.path !== shot.monitored_workflow || !shot.workflow_file)) {
                 matched++;
                 hasChanges = true;
                 return {
                   ...shot,
-                  monitored_workflow: matchingWf.path
+                  monitored_workflow: matchingWf.path,
+                  workflow_file: shot.workflow_file || matchingWf.filename
                 };
               }
               return shot;

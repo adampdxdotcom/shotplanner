@@ -89,11 +89,13 @@ export const RemoteWorkflowMonitorPanel: React.FC<RemoteWorkflowMonitorPanelProp
   // Assign a remote workflow to the active shot
   const handleAssignWorkflow = (workflowPath: string) => {
     if (!activeShot) return;
+    const filename = workflowPath.split("/").pop() || workflowPath;
     onUpdateShot(prev => ({
       ...prev,
-      monitored_workflow: workflowPath
+      monitored_workflow: workflowPath,
+      workflow_file: filename
     }));
-    onShowToast?.(`Assigned '${workflowPath.split("/").pop()}' to Shot ${formatShotNumber(activeShot.shot_number)} for monitoring.`, "success");
+    onShowToast?.(`Assigned '${filename}' to Shot ${formatShotNumber(activeShot.shot_number)} for monitoring & execution.`, "success");
   };
 
   // Clear monitoring assignment from active shot
