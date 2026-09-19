@@ -374,7 +374,7 @@ export const CivitaiIngestionTab: React.FC<CivitaiIngestionTabProps> = ({
   };
 
   return (
-    <div className="space-y-5 animate-in fade-in duration-200">
+    <div className="space-y-5 animate-in fade-in duration-200 text-zinc-900 dark:text-zinc-100">
       {/* Civitai Credentials Box */}
       <CivitaiCredentialsCard
         civitaiConfigured={civitaiConfigured}
@@ -388,8 +388,8 @@ export const CivitaiIngestionTab: React.FC<CivitaiIngestionTabProps> = ({
       />
 
       {/* Model Lookup Query */}
-      <div className="bg-neutral-900/90 border border-neutral-800 rounded-xl p-4">
-        <label className="block text-xs font-semibold text-neutral-200 uppercase tracking-wider mb-2">
+      <div className="bg-white dark:bg-neutral-900 border border-zinc-200 dark:border-neutral-800 rounded-xl p-4 shadow-sm">
+        <label className="block text-xs font-semibold text-zinc-800 dark:text-neutral-200 uppercase tracking-wider mb-2">
           Civitai Model ID, Version ID, or Model URL
         </label>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
@@ -403,7 +403,7 @@ export const CivitaiIngestionTab: React.FC<CivitaiIngestionTabProps> = ({
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleLookupCivitaiModel();
               }}
-              className="w-full bg-neutral-950/80 border border-neutral-700/70 focus:border-blue-500 rounded-lg px-3 py-2 text-xs text-neutral-200 placeholder-neutral-500 outline-none"
+              className="w-full bg-zinc-50 dark:bg-neutral-950/80 border border-zinc-300 dark:border-neutral-700/70 focus:border-blue-500 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-neutral-200 placeholder-zinc-400 dark:placeholder-neutral-500 outline-none"
             />
           </div>
 
@@ -440,8 +440,8 @@ export const CivitaiIngestionTab: React.FC<CivitaiIngestionTabProps> = ({
         </div>
 
         {civitaiLookupError && (
-          <div className="mt-3 p-3 bg-red-950/40 border border-red-800/60 rounded-lg flex items-start gap-2 text-xs text-red-300">
-            <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+          <div className="mt-3 p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/60 rounded-lg flex items-start gap-2 text-xs text-red-600 dark:text-red-300">
+            <AlertCircle className="w-4 h-4 text-red-500 dark:text-red-400 shrink-0 mt-0.5" />
             <span className="leading-relaxed">{civitaiLookupError}</span>
           </div>
         )}

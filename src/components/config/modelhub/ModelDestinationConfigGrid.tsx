@@ -25,23 +25,23 @@ export const ModelDestinationConfigGrid: React.FC<ModelDestinationConfigGridProp
 }) => {
   const isAmber = accentColor === "amber";
   const focusBorderClass = isAmber ? "focus:border-amber-500" : "focus:border-blue-500";
-  const iconColorClass = isAmber ? "text-amber-400" : "text-blue-400";
+  const iconColorClass = isAmber ? "text-amber-500 dark:text-amber-400" : "text-blue-500 dark:text-blue-400";
   const selectId = isAmber ? "select-hf-category" : "select-civitai-category";
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 text-zinc-900 dark:text-zinc-100">
       {/* Destination Configuration Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Category Preset Selector */}
         <div>
-          <label className="block text-xs font-semibold text-neutral-300 uppercase tracking-wider mb-1.5">
+          <label className="block text-xs font-semibold text-zinc-800 dark:text-neutral-300 uppercase tracking-wider mb-1.5">
             Target Model Category
           </label>
           <select
             id={selectId}
             value={categoryPreset}
             onChange={(e) => onCategoryChange(e.target.value)}
-            className={`w-full bg-neutral-950 border border-neutral-700 rounded-lg px-3 py-2 text-xs text-neutral-200 ${focusBorderClass} outline-none`}
+            className={`w-full bg-zinc-50 dark:bg-neutral-950 border border-zinc-300 dark:border-neutral-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-neutral-200 ${focusBorderClass} outline-none`}
           >
             {COMFYUI_MODEL_CATEGORIES.map((cat) => (
               <option key={cat.id} value={cat.id}>
@@ -49,14 +49,14 @@ export const ModelDestinationConfigGrid: React.FC<ModelDestinationConfigGridProp
               </option>
             ))}
           </select>
-          <p className="text-[11px] text-neutral-400 mt-1">
+          <p className="text-[11px] text-zinc-500 dark:text-neutral-400 mt-1">
             {COMFYUI_MODEL_CATEGORIES.find((c) => c.id === categoryPreset)?.description}
           </p>
         </div>
 
         {/* Subfolder override input */}
         <div>
-          <label className="block text-xs font-semibold text-neutral-300 uppercase tracking-wider mb-1.5">
+          <label className="block text-xs font-semibold text-zinc-800 dark:text-neutral-300 uppercase tracking-wider mb-1.5">
             Destination Subfolder (Relative to ComfyUI Root)
           </label>
           <div className="relative">
@@ -67,35 +67,35 @@ export const ModelDestinationConfigGrid: React.FC<ModelDestinationConfigGridProp
                 onTargetDestChange(e.target.value);
                 onCategoryChange("custom");
               }}
-              className={`w-full bg-neutral-950 border border-neutral-700 rounded-lg px-3 py-2 text-xs text-neutral-200 font-mono ${focusBorderClass} outline-none`}
+              className={`w-full bg-zinc-50 dark:bg-neutral-950 border border-zinc-300 dark:border-neutral-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-neutral-200 font-mono ${focusBorderClass} outline-none`}
             />
           </div>
-          <p className="text-[11px] text-neutral-400 mt-1">
+          <p className="text-[11px] text-zinc-500 dark:text-neutral-400 mt-1">
             Folder is automatically created if it does not exist on remote host.
           </p>
         </div>
 
         {/* Target Filename input */}
         <div className="md:col-span-2">
-          <label className="block text-xs font-semibold text-neutral-300 uppercase tracking-wider mb-1.5">
+          <label className="block text-xs font-semibold text-zinc-800 dark:text-neutral-300 uppercase tracking-wider mb-1.5">
             Target Filename on Remote Host
           </label>
           <input
             type="text"
             value={targetFilename}
             onChange={(e) => onTargetFilenameChange(e.target.value)}
-            className={`w-full bg-neutral-950 border border-neutral-700 rounded-lg px-3 py-2 text-xs text-neutral-200 font-mono ${focusBorderClass} outline-none`}
+            className={`w-full bg-zinc-50 dark:bg-neutral-950 border border-zinc-300 dark:border-neutral-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-neutral-200 font-mono ${focusBorderClass} outline-none`}
           />
         </div>
       </div>
 
       {/* Path confirmation callout */}
-      <div className="bg-neutral-950/80 border border-neutral-800 rounded-lg p-3 space-y-1.5">
-        <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 font-semibold uppercase tracking-wider">
+      <div className="bg-zinc-50 dark:bg-neutral-950/80 border border-zinc-200 dark:border-neutral-800 rounded-lg p-3 space-y-1.5">
+        <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 dark:text-neutral-400 font-semibold uppercase tracking-wider">
           <HardDrive className={`w-3.5 h-3.5 ${iconColorClass}`} />
           Full Remote Destination Path:
         </div>
-        <div className="font-mono text-xs text-emerald-300 bg-neutral-900/90 px-2.5 py-1.5 rounded border border-neutral-800 break-all select-all">
+        <div className="font-mono text-xs text-emerald-600 dark:text-emerald-300 bg-white dark:bg-neutral-900/90 px-2.5 py-1.5 rounded border border-zinc-200 dark:border-neutral-800 break-all select-all">
           {computeFullRemotePath(targetDest, targetFilename, remoteComfyRoot)}
         </div>
       </div>

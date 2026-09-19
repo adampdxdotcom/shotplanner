@@ -24,15 +24,15 @@ export const ModelDownloadStatusCard: React.FC<ModelDownloadStatusCardProps> = (
     <div
       className={`p-4 rounded-xl border animate-in fade-in duration-300 ${
         downloadResult.success
-          ? "bg-emerald-950/30 border-emerald-800/60 text-emerald-200"
-          : "bg-red-950/30 border-red-800/60 text-red-200"
+          ? "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-200"
+          : "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800/60 text-red-800 dark:text-red-200"
       }`}
     >
       <div className="flex items-start gap-3">
         {downloadResult.success ? (
-          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+          <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
         ) : (
-          <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+          <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
         )}
         <div className="space-y-2 flex-1">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
@@ -50,17 +50,17 @@ export const ModelDownloadStatusCard: React.FC<ModelDownloadStatusCardProps> = (
           </p>
 
           {downloadResult.destination_path && (
-            <div className="text-xs font-mono bg-neutral-950/80 px-2.5 py-1.5 rounded border border-neutral-800/80 text-neutral-300 select-all">
+            <div className="text-xs font-mono bg-white dark:bg-neutral-950/80 px-2.5 py-1.5 rounded border border-zinc-200 dark:border-neutral-800/80 text-zinc-700 dark:text-neutral-300 select-all">
               Location: {downloadResult.destination_path}
             </div>
           )}
 
           {downloadResult.logs && (
             <details className="mt-2 text-xs">
-              <summary className="cursor-pointer text-neutral-400 hover:text-neutral-200 font-medium">
+              <summary className="cursor-pointer text-zinc-500 hover:text-zinc-700 dark:text-neutral-400 dark:hover:text-neutral-200 font-medium">
                 View Remote SSH Execution Logs
               </summary>
-              <pre className="mt-1.5 p-3 bg-neutral-950 rounded border border-neutral-800 font-mono text-[11px] text-neutral-300 max-h-48 overflow-y-auto whitespace-pre-wrap">
+              <pre className="mt-1.5 p-3 bg-zinc-100 dark:bg-neutral-950 rounded border border-zinc-200 dark:border-neutral-800 font-mono text-[11px] text-zinc-700 dark:text-neutral-300 max-h-48 overflow-y-auto whitespace-pre-wrap">
                 {downloadResult.logs}
               </pre>
             </details>

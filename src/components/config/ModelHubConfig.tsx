@@ -160,29 +160,29 @@ export const ModelHubConfig: React.FC<ModelHubConfigProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-zinc-900 dark:text-zinc-100">
       {/* Header Banner */}
-      <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-5 shadow-sm">
+      <div className="bg-white dark:bg-neutral-900 border border-zinc-200 dark:border-neutral-800 rounded-xl p-5 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2.5">
-              <div className="p-2 bg-blue-500/10 text-blue-400 rounded-lg border border-blue-500/20">
+              <div className="p-2 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-lg border border-blue-500/20">
                 <DownloadCloud className="w-5 h-5" />
               </div>
-              <h3 className="text-lg font-bold text-white tracking-wide">
+              <h3 className="text-lg font-bold text-zinc-900 dark:text-white tracking-wide">
                 Remote Model Ingestion Hub
               </h3>
             </div>
-            <p className="text-xs text-neutral-400 mt-1.5 max-w-2xl leading-relaxed">
+            <p className="text-xs text-zinc-500 dark:text-neutral-400 mt-1.5 max-w-2xl leading-relaxed">
               Ingest Checkpoints, DiT Diffusion Models (Wan 2.1, FLUX), LoRAs, Text Encoders, ControlNets, and VAEs directly into your remote GPU ComfyUI instance with multi-stream accelerated downloading.
             </p>
           </div>
 
-          <div className="flex items-center gap-2 bg-neutral-950/80 px-3.5 py-2 rounded-lg border border-neutral-800 text-xs text-neutral-300">
-            <Server className="w-4 h-4 text-emerald-400 shrink-0" />
+          <div className="flex items-center gap-2 bg-zinc-50 dark:bg-neutral-950/80 px-3.5 py-2 rounded-lg border border-zinc-200 dark:border-neutral-800 text-xs text-zinc-700 dark:text-neutral-300">
+            <Server className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
             <div className="flex flex-col">
-              <span className="text-[10px] text-neutral-400 uppercase font-medium">Remote ComfyUI Root</span>
-              <span className="font-mono text-emerald-300 font-semibold text-xs truncate max-w-[220px]">
+              <span className="text-[10px] text-zinc-500 dark:text-neutral-400 uppercase font-medium">Remote ComfyUI Root</span>
+              <span className="font-mono text-emerald-600 dark:text-emerald-300 font-semibold text-xs truncate max-w-[220px]">
                 {config.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI"}
               </span>
             </div>
@@ -190,21 +190,21 @@ export const ModelHubConfig: React.FC<ModelHubConfigProps> = ({
         </div>
 
         {/* Source Navigation Tabs */}
-        <div className="flex items-center gap-2 mt-5 border-t border-neutral-800/80 pt-4">
+        <div className="flex items-center gap-2 mt-5 border-t border-zinc-200 dark:border-neutral-800/80 pt-4">
           <button
             id="tab-huggingface"
             type="button"
             onClick={() => setActiveTab("huggingface")}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
               activeTab === "huggingface"
-                ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm"
-                : "bg-neutral-800/60 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 border border-transparent"
+                ? "bg-amber-500/10 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40 shadow-sm"
+                : "bg-zinc-100 dark:bg-neutral-800/60 text-zinc-600 dark:text-neutral-400 hover:text-zinc-900 hover:dark:text-neutral-200 hover:bg-zinc-200 dark:hover:bg-neutral-800 border border-transparent"
             }`}
           >
-            <Globe className="w-3.5 h-3.5 text-amber-400" />
+            <Globe className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
             Hugging Face / Direct URL
             {hfConfigured && (
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" title="Token Configured" />
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" title="Token Configured" />
             )}
           </button>
 
@@ -214,14 +214,14 @@ export const ModelHubConfig: React.FC<ModelHubConfigProps> = ({
             onClick={() => setActiveTab("civitai")}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
               activeTab === "civitai"
-                ? "bg-blue-500/20 text-blue-300 border border-blue-500/40 shadow-sm"
-                : "bg-neutral-800/60 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 border border-transparent"
+                ? "bg-blue-500/10 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300 border border-blue-300 dark:border-blue-500/40 shadow-sm"
+                : "bg-zinc-100 dark:bg-neutral-800/60 text-zinc-600 dark:text-neutral-400 hover:text-zinc-900 hover:dark:text-neutral-200 hover:bg-zinc-200 dark:hover:bg-neutral-800 border border-transparent"
             }`}
           >
-            <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+            <Sparkles className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
             Civitai Models & LoRAs
             {civitaiConfigured && (
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" title="API Key Configured" />
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" title="API Key Configured" />
             )}
           </button>
         </div>

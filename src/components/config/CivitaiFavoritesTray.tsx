@@ -23,46 +23,46 @@ export const CivitaiFavoritesTray: React.FC<CivitaiFavoritesTrayProps> = ({
   const getCategoryColor = (category?: string) => {
     const cat = (category || "").toLowerCase();
     if (cat.includes("lora") || cat.includes("dora") || cat.includes("lycoris")) {
-      return "bg-purple-950/70 border-purple-800/60 text-purple-300";
+      return "bg-purple-50 dark:bg-purple-950/70 border-purple-200 dark:border-purple-800/60 text-purple-700 dark:text-purple-300";
     }
     if (cat.includes("controlnet") || cat.includes("adapter")) {
-      return "bg-emerald-950/70 border-emerald-800/60 text-emerald-300";
+      return "bg-emerald-50 dark:bg-emerald-950/70 border-emerald-200 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-300";
     }
     if (cat.includes("vae")) {
-      return "bg-amber-950/70 border-amber-800/60 text-amber-300";
+      return "bg-amber-50 dark:bg-amber-950/70 border-amber-200 dark:border-amber-800/60 text-amber-750 dark:text-amber-300";
     }
     if (cat.includes("upscale")) {
-      return "bg-pink-950/70 border-pink-800/60 text-pink-300";
+      return "bg-pink-50 dark:bg-pink-950/70 border-pink-200 dark:border-pink-800/60 text-pink-700 dark:text-pink-300";
     }
-    return "bg-blue-950/70 border-blue-800/60 text-blue-300";
+    return "bg-blue-50 dark:bg-blue-950/70 border-blue-200 dark:border-blue-800/60 text-blue-700 dark:text-blue-300";
   };
 
   return (
-    <div id="civitai-saved-favorites-tray" className="w-full bg-neutral-950/70 border border-neutral-800/80 rounded-xl overflow-hidden shadow-xs transition-all">
+    <div id="civitai-saved-favorites-tray" className="w-full bg-zinc-50 dark:bg-neutral-950/70 border border-zinc-200 dark:border-neutral-800/80 rounded-xl overflow-hidden shadow-xs transition-all text-zinc-900 dark:text-zinc-100">
       {/* Tray Header Bar */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-3.5 py-2.5 flex items-center justify-between bg-neutral-900/60 hover:bg-neutral-900/90 transition-colors text-left cursor-pointer border-b border-neutral-800/60"
+        className="w-full px-3.5 py-2.5 flex items-center justify-between bg-white dark:bg-neutral-900/60 hover:bg-zinc-100 dark:hover:bg-neutral-900/90 transition-colors text-left cursor-pointer border-b border-zinc-200 dark:border-neutral-800/60"
       >
         <div className="flex items-center gap-2">
-          <Star className="w-4 h-4 text-amber-400 fill-amber-400 shrink-0" />
-          <span className="text-xs font-semibold text-neutral-200">
+          <Star className="w-4 h-4 text-amber-500 fill-amber-500 shrink-0" />
+          <span className="text-xs font-semibold text-zinc-800 dark:text-neutral-200">
             Saved Favorites
           </span>
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-950/50 border border-amber-800/50 text-amber-300 font-semibold">
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800/50 text-amber-800 dark:text-amber-300 font-semibold">
             {favorites.length}
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5 text-neutral-400 text-xs font-medium">
-          <span className="text-[11px] text-neutral-500 hidden sm:inline">
+        <div className="flex items-center gap-1.5 text-zinc-500 dark:text-neutral-400 text-xs font-medium">
+          <span className="text-[11px] text-zinc-400 dark:text-neutral-500 hidden sm:inline">
             {isOpen ? "Collapse" : "Expand"}
           </span>
           {isOpen ? (
-            <ChevronUp className="w-4 h-4 text-neutral-400" />
+            <ChevronUp className="w-4 h-4 text-zinc-500 dark:text-neutral-400" />
           ) : (
-            <ChevronDown className="w-4 h-4 text-neutral-400" />
+            <ChevronDown className="w-4 h-4 text-zinc-500 dark:text-neutral-400" />
           )}
         </div>
       </button>
@@ -71,9 +71,9 @@ export const CivitaiFavoritesTray: React.FC<CivitaiFavoritesTrayProps> = ({
       {isOpen && (
         <div className="p-3">
           {favorites.length === 0 ? (
-            <div className="flex items-center justify-between gap-3 px-3 py-3 rounded-lg bg-neutral-900/40 border border-dashed border-neutral-800 text-xs text-neutral-400">
+            <div className="flex items-center justify-between gap-3 px-3 py-3 rounded-lg bg-white dark:bg-neutral-900/40 border border-dashed border-zinc-200 dark:border-neutral-800 text-xs text-zinc-500 dark:text-neutral-400">
               <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-amber-400/70 shrink-0" />
+                <Sparkles className="w-4 h-4 text-amber-500/70 dark:text-amber-400/70 shrink-0" />
                 <span>
                   No favorite models saved yet. Click the <strong>⭐ Favorite</strong> button on any model preview to pin it here for 1-click access.
                 </span>
@@ -94,12 +94,12 @@ export const CivitaiFavoritesTray: React.FC<CivitaiFavoritesTrayProps> = ({
                     title={`Load ${title} (${fav.version_name || "Latest"})`}
                     className={`group relative flex items-start gap-2.5 p-2 rounded-lg border transition-all cursor-pointer text-left select-none ${
                       isSelected
-                        ? "bg-amber-950/30 border-amber-600/70 shadow-sm ring-1 ring-amber-500/40"
-                        : "bg-neutral-900/80 hover:bg-neutral-850 border-neutral-800 hover:border-neutral-700"
+                        ? "bg-amber-50 dark:bg-amber-950/30 border-amber-500/70 shadow-sm ring-1 ring-amber-500/40"
+                        : "bg-white dark:bg-neutral-900/80 hover:bg-zinc-50 dark:hover:bg-neutral-850 border-zinc-200 dark:border-neutral-800 hover:border-zinc-300 dark:hover:border-neutral-700"
                     }`}
                   >
                     {/* Thumbnail */}
-                    <div className="w-12 h-12 rounded-md bg-neutral-950 border border-neutral-800 overflow-hidden shrink-0 relative flex items-center justify-center">
+                    <div className="w-12 h-12 rounded-md bg-zinc-100 dark:bg-neutral-950 border border-zinc-200 dark:border-neutral-800 overflow-hidden shrink-0 relative flex items-center justify-center">
                       {img ? (
                         <img
                           src={img}
@@ -108,17 +108,17 @@ export const CivitaiFavoritesTray: React.FC<CivitaiFavoritesTrayProps> = ({
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                         />
                       ) : (
-                        <Layers className="w-5 h-5 text-neutral-600" />
+                        <Layers className="w-5 h-5 text-zinc-400 dark:text-neutral-600" />
                       )}
                     </div>
 
                     {/* Meta Details */}
                     <div className="flex-1 min-w-0 pr-4">
-                      <h4 className="text-xs font-semibold text-neutral-200 truncate group-hover:text-amber-300 transition-colors">
+                      <h4 className="text-xs font-semibold text-zinc-800 dark:text-neutral-200 truncate group-hover:text-amber-650 dark:group-hover:text-amber-300 transition-colors">
                         {title}
                       </h4>
                       {fav.version_name && (
-                        <p className="text-[10px] text-neutral-400 truncate">
+                        <p className="text-[10px] text-zinc-500 dark:text-neutral-400 truncate">
                           {fav.version_name}
                         </p>
                       )}
@@ -128,12 +128,12 @@ export const CivitaiFavoritesTray: React.FC<CivitaiFavoritesTrayProps> = ({
                           {fav.category || "Model"}
                         </span>
                         {fav.base_model && (
-                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-neutral-800 text-neutral-400 font-mono">
+                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-zinc-100 dark:bg-neutral-800 text-zinc-500 dark:text-neutral-400 border border-zinc-200 dark:border-neutral-700 font-mono">
                             {fav.base_model}
                           </span>
                         )}
                         {size && (
-                          <span className="text-[9px] text-neutral-500 font-mono hidden xl:inline">
+                          <span className="text-[9px] text-zinc-400 dark:text-neutral-500 font-mono hidden xl:inline">
                             {size}
                           </span>
                         )}
@@ -145,7 +145,7 @@ export const CivitaiFavoritesTray: React.FC<CivitaiFavoritesTrayProps> = ({
                       type="button"
                       onClick={(e) => onRemoveFavorite(fav.version_id, e)}
                       title="Remove from favorites"
-                      className="absolute top-1.5 right-1.5 w-5 h-5 rounded flex items-center justify-center text-neutral-500 hover:text-red-400 hover:bg-red-950/60 opacity-60 hover:opacity-100 transition-all cursor-pointer"
+                      className="absolute top-1.5 right-1.5 w-5 h-5 rounded flex items-center justify-center text-zinc-400 hover:text-red-500 dark:text-neutral-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/60 opacity-60 hover:opacity-100 transition-all cursor-pointer"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>

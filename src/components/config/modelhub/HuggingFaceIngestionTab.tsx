@@ -242,13 +242,13 @@ export const HuggingFaceIngestionTab: React.FC<HuggingFaceIngestionTabProps> = (
   };
 
   return (
-    <div className="space-y-5 animate-in fade-in duration-200">
+    <div className="space-y-5 animate-in fade-in duration-200 text-zinc-900 dark:text-zinc-100">
       {/* Hugging Face Credentials Box */}
-      <div className="bg-neutral-900/90 border border-neutral-800 rounded-xl p-4">
+      <div className="bg-white dark:bg-neutral-900 border border-zinc-200 dark:border-neutral-800 rounded-xl p-4 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-3">
           <div className="flex items-center gap-2">
-            <Key className="w-4 h-4 text-amber-400" />
-            <span className="text-xs font-semibold text-neutral-200 uppercase tracking-wider">
+            <Key className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+            <span className="text-xs font-semibold text-zinc-800 dark:text-neutral-200 uppercase tracking-wider">
               Hugging Face Access Token (Optional)
             </span>
           </div>
@@ -256,7 +256,7 @@ export const HuggingFaceIngestionTab: React.FC<HuggingFaceIngestionTabProps> = (
             href="https://huggingface.co/settings/tokens"
             target="_blank"
             rel="noreferrer"
-            className="text-[11px] text-amber-400/90 hover:text-amber-300 flex items-center gap-1 transition-colors"
+            className="text-[11px] text-amber-600 hover:text-amber-500 dark:text-amber-400/90 dark:hover:text-amber-300 flex items-center gap-1 transition-colors font-medium"
           >
             <span>Get Hugging Face Token</span>
             <ExternalLink className="w-3 h-3" />
@@ -271,7 +271,7 @@ export const HuggingFaceIngestionTab: React.FC<HuggingFaceIngestionTabProps> = (
               placeholder={hfConfigured ? `Configured (${hfMaskedToken})` : "Enter Hugging Face Token (hf_...)"}
               value={hfTokenInput}
               onChange={(e) => setHfTokenInput(e.target.value)}
-              className="w-full bg-neutral-950/80 border border-neutral-700/70 focus:border-amber-500 rounded-lg px-3 py-2 text-xs text-neutral-200 placeholder-neutral-500 outline-none"
+              className="w-full bg-zinc-50 dark:bg-neutral-950/80 border border-zinc-300 dark:border-neutral-700/70 focus:border-amber-500 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-neutral-200 placeholder-zinc-400 dark:placeholder-neutral-500 outline-none"
             />
           </div>
 
@@ -281,7 +281,7 @@ export const HuggingFaceIngestionTab: React.FC<HuggingFaceIngestionTabProps> = (
               type="button"
               onClick={handleSaveHfToken}
               disabled={savingHfToken || !hfTokenInput.trim()}
-              className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-neutral-950 font-semibold text-xs disabled:opacity-50 transition-colors shrink-0 cursor-pointer"
+              className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-neutral-950 font-semibold text-xs disabled:opacity-50 transition-colors shrink-0 cursor-pointer"
             >
               <Save className="w-3.5 h-3.5" />
               {savingHfToken ? "Saving..." : "Save Token"}
@@ -293,7 +293,7 @@ export const HuggingFaceIngestionTab: React.FC<HuggingFaceIngestionTabProps> = (
                 type="button"
                 onClick={handleClearHfToken}
                 disabled={savingHfToken}
-                className="p-2 rounded-lg bg-neutral-800 hover:bg-red-500/20 text-neutral-400 hover:text-red-400 border border-neutral-700 transition-colors cursor-pointer"
+                className="p-2 rounded-lg bg-zinc-100 hover:bg-red-500/10 dark:bg-neutral-800 dark:hover:bg-red-500/20 text-zinc-500 hover:text-red-500 dark:text-neutral-400 dark:hover:text-red-400 border border-zinc-200 dark:border-neutral-700 transition-colors cursor-pointer"
                 title="Clear Token"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -303,19 +303,19 @@ export const HuggingFaceIngestionTab: React.FC<HuggingFaceIngestionTabProps> = (
         </div>
 
         {hfTokenFeedback && (
-          <div className={`mt-2 flex items-center gap-1.5 text-xs ${hfTokenFeedback.success ? "text-emerald-400" : "text-red-400"}`}>
+          <div className={`mt-2 flex items-center gap-1.5 text-xs ${hfTokenFeedback.success ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
             {hfTokenFeedback.success ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
             <span>{hfTokenFeedback.message}</span>
           </div>
         )}
-        <p className="text-[11px] text-neutral-400 mt-2 leading-relaxed">
-          Public repos download without a token. Gated models (like FLUX.1-dev or Llama) pass this token automatically via <code className="text-amber-300 font-mono">Authorization: Bearer</code> headers.
+        <p className="text-[11px] text-zinc-500 dark:text-neutral-400 mt-2 leading-relaxed">
+          Public repos download without a token. Gated models (like FLUX.1-dev or Llama) pass this token automatically via <code className="text-amber-600 dark:text-amber-300 font-mono">Authorization: Bearer</code> headers.
         </p>
       </div>
 
       {/* Model URL Search Bar */}
-      <div className="bg-neutral-900/90 border border-neutral-800 rounded-xl p-4">
-        <label className="block text-xs font-semibold text-neutral-200 uppercase tracking-wider mb-2">
+      <div className="bg-white dark:bg-neutral-900 border border-zinc-200 dark:border-neutral-800 rounded-xl p-4 shadow-sm">
+        <label className="block text-xs font-semibold text-zinc-800 dark:text-neutral-200 uppercase tracking-wider mb-2">
           Hugging Face URL, Repository, or Direct Model Link
         </label>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
@@ -329,7 +329,7 @@ export const HuggingFaceIngestionTab: React.FC<HuggingFaceIngestionTabProps> = (
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleLookupHfModel();
               }}
-              className="w-full bg-neutral-950/80 border border-neutral-700/70 focus:border-amber-500 rounded-lg px-3 py-2 text-xs text-neutral-200 placeholder-neutral-500 outline-none"
+              className="w-full bg-zinc-50 dark:bg-neutral-950/80 border border-zinc-300 dark:border-neutral-700/70 focus:border-amber-500 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-neutral-200 placeholder-zinc-400 dark:placeholder-neutral-500 outline-none"
             />
           </div>
 
@@ -356,8 +356,8 @@ export const HuggingFaceIngestionTab: React.FC<HuggingFaceIngestionTabProps> = (
 
         {/* Quick Presets */}
         <div className="mt-3 flex flex-wrap items-center gap-1.5">
-          <span className="text-[11px] text-neutral-400 font-medium mr-1 flex items-center gap-1">
-            <Sparkles className="w-3 h-3 text-amber-400" />
+          <span className="text-[11px] text-zinc-500 dark:text-neutral-400 font-medium mr-1 flex items-center gap-1">
+            <Sparkles className="w-3 h-3 text-amber-500 dark:text-amber-400" />
             Popular:
           </span>
           {[
@@ -374,7 +374,7 @@ export const HuggingFaceIngestionTab: React.FC<HuggingFaceIngestionTabProps> = (
                 setHfQuery(preset.url);
                 handleLookupHfModel(preset.url);
               }}
-              className="px-2.5 py-1 rounded bg-neutral-800/80 hover:bg-neutral-700/80 text-[11px] text-neutral-300 hover:text-amber-300 border border-neutral-700/60 transition-colors font-mono cursor-pointer"
+              className="px-2.5 py-1 rounded bg-zinc-100 hover:bg-zinc-200 dark:bg-neutral-800/80 dark:hover:bg-neutral-700/80 text-[11px] text-zinc-700 hover:text-amber-600 dark:text-neutral-300 dark:hover:text-amber-300 border border-zinc-200 dark:border-neutral-700/60 transition-colors font-mono cursor-pointer"
             >
               {preset.label}
             </button>
@@ -382,8 +382,8 @@ export const HuggingFaceIngestionTab: React.FC<HuggingFaceIngestionTabProps> = (
         </div>
 
         {hfLookupError && (
-          <div className="mt-3 p-3 bg-red-950/40 border border-red-800/60 rounded-lg flex items-start gap-2 text-xs text-red-300">
-            <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+          <div className="mt-3 p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/60 rounded-lg flex items-start gap-2 text-xs text-red-600 dark:text-red-300">
+            <AlertCircle className="w-4 h-4 text-red-500 dark:text-red-400 shrink-0 mt-0.5" />
             <span className="leading-relaxed">{hfLookupError}</span>
           </div>
         )}

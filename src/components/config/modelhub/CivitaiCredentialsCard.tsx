@@ -23,11 +23,11 @@ export const CivitaiCredentialsCard: React.FC<CivitaiCredentialsCardProps> = ({
   tokenFeedback
 }) => {
   return (
-    <div className="bg-neutral-900/90 border border-neutral-800 rounded-xl p-4">
+    <div className="bg-white dark:bg-neutral-900 border border-zinc-200 dark:border-neutral-800 rounded-xl p-4 shadow-sm text-zinc-900 dark:text-zinc-100">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-3">
         <div className="flex items-center gap-2">
-          <Key className="w-4 h-4 text-blue-400" />
-          <span className="text-xs font-semibold text-neutral-200 uppercase tracking-wider">
+          <Key className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+          <span className="text-xs font-semibold text-zinc-800 dark:text-neutral-200 uppercase tracking-wider">
             Civitai API Key (Required for authenticated/NSFW/creator weights)
           </span>
         </div>
@@ -35,7 +35,7 @@ export const CivitaiCredentialsCard: React.FC<CivitaiCredentialsCardProps> = ({
           href="https://civitai.com/user/account"
           target="_blank"
           rel="noreferrer"
-          className="text-[11px] text-blue-400/90 hover:text-blue-300 flex items-center gap-1 transition-colors"
+          className="text-[11px] text-blue-600 hover:text-blue-500 dark:text-blue-400/90 dark:hover:text-blue-300 flex items-center gap-1 transition-colors font-medium"
         >
           <span>Get Civitai API Key</span>
           <ExternalLink className="w-3 h-3" />
@@ -50,7 +50,7 @@ export const CivitaiCredentialsCard: React.FC<CivitaiCredentialsCardProps> = ({
             placeholder={civitaiConfigured ? `Configured (${civitaiMaskedKey})` : "Enter Civitai API Key"}
             value={civitaiKeyInput}
             onChange={(e) => setCivitaiKeyInput(e.target.value)}
-            className="w-full bg-neutral-950/80 border border-neutral-700/70 focus:border-blue-500 rounded-lg px-3 py-2 text-xs text-neutral-200 placeholder-neutral-500 outline-none"
+            className="w-full bg-zinc-50 dark:bg-neutral-950/80 border border-zinc-300 dark:border-neutral-700/70 focus:border-blue-500 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-neutral-200 placeholder-zinc-400 dark:placeholder-neutral-500 outline-none"
           />
         </div>
 
@@ -72,7 +72,7 @@ export const CivitaiCredentialsCard: React.FC<CivitaiCredentialsCardProps> = ({
               type="button"
               onClick={onClearKey}
               disabled={savingCivitaiKey}
-              className="p-2 rounded-lg bg-neutral-800 hover:bg-red-500/20 text-neutral-400 hover:text-red-400 border border-neutral-700 transition-colors cursor-pointer"
+              className="p-2 rounded-lg bg-zinc-100 hover:bg-red-500/10 dark:bg-neutral-800 dark:hover:bg-red-500/20 text-zinc-500 hover:text-red-500 dark:text-neutral-400 dark:hover:text-red-400 border border-zinc-200 dark:border-neutral-700 transition-colors cursor-pointer"
               title="Clear Key"
             >
               <Trash2 className="w-3.5 h-3.5" />
@@ -82,7 +82,7 @@ export const CivitaiCredentialsCard: React.FC<CivitaiCredentialsCardProps> = ({
       </div>
 
       {tokenFeedback && (
-        <div className={`mt-2 flex items-center gap-1.5 text-xs ${tokenFeedback.success ? "text-emerald-400" : "text-red-400"}`}>
+        <div className={`mt-2 flex items-center gap-1.5 text-xs ${tokenFeedback.success ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
           {tokenFeedback.success ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
           <span>{tokenFeedback.message}</span>
         </div>
