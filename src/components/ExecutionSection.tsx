@@ -201,6 +201,8 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
           node_mappings: activeShot.assigned_slots,
           generation_parameters: activeShot.generation_params,
           parameter_node_mappings: activeShot.parameter_node_mappings,
+          client_id: monitorState?.clientId || (typeof window !== "undefined" ? (window as any).__comfyMonitorClientId : undefined) || "comfyui-bridge-session",
+          stage_assets_first: false
         })
       });
       

@@ -11,6 +11,7 @@ export interface ComfyMonitorState {
   elapsedMs: number;
   activePromptId: string | null;
   lastError?: string | null;
+  clientId?: string;
 }
 
 export interface PulledOutputDetails {
@@ -30,6 +31,29 @@ export function useComfyMonitor(
   onExecutionStarted?: (promptId: string) => void,
   onStatusUpdated?: () => void
 ) {
+  // Stable persistent client ID
+  const clientIdRef = useRef<string>(
+    (() => {
+      try {
+        if (typeof window !== "undefined") {
+          const stored = localStorage.getItem("comfyui_monitor_client_id");
+          if (stored) return stored;
+          const gen = `cinematic_bridge_${Math.random().toString(36).substring(2, 11)}`;
+          localStorage.setItem("comfyui_monitor_client_id", gen);
+          return gen;
+        }
+      } catch {}
+      return `cinematic_bridge_${Math.random().toString(36).substring(2, 11)}`;
+    })()
+  );
+
+  const resolvedClientId = clientIdRef.current;
+
+  // Expose on window for easy access
+  if (typeof window !== "undefined") {
+    (window as any).__comfyMonitorClientId = resolvedClientId;
+  }
+
   const [state, setState] = useState<ComfyMonitorState>({
     isConnected: false,
     isExecuting: false,
@@ -41,6 +65,7 @@ export function useComfyMonitor(
     elapsedMs: 0,
     activePromptId: null,
     lastError: null,
+    clientId: resolvedClientId
   });
 
   const wsRef = useRef<WebSocket | null>(null);
@@ -84,9 +109,7 @@ export function useComfyMonitor(
     let wsUrl = comfyApiUrl.replace(/^http/, 'ws');
     if (wsUrl.endsWith('/')) wsUrl = wsUrl.slice(0, -1);
     
-    // Generate a simple clientId
-    const clientId = Math.random().toString(36).substring(2, 15);
-    const fullWsUrl = `${wsUrl}/ws?clientId=${clientId}`;
+    const fullWsUrl = `${wsUrl}/ws?clientId=${resolvedClientId}`;
 
     let ws: WebSocket;
     let reconnectTimer: NodeJS.Timeout;

@@ -8,9 +8,10 @@ import {
   sanitizeFilenamePart,
   formatShotNumber
 } from "../utils/formatters";
-import { injectAndPrepareWorkflowData, parseWorkflowData } from "./workflowService";
+import { injectAndPrepareWorkflowData, parseWorkflowData, convertWorkflowToApiPrompt } from "./workflowService";
 import { assetService } from "./assetService";
 import { executeSFTPBatchTransfer, SSHCredentials, TransferItem } from "./sshService";
+import { queuePromptToRemoteComfy } from "./remoteComfyService";
 
 export interface AssetTransferOptions extends SSHCredentials {
   take_number?: string | number;
@@ -565,6 +566,8 @@ export interface ExecuteWorkflowOptions {
   parameter_node_mappings?: Record<string, string>;
   generation_parameters?: any;
   dry_run_only?: boolean;
+  client_id?: string;
+  stage_assets_first?: boolean;
 }
 
 export async function executeWorkflow(options: ExecuteWorkflowOptions) {
@@ -594,7 +597,9 @@ export async function executeWorkflow(options: ExecuteWorkflowOptions) {
     parameter_overrides = {},
     parameter_node_mappings = {},
     generation_parameters = null,
-    dry_run_only = false
+    dry_run_only = false,
+    client_id = "comfyui-bridge-session",
+    stage_assets_first = false
   } = options;
 
   const cleanScene = sanitizeFilenamePart(scene_name ?? scene_planning?.scene_name ?? planning?.scene_name ?? "Scene");
@@ -689,6 +694,9 @@ export async function executeWorkflow(options: ExecuteWorkflowOptions) {
     resolvedSaveVideoPrefix
   );
 
+  // Convert to ComfyUI API Prompt format for direct execution
+  const apiPrompt = convertWorkflowToApiPrompt(modifiedWf);
+
   const stepsLog: ExecutionStepLog[] = [];
   const parsedOriginal = parseWorkflowData(workflow);
 
@@ -697,7 +705,7 @@ export async function executeWorkflow(options: ExecuteWorkflowOptions) {
     step: "B",
     title: "Workflow Loaded",
     status: "success",
-    detail: `Parsed '${resolvedWorkflowFilename}' (${parsedOriginal.totalNodes} nodes). Retaining all graph loader nodes without pruning.`
+    detail: `Parsed '${resolvedWorkflowFilename}' (${parsedOriginal.totalNodes} nodes). Prepared API prompt graph.`
   });
 
   // Step C: Summary
@@ -709,7 +717,7 @@ export async function executeWorkflow(options: ExecuteWorkflowOptions) {
       Object.keys(node_mappings).length
     } active asset slot(s). ${
       resolvedSaveVideoPrefix ? `SaveVideo filename prefix set to '${resolvedSaveVideoPrefix}'.` : ""
-    } All loader nodes retained with clean default override ('empty.png').`
+    }`
   });
 
   // If Dry Run requested, return immediately
@@ -720,96 +728,92 @@ export async function executeWorkflow(options: ExecuteWorkflowOptions) {
       take_number: calculatedTake,
       expected_video_filename: expectedVideoFilename,
       steps: stepsLog,
-      modified_workflow: modifiedWf
+      modified_workflow: modifiedWf,
+      api_prompt: apiPrompt
     };
   }
 
-  // Step A: SFTP transfer (Auto-Staging)
+  // Step A: Optional SFTP transfer (ONLY if explicitly requested via stage_assets_first)
   let transferResult: any = null;
   const targetHost = remote_host || (options as any).host || (options as any).runpod_ip;
-  if (targetHost) {
+  if (stage_assets_first && targetHost) {
     try {
       transferResult = await processAssetTransfer(options);
       const mappedFiles = Array.from(new Set(Object.values(node_mappings).filter(Boolean) as string[]));
       stepsLog.push({
         step: "A",
-        title: "SSH Asset Sync (Auto-Staged)",
+        title: "SSH Asset Sync (Staged)",
         status: "success",
-        detail: `Connected to ${ssh_username}@${targetHost}:${ssh_port} via SFTP. Verified & auto-staged ${mappedFiles.length} assigned asset file(s) across all active input slots into ${remote_comfyui_root}.`
+        detail: `Auto-staged ${mappedFiles.length} assigned asset file(s) into ${remote_comfyui_root}.`
       });
     } catch (err: any) {
       stepsLog.push({
         step: "A",
-        title: "SSH Asset Sync (Auto-Staged)",
+        title: "SSH Asset Sync (Staged)",
         status: "error",
-        detail: `Auto-staging failed: ${err.message}`
+        detail: `Asset staging failed: ${err.message}`
       });
-      throw err;
     }
   } else {
     stepsLog.push({
       step: "A",
-      title: "SSH Asset Sync (Auto-Staged)",
+      title: "Asset Check",
       status: "info",
-      detail: "No remote GPU host specified; skipping remote SSH staging."
+      detail: "Direct workflow dispatch mode active (skipping upload sequence)."
     });
   }
 
-  // Step D: ComfyUI /prompt HTTP endpoint
-  const promptEndpoint = comfyui_api_url.endsWith("/prompt")
-    ? comfyui_api_url
-    : `${comfyui_api_url.replace(/\/$/, "")}/prompt`;
-  const comfyPayload = {
-    prompt: modifiedWf,
-    client_id: "comfyui-bridge-session"
-  };
-
-  let apiSucceeded = false;
-  let promptId = `prompt_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-
-  try {
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (remote_api_token) {
-      headers["Authorization"] = `Bearer ${remote_api_token}`;
+  // Step D: ComfyUI /prompt Dispatch via Multi-Transport (HTTP + SSH Bridge)
+  const queueResult = await queuePromptToRemoteComfy(
+    {
+      host: targetHost,
+      port: ssh_port,
+      username: ssh_username,
+      password: options.ssh_password,
+      keyPath: options.ssh_key_path,
+      privateKey: options.ssh_private_key,
+      remote_comfyui_root: remote_comfyui_root,
+      comfyui_api_url,
+      remote_api_token
+    },
+    apiPrompt,
+    client_id,
+    {
+      scene_name: cleanScene,
+      shot_number: formattedShot,
+      take_number: calculatedTake,
+      workflow_file: resolvedWorkflowFilename
     }
+  );
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-    const comfyRes = await fetch(promptEndpoint, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(comfyPayload),
-      signal: controller.signal
+  if (queueResult.success) {
+    stepsLog.push({
+      step: "D",
+      title: "ComfyUI Execution Triggered",
+      status: "success",
+      detail: `Successfully queued in ComfyUI (${queueResult.dispatch_method})! Prompt ID: ${queueResult.prompt_id}${queueResult.number ? ` (Queue #${queueResult.number})` : ""}`
     });
-    clearTimeout(timeoutId);
 
-    if (comfyRes.ok) {
-      const respJson = await comfyRes.json();
-      promptId = respJson.prompt_id || promptId;
-      apiSucceeded = true;
-    }
-  } catch (apiErr) {
-    // Endpoint is remote or unreachable from dev container
+    return {
+      success: true,
+      prompt_id: queueResult.prompt_id,
+      queue_number: queueResult.number,
+      take_number: calculatedTake,
+      expected_video_filename: expectedVideoFilename,
+      steps: stepsLog,
+      modified_workflow: modifiedWf,
+      api_prompt: apiPrompt,
+      dispatch_method: queueResult.dispatch_method
+    };
+  } else {
+    stepsLog.push({
+      step: "D",
+      title: "ComfyUI Execution Failed",
+      status: "error",
+      detail: queueResult.error || "Failed to submit prompt to ComfyUI."
+    });
+
+    throw new Error(queueResult.error || "Failed to trigger workflow execution in ComfyUI.");
   }
-
-  stepsLog.push({
-    step: "D",
-    title: "ComfyUI /prompt Dispatch",
-    status: apiSucceeded ? "success" : "info",
-    detail: apiSucceeded
-      ? `Successfully queued workflow in ComfyUI instance! Prompt ID: ${promptId}`
-      : `Generated valid ComfyUI API payload for endpoint: ${promptEndpoint}. Payload verified and ready for execution.`
-  });
-
-  return {
-    success: true,
-    prompt_id: promptId,
-    take_number: calculatedTake,
-    expected_video_filename: expectedVideoFilename,
-    steps: stepsLog,
-    modified_workflow: modifiedWf,
-    remote_workflow_paths: transferResult?.remote_workflow_path ? [transferResult.remote_workflow_path] : [],
-    uploaded_files: transferResult?.uploaded_files || []
-  };
 }
+

@@ -475,3 +475,181 @@ export async function getRemoteComfyObjectInfo(
 
   return { success: false, error: "Could not query ComfyUI /object_info endpoint." };
 }
+
+export interface QueuePromptResult {
+  success: boolean;
+  prompt_id?: string;
+  number?: number;
+  node_errors?: any;
+  error?: string;
+  dispatch_method: "direct_http" | "ssh_bridge" | "failed";
+  details?: string;
+}
+
+/**
+ * Submits an API prompt graph directly to ComfyUI via HTTP or SSH bridge.
+ */
+export async function queuePromptToRemoteComfy(
+  creds: SSHCredentials & { comfyui_api_url?: string; remote_api_token?: string },
+  apiPrompt: Record<string, any>,
+  clientId: string = "comfyui-bridge-session",
+  extraData: Record<string, any> = {}
+): Promise<QueuePromptResult> {
+  const comfyApiUrl = (creds.comfyui_api_url || "http://127.0.0.1:8188").replace(/\/$/, "");
+  const payload = {
+    prompt: apiPrompt,
+    client_id: clientId,
+    extra_data: extraData
+  };
+
+  const payloadString = JSON.stringify(payload);
+
+  // 1. Attempt Direct HTTP Dispatch
+  if (comfyApiUrl) {
+    try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      };
+      if (creds.remote_api_token) {
+        headers["Authorization"] = `Bearer ${creds.remote_api_token}`;
+      }
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 6000);
+
+      const res = await fetch(`${comfyApiUrl}/prompt`, {
+        method: "POST",
+        headers,
+        body: payloadString,
+        signal: controller.signal
+      });
+      clearTimeout(timeout);
+
+      const resText = await res.text();
+      let resJson: any = null;
+      try {
+        resJson = JSON.parse(resText);
+      } catch {}
+
+      if (res.ok && resJson && resJson.prompt_id) {
+        return {
+          success: true,
+          prompt_id: resJson.prompt_id,
+          number: resJson.number,
+          node_errors: resJson.node_errors,
+          dispatch_method: "direct_http",
+          details: `Direct HTTP queue succeeded (prompt_id: ${resJson.prompt_id})`
+        };
+      } else if (resJson && resJson.error) {
+        const errorMsg = typeof resJson.error === "string" 
+          ? resJson.error 
+          : resJson.error.message || JSON.stringify(resJson.error);
+        return {
+          success: false,
+          error: `ComfyUI API rejected prompt: ${errorMsg}`,
+          node_errors: resJson.node_errors,
+          dispatch_method: "direct_http"
+        };
+      }
+    } catch (httpErr: any) {
+      console.log(`[ComfyUI Dispatch] Direct HTTP fetch failed (${httpErr.message}). Checking SSH fallback...`);
+    }
+  }
+
+  // 2. Attempt SSH Fallback Dispatch (executes python directly on the remote GPU instance)
+  const resolved = resolveSSHConfig(creds);
+  if (resolved.host && resolved.authMethod !== "None") {
+    let client: Client | null = null;
+    try {
+      client = await connectSSH(resolved.connectConfig);
+
+      // Write payload to a temporary file on remote host or stream via stdin to python
+      const pyScript = `
+import urllib.request, json, sys
+
+try:
+    payload_raw = sys.stdin.read()
+    req = urllib.request.Request(
+        "http://127.0.0.1:8188/prompt",
+        data=payload_raw.encode("utf-8"),
+        headers={"Content-Type": "application/json", "Accept": "application/json"}
+    )
+    with urllib.request.urlopen(req, timeout=12) as response:
+        body = response.read().decode("utf-8")
+        print(body)
+except urllib.error.HTTPError as e:
+    err_body = e.read().decode("utf-8", errors="ignore")
+    print(json.dumps({"error": f"HTTP {e.code}: {err_body}", "code": e.code}))
+except Exception as e:
+    print(json.dumps({"error": str(e)}))
+`.trim();
+
+      const cmd = `python3 -c '${pyScript.replace(/'/g, "'\\''")}'`;
+      
+      // Execute with stdin stream
+      const result = await new Promise<{ stdout: string; stderr: string; code: number }>((resolve, reject) => {
+        client!.exec(cmd, (err, stream) => {
+          if (err) return reject(err);
+          let stdout = "";
+          let stderr = "";
+          stream.on("data", (d: Buffer) => { stdout += d.toString(); });
+          stream.stderr.on("data", (d: Buffer) => { stderr += d.toString(); });
+          stream.on("close", (code: number) => { resolve({ stdout, stderr, code: code ?? 0 }); });
+
+          // Write payload to stdin and close stdin
+          stream.write(payloadString);
+          stream.end();
+        });
+      });
+
+      try { client.end(); } catch {}
+
+      if (result.stdout.trim()) {
+        try {
+          const parsed = JSON.parse(result.stdout.trim());
+          if (parsed.prompt_id) {
+            return {
+              success: true,
+              prompt_id: parsed.prompt_id,
+              number: parsed.number,
+              node_errors: parsed.node_errors,
+              dispatch_method: "ssh_bridge",
+              details: `Dispatched to ComfyUI via SSH bridge (prompt_id: ${parsed.prompt_id})`
+            };
+          } else if (parsed.error) {
+            return {
+              success: false,
+              error: `ComfyUI returned error over SSH bridge: ${parsed.error}`,
+              node_errors: parsed.node_errors,
+              dispatch_method: "ssh_bridge"
+            };
+          }
+        } catch {}
+      }
+
+      return {
+        success: false,
+        error: result.stderr.trim() || result.stdout.trim() || "Remote SSH bridge returned empty response from ComfyUI /prompt.",
+        dispatch_method: "ssh_bridge"
+      };
+    } catch (sshErr: any) {
+      return {
+        success: false,
+        error: `Failed to dispatch prompt via SSH bridge: ${sshErr.message}`,
+        dispatch_method: "ssh_bridge"
+      };
+    } finally {
+      if (client) {
+        try { client.end(); } catch {}
+      }
+    }
+  }
+
+  return {
+    success: false,
+    error: "Could not connect to ComfyUI instance (both direct HTTP and SSH failed).",
+    dispatch_method: "failed"
+  };
+}
+
