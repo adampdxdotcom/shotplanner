@@ -15,6 +15,7 @@
   "dependencies": {
     "@google/genai": "^2.4.0",
     "@tailwindcss/vite": "^4.1.14",
+    "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^5.0.4",
     "archiver": "^8.0.0",
     "dotenv": "^17.2.3",
@@ -30,7 +31,8 @@
     "sharp": "^0.35.4",
     "ssh2": "^1.17.0",
     "unzipper": "^0.12.5",
-    "vite": "^6.2.3"
+    "vite": "^6.2.3",
+    "ws": "^8.21.3"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",

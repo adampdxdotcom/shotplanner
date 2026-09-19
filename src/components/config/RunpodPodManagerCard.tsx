@@ -202,13 +202,55 @@ export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
     }
   }, [apiKey, config.runpod_api_key]);
 
-  // Periodic 15-second background auto-refresh
+  // Periodic 15-second background auto-refresh via Server-Sent Events (SSE) background push
   React.useEffect(() => {
-    if (!autoSyncEnabled || !(apiKey.trim() || config.runpod_api_key?.trim())) return;
-    const interval = setInterval(() => {
-      handleFetchPods(true);
-    }, 15000);
-    return () => clearInterval(interval);
+    const keyToUse = apiKey.trim() || config.runpod_api_key?.trim() || "";
+    if (!autoSyncEnabled || !keyToUse) return;
+
+    const eventSource = new EventSource(`/api/runpod/events?apiKey=${encodeURIComponent(keyToUse)}`);
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.success && Array.isArray(data.pods)) {
+          const discoveredPods: RunpodPodItem[] = data.pods;
+          setPods(discoveredPods);
+          setLastSyncedAt(new Date());
+          setConnectionStatus("connected");
+
+          if (discoveredPods.length > 0) {
+            setSelectedPodId((prev) => {
+              if (!prev || !discoveredPods.some(p => p.id === prev)) {
+                return discoveredPods[0].id;
+              }
+              return prev;
+            });
+
+            // Auto-connect if enabled
+            const activePod = discoveredPods.find(p => p.id === selectedPodId) || discoveredPods[0];
+            if (
+              activePod &&
+              activePod.ip &&
+              (config.runpod_auto_connect || !config.remote_host || config.remote_host !== activePod.ip)
+            ) {
+              handleConnectPod(activePod, true);
+            }
+          }
+        } else if (data.error) {
+          setError(data.error);
+        }
+      } catch (e) {
+        console.error("Failed to parse SSE event data", e);
+      }
+    };
+
+    eventSource.onerror = (err) => {
+      console.warn("RunPod Live Sync connection lost, reconnecting...", err);
+    };
+
+    return () => {
+      eventSource.close();
+    };
   }, [autoSyncEnabled, apiKey, config.runpod_api_key, selectedPodId, config.remote_host]);
 
   const handleConnectPod = (pod: RunpodPodItem, silent: boolean = false) => {

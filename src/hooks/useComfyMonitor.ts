@@ -106,27 +106,44 @@ export function useComfyMonitor(
   useEffect(() => {
     if (!comfyApiUrl) return;
 
-    let wsUrl = comfyApiUrl.replace(/^http/, 'ws');
-    if (wsUrl.endsWith('/')) wsUrl = wsUrl.slice(0, -1);
-    
-    const fullWsUrl = `${wsUrl}/ws?clientId=${resolvedClientId}`;
+    const sseUrl = `/api/comfy/events?url=${encodeURIComponent(comfyApiUrl)}`;
 
-    let ws: WebSocket;
+    let eventSource: EventSource;
     let reconnectTimer: NodeJS.Timeout;
 
     const connect = () => {
       try {
-        ws = new WebSocket(fullWsUrl);
-        wsRef.current = ws;
+        eventSource = new EventSource(sseUrl);
 
-        ws.onopen = () => {
+        eventSource.onopen = () => {
           setState(prev => ({ ...prev, isConnected: true }));
         };
 
-        ws.onmessage = (event) => {
+        eventSource.onmessage = (event) => {
           if (typeof event.data !== 'string') return;
           try {
             const msg = JSON.parse(event.data);
+
+            // Handle server-synced job state history to automatically re-sync when tab is opened
+            if (msg.type === 'history' && Array.isArray(msg.jobs)) {
+              const activeJob = msg.jobs.find((j: any) => j.status === 'running' || j.status === 'queued');
+              if (activeJob) {
+                setState(prev => ({
+                  ...prev,
+                  isExecuting: true,
+                  activePromptId: activeJob.promptId,
+                  currentStep: activeJob.step,
+                  maxSteps: activeJob.maxSteps,
+                  activeNodeId: activeJob.currentNodeId,
+                  activeNodeName: `KSampler`,
+                  elapsedMs: Date.now() - activeJob.timestamp
+                }));
+                startTimeRef.current = activeJob.timestamp;
+                startTimer();
+              }
+              return;
+            }
+
             if (msg.type === 'status') {
               const queueRemaining = msg.data?.status?.exec_info?.queue_remaining ?? 0;
               setState(prev => {
@@ -170,9 +187,6 @@ export function useComfyMonitor(
                     isExecuting: true 
                   };
                 });
-              } else {
-                // node is null when execution is finished for this prompt
-                // execution_success event should also fire
               }
             } else if (msg.type === 'progress') {
               const currentStep = msg.data.value;
@@ -189,7 +203,6 @@ export function useComfyMonitor(
               onShowToast?.('🎬 ComfyUI Execution Complete', 'success');
               resetState();
               onStatusUpdated?.();
-              // Proactively trigger backend history sync
               if (activeSceneName) {
                 fetch('/api/outputs/sync-history', {
                   method: 'POST',
@@ -203,7 +216,6 @@ export function useComfyMonitor(
               }
             } else if (msg.type === 'executed') {
               onStatusUpdated?.();
-              // Trigger backend history sync for prompt completion
               if (activeSceneName) {
                 fetch('/api/outputs/sync-history', {
                   method: 'POST',
@@ -234,18 +246,15 @@ export function useComfyMonitor(
               resetState();
             }
           } catch (e) {
-            console.error('Error parsing ComfyUI WS message', e);
+            console.error('Error parsing ComfyUI message from event stream', e);
           }
         };
 
-        ws.onclose = () => {
+        eventSource.onerror = () => {
           setState(prev => ({ ...prev, isConnected: false }));
           resetState();
-          reconnectTimer = setTimeout(connect, 5000); // Polling/Reconnect fallback
-        };
-        
-        ws.onerror = () => {
-          // handled by onclose
+          eventSource.close();
+          reconnectTimer = setTimeout(connect, 5000);
         };
       } catch (e) {
         reconnectTimer = setTimeout(connect, 5000);
@@ -255,11 +264,11 @@ export function useComfyMonitor(
     connect();
 
     return () => {
-      if (ws) ws.close();
+      if (eventSource) eventSource.close();
       clearTimeout(reconnectTimer);
       resetState();
     };
-  }, [comfyApiUrl, onShowToast]);
+  }, [comfyApiUrl, onShowToast, activeSceneName, onOutputPulled, onExecutionStarted, onStatusUpdated, resolvedClientId, startTimer, resetState]);
 
   return state;
 }

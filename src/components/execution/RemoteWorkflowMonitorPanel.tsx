@@ -68,6 +68,13 @@ export const RemoteWorkflowMonitorPanel: React.FC<RemoteWorkflowMonitorPanelProp
     onShowToast
   });
 
+  // Proactive queue refresh on socket monitor status updates (start/stop execution or queue size adjustments)
+  React.useEffect(() => {
+    if (monitorState?.isExecuting !== undefined || monitorState?.queueRemaining !== undefined) {
+      refreshQueue(true);
+    }
+  }, [monitorState?.isExecuting, monitorState?.queueRemaining, refreshQueue]);
+
   const activeMonitoredWorkflow = activeShot?.monitored_workflow;
   const primaryDevice = systemStats?.devices?.[0] || null;
 

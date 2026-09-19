@@ -6,6 +6,11 @@ import {
   clearComfyQueue,
   fetchComfySystemStats
 } from "../services/comfyQueueService";
+import {
+  registerSSEClient,
+  unregisterSSEClient,
+  getJobState
+} from "../services/comfySocketMonitorService";
 
 const router = Router();
 
@@ -97,6 +102,46 @@ router.post("/system-stats", async (req: Request, res: Response) => {
   const { apiUrl, authToken } = resolveEndpointParams(req);
   const result = await fetchComfySystemStats(apiUrl, authToken);
   res.json(result);
+});
+
+/**
+ * GET /api/comfy/events
+ * Live progress stream for ComfyUI jobs over Server-Sent Events (SSE)
+ */
+router.get("/events", (req: Request, res: Response) => {
+  const { apiUrl } = resolveEndpointParams(req);
+  if (!apiUrl) {
+    return res.status(400).json({ success: false, error: "ComfyUI API URL is required." });
+  }
+
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    "Connection": "keep-alive"
+  });
+
+  // Keep alive comment
+  res.write(":\n\n");
+
+  registerSSEClient(apiUrl, res);
+
+  req.on("close", () => {
+    unregisterSSEClient(apiUrl, res);
+  });
+});
+
+/**
+ * GET /api/comfy/job-status/:promptId
+ * Retrieve the current cached progress status of a specific prompt ID
+ */
+router.get("/job-status/:promptId", (req: Request, res: Response) => {
+  const { promptId } = req.params;
+  const state = getJobState(promptId);
+  if (state) {
+    res.json({ success: true, job: state });
+  } else {
+    res.json({ success: false, message: "Job not found or not yet tracked by backend." });
+  }
 });
 
 export default router;

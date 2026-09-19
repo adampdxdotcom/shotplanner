@@ -248,8 +248,8 @@ export function useComfyQueue({
     refreshQueue(true);
     refreshSystemStats();
 
-    // Determine poll interval based on queue activity
-    const interval = autoPollIntervalMs || (queueStatus.queue_remaining > 0 ? 3000 : 8000);
+    // Since SSE event stream handles real-time updates, we can use a very gentle fallback poll interval
+    const interval = autoPollIntervalMs || (queueStatus.queue_remaining > 0 ? 10000 : 15000);
 
     pollTimerRef.current = setInterval(() => {
       refreshQueue(true);
