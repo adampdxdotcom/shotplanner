@@ -40,9 +40,16 @@ export const ShotCarousel: React.FC<ShotCarouselProps> = ({
   };
 
   const getShotThumbnailUrl = (shot: ShotItem) => {
-    let filename = shot.assigned_slots[8] || shot.assigned_slots[9];
+    // 1. Primary: 9th asset slot (Slot 9, index 8, 9, or 'location')
+    let filename = shot.assigned_slots?.[8] || 
+                   shot.assigned_slots?.[9] || 
+                   (shot.assigned_slots as any)?.["8"] || 
+                   (shot.assigned_slots as any)?.["9"] || 
+                   (shot.assigned_slots as any)?.["location"];
+
+    // 2. Global location/scene reference in project if not explicitly assigned
     if (!filename) {
-      const locAsset = assets.find(a => a.type === "Scene Reference" || a.slot_index === 8);
+      const locAsset = assets.find(a => a.slot_index === 8 || a.slot_index === 9 || a.type === "Scene Reference");
       if (locAsset) filename = locAsset.filename;
     }
     if (!filename) {
@@ -54,10 +61,8 @@ export const ShotCarousel: React.FC<ShotCarouselProps> = ({
       });
       if (locAsset) filename = locAsset.filename;
     }
-    if (!filename) {
-      filename = shot.assigned_slots[0] || shot.assigned_slots[1];
-    }
-    return getAssetMediaUrl(filename, true);
+
+    return filename ? getAssetMediaUrl(filename, true) : null;
   };
 
   const handleDragStart = (idx: number) => setDraggedIdx(idx);

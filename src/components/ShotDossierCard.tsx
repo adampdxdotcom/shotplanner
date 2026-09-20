@@ -65,53 +65,31 @@ export const ShotDossierCard: React.FC<ShotDossierCardProps> = ({
     }
   };
 
-  // Derive preview media thumbnail for the shot
+  // Derive preview media thumbnail for the shot (9th asset slot / location slot)
   const { previewUrl, isVideo } = useMemo(() => {
     if (!activeShot) return { previewUrl: null, isVideo: false };
 
-    // 1. Check hero take or latest take
-    const heroTake = (activeShot.takes || []).find(t => t.id === activeShot.hero_take_id || t.is_hero) ||
-                     (activeShot.takes && activeShot.takes.length > 0 ? activeShot.takes[activeShot.takes.length - 1] : null);
-
-    if (heroTake?.video_url) {
-      return { previewUrl: heroTake.video_url, isVideo: true };
-    }
-
-    // 2. Check first frame asset / preview
-    if (activeShot.first_frame?.preview_url) {
-      return { previewUrl: activeShot.first_frame.preview_url, isVideo: false };
-    }
-    if (activeShot.first_frame?.asset_filename) {
-      return { previewUrl: getAssetMediaUrl(activeShot.first_frame.asset_filename, true), isVideo: false };
-    }
-
-    // 3. Check assigned slot 8 or 9 (Location/Environment)
-    const locFilename = activeShot.assigned_slots?.[8] || activeShot.assigned_slots?.[9];
+    // 1. Primary: 9th asset slot (Slot 9, index 8, 9, or 'location')
+    const locFilename = activeShot.assigned_slots?.[8] ?? 
+                        activeShot.assigned_slots?.[9] ?? 
+                        (activeShot.assigned_slots as any)?.["8"] ??
+                        (activeShot.assigned_slots as any)?.["9"] ??
+                        (activeShot.assigned_slots as any)?.["location"];
     if (locFilename) {
-      return { previewUrl: getAssetMediaUrl(locFilename, true), isVideo: false };
+      const isVideoAsset = Boolean(locFilename && /\.(mp4|mov|webm|mkv|avi)$/i.test(locFilename));
+      return { previewUrl: getAssetMediaUrl(locFilename, true), isVideo: isVideoAsset };
     }
 
-    // 4. Check global location/scene reference asset in project
+    // 2. Global location/scene reference asset in project if not explicitly assigned on shot
     const globalLoc = assets.find(a => {
       const t = (a.type || "").toLowerCase();
       const n = (a.subject_name || "").toLowerCase();
-      return a.slot_index === 8 || t === "scene reference" || t.includes("location") || t.includes("environment") ||
+      return a.slot_index === 8 || a.slot_index === 9 || t === "scene reference" || t.includes("location") || t.includes("environment") ||
              n.includes("location") || n.includes("environment");
     });
     if (globalLoc?.filename) {
-      return { previewUrl: getAssetMediaUrl(globalLoc.filename, true), isVideo: false };
-    }
-
-    // 5. Check character slots (0, 1, etc.)
-    const charFilename = activeShot.assigned_slots?.[0] || activeShot.assigned_slots?.[1];
-    if (charFilename) {
-      return { previewUrl: getAssetMediaUrl(charFilename, true), isVideo: false };
-    }
-
-    // 6. Any assigned slot
-    const anySlot = Object.values(activeShot.assigned_slots || {}).find(Boolean);
-    if (anySlot) {
-      return { previewUrl: getAssetMediaUrl(anySlot, true), isVideo: false };
+      const isVideoAsset = Boolean(globalLoc.filename && /\.(mp4|mov|webm|mkv|avi)$/i.test(globalLoc.filename));
+      return { previewUrl: getAssetMediaUrl(globalLoc.filename, true), isVideo: isVideoAsset };
     }
 
     return { previewUrl: null, isVideo: false };
