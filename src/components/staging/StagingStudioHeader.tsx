@@ -1,6 +1,7 @@
 import React from "react";
-import { Layers, Film, Zap, LayoutGrid } from "lucide-react";
+import { Layers, Film, Zap, LayoutGrid, Clapperboard } from "lucide-react";
 import { SceneProjectFile } from "../../types";
+import { StagingWorkspaceTab } from "../../utils/workspaceSessionStore";
 
 export interface StagingStudioHeaderProps {
   sceneProject?: SceneProjectFile;
@@ -9,8 +10,8 @@ export interface StagingStudioHeaderProps {
   activeSubject: string;
   setActiveSubject: (subject: string) => void;
   availableCharacters: string[];
-  activeTab: "headshots" | "staging" | "sheets";
-  setActiveTab: (tab: "headshots" | "staging" | "sheets") => void;
+  activeTab: StagingWorkspaceTab;
+  setActiveTab: (tab: StagingWorkspaceTab) => void;
   saveStatus?: "saved" | "saving" | "unsaved" | "error";
   lastSavedAt?: Date | null;
 }
@@ -91,21 +92,38 @@ export const StagingStudioHeader: React.FC<StagingStudioHeaderProps> = ({
 
       {/* WORKSPACE SUB-TABS */}
       <div className="border-t border-zinc-800/80 pt-3">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 bg-zinc-950/60 p-1 rounded-lg border border-zinc-800 w-full">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-1.5 bg-zinc-950/60 p-1 rounded-lg border border-zinc-800 w-full">
           <button
             id="tab-staging"
             type="button"
             onClick={() => setActiveTab("staging")}
-            className={`w-full justify-center px-3.5 py-2 text-xs font-semibold rounded-md flex items-center gap-2 transition-all cursor-pointer ${
+            className={`w-full justify-center px-3 py-2 text-xs font-semibold rounded-md flex items-center gap-2 transition-all cursor-pointer ${
               activeTab === "staging"
                 ? "bg-indigo-600 text-white shadow-xs"
                 : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60"
             }`}
           >
             <Layers className="w-3.5 h-3.5 shrink-0" />
-            <span>Scene Staging &amp; Blocking</span>
+            <span className="truncate">Scene Staging &amp; Blocking</span>
             <span className="text-[10px] px-1.5 py-0.5 bg-black/20 dark:bg-white/10 rounded font-mono shrink-0">
               Stage
+            </span>
+          </button>
+
+          <button
+            id="tab-first-frame"
+            type="button"
+            onClick={() => setActiveTab("first_frame")}
+            className={`w-full justify-center px-3 py-2 text-xs font-semibold rounded-md flex items-center gap-2 transition-all cursor-pointer ${
+              activeTab === "first_frame"
+                ? "bg-purple-600 text-white shadow-xs"
+                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60"
+            }`}
+          >
+            <Clapperboard className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">First Frame</span>
+            <span className="text-[10px] px-1.5 py-0.5 bg-black/20 dark:bg-white/10 rounded font-mono shrink-0">
+              Frame 0
             </span>
           </button>
 
@@ -113,14 +131,14 @@ export const StagingStudioHeader: React.FC<StagingStudioHeaderProps> = ({
             id="tab-headshots"
             type="button"
             onClick={() => setActiveTab("headshots")}
-            className={`w-full justify-center px-3.5 py-2 text-xs font-semibold rounded-md flex items-center gap-2 transition-all cursor-pointer ${
+            className={`w-full justify-center px-3 py-2 text-xs font-semibold rounded-md flex items-center gap-2 transition-all cursor-pointer ${
               activeTab === "headshots"
                 ? "bg-amber-600 text-white shadow-xs"
                 : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60"
             }`}
           >
             <Zap className="w-3.5 h-3.5 shrink-0" />
-            <span>AI Headshots &amp; Variations</span>
+            <span className="truncate">AI Headshots &amp; Variations</span>
             <span className="text-[10px] px-1.5 py-0.5 bg-black/20 dark:bg-white/10 rounded font-mono shrink-0">
               Gemini
             </span>
@@ -130,14 +148,14 @@ export const StagingStudioHeader: React.FC<StagingStudioHeaderProps> = ({
             id="tab-sheets"
             type="button"
             onClick={() => setActiveTab("sheets")}
-            className={`w-full justify-center px-3.5 py-2 text-xs font-semibold rounded-md flex items-center gap-2 transition-all cursor-pointer ${
+            className={`w-full justify-center px-3 py-2 text-xs font-semibold rounded-md flex items-center gap-2 transition-all cursor-pointer ${
               activeTab === "sheets"
                 ? "bg-emerald-600 text-white shadow-xs"
                 : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60"
             }`}
           >
             <LayoutGrid className="w-3.5 h-3.5 shrink-0" />
-            <span>Reference Sheets</span>
+            <span className="truncate">Reference Sheets</span>
             <span className="text-[10px] px-1.5 py-0.5 bg-black/20 dark:bg-white/10 rounded font-mono shrink-0">
               Panels
             </span>

@@ -156,17 +156,19 @@ export function setLastActiveSubject(subject: string | null): void {
   }
 }
 
+export type StagingWorkspaceTab = "headshots" | "staging" | "sheets" | "first_frame";
+
 // 5. Active Staging Sub-Tab
-export function getLastStagingTab(fallback: "headshots" | "staging" | "sheets" = "staging"): "headshots" | "staging" | "sheets" {
+export function getLastStagingTab(fallback: StagingWorkspaceTab = "staging"): StagingWorkspaceTab {
   const val = safeStorage.getItem(STORAGE_KEYS.ACTIVE_STAGING_TAB);
-  if (val === "headshots" || val === "staging" || val === "sheets") {
+  if (val === "headshots" || val === "staging" || val === "sheets" || val === "first_frame") {
     return val;
   }
   return fallback;
 }
 
-export function setLastStagingTab(tab: "headshots" | "staging" | "sheets"): void {
-  if (tab === "headshots" || tab === "staging" || tab === "sheets") {
+export function setLastStagingTab(tab: StagingWorkspaceTab): void {
+  if (tab === "headshots" || tab === "staging" || tab === "sheets" || tab === "first_frame") {
     safeStorage.setItem(STORAGE_KEYS.ACTIVE_STAGING_TAB, tab);
   }
 }

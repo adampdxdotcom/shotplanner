@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { ShotTake, PromptVariation } from "../types";
-import { X, Star, CheckCircle, XCircle, ThumbsUp, ThumbsDown, Download, Sparkles } from "lucide-react";
+import { X, Star, CheckCircle, XCircle, ThumbsUp, ThumbsDown, Download, Sparkles, Link as LinkIcon } from "lucide-react";
 
 interface TakeReviewModalProps {
   take: ShotTake;
@@ -11,6 +11,7 @@ interface TakeReviewModalProps {
   onSetHero: () => void;
   onUpdateRating?: (rating: "good" | "bad" | null) => void;
   onUpdateNotes?: (notes: string) => void;
+  onChainLastFrameToNextShot?: (take: ShotTake, videoUrl: string) => Promise<void> | void;
 }
 
 export function TakeReviewModal({ 
@@ -21,9 +22,11 @@ export function TakeReviewModal({
   onClose, 
   onSetHero,
   onUpdateRating,
-  onUpdateNotes 
+  onUpdateNotes,
+  onChainLastFrameToNextShot
 }: TakeReviewModalProps) {
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
+  const [isChaining, setIsChaining] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -159,6 +162,27 @@ export function TakeReviewModal({
                     <span>Bad</span>
                   </button>
                 </div>
+              )}
+
+              {onChainLastFrameToNextShot && videoSrc && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!videoSrc) return;
+                    setIsChaining(true);
+                    try {
+                      await onChainLastFrameToNextShot(take, videoSrc);
+                    } finally {
+                      setIsChaining(false);
+                    }
+                  }}
+                  disabled={isChaining}
+                  className="flex items-center justify-center gap-1.5 px-3 py-2 bg-purple-600/90 hover:bg-purple-600 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                  title="Extract last frame of this take and set as Shot Frame 0"
+                >
+                  <LinkIcon className="w-3.5 h-3.5" />
+                  <span>{isChaining ? "Chaining..." : "Chain Last Frame"}</span>
+                </button>
               )}
 
               {videoSrc && (

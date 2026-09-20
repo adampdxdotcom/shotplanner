@@ -19,7 +19,7 @@ export interface StagingStudioProps {
   onUpdateShot?: (updater: (prev: ShotItem) => ShotItem) => void;
   onAssetUploaded?: (asset: MediaAsset, targetSlotIndex?: number) => void;
   addToast?: (msg: string, type?: "success" | "error" | "info") => void;
-  initialTab?: "headshots" | "staging";
+  initialTab?: "headshots" | "staging" | "sheets" | "first_frame";
   initialSubject?: string;
 }
 

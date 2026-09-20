@@ -10,8 +10,10 @@ import {
   StagedActor,
   useStagingStage,
   StagingStudioHeader,
-  StagingViewportCard
+  StagingViewportCard,
+  FirstFrameTab
 } from "./staging";
+import { StagingWorkspaceTab } from "../utils/workspaceSessionStore";
 
 export type { StagedActor };
 
@@ -28,7 +30,7 @@ export interface StagingSectionProps {
   onUpdateShot?: (updater: (prev: ShotItem) => ShotItem) => void;
   onAssetUploaded?: (asset: MediaAsset, targetSlotIndex?: number) => void;
   addToast?: (msg: string, type?: "success" | "error" | "info") => void;
-  initialTab?: "headshots" | "staging" | "sheets";
+  initialTab?: StagingWorkspaceTab;
   initialSubject?: string;
   autosaveStatus?: "saved" | "saving" | "unsaved" | "error";
   lastSavedAt?: Date | null;
@@ -236,7 +238,22 @@ export const StagingSection: React.FC<StagingSectionProps> = ({
           </div>
         )}
 
-        {/* TAB 2: AI HEADSHOTS WORKSPACE */}
+        {/* TAB 2: FIRST FRAME CONTINUITY STUDIO */}
+        {activeTab === "first_frame" && (
+          <FirstFrameTab
+            sceneProject={sceneProject}
+            activeShot={activeShot}
+            activeScene={activeScene}
+            allAssets={assets}
+            onUpdateShot={onUpdateShot}
+            onUpdateProject={onUpdateProject}
+            onSelectShot={onSelectShot}
+            onAssetUploaded={onAssetUploaded}
+            addToast={addToast}
+          />
+        )}
+
+        {/* TAB 3: AI HEADSHOTS WORKSPACE */}
         {activeTab === "headshots" && (
           <div className="p-5">
             <HeadshotGeneratorTab

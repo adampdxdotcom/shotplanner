@@ -137,6 +137,19 @@ export interface StagingLayerRecipe {
   updatedAt?: string;
 }
 
+export interface ShotFirstFrame {
+  source: "last_frame_chain" | "generated_staging" | "manual_upload";
+  asset_filename: string;
+  preview_url?: string;
+  source_shot_id?: string;
+  source_shot_number?: number;
+  source_take_number?: number;
+  aspect_ratio?: string;
+  locked: boolean;
+  notes?: string;
+  updated_at: string;
+}
+
 export interface PromptVariation {
   id: string;
   variation_number: number;
@@ -196,6 +209,7 @@ export interface ShotItem {
   takes?: ShotTake[];
   active_take_id?: string;
   hero_take_id?: string;
+  first_frame?: ShotFirstFrame;
   staging_recipe?: StagingLayerRecipe;
 }
 

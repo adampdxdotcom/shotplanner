@@ -21,6 +21,7 @@ import { AssetCard, EmptySlotCard } from "./AssetSlotGrid";
 import { toCanonicalSubjectName } from "../utils/subjectUtils";
 import { getLastAssetTab, setLastAssetTab } from "../utils/workspaceSessionStore";
 import { AddCharacterToShotModal } from "./hub/AddCharacterToShotModal";
+import { extractAndUploadTakeLastFrame } from "../utils/frameExtraction";
 
 const MAX_IMAGES = 9;
 const MAX_VIDEOS = 1;
@@ -660,6 +661,59 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
               }
               return { ...prev, shots };
             });
+          }}
+          onChainLastFrameToNextShot={async (take, videoUrl) => {
+            try {
+              const shots = sceneProject.shots || [];
+              const currentIdx = shots.findIndex(s => s.id === activeShot.id);
+              const nextShot = currentIdx >= 0 && currentIdx < shots.length - 1 ? shots[currentIdx + 1] : null;
+              
+              const targetShotNumber = nextShot ? nextShot.shot_number : (activeShot.shot_number || currentIdx + 1) + 1;
+              const result = await extractAndUploadTakeLastFrame({
+                videoUrl,
+                sceneName: sceneProject.scene_name || activeSceneName,
+                sourceShotNumber: activeShot.shot_number || currentIdx + 1,
+                sourceTakeNumber: take.take_number,
+                targetShotNumber
+              });
+
+              if (!result.success || !result.assetFilename) {
+                throw new Error(result.error || "Frame extraction failed");
+              }
+
+              if (result.asset && onAssetUploaded) {
+                onAssetUploaded(result.asset);
+              }
+
+              // If next shot exists in project, link directly to next shot's first_frame!
+              if (nextShot) {
+                onUpdateProject(prev => {
+                  const updatedShots = [...prev.shots];
+                  const nIdx = updatedShots.findIndex(s => s.id === nextShot.id);
+                  if (nIdx !== -1) {
+                    updatedShots[nIdx] = {
+                      ...updatedShots[nIdx],
+                      first_frame: {
+                        source: "last_frame_chain",
+                        asset_filename: result.assetFilename!,
+                        source_shot_id: activeShot.id,
+                        source_shot_number: activeShot.shot_number,
+                        source_take_number: take.take_number,
+                        locked: true,
+                        updated_at: new Date().toISOString()
+                      }
+                    };
+                  }
+                  return { ...prev, shots: updatedShots };
+                });
+                if (addToast) addToast(`Extracted final frame and locked as Shot ${nextShot.shot_number} Frame 0!`, "success");
+              } else {
+                if (addToast) addToast(`Extracted final frame (${result.assetFilename}) as asset.`, "success");
+              }
+            } catch (err: any) {
+              console.error("Failed to chain last frame:", err);
+              if (addToast) addToast(`Failed to chain frame: ${err.message}`, "error");
+            }
           }}
         />
       )}

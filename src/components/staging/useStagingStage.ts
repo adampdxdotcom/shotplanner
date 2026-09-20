@@ -10,7 +10,8 @@ import {
   getLastStagingTab, 
   setLastStagingTab, 
   getLastActiveSubject, 
-  setLastActiveSubject 
+  setLastActiveSubject,
+  StagingWorkspaceTab
 } from "../../utils/workspaceSessionStore";
 
 export interface UseStagingStageProps {
@@ -25,7 +26,7 @@ export interface UseStagingStageProps {
   onUpdateShot?: (updater: (prev: ShotItem) => ShotItem) => void;
   onAssetUploaded?: (asset: MediaAsset, targetSlotIndex?: number) => void;
   addToast?: (msg: string, type?: "success" | "error" | "info") => void;
-  initialTab?: "headshots" | "staging" | "sheets";
+  initialTab?: StagingWorkspaceTab;
   initialSubject?: string;
 }
 
@@ -41,11 +42,11 @@ export function useStagingStage({
   onUpdateShot,
   onAssetUploaded,
   addToast,
-  initialTab = "staging" as "headshots" | "staging" | "sheets",
+  initialTab = "staging",
   initialSubject = ""
 }: UseStagingStageProps) {
   // Studio Active Tab state (persisted across reloads)
-  const [activeTab, setActiveTab] = useState<"headshots" | "staging" | "sheets">(() => {
+  const [activeTab, setActiveTab] = useState<StagingWorkspaceTab>(() => {
     return getLastStagingTab(initialTab);
   });
 
