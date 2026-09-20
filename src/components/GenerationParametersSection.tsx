@@ -33,7 +33,7 @@ export const GenerationParametersSection: React.FC<GenerationParametersSectionPr
   onSelectPromptNodeId,
   activeShot
 }) => {
-  const [editingNode, setEditingNode] = useState<{ steps?: boolean; megapixels?: boolean; frames?: boolean }>({});
+  const [editingNode, setEditingNode] = useState<{ steps?: boolean; megapixels?: boolean; frames?: boolean; prompt?: boolean }>({});
   const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   // Compute all available workflow nodes for inspection
@@ -504,8 +504,9 @@ export const GenerationParametersSection: React.FC<GenerationParametersSectionPr
 
         {/* 4. Prompt Stub Display Card */}
         {(() => {
+          const autoPromptNode = promptNodes.length > 0 ? String(promptNodes[0].id) : null;
           const isMapped = !!selectedPromptNodeId;
-          const matchedPromptNode = promptNodes.find(n => String(n.id) === String(selectedPromptNodeId));
+          const isEditing = editingNode.prompt;
           const stubText = activeShot?.basic_stub || activeShot?.expanded_prompt || "";
 
           return (
@@ -523,8 +524,9 @@ export const GenerationParametersSection: React.FC<GenerationParametersSectionPr
                       Node #{selectedPromptNodeId}
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded font-mono bg-zinc-100 text-zinc-600 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700 border">
-                      Auto-detected
+                    <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded font-mono bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-500/30 border">
+                      <AlertCircle className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400" />
+                      Not Injected
                     </span>
                   )}
                 </div>
@@ -558,15 +560,54 @@ export const GenerationParametersSection: React.FC<GenerationParametersSectionPr
                 </p>
               </div>
 
-              {/* Footer info */}
-              <div className="border-t border-zinc-200 dark:border-zinc-800/60 pt-2 flex items-center justify-between text-[10px] text-zinc-500 dark:text-zinc-400">
-                <span>{promptNodes.length} text node(s)</span>
-                {matchedPromptNode ? (
-                  <span className="font-mono text-[10px] text-indigo-600 dark:text-indigo-400 truncate max-w-[120px]" title={matchedPromptNode.title}>
-                    {matchedPromptNode.title}
-                  </span>
+              {/* Node ID Edit / Override controls */}
+              <div className="border-t border-zinc-200 dark:border-zinc-800/60 pt-2 flex items-center justify-between text-[10px]">
+                {isEditing ? (
+                  <div className="flex items-center gap-1.5 w-full">
+                    <span className="text-zinc-500 dark:text-zinc-400 text-[10px]">Node ID:</span>
+                    <input
+                      type="text"
+                      value={selectedPromptNodeId || ""}
+                      onChange={(e) => onSelectPromptNodeId?.(e.target.value.trim())}
+                      className="w-16 bg-white dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded px-1.5 py-0.5 text-[10px] font-mono text-zinc-900 dark:text-zinc-200 outline-none shadow-2xs"
+                      placeholder="Node #"
+                    />
+                    <button
+                      onClick={() => setEditingNode(prev => ({ ...prev, prompt: false }))}
+                      className="px-1.5 py-0.5 bg-zinc-200 hover:bg-zinc-300 text-zinc-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-300 rounded text-[10px] cursor-pointer"
+                    >
+                      Done
+                    </button>
+                  </div>
                 ) : (
-                  <span className="italic">Auto Target</span>
+                  <>
+                    <span className="text-zinc-500 dark:text-zinc-400">
+                      {autoPromptNode && selectedPromptNodeId === autoPromptNode ? "Auto-detected" : "Manual override"}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setEditingNode(prev => ({ ...prev, prompt: true }))}
+                        className="text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 flex items-center gap-0.5 cursor-pointer"
+                        title="Change target Node ID"
+                      >
+                        <Edit3 className="w-2.5 h-2.5" />
+                        <span>Change</span>
+                      </button>
+                      {autoPromptNode && selectedPromptNodeId !== autoPromptNode && (
+                        <button
+                          onClick={() => {
+                            onSelectPromptNodeId?.(autoPromptNode);
+                            setEditingNode(prev => ({ ...prev, prompt: false }));
+                          }}
+                          className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 flex items-center gap-0.5 cursor-pointer"
+                          title="Reset to auto-detected node"
+                        >
+                          <RotateCcw className="w-2.5 h-2.5" />
+                          <span>Auto</span>
+                        </button>
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
             </div>
