@@ -5,7 +5,8 @@ import {
   ScenePlanning, 
   SceneProjectFile, 
   ShotItem, 
-  AppConfig 
+  AppConfig,
+  PromptVariation
 } from "../types";
 import { TakeReviewModal } from "./TakeReviewModal";
 import { PromptDebugModal } from "./PromptDebugModal";
@@ -13,7 +14,9 @@ import { copyToClipboard } from "../utils/clipboard";
 import { Sparkles, Bot, AlertCircle, History } from "lucide-react";
 import { useShotPromptContext } from "./prompt/useShotPromptContext";
 import { usePromptExpansion } from "./prompt/usePromptExpansion";
-import { PromptHeaderBar } from "./prompt/PromptHeaderBar";
+import { ShotDossierCard } from "./ShotDossierCard";
+import { VariationSelector } from "./workflow/VariationSelector";
+import { TakeSelector } from "./TakeSelector";
 import { BasicStubInput } from "./prompt/BasicStubInput";
 import { PromptOutputPanel } from "./prompt/PromptOutputPanel";
 
@@ -36,6 +39,7 @@ interface LLMSectionProps {
   sceneProject: SceneProjectFile;
   onUpdateShot: (updater: (prev: ShotItem) => ShotItem) => void;
   onUpdateSpecificShot?: (id: string, updater: (prev: ShotItem) => ShotItem) => void;
+  onUpdateProject?: React.Dispatch<React.SetStateAction<SceneProjectFile>> | ((updater: (prev: SceneProjectFile) => SceneProjectFile) => void);
   config?: AppConfig;
 }
 
@@ -62,6 +66,7 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
   sceneProject,
   onUpdateShot,
   onUpdateSpecificShot,
+  onUpdateProject,
   config
 }) => {
   // Resolve effective default provider (only default LLM is active & shown)
@@ -176,21 +181,135 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
     }
   };
 
+  const handleAddBlankShot = () => {
+    if (!onUpdateProject) return;
+    const newId = "shot_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
+    onUpdateProject(prev => {
+      const newShot: ShotItem = {
+        id: newId,
+        shot_number: prev.shots.length + 1,
+        shot_type: "Medium Shot",
+        camera_movement: "Locked Off",
+        lens_focal_length: "50mm Standard Prime",
+        aspect_ratio: "16:9 Widescreen",
+        basic_stub: "",
+        expanded_prompt: "",
+        assigned_slots: {},
+        status: "unstaged",
+        takes: [],
+        updated_at: new Date().toISOString()
+      };
+      return { ...prev, shots: [...prev.shots, newShot] };
+    });
+    onSelectShot(newId);
+  };
+
+  const handleDuplicateShot = () => {
+    if (!onUpdateProject || !activeShot) return;
+    const newId = "shot_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
+    onUpdateProject(prev => {
+      const duplicatedShot: ShotItem = {
+        ...activeShot,
+        id: newId,
+        shot_number: prev.shots.length + 1,
+        shot_name: activeShot.shot_name ? `${activeShot.shot_name} (Copy)` : undefined,
+        status: "unstaged",
+        takes: [],
+        hero_take_id: undefined,
+        assigned_slots: { ...(activeShot.assigned_slots || {}) },
+        characters: activeShot.characters ? [...activeShot.characters] : [],
+        updated_at: new Date().toISOString()
+      };
+      return { ...prev, shots: [...prev.shots, duplicatedShot] };
+    });
+    onSelectShot(newId);
+  };
+
   return (
-    <div id="llm-section" className="space-y-5 flex flex-col min-h-0">
-      {/* Top Shot Context & Variation Selector Strip */}
-      <PromptHeaderBar
-        sceneProject={sceneProject}
+    <div id="llm-section" className="w-full space-y-5 flex flex-col min-h-0">
+      {/* Unified Shot Dossier Card */}
+      <ShotDossierCard
+        shots={sceneProject.shots}
         activeShotId={activeShotId}
-        activeShot={activeShot}
         onSelectShot={onSelectShot}
-        onUpdateShot={onUpdateShot}
-        onUpdateSpecificShot={onUpdateSpecificShot}
-        onChangeExpandedPrompt={onChangeExpandedPrompt}
-        onChangeBasicStub={onChangeBasicStub}
-        onShowToast={onShowToast}
-        onReviewTake={setReviewTakeId}
+        assets={assets}
+        sceneName={sceneProject.scene_name}
+        onNewShot={onUpdateProject ? handleAddBlankShot : undefined}
+        onDuplicateShot={onUpdateProject && activeShot ? handleDuplicateShot : undefined}
       />
+
+      {/* Prompt Variation History Strip */}
+      {activeShot && activeShot.prompt_variations && activeShot.prompt_variations.length > 0 && (
+        <div className="bg-white dark:bg-zinc-900/80 border border-amber-300 dark:border-amber-500/30 rounded-xl p-3 shadow-xs">
+          <VariationSelector
+            variations={activeShot.prompt_variations}
+            activeVariationId={activeShot.active_variation_id}
+            shotNumber={activeShot.shot_number}
+            onSelectVariation={(variation: PromptVariation) => {
+              if (onUpdateSpecificShot && activeShotId) {
+                onUpdateSpecificShot(activeShotId, (prev) => ({
+                  ...prev,
+                  expanded_prompt: variation.expanded_prompt,
+                  basic_stub: variation.basic_stub || prev.basic_stub,
+                  active_variation_id: variation.id,
+                  status: "unstaged"
+                }));
+              } else {
+                onUpdateShot((prev) => ({
+                  ...prev,
+                  expanded_prompt: variation.expanded_prompt,
+                  basic_stub: variation.basic_stub || prev.basic_stub,
+                  active_variation_id: variation.id,
+                  status: "unstaged"
+                }));
+              }
+              onChangeExpandedPrompt(variation.expanded_prompt);
+              if (variation.basic_stub) {
+                onChangeBasicStub(variation.basic_stub);
+              }
+              onShowToast?.(`Loaded ${variation.label || `Variation ${variation.variation_number}`} into prompt editor.`, "info");
+            }}
+            onDeleteVariation={(varId: string) => {
+              if (onUpdateSpecificShot && activeShotId) {
+                onUpdateSpecificShot(activeShotId, (prev) => {
+                  const filtered = (prev.prompt_variations || []).filter((v) => v.id !== varId);
+                  return {
+                    ...prev,
+                    prompt_variations: filtered,
+                    active_variation_id: prev.active_variation_id === varId ? (filtered[filtered.length - 1]?.id || undefined) : prev.active_variation_id
+                  };
+                });
+              } else {
+                onUpdateShot((prev) => {
+                  const filtered = (prev.prompt_variations || []).filter((v) => v.id !== varId);
+                  return {
+                    ...prev,
+                    prompt_variations: filtered,
+                    active_variation_id: prev.active_variation_id === varId ? (filtered[filtered.length - 1]?.id || undefined) : prev.active_variation_id
+                  };
+                });
+              }
+            }}
+          />
+        </div>
+      )}
+
+      {/* Hero Take Selector */}
+      {activeShot && activeShot.takes && activeShot.takes.length > 0 && (
+        <div className="bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 shadow-xs">
+          <TakeSelector 
+            shot={activeShot} 
+            onSetHeroTake={(tid) => onUpdateShot((prev) => {
+              const updatedTakes = (prev.takes || []).map((t) => ({
+                ...t,
+                is_hero: t.id === tid
+              }));
+              return { ...prev, hero_take_id: tid, takes: updatedTakes };
+            })}
+            onReviewTake={(tid) => setReviewTakeId(tid)}
+          />
+        </div>
+      )}
 
       {!activeShotId ? (
         <div className="flex flex-col items-center justify-center p-12 bg-zinc-50/60 dark:bg-zinc-900/40 border-2 border-dashed border-zinc-300 dark:border-zinc-800 rounded-xl">

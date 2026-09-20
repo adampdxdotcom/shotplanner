@@ -21,7 +21,8 @@ import {
   Layers, 
   Video, 
   Aperture, 
-  RectangleHorizontal 
+  RectangleHorizontal,
+  UserPlus
 } from "lucide-react";
 
 export { formatShotNumber, generateSaveVideoPrefix, sanitizeFilenamePart, generatePromptPrefix, assembleFinalPrompt };
@@ -40,11 +41,13 @@ export const ASPECT_RATIO_PRESETS = [
 interface ScenePlanningHeaderProps {
   planning: ScenePlanning;
   onChangePlanning: (newPlanning: ScenePlanning) => void;
+  onAddCharacter?: () => void;
 }
 
 export const ScenePlanningHeader: React.FC<ScenePlanningHeaderProps> = ({
   planning,
-  onChangePlanning
+  onChangePlanning,
+  onAddCharacter
 }) => {
   const [copied, setCopied] = useState(false);
 
@@ -123,12 +126,23 @@ export const ScenePlanningHeader: React.FC<ScenePlanningHeaderProps> = ({
           </div>
         </div>
 
-        {/* Current Shot Badge */}
+        {/* Current Shot Badge & Actions */}
         <div className="flex items-center gap-2">
           <span className="text-xs font-mono font-semibold px-2.5 py-1 rounded-md bg-zinc-100 text-indigo-700 border border-indigo-200 dark:bg-zinc-900 dark:text-indigo-300 dark:border-indigo-500/30 flex items-center gap-1.5 shadow-xs">
             <Film className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
             Shot {formattedShot}
           </span>
+          {onAddCharacter && (
+            <button
+              type="button"
+              onClick={onAddCharacter}
+              className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md text-xs font-semibold transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
+              title="Add character to shot"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>Add Character</span>
+            </button>
+          )}
         </div>
       </div>
 

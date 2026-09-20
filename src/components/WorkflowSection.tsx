@@ -4,7 +4,7 @@ import { getAssetMediaUrl } from "../utils/assetUrl";
 import { formatShotNumber, generateSaveVideoPrefix } from "../utils/formatters";
 import { copyToClipboard } from "../utils/clipboard";
 import { generateLiveInjectedWorkflow } from "../utils/workflowInjection";
-import { WorkflowHeaderControls } from "./workflow/WorkflowHeaderControls";
+import { ShotDossierCard } from "./ShotDossierCard";
 import { WorkflowFileSelector } from "./workflow/WorkflowFileSelector";
 import { PromptNodeSelector } from "./workflow/PromptNodeSelector";
 import { MediaLoaderMapper } from "./workflow/MediaLoaderMapper";
@@ -55,6 +55,7 @@ export interface WorkflowSectionProps {
   onSelectShot: (id: string | null) => void;
   sceneProject: SceneProjectFile;
   onUpdateShot: (updater: (prev: ShotItem) => ShotItem) => void;
+  onUpdateProject?: React.Dispatch<React.SetStateAction<SceneProjectFile>> | ((updater: (prev: SceneProjectFile) => SceneProjectFile) => void);
 }
 
 export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
@@ -78,6 +79,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
   onSelectShot,
   sceneProject,
   onUpdateShot,
+  onUpdateProject,
   activeSceneName
 }) => {
   const [uploading, setUploading] = useState(false);
@@ -91,6 +93,50 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
   const audioNodes = parsedWorkflow?.nodes_info?.audio_loader_nodes || [];
 
   const activeShot = sceneProject.shots.find((s) => s.id === activeShotId);
+
+  const handleAddBlankShot = () => {
+    if (!onUpdateProject) return;
+    const newId = "shot_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
+    onUpdateProject(prev => {
+      const newShot: ShotItem = {
+        id: newId,
+        shot_number: prev.shots.length + 1,
+        shot_type: "Medium Shot",
+        camera_movement: "Locked Off",
+        lens_focal_length: "50mm Standard Prime",
+        aspect_ratio: "16:9 Widescreen",
+        basic_stub: "",
+        expanded_prompt: "",
+        assigned_slots: {},
+        status: "unstaged",
+        takes: [],
+        updated_at: new Date().toISOString()
+      };
+      return { ...prev, shots: [...prev.shots, newShot] };
+    });
+    onSelectShot(newId);
+  };
+
+  const handleDuplicateShot = () => {
+    if (!onUpdateProject || !activeShot) return;
+    const newId = "shot_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
+    onUpdateProject(prev => {
+      const duplicatedShot: ShotItem = {
+        ...activeShot,
+        id: newId,
+        shot_number: prev.shots.length + 1,
+        shot_name: activeShot.shot_name ? `${activeShot.shot_name} (Copy)` : undefined,
+        status: "unstaged",
+        takes: [],
+        hero_take_id: undefined,
+        assigned_slots: { ...(activeShot.assigned_slots || {}) },
+        characters: activeShot.characters ? [...activeShot.characters] : [],
+        updated_at: new Date().toISOString()
+      };
+      return { ...prev, shots: [...prev.shots, duplicatedShot] };
+    });
+    onSelectShot(newId);
+  };
 
   const rawWorkflowData = parsedWorkflow?.raw_json || parsedWorkflow?.workflow || parsedWorkflow?.raw_workflow;
 
@@ -174,12 +220,16 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
   };
 
   return (
-    <div id="workflow-section" className="space-y-5 flex flex-col min-h-0">
-      <WorkflowHeaderControls 
+    <div id="workflow-section" className="w-full space-y-5 flex flex-col min-h-0">
+      {/* Unified Shot Dossier Card */}
+      <ShotDossierCard
+        shots={sceneProject.shots}
         activeShotId={activeShotId}
         onSelectShot={onSelectShot}
-        shots={sceneProject.shots}
-        activeShot={activeShot}
+        assets={uploadedAssets}
+        sceneName={activeSceneName}
+        onNewShot={onUpdateProject ? handleAddBlankShot : undefined}
+        onDuplicateShot={onUpdateProject && activeShot ? handleDuplicateShot : undefined}
       />
 
       <div className="bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-700 rounded-xl p-5 shadow-xs space-y-5">

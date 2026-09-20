@@ -22,6 +22,7 @@ import { toCanonicalSubjectName } from "../utils/subjectUtils";
 import { getLastAssetTab, setLastAssetTab } from "../utils/workspaceSessionStore";
 import { AddCharacterToShotModal } from "./hub/AddCharacterToShotModal";
 import { extractAndUploadTakeLastFrame } from "../utils/frameExtraction";
+import { ShotDossierCard } from "./ShotDossierCard";
 
 const MAX_IMAGES = 9;
 const MAX_VIDEOS = 1;
@@ -105,9 +106,10 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
   };
 
   const handleAddBlankShot = () => {
+    const newId = "shot_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
     onUpdateProject(prev => {
       const newShot: ShotItem = {
-        id: "shot_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
+        id: newId,
         shot_number: prev.shots.length + 1,
         shot_type: "Medium Shot",
         camera_movement: "Locked Off",
@@ -122,6 +124,28 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
       };
       return { ...prev, shots: [...prev.shots, newShot] };
     });
+    onSelectShot(newId);
+  };
+
+  const handleDuplicateShot = () => {
+    if (!activeShot) return;
+    const newId = "shot_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
+    onUpdateProject(prev => {
+      const duplicatedShot: ShotItem = {
+        ...activeShot,
+        id: newId,
+        shot_number: prev.shots.length + 1,
+        shot_name: activeShot.shot_name ? `${activeShot.shot_name} (Copy)` : undefined,
+        status: "unstaged",
+        takes: [],
+        hero_take_id: undefined,
+        assigned_slots: { ...(activeShot.assigned_slots || {}) },
+        characters: activeShot.characters ? [...activeShot.characters] : [],
+        updated_at: new Date().toISOString()
+      };
+      return { ...prev, shots: [...prev.shots, duplicatedShot] };
+    });
+    onSelectShot(newId);
   };
 
   const getGlobalSlotIndex = (type: "image" | "audio" | "video", localIndex: number) => {
@@ -294,52 +318,25 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
   const currentMax = activeTab === "image" ? MAX_IMAGES : activeTab === "video" ? MAX_VIDEOS : MAX_AUDIOS;
 
   return (
-    <div id="assets-section" className="space-y-5 flex flex-col min-h-0">
+    <div id="assets-section" className="w-full space-y-5 flex flex-col min-h-0">
       
-      {/* Assets Screen Header Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900/60 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-xs">
-        <div className="flex items-center gap-3">
-          <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Shot Context:</label>
-          <select 
-            value={activeShotId || ""}
-            onChange={(e) => onSelectShot(e.target.value || null)}
-            className="bg-white dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-white focus:border-indigo-500 focus:outline-hidden min-w-[250px] shadow-xs cursor-pointer"
-          >
-            <option key="empty" value="">-- Select a Shot --</option>
-            {sceneProject.shots.map(s => (
-              <option key={s.id} value={s.id}>
-                Shot {s.shot_number.toString().padStart(2, '0')} - {s.shot_type}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex items-center gap-2">
-          {activeShot && (
-            <button
-              type="button"
-              onClick={() => setIsAddCharacterModalOpen(true)}
-              className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
-              title="Add character references to active shot"
-            >
-              <UserPlus className="w-4 h-4" />
-              <span>Add Character to Shot</span>
-            </button>
-          )}
-          <button
-            onClick={handleAddBlankShot}
-            className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 dark:bg-indigo-600/20 dark:hover:bg-indigo-600/30 dark:text-indigo-300 dark:border-indigo-500/30 rounded-lg text-sm font-medium transition-colors shadow-xs cursor-pointer"
-          >
-            + New Shot
-          </button>
-        </div>
-      </div>
+      {/* Unified Shot Dossier Card */}
+      <ShotDossierCard
+        shots={sceneProject.shots}
+        activeShotId={activeShotId}
+        onSelectShot={onSelectShot}
+        assets={assets}
+        sceneName={activeSceneName}
+        onNewShot={handleAddBlankShot}
+        onDuplicateShot={activeShot ? handleDuplicateShot : undefined}
+      />
 
       {!activeShotId ? (
-        <div className="flex flex-col items-center justify-center p-12 bg-white dark:bg-zinc-900/40 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xs">
+        <div className="w-full flex flex-col items-center justify-center p-12 bg-white dark:bg-zinc-900/40 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xs">
           <FileImage className="w-12 h-12 text-zinc-400 dark:text-zinc-600 mb-4" />
           <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-300 mb-2">No Shot Selected</h2>
           <p className="text-sm text-zinc-600 dark:text-zinc-500 text-center max-w-md">
-            Choose an existing shot from the dropdown above or click <strong className="text-indigo-600 dark:text-indigo-400 font-semibold">"+ New Shot"</strong> to stage a new camera setup and assign media assets.
+            Choose an existing shot from the Shot Dossier above or click <strong className="text-indigo-600 dark:text-indigo-400 font-semibold">"+ New Shot"</strong> to stage a new camera setup and assign media assets.
           </p>
         </div>
       ) : (
@@ -355,6 +352,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
                 lens_focal_length: activeShot.lens_focal_length || "50mm Standard Prime",
                 aspect_ratio: activeShot.aspect_ratio || "16:9 Widescreen"
               }} 
+              onAddCharacter={() => setIsAddCharacterModalOpen(true)}
               onChangePlanning={(newPlanning) => {
                 onUpdateProject(prev => {
                   const shots = [...prev.shots];

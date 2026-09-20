@@ -4,8 +4,8 @@ import { SceneProjectFile, ShotItem, MediaAsset, AppConfig, CharacterProfile, Un
 import { ComfyMonitorState } from "../hooks/useComfyMonitor";
 import { TakeReviewModal } from "./TakeReviewModal";
 import { TakeComparisonModal } from "./TakeComparisonModal";
+import { ShotDossierCard } from "./ShotDossierCard";
 import { ShotCarousel } from "./hub/ShotCarousel";
-import { ShotMetadataPanel } from "./hub/ShotMetadataPanel";
 import { ShotCharacterRoster } from "./hub/ShotCharacterRoster";
 import { AssetMatrixPanel } from "./hub/AssetMatrixPanel";
 import { PromptPreviewPanel } from "./hub/PromptPreviewPanel";
@@ -134,6 +134,31 @@ export default function SceneProjectHub({
       shots.forEach((s, i) => s.shot_number = i + 1);
       return { ...prev, shots };
     });
+  };
+
+  const handleDuplicateActiveShot = () => {
+    if (!activeShot) return;
+    const newId = "shot_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
+    onUpdateProject((prev) => {
+      const idx = prev.shots.findIndex(s => s.id === activeShot.id);
+      const duplicatedShot: ShotItem = {
+        ...activeShot,
+        id: newId,
+        shot_number: activeShot.shot_number + 1,
+        shot_name: activeShot.shot_name ? `${activeShot.shot_name} (Copy)` : undefined,
+        status: "unstaged",
+        takes: [],
+        hero_take_id: undefined,
+        assigned_slots: { ...(activeShot.assigned_slots || {}) },
+        characters: activeShot.characters ? [...activeShot.characters] : [],
+        updated_at: new Date().toISOString()
+      };
+      const shots = [...prev.shots];
+      shots.splice(idx + 1, 0, duplicatedShot);
+      shots.forEach((s, i) => s.shot_number = i + 1);
+      return { ...prev, shots };
+    });
+    onSelectShot(newId);
   };
 
   const handleDeleteShot = (shotId: string, e: React.MouseEvent) => {
@@ -304,7 +329,18 @@ export default function SceneProjectHub({
   };
 
   return (
-    <div className="flex flex-col h-full space-y-5">
+    <div className="w-full flex flex-col h-full space-y-5">
+      {/* Unified Shot Dossier Card at Top of Scene Hub */}
+      <ShotDossierCard
+        shots={project.shots}
+        activeShotId={activeShotId}
+        onSelectShot={onSelectShot}
+        assets={assets}
+        sceneName={project.scene_name}
+        onNewShot={handleAddBlankShot}
+        onDuplicateShot={activeShot ? handleDuplicateActiveShot : undefined}
+      />
+
       {/* Scene Controls & Action Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-1">
         <div className="flex items-center gap-3">
@@ -373,25 +409,6 @@ export default function SceneProjectHub({
 
       {activeShot ? (
         <div className="flex-1 flex flex-col min-h-0 space-y-6">
-          <ShotMetadataPanel 
-            activeShot={activeShot}
-            sceneName={project.scene_name}
-            onSetHeroTake={(tid) => onUpdateProject(prev => {
-              const shots = [...prev.shots];
-              const idx = shots.findIndex(s => s.id === activeShot.id);
-              if (idx !== -1) {
-                const updatedTakes = (shots[idx].takes || []).map(t => ({
-                  ...t,
-                  is_hero: t.id === tid
-                }));
-                shots[idx] = { ...shots[idx], hero_take_id: tid, takes: updatedTakes };
-              }
-              return { ...prev, shots };
-            })}
-            onReviewTake={setReviewTakeId}
-            onCompareTakes={() => setIsComparisonOpen(true)}
-          />
-
           <ShotCharacterRoster
             activeShot={activeShot}
             sceneProject={project}

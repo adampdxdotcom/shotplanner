@@ -95,7 +95,7 @@ export default function App() {
       />
 
       {/* Main Workspace Layout */}
-      <main className="max-w-7xl mx-auto px-4 lg:px-8 py-6 space-y-6 flex-1 flex flex-col min-h-0">
+      <main className="w-full max-w-7xl mx-auto px-4 lg:px-8 py-6 space-y-6 flex-1 flex flex-col min-h-0">
         
         {/* Tab Content Rendering */}
         {activeSection === "scene" && (
@@ -180,6 +180,7 @@ export default function App() {
             onSelectShot={setActiveShotId}
             sceneProject={sceneProject}
             onUpdateShot={updateActiveShot}
+            onUpdateProject={setSceneProject}
             activeSceneName={sceneProject.scene_name || currentProjectName || "Untitled_Scene"}
           />
         )}
@@ -210,6 +211,7 @@ export default function App() {
             sceneProject={sceneProject}
             onUpdateShot={updateActiveShot}
             onUpdateSpecificShot={updateShot}
+            onUpdateProject={setSceneProject}
             config={config}
           />
         )}
@@ -221,6 +223,7 @@ export default function App() {
             activeShotId={activeShotId}
             sceneProject={sceneProject}
             selectedWorkflowFile={selectedWorkflowFile}
+            assets={assets}
             onSelectShot={setActiveShotId}
             onUpdateShot={updateActiveShot}
             onUpdateSceneProject={setSceneProject}

@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect, useRef } from "react";
-import { AppConfig, SceneProjectFile, ShotItem, TransferResult, generateSaveVideoPrefix, formatShotNumber } from "../types";
+import { AppConfig, SceneProjectFile, ShotItem, TransferResult, MediaAsset, generateSaveVideoPrefix, formatShotNumber } from "../types";
 import { ComfyMonitorState } from "../hooks/useComfyMonitor";
 import { Send, Activity } from "lucide-react";
 
-import { ExecutionHeader } from "./execution/ExecutionHeader";
+import { ShotDossierCard } from "./ShotDossierCard";
 import { ExecutionMonitor } from "./execution/ExecutionMonitor";
 import { SendShotPanel } from "./execution/SendShotPanel";
 import { SendScenePanel } from "./execution/SendScenePanel";
@@ -18,6 +18,7 @@ interface ExecutionSectionProps {
   activeShotId: string | null;
   sceneProject: SceneProjectFile;
   selectedWorkflowFile?: string;
+  assets?: MediaAsset[];
   onSelectShot: (id: string | null) => void;
   onUpdateShot: (updater: (prev: ShotItem) => ShotItem) => void;
   onUpdateSceneProject: (updater: (prev: SceneProjectFile) => SceneProjectFile) => void;
@@ -31,6 +32,7 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
   activeShotId,
   sceneProject,
   selectedWorkflowFile,
+  assets = [],
   onSelectShot,
   onUpdateShot,
   onUpdateSceneProject,
@@ -101,6 +103,49 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
   };
 
   const activeShotAssets = activeShot ? getShotAssets(activeShot) : [];
+
+  const handleAddBlankShot = () => {
+    const newId = "shot_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
+    onUpdateSceneProject(prev => {
+      const newShot: ShotItem = {
+        id: newId,
+        shot_number: prev.shots.length + 1,
+        shot_type: "Medium Shot",
+        camera_movement: "Locked Off",
+        lens_focal_length: "50mm Standard Prime",
+        aspect_ratio: "16:9 Widescreen",
+        basic_stub: "",
+        expanded_prompt: "",
+        assigned_slots: {},
+        status: "unstaged",
+        takes: [],
+        updated_at: new Date().toISOString()
+      };
+      return { ...prev, shots: [...prev.shots, newShot] };
+    });
+    onSelectShot(newId);
+  };
+
+  const handleDuplicateShot = () => {
+    if (!activeShot) return;
+    const newId = "shot_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
+    onUpdateSceneProject(prev => {
+      const duplicatedShot: ShotItem = {
+        ...activeShot,
+        id: newId,
+        shot_number: prev.shots.length + 1,
+        shot_name: activeShot.shot_name ? `${activeShot.shot_name} (Copy)` : undefined,
+        status: "unstaged",
+        takes: [],
+        hero_take_id: undefined,
+        assigned_slots: { ...(activeShot.assigned_slots || {}) },
+        characters: activeShot.characters ? [...activeShot.characters] : [],
+        updated_at: new Date().toISOString()
+      };
+      return { ...prev, shots: [...prev.shots, duplicatedShot] };
+    });
+    onSelectShot(newId);
+  };
 
   const simulateProgress = () => {
     setProgressPercent(0);
@@ -382,12 +427,16 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
   const isTransferring = transferState === "progress";
 
   return (
-    <div id="execution-section" className="space-y-5 flex flex-col min-h-0">
-      <ExecutionHeader
-        activeSceneName={activeSceneName}
+    <div id="execution-section" className="w-full space-y-5 flex flex-col min-h-0">
+      {/* Unified Shot Dossier Card */}
+      <ShotDossierCard
+        shots={sceneProject.shots}
         activeShotId={activeShotId}
-        sceneProject={sceneProject}
         onSelectShot={onSelectShot}
+        assets={assets}
+        sceneName={activeSceneName}
+        onNewShot={handleAddBlankShot}
+        onDuplicateShot={activeShot ? handleDuplicateShot : undefined}
       />
 
       {/* Quick RunPod Sync & Status Bar */}
