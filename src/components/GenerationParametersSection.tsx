@@ -1,6 +1,8 @@
-import React, { useState } from "react";
-import { Sliders, Gauge, Film, Layers, AlertCircle, CheckCircle2, Edit3, RotateCcw } from "lucide-react";
-import { DetectedNodes, GenerationParameters, ParameterNodeMappings } from "../types";
+import React, { useState, useMemo } from "react";
+import { Sliders, Gauge, Film, Layers, AlertCircle, CheckCircle2, Edit3, RotateCcw, Cpu } from "lucide-react";
+import { DetectedNodes, GenerationParameters, ParameterNodeMappings, ParsedWorkflow, WorkflowNodeInfo } from "../types";
+import { NodeScannerModal } from "./workflow/NodeScannerModal";
+import { extractAllWorkflowNodes } from "../utils/workflowNodes";
 
 interface GenerationParametersSectionProps {
   detectedNodes?: DetectedNodes;
@@ -8,6 +10,9 @@ interface GenerationParametersSectionProps {
   onChangeParam: (key: keyof GenerationParameters, value: number) => void;
   parameterNodeMappings: ParameterNodeMappings;
   onChangeParameterMapping: (key: keyof ParameterNodeMappings, nodeId: string) => void;
+  parsedWorkflow?: ParsedWorkflow | null;
+  workflowFilename?: string;
+  workflowNodes?: WorkflowNodeInfo[];
 }
 
 export const GenerationParametersSection: React.FC<GenerationParametersSectionProps> = ({
@@ -15,9 +20,19 @@ export const GenerationParametersSection: React.FC<GenerationParametersSectionPr
   generationParams,
   onChangeParam,
   parameterNodeMappings,
-  onChangeParameterMapping
+  onChangeParameterMapping,
+  parsedWorkflow,
+  workflowFilename,
+  workflowNodes: explicitNodes
 }) => {
   const [editingNode, setEditingNode] = useState<{ steps?: boolean; megapixels?: boolean; frames?: boolean }>({});
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+
+  // Compute all available workflow nodes for inspection
+  const allNodes = useMemo(() => {
+    if (explicitNodes && explicitNodes.length > 0) return explicitNodes;
+    return extractAllWorkflowNodes(parsedWorkflow || null);
+  }, [explicitNodes, parsedWorkflow]);
 
   const toggleEditNode = (key: keyof ParameterNodeMappings) => {
     setEditingNode(prev => ({ ...prev, [key]: !prev[key] }));
@@ -31,10 +46,10 @@ export const GenerationParametersSection: React.FC<GenerationParametersSectionPr
 
   return (
     <div className="bg-white dark:bg-zinc-950/60 p-4 rounded-xl border border-zinc-200 dark:border-zinc-700/80 space-y-4 shadow-xs">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-3">
+      {/* Header with Blue 'Node Scanner' Button in the upper right hand corner */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-200 dark:border-zinc-800 pb-3">
         <div className="flex items-center gap-2">
-          <div className="p-1 rounded-md bg-indigo-50 text-indigo-600 border-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/20 border">
+          <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600 border-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/20 border">
             <Sliders className="w-4 h-4" />
           </div>
           <div>
@@ -46,6 +61,23 @@ export const GenerationParametersSection: React.FC<GenerationParametersSectionPr
             </p>
           </div>
         </div>
+
+        {/* Blue Node Scanner Button */}
+        <button
+          id="node-scanner-trigger-btn"
+          type="button"
+          onClick={() => setIsScannerOpen(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-medium text-xs shadow-xs transition-colors cursor-pointer self-start sm:self-center shrink-0"
+          title="Open Workflow Node Scanner to inspect and map all nodes"
+        >
+          <Cpu className="w-3.5 h-3.5" />
+          <span>Node Scanner</span>
+          {allNodes.length > 0 && (
+            <span className="px-1.5 py-0.2 rounded-full bg-blue-700 text-[10px] font-mono text-blue-100">
+              {allNodes.length}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* Parameter Cards Grid */}
@@ -462,6 +494,17 @@ export const GenerationParametersSection: React.FC<GenerationParametersSectionPr
           );
         })()}
       </div>
+
+      {/* Node Scanner Modal */}
+      <NodeScannerModal
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        workflowFilename={workflowFilename}
+        nodes={allNodes}
+        parameterNodeMappings={parameterNodeMappings}
+        onSelectParameterMapping={onChangeParameterMapping}
+        detectedNodes={detectedNodes}
+      />
     </div>
   );
 };

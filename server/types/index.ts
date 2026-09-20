@@ -120,6 +120,7 @@ export interface WorkflowNodeInfo {
   class_type: string;
   title: string;
   mode?: number;
+  category?: string;
   current_value?: string;
   current_file?: string;
   inputs?: any;
@@ -131,6 +132,7 @@ export interface ParsedWorkflowData {
   videoLoaderNodes: WorkflowNodeInfo[];
   audioLoaderNodes: WorkflowNodeInfo[];
   otherNodes: WorkflowNodeInfo[];
+  allNodes?: WorkflowNodeInfo[];
   detectedNodes: {
     steps: string | null;
     megapixels: string | null;

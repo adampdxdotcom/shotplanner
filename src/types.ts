@@ -507,6 +507,8 @@ export interface WorkflowNodeInfo {
   id: string;
   class_type: string;
   title: string;
+  category?: string;
+  mode?: number;
   inputs: Record<string, any>;
   current_value?: string;
   current_file?: string;
@@ -541,6 +543,8 @@ export interface ParsedWorkflow {
     image_loader_nodes: WorkflowNodeInfo[];
     video_loader_nodes: WorkflowNodeInfo[];
     audio_loader_nodes: WorkflowNodeInfo[];
+    other_nodes?: WorkflowNodeInfo[];
+    all_nodes?: WorkflowNodeInfo[];
     total_nodes: number;
     detected_nodes?: DetectedNodes;
   };

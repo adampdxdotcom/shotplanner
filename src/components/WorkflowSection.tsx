@@ -266,6 +266,8 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
                 onChangeParam={onUpdateParam}
                 parameterNodeMappings={parameterNodeMappings}
                 onChangeParameterMapping={onUpdateParameterMapping}
+                parsedWorkflow={parsedWorkflow}
+                workflowFilename={selectedWorkflowFile}
               />
 
               <PromptNodeSelector 

@@ -154,6 +154,8 @@ router.post("/parse", (req: Request, res: Response) => {
         image_loader_nodes: parsed.imageLoaderNodes,
         video_loader_nodes: parsed.videoLoaderNodes,
         audio_loader_nodes: parsed.audioLoaderNodes,
+        other_nodes: parsed.otherNodes,
+        all_nodes: parsed.allNodes || [],
         detected_nodes: parsed.detectedNodes,
         total_nodes: parsed.totalNodes
       },
