@@ -9,6 +9,7 @@ import {
 import { getAssetMediaUrl } from "../../utils/assetUrl";
 import { extractAndUploadTakeLastFrame } from "../../utils/frameExtraction";
 import { MultimodalFrameComposer } from "./MultimodalFrameComposer";
+import { ScrubbableFramePlayer } from "./ScrubbableFramePlayer";
 import { 
   Clapperboard, 
   Lock, 
@@ -56,6 +57,8 @@ export const FirstFrameTab: React.FC<FirstFrameTabProps> = ({
   const [isAssetPickerOpen, setIsAssetPickerOpen] = useState(false);
   const [previewTakeUrl, setPreviewTakeUrl] = useState<string | null>(null);
   const [extractOffsetSeconds, setExtractOffsetSeconds] = useState<number>(0.04);
+  const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null);
+  const [videoTimestamp, setVideoTimestamp] = useState<number | undefined>(undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Derive shots list and sequence position
@@ -120,7 +123,7 @@ export const FirstFrameTab: React.FC<FirstFrameTabProps> = ({
     }
   };
 
-  // 2. Action: Extract last frame from previous shot's take
+  // 2. Action: Extract frame (last or user-scrubbed timestamp) from previous shot's take
   const handleExtractFromPreviousShot = async () => {
     if (!previousShot || !previousHeroTake || !previousTakeVideoUrl || !activeShot) {
       if (addToast) addToast("No valid previous video take found for extraction.", "error");
@@ -140,7 +143,9 @@ export const FirstFrameTab: React.FC<FirstFrameTabProps> = ({
         sourceShotNumber: previousShot.shot_number || currentShotIndex,
         sourceTakeNumber: previousHeroTake.take_number,
         targetShotNumber: activeShot.shot_number || currentShotIndex + 1,
-        customLabel: `Chained First Frame from Shot ${previousShot.shot_number} (Take ${previousHeroTake.take_number})`
+        timestampSeconds: videoTimestamp,
+        videoElement: videoElement,
+        customLabel: `Chained Frame from Shot ${previousShot.shot_number} Take ${previousHeroTake.take_number}${videoTimestamp !== undefined ? ` (at ${videoTimestamp.toFixed(2)}s)` : ""}`
       });
 
       if (!result.success || !result.assetFilename) {
@@ -160,12 +165,12 @@ export const FirstFrameTab: React.FC<FirstFrameTabProps> = ({
         source_take_number: previousHeroTake.take_number,
         locked: true, // Default to locked to protect continuity
         updated_at: new Date().toISOString(),
-        notes: `Chained from Shot ${previousShot.shot_number} Take ${previousHeroTake.take_number}`
+        notes: `Chained from Shot ${previousShot.shot_number} Take ${previousHeroTake.take_number}${videoTimestamp !== undefined ? ` @ ${videoTimestamp.toFixed(2)}s` : ""}`
       };
 
       handleSetFirstFrame(newFirstFrame);
       if (addToast) {
-        addToast(`Extracted last frame from Shot ${previousShot.shot_number} and locked as Shot ${activeShot.shot_number} Frame 0!`, "success");
+        addToast(`Captured frame from Shot ${previousShot.shot_number} and locked as Shot ${activeShot.shot_number} Frame 0!`, "success");
       }
     } catch (err: any) {
       console.error("Frame extraction error:", err);
@@ -327,275 +332,158 @@ export const FirstFrameTab: React.FC<FirstFrameTabProps> = ({
         )}
       </div>
 
-      {/* MAIN TWO-COLUMN WORKBENCH */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      {/* MAIN WORKBENCH (FULL WIDTH STACK) */}
+      <div className="flex flex-col gap-5">
         
-        {/* LEFT COLUMN: ACTIVE FIRST FRAME PREVIEW CARD (5 cols) */}
-        <div className="lg:col-span-5 flex flex-col gap-4">
-          <div className="bg-zinc-950/80 border border-zinc-800 rounded-xl overflow-hidden shadow-sm flex flex-col">
-            {/* CARD HEADER */}
-            <div className="p-3.5 px-4 border-b border-zinc-800/80 bg-zinc-900/50 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Clapperboard className="w-4 h-4 text-purple-400" />
-                <h3 className="text-xs font-bold text-white uppercase tracking-wider">
-                  Shot {activeShot.shot_number} Frame 0 (Starting Keyframe)
-                </h3>
-              </div>
-              {assignedFirstFrame && (
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={handleToggleLock}
-                    title={assignedFirstFrame.locked ? "Click to unlock first frame" : "Click to lock and prevent accidental overwrite"}
-                    className={`flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border transition-colors cursor-pointer ${
-                      assignedFirstFrame.locked
-                        ? "bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30"
-                        : "bg-zinc-800 text-zinc-400 border-zinc-700 hover:text-zinc-200"
-                    }`}
-                  >
-                    {assignedFirstFrame.locked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
-                    <span>{assignedFirstFrame.locked ? "Locked" : "Unlocked"}</span>
-                  </button>
-                </div>
-              )}
+        {/* OPTION 1: SHOT CONTINUITY BRIDGE */}
+        <div className="bg-zinc-950/80 border border-purple-900/40 rounded-xl overflow-hidden shadow-sm flex flex-col">
+          <div className="p-3.5 px-4 border-b border-zinc-800/80 bg-purple-950/20 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <LinkIcon className="w-4 h-4 text-purple-400" />
+              <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                Option 1: Continuity Chaining from Previous Shot
+              </h3>
+            </div>
+            <span className="text-[10px] font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full">
+              Phase 1 Active
+            </span>
+          </div>
+
+          <div className="p-4 flex flex-col md:flex-row gap-5 items-start">
+            {/* VIDEO PREVIEW & FRAME SCRUBBER (1/3 WIDTH ON DESKTOP) */}
+            <div className="w-full md:w-1/3 shrink-0">
+              <ScrubbableFramePlayer
+                videoUrl={previousShot ? previousTakeVideoUrl : null}
+                emptyLabel={!previousShot ? "No preceding shot" : "No take rendered yet"}
+                takeNumber={previousHeroTake?.take_number}
+                isHero={previousHeroTake?.is_hero}
+                onVideoElementReady={setVideoElement}
+                onCurrentTimeChange={(time) => setVideoTimestamp(time)}
+              />
             </div>
 
-            {/* PREVIEW IMAGE DISPLAY */}
-            <div className="p-4 flex flex-col items-center justify-center bg-black/40 min-h-[260px] relative">
-              {assignedMediaUrl ? (
-                <div className="relative w-full group rounded-lg overflow-hidden border border-zinc-800 bg-black aspect-video flex items-center justify-center">
-                  <img
-                    src={assignedMediaUrl}
-                    alt={`First frame for Shot ${activeShot.shot_number}`}
-                    className="w-full h-full object-contain"
-                    referrerPolicy="no-referrer"
-                  />
-                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-3">
-                    <a
-                      href={assignedMediaUrl}
-                      download={assignedFirstFrame?.asset_filename || `Shot_${activeShot.shot_number}_First_Frame.png`}
-                      className="p-2 bg-zinc-800/90 hover:bg-zinc-700 text-white rounded-lg border border-zinc-600 transition-colors text-xs flex items-center gap-1 font-semibold"
-                      title="Download image"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>Download</span>
-                    </a>
-                    <button
-                      type="button"
-                      onClick={handleClearFirstFrame}
-                      className="p-2 bg-rose-900/80 hover:bg-rose-800 text-white rounded-lg border border-rose-700 transition-colors text-xs flex items-center gap-1 font-semibold cursor-pointer"
-                      title="Remove assigned first frame"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>Clear</span>
-                    </button>
+            {/* TAKE INFO & ACTION (2/3 WIDTH ON DESKTOP) */}
+            <div className="flex-1 flex flex-col justify-between self-stretch gap-3 w-full">
+              <div>
+                {!previousShot ? (
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-white">Opening Shot</span>
+                      <span className="text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full font-medium">
+                        Shot 1 of {shots.length || 1}
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-400 mt-1.5 leading-relaxed">
+                      This is the first shot in the scene. Use Option 2 below or manual upload to stage the opening keyframe.
+                    </p>
                   </div>
-                </div>
-              ) : (
-                <div className="text-center p-6 flex flex-col items-center justify-center text-zinc-500">
-                  <div className="w-12 h-12 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-600 mb-3">
-                    <Clapperboard className="w-6 h-6 opacity-60" />
+                ) : previousHeroTake ? (
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-white">
+                        Shot {previousShot.shot_number}: {previousShot.shot_name || `Shot ${previousShot.shot_number}`}
+                      </span>
+                      <span className="text-[10px] bg-zinc-800 text-zinc-300 border border-zinc-700 px-1.5 py-0.5 rounded font-mono font-semibold">
+                        Take {previousHeroTake.take_number}
+                      </span>
+                      {previousHeroTake.is_hero && (
+                        <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded font-semibold">
+                          Hero Take
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-zinc-400 mt-1.5 line-clamp-2 leading-relaxed">
+                      {previousHeroTake.expanded_prompt || previousHeroTake.basic_stub || "Rendered take available for frame capture"}
+                    </p>
                   </div>
-                  <p className="text-xs font-semibold text-zinc-300">No First Frame Set</p>
-                  <p className="text-[11px] text-zinc-500 mt-1 max-w-xs text-center">
-                    Chain from the previous shot's good take or upload a starting image to lock character and scene continuity.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* METADATA FOOTER */}
-            {assignedFirstFrame && (
-              <div className="p-3 px-4 bg-zinc-900/40 border-t border-zinc-800 text-[11px] text-zinc-400 flex flex-col gap-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-500">Source:</span>
-                  <span className="font-semibold text-purple-300 capitalize flex items-center gap-1">
-                    {assignedFirstFrame.source === "last_frame_chain" && <LinkIcon className="w-3 h-3 text-purple-400" />}
-                    {assignedFirstFrame.source.replace(/_/g, " ")}
-                  </span>
-                </div>
-                {assignedFirstFrame.source_shot_number && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-zinc-500">Extracted from:</span>
-                    <span className="text-zinc-200 font-mono">
-                      Shot {assignedFirstFrame.source_shot_number} (Take {assignedFirstFrame.source_take_number || 1})
-                    </span>
+                ) : (
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-white">
+                        Shot {previousShot.shot_number}: {previousShot.shot_name || `Shot ${previousShot.shot_number}`}
+                      </span>
+                      <span className="text-[10px] bg-zinc-800 text-amber-400/80 border border-amber-500/30 px-1.5 py-0.5 rounded font-medium">
+                        Awaiting Render
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-400 mt-1.5 leading-relaxed">
+                      Render a take for Shot {previousShot.shot_number} in the Takes/Renders tab to enable one-click final frame capture.
+                    </p>
                   </div>
                 )}
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-500">Filename:</span>
-                  <span className="text-zinc-300 font-mono text-[10px] truncate max-w-[200px]" title={assignedFirstFrame.asset_filename}>
-                    {assignedFirstFrame.asset_filename}
-                  </span>
-                </div>
               </div>
-            )}
+
+              {/* CAPTURE FRAME ACTION BUTTON */}
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleExtractFromPreviousShot}
+                  disabled={!previousShot || !previousHeroTake || isExtracting || assignedFirstFrame?.locked}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 shadow-xs transition-colors cursor-pointer ${
+                    !previousShot || !previousHeroTake || assignedFirstFrame?.locked
+                      ? "bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-700/50"
+                      : "bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white"
+                  }`}
+                >
+                  <LinkIcon className="w-3.5 h-3.5" />
+                  <span>{isExtracting ? "Capturing Frame..." : "Capture Frame"}</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* RIGHT COLUMN: SOURCES & CONTINUITY CHAINING (7 cols) */}
-        <div className="lg:col-span-7 flex flex-col gap-5">
-          
-          {/* OPTION 1: SHOT CONTINUITY BRIDGE */}
-          <div className="bg-zinc-950/80 border border-purple-900/40 rounded-xl overflow-hidden shadow-sm flex flex-col">
-            <div className="p-3.5 px-4 border-b border-zinc-800/80 bg-purple-950/20 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <LinkIcon className="w-4 h-4 text-purple-400" />
-                <h3 className="text-xs font-bold text-white uppercase tracking-wider">
-                  Option 1: Continuity Chaining from Previous Shot
-                </h3>
-              </div>
-              <span className="text-[10px] font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full">
-                Phase 1 Active
-              </span>
-            </div>
+        {/* OPTION 2: MULTIMODAL FIRST FRAME GENERATOR */}
+        <MultimodalFrameComposer
+          sceneProject={sceneProject}
+          activeShot={activeShot}
+          activeScene={activeScene}
+          allAssets={allAssets}
+          assignedFirstFrame={assignedFirstFrame}
+          onAcceptFirstFrame={handleSetFirstFrame}
+          onAssetUploaded={onAssetUploaded}
+          addToast={addToast}
+        />
 
-            <div className="p-4 flex flex-col gap-4">
-              {currentShotIndex === 0 ? (
-                <div className="p-4 bg-zinc-900/60 border border-zinc-800 rounded-lg flex items-start gap-3 text-zinc-400">
-                  <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-                  <div className="text-xs">
-                    <p className="font-semibold text-zinc-200">Opening Establishing Shot (Shot 1)</p>
-                    <p className="text-zinc-400 mt-1 leading-relaxed">
-                      This is the first shot in the scene. Because there is no preceding shot to chain from, upload a custom keyframe or use the scene staging canvas to establish the scene's opening look.
-                    </p>
-                  </div>
-                </div>
-              ) : previousShot ? (
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-zinc-400">Preceding Shot:</span>
-                    <span className="font-bold text-white">
-                      Shot {previousShot.shot_number}: {previousShot.shot_name || `Shot ${previousShot.shot_number}`}
-                    </span>
-                  </div>
-
-                  {previousHeroTake ? (
-                    <div className="bg-zinc-900/90 border border-zinc-800 rounded-xl p-3.5 flex flex-col sm:flex-row gap-4 items-center">
-                      {/* MINI VIDEO PLAYER / THUMBNAIL */}
-                      <div className="w-full sm:w-44 aspect-video bg-black rounded-lg overflow-hidden border border-zinc-700/60 shrink-0 relative flex items-center justify-center">
-                        {previousTakeVideoUrl ? (
-                          <video
-                            src={previousTakeVideoUrl}
-                            className="w-full h-full object-contain"
-                            controls={false}
-                            muted
-                            playsInline
-                            onMouseEnter={(e) => {
-                              const el = e.currentTarget;
-                              el.currentTime = Math.max(0, (el.duration || 0) - extractOffsetSeconds);
-                            }}
-                          />
-                        ) : (
-                          <Film className="w-6 h-6 text-zinc-600" />
-                        )}
-                        <span className="absolute bottom-1 right-1 bg-black/80 text-[10px] font-mono font-semibold text-amber-400 px-1.5 py-0.5 rounded border border-amber-500/30">
-                          Take {previousHeroTake.take_number} {previousHeroTake.is_hero ? "★" : ""}
-                        </span>
-                      </div>
-
-                      {/* TAKE INFO & ACTION */}
-                      <div className="flex-1 flex flex-col gap-2 w-full">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-white">Take {previousHeroTake.take_number}</span>
-                            {previousHeroTake.is_hero && (
-                              <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 rounded font-semibold">
-                                Hero Take
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-[11px] text-zinc-400 mt-0.5 line-clamp-1">
-                            {previousHeroTake.expanded_prompt || previousHeroTake.basic_stub || "Rendered take available"}
-                          </p>
-                        </div>
-
-                        {/* EXTRACTION BUTTON */}
-                        <div className="flex flex-wrap items-center gap-2 pt-1">
-                          <button
-                            type="button"
-                            onClick={handleExtractFromPreviousShot}
-                            disabled={isExtracting || assignedFirstFrame?.locked}
-                            className={`px-3.5 py-2 rounded-lg text-xs font-bold flex items-center gap-2 shadow-xs transition-all cursor-pointer ${
-                              assignedFirstFrame?.locked
-                                ? "bg-zinc-800 text-zinc-500 cursor-not-allowed"
-                                : "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white"
-                            }`}
-                          >
-                            <LinkIcon className="w-3.5 h-3.5" />
-                            <span>{isExtracting ? "Extracting Final Frame..." : "Extract & Lock as Frame 0"}</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="p-4 bg-zinc-900/60 border border-zinc-800 rounded-lg flex items-start gap-3 text-zinc-400">
-                      <AlertCircle className="w-5 h-5 text-zinc-500 shrink-0 mt-0.5" />
-                      <div className="text-xs">
-                        <p className="font-semibold text-zinc-300">No Rendered Takes for Shot {previousShot.shot_number} Yet</p>
-                        <p className="text-zinc-500 mt-1">
-                          Once you render a take for Shot {previousShot.shot_number} and review it in the Takes/Renders tab, its final frame will be automatically ready for one-click continuity extraction here.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : null}
+        {/* MANUAL UPLOAD & ASSET SELECTOR */}
+        <div className="bg-zinc-950/80 border border-zinc-800 rounded-xl overflow-hidden shadow-sm flex flex-col">
+          <div className="p-3.5 px-4 border-b border-zinc-800/80 bg-zinc-900/50 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Upload className="w-4 h-4 text-indigo-400" />
+              <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                Manual Keyframe / Asset Library
+              </h3>
             </div>
           </div>
 
-          {/* OPTION 2: MULTIMODAL FIRST FRAME GENERATOR */}
-          <MultimodalFrameComposer
-            sceneProject={sceneProject}
-            activeShot={activeShot}
-            activeScene={activeScene}
-            allAssets={allAssets}
-            assignedFirstFrame={assignedFirstFrame}
-            onAcceptFirstFrame={handleSetFirstFrame}
-            onAssetUploaded={onAssetUploaded}
-            addToast={addToast}
-          />
+          <div className="p-4 flex flex-wrap items-center gap-3">
+            {/* HIDDEN FILE INPUT */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleManualUpload}
+            />
 
-          {/* MANUAL UPLOAD & ASSET SELECTOR */}
-          <div className="bg-zinc-950/80 border border-zinc-800 rounded-xl overflow-hidden shadow-sm flex flex-col">
-            <div className="p-3.5 px-4 border-b border-zinc-800/80 bg-zinc-900/50 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Upload className="w-4 h-4 text-indigo-400" />
-                <h3 className="text-xs font-bold text-white uppercase tracking-wider">
-                  Manual Keyframe / Asset Library
-                </h3>
-              </div>
-            </div>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+              className="flex items-center gap-2 px-3.5 py-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-700 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+            >
+              <Upload className="w-3.5 h-3.5 text-indigo-400" />
+              <span>{isUploading ? "Uploading..." : "Upload Custom Frame Image"}</span>
+            </button>
 
-            <div className="p-4 flex flex-wrap items-center gap-3">
-              {/* HIDDEN FILE INPUT */}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleManualUpload}
-              />
-
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
-                className="flex items-center gap-2 px-3.5 py-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-700 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
-              >
-                <Upload className="w-3.5 h-3.5 text-indigo-400" />
-                <span>{isUploading ? "Uploading..." : "Upload Custom Frame Image"}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setIsAssetPickerOpen(true)}
-                className="flex items-center gap-2 px-3.5 py-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-700 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
-              >
-                <FolderOpen className="w-3.5 h-3.5 text-amber-400" />
-                <span>Pick from Scene Assets</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setIsAssetPickerOpen(true)}
+              className="flex items-center gap-2 px-3.5 py-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-700 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+            >
+              <FolderOpen className="w-3.5 h-3.5 text-amber-400" />
+              <span>Pick from Scene Assets</span>
+            </button>
           </div>
         </div>
       </div>

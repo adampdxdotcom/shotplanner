@@ -110,7 +110,7 @@ export async function extractFrameFromVideoUrl(
 }
 
 /**
- * Extracts the last frame of a video take and uploads it to the backend as a project asset.
+ * Extracts the last frame (or specified timestamp) of a video take and uploads it to the backend as a project asset.
  */
 export async function extractAndUploadTakeLastFrame({
   videoUrl,
@@ -118,7 +118,9 @@ export async function extractAndUploadTakeLastFrame({
   sourceShotNumber,
   sourceTakeNumber,
   targetShotNumber,
-  customLabel
+  customLabel,
+  timestampSeconds,
+  videoElement
 }: {
   videoUrl: string;
   sceneName: string;
@@ -126,10 +128,37 @@ export async function extractAndUploadTakeLastFrame({
   sourceTakeNumber: number;
   targetShotNumber?: number;
   customLabel?: string;
+  timestampSeconds?: number;
+  videoElement?: HTMLVideoElement | null;
 }): Promise<FrameExtractionResult> {
   try {
-    // 1. Extract the frame via canvas
-    const { blob, dataUrl, width, height } = await extractFrameFromVideoUrl(videoUrl);
+    let blob: Blob;
+    let dataUrl: string;
+    let width: number;
+    let height: number;
+
+    // Fast-path: If active live video element is provided and rendered, capture directly
+    if (videoElement && videoElement.readyState >= 2 && videoElement.videoWidth > 0) {
+      width = videoElement.videoWidth || 1280;
+      height = videoElement.videoHeight || 720;
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Failed to get 2D canvas context");
+      ctx.drawImage(videoElement, 0, 0, width, height);
+      dataUrl = canvas.toDataURL("image/png");
+      const extractedBlob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+      if (!extractedBlob) throw new Error("Failed to generate image blob from video player");
+      blob = extractedBlob;
+    } else {
+      // Background offscreen extraction at specified timestamp
+      const extracted = await extractFrameFromVideoUrl(videoUrl, { timestampSeconds });
+      blob = extracted.blob;
+      dataUrl = extracted.dataUrl;
+      width = extracted.width;
+      height = extracted.height;
+    }
 
     // 2. Format sanitized asset filename
     const cleanScene = (sceneName || "scene").trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_");
@@ -145,7 +174,7 @@ export async function extractAndUploadTakeLastFrame({
     formData.append("file", blob, baseName);
     formData.append("type", "Scene Reference");
     formData.append("scene_name", cleanScene);
-    formData.append("description", customLabel || `Last frame of Shot ${sourceShotNumber} Take ${sourceTakeNumber} (chained for Shot ${targetShotNumber || sourceShotNumber + 1})`);
+    formData.append("description", customLabel || `Captured frame of Shot ${sourceShotNumber} Take ${sourceTakeNumber} (timestamp: ${timestampSeconds !== undefined ? timestampSeconds.toFixed(2) + 's' : 'end'})`);
     formData.append("tags", JSON.stringify(["First Frame", "Frame 0", "Continuity", `Shot_${paddedSourceShot}`, `Take_${sourceTakeNumber}`]));
     formData.append("subject_name", cleanScene);
 
