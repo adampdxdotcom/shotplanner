@@ -199,17 +199,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             Shots
           </button>
           <button
-            onClick={() => onNavigate("workflow")}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
-              activeSection === "workflow" 
-                ? "bg-zinc-800 text-zinc-100 shadow-xs" 
-                : "text-zinc-400 hover:text-zinc-200"
-            }`}
-          >
-            <Workflow className="w-3.5 h-3.5" />
-            Workflow
-          </button>
-          <button
             onClick={() => onNavigate("llm")}
             className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
               activeSection === "llm" 
@@ -219,6 +208,17 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
             Prompt
+          </button>
+          <button
+            onClick={() => onNavigate("workflow")}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
+              activeSection === "workflow" 
+                ? "bg-zinc-800 text-zinc-100 shadow-xs" 
+                : "text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            <Workflow className="w-3.5 h-3.5" />
+            Workflow
           </button>
           <button
             onClick={() => onNavigate("execute")}

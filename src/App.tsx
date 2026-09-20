@@ -158,33 +158,6 @@ export default function App() {
           />
         )}
 
-        {activeSection === "workflow" && (
-          <WorkflowSection
-            workflows={workflows}
-            selectedWorkflowFile={selectedWorkflowFile}
-            onSelectWorkflow={setSelectedWorkflowFile}
-            onRefreshWorkflows={fetchWorkflows}
-            parsedWorkflow={parsedWorkflow}
-            selectedPromptNodeId={selectedPromptNodeId}
-            onSelectPromptNodeId={setSelectedPromptNodeId}
-            nodeMappings={nodeMappings}
-            onUpdateMapping={handleUpdateMapping}
-            uploadedAssets={assets}
-            bypassMissing={bypassMissing}
-            onToggleBypass={setBypassMissing}
-            generationParams={generationParams}
-            onUpdateParam={handleUpdateParam}
-            parameterNodeMappings={parameterNodeMappings}
-            onUpdateParameterMapping={handleUpdateParameterMapping}
-            activeShotId={activeShotId}
-            onSelectShot={setActiveShotId}
-            sceneProject={sceneProject}
-            onUpdateShot={updateActiveShot}
-            onUpdateProject={setSceneProject}
-            activeSceneName={sceneProject.scene_name || currentProjectName || "Untitled_Scene"}
-          />
-        )}
-
         {activeSection === "llm" && (
           <LLMSection
             basicStub={basicStub}
@@ -213,6 +186,33 @@ export default function App() {
             onUpdateSpecificShot={updateShot}
             onUpdateProject={setSceneProject}
             config={config}
+          />
+        )}
+
+        {activeSection === "workflow" && (
+          <WorkflowSection
+            workflows={workflows}
+            selectedWorkflowFile={selectedWorkflowFile}
+            onSelectWorkflow={setSelectedWorkflowFile}
+            onRefreshWorkflows={fetchWorkflows}
+            parsedWorkflow={parsedWorkflow}
+            selectedPromptNodeId={selectedPromptNodeId}
+            onSelectPromptNodeId={setSelectedPromptNodeId}
+            nodeMappings={nodeMappings}
+            onUpdateMapping={handleUpdateMapping}
+            uploadedAssets={assets}
+            bypassMissing={bypassMissing}
+            onToggleBypass={setBypassMissing}
+            generationParams={generationParams}
+            onUpdateParam={handleUpdateParam}
+            parameterNodeMappings={parameterNodeMappings}
+            onUpdateParameterMapping={handleUpdateParameterMapping}
+            activeShotId={activeShotId}
+            onSelectShot={setActiveShotId}
+            sceneProject={sceneProject}
+            onUpdateShot={updateActiveShot}
+            onUpdateProject={setSceneProject}
+            activeSceneName={sceneProject.scene_name || currentProjectName || "Untitled_Scene"}
           />
         )}
 

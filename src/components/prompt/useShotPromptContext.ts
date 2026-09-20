@@ -65,7 +65,12 @@ export function useShotPromptContext({
         const asset = assets.find((a) => a.filename === filename);
         if (asset) {
           const match = slotKey.match(/slot_(\d+)/);
-          const slotIdx = match ? parseInt(match[1], 10) : asset.slot_index;
+          const numericKey = !isNaN(Number(slotKey)) ? parseInt(slotKey, 10) : null;
+          const slotIdx = numericKey !== null 
+            ? numericKey 
+            : match 
+            ? parseInt(match[1], 10) 
+            : asset.slot_index;
           mapped.push({ ...asset, slot_index: slotIdx });
         }
       });
