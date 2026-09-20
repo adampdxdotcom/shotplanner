@@ -69,31 +69,20 @@ export const ShotDossierCard: React.FC<ShotDossierCardProps> = ({
   const { previewUrl, isVideo } = useMemo(() => {
     if (!activeShot) return { previewUrl: null, isVideo: false };
 
-    // 1. Primary: 9th asset slot (Slot 9, index 8, 9, or 'location')
+    // Primary: 9th asset slot (Slot 9, index 8, 9, or 'location')
     const locFilename = activeShot.assigned_slots?.[8] ?? 
                         activeShot.assigned_slots?.[9] ?? 
                         (activeShot.assigned_slots as any)?.["8"] ??
                         (activeShot.assigned_slots as any)?.["9"] ??
                         (activeShot.assigned_slots as any)?.["location"];
+
     if (locFilename) {
       const isVideoAsset = Boolean(locFilename && /\.(mp4|mov|webm|mkv|avi)$/i.test(locFilename));
       return { previewUrl: getAssetMediaUrl(locFilename, true), isVideo: isVideoAsset };
     }
 
-    // 2. Global location/scene reference asset in project if not explicitly assigned on shot
-    const globalLoc = assets.find(a => {
-      const t = (a.type || "").toLowerCase();
-      const n = (a.subject_name || "").toLowerCase();
-      return a.slot_index === 8 || a.slot_index === 9 || t === "scene reference" || t.includes("location") || t.includes("environment") ||
-             n.includes("location") || n.includes("environment");
-    });
-    if (globalLoc?.filename) {
-      const isVideoAsset = Boolean(globalLoc.filename && /\.(mp4|mov|webm|mkv|avi)$/i.test(globalLoc.filename));
-      return { previewUrl: getAssetMediaUrl(globalLoc.filename, true), isVideo: isVideoAsset };
-    }
-
     return { previewUrl: null, isVideo: false };
-  }, [activeShot, assets]);
+  }, [activeShot]);
 
   // Copy prompt stub handler
   const handleCopyStub = async () => {
@@ -241,7 +230,7 @@ export const ShotDossierCard: React.FC<ShotDossierCardProps> = ({
           ) : (
             <div className="flex flex-col items-center justify-center text-center p-2 text-zinc-500 dark:text-zinc-400">
               <Camera className="w-6 h-6 mb-1 opacity-50 text-indigo-500 dark:text-indigo-400" />
-              <span className="text-[11px] font-medium">No Keyframe Media</span>
+              <span className="text-[11px] font-medium">No Location Asset</span>
             </div>
           )}
 

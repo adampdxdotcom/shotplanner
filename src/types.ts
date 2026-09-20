@@ -407,6 +407,7 @@ export type AssetType =
   | "Headshot"
   | "Body Reference"
   | "Scene Reference"
+  | "Start Frame"
   | "Object Reference"
   | "Style Reference"
   | "Voiceover Audio"
