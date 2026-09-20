@@ -117,7 +117,15 @@ describe("workflowInjection", () => {
             id: 10,
             type: "LoadImage",
             title: "Load Image",
-            widgets_values: ["old_image.png"]
+            widgets_values: ["old_image.png"],
+            mode: 4
+          },
+          {
+            id: 11,
+            type: "LoadImage",
+            title: "Unassigned Ref Image",
+            widgets_values: ["empty.png"],
+            mode: 0
           },
           {
             id: 20,
@@ -161,13 +169,16 @@ describe("workflowInjection", () => {
         defaultParams,
         emptyParamNodes,
         "Scene_01",
-        [{ id: "10" }]
+        [{ id: "10" }, { id: "11" }]
       );
 
-      const imgNode = result.nodes.find((n: any) => n.id === 10);
+      const assignedImgNode = result.nodes.find((n: any) => n.id === 10);
+      const unassignedImgNode = result.nodes.find((n: any) => n.id === 11);
       const promptNode = result.nodes.find((n: any) => n.id === 20);
 
-      expect(imgNode.widgets_values[0]).toBe("city_background.png");
+      expect(assignedImgNode.widgets_values[0]).toBe("city_background.png");
+      expect(assignedImgNode.mode).toBe(0); // Active
+      expect(unassignedImgNode.mode).toBe(4); // Bypassed
       expect(promptNode.widgets_values[0]).toBe("Wide sunset horizon over neon city");
     });
   });

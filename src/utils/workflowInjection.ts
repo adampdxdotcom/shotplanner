@@ -261,19 +261,22 @@ export function generateLiveInjectedWorkflow(
           if (node.widgets_values_named && typeof node.widgets_values_named === "object") {
             node.widgets_values_named.image = assigned;
           }
-          if (node.mode === 2 || node.mode === 4) {
-            node.mode = 0;
-          }
-        } else if (isImgLoader && bypassMissing) {
-          if (Array.isArray(node.widgets_values) && node.widgets_values.length > 0) {
-            if (!node.widgets_values[0] || node.widgets_values[0] === "example.png") {
-              node.widgets_values[0] = placeholder;
+          // Explicitly set active mode when asset is assigned
+          node.mode = 0;
+        } else if (isImgLoader) {
+          // Explicitly bypass in ComfyUI visual graph when no asset is assigned
+          node.mode = 4;
+          if (bypassMissing) {
+            if (Array.isArray(node.widgets_values) && node.widgets_values.length > 0) {
+              if (!node.widgets_values[0] || node.widgets_values[0] === "example.png") {
+                node.widgets_values[0] = placeholder;
+              }
+            } else {
+              node.widgets_values = [placeholder, "image"];
             }
-          } else {
-            node.widgets_values = [placeholder, "image"];
-          }
-          if (node.widgets_values_named && typeof node.widgets_values_named === "object") {
-            node.widgets_values_named.image = placeholder;
+            if (node.widgets_values_named && typeof node.widgets_values_named === "object") {
+              node.widgets_values_named.image = placeholder;
+            }
           }
         }
       }
@@ -290,10 +293,14 @@ export function generateLiveInjectedWorkflow(
           if (node.widgets_values_named && typeof node.widgets_values_named === "object") {
             node.widgets_values_named.video = assigned;
           }
-          if (node.mode === 2 || node.mode === 4) node.mode = 0;
-        } else if (bypassMissing) {
-          if (Array.isArray(node.widgets_values) && node.widgets_values.length > 0 && (!node.widgets_values[0] || String(node.widgets_values[0]).includes("default"))) {
-            node.widgets_values[0] = placeholder;
+          node.mode = 0;
+        } else {
+          // Explicitly bypass when unassigned
+          node.mode = 4;
+          if (bypassMissing) {
+            if (Array.isArray(node.widgets_values) && node.widgets_values.length > 0 && (!node.widgets_values[0] || String(node.widgets_values[0]).includes("default"))) {
+              node.widgets_values[0] = placeholder;
+            }
           }
         }
       }
@@ -310,10 +317,14 @@ export function generateLiveInjectedWorkflow(
           if (node.widgets_values_named && typeof node.widgets_values_named === "object") {
             node.widgets_values_named.audio = assigned;
           }
-          if (node.mode === 2 || node.mode === 4) node.mode = 0;
-        } else if (bypassMissing) {
-          if (Array.isArray(node.widgets_values) && node.widgets_values.length > 0 && (!node.widgets_values[0] || String(node.widgets_values[0]).includes("default"))) {
-            node.widgets_values[0] = placeholder;
+          node.mode = 0;
+        } else {
+          // Explicitly bypass when unassigned
+          node.mode = 4;
+          if (bypassMissing) {
+            if (Array.isArray(node.widgets_values) && node.widgets_values.length > 0 && (!node.widgets_values[0] || String(node.widgets_values[0]).includes("default"))) {
+              node.widgets_values[0] = placeholder;
+            }
           }
         }
       }
