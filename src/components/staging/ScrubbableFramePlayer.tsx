@@ -162,17 +162,6 @@ export const ScrubbableFramePlayer: React.FC<ScrubbableFramePlayerProps> = ({
           onClick={handleTogglePlay}
         />
 
-        {/* TAKE NUMBER BADGE */}
-        {takeNumber !== undefined && (
-          <span className={`frame-take-badge absolute top-2 left-2 backdrop-blur-md text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border pointer-events-none transition-colors shadow-xs ${
-            isLight
-              ? "bg-white/95 text-amber-800 border-amber-300 shadow-zinc-300/40"
-              : "bg-black/85 text-amber-400 border-amber-500/30"
-          }`}>
-            Take {takeNumber} {isHero ? "★" : ""}
-          </span>
-        )}
-
         {/* TIMECODE & FRAME NUMBER OVERLAY */}
         {isLoaded && duration > 0 && (
           <span className={`frame-timecode-badge absolute bottom-2 right-2 backdrop-blur-md text-[10px] font-mono font-bold px-2 py-0.5 rounded border pointer-events-none transition-colors shadow-xs ${

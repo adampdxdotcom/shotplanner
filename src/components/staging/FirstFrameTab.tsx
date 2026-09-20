@@ -344,88 +344,33 @@ export const FirstFrameTab: React.FC<FirstFrameTabProps> = ({
                 Frame Grab
               </h3>
             </div>
-            <span className="text-[10px] font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full">
-              Phase 1 Active
-            </span>
           </div>
 
-          <div className="p-4 flex flex-col md:flex-row gap-5 items-start">
-            {/* VIDEO PREVIEW & FRAME SCRUBBER (1/3 WIDTH ON DESKTOP) */}
-            <div className="w-full md:w-1/3 shrink-0">
+          <div className="p-4 flex flex-col md:flex-row gap-6 items-center">
+            {/* VIDEO PREVIEW & FRAME SCRUBBER (50% WIDTH ON DESKTOP) */}
+            <div className="w-full md:w-1/2 shrink-0">
               <ScrubbableFramePlayer
                 videoUrl={previousShot ? previousTakeVideoUrl : null}
                 emptyLabel={!previousShot ? "No preceding shot" : "No take rendered yet"}
-                takeNumber={previousHeroTake?.take_number}
-                isHero={previousHeroTake?.is_hero}
                 onVideoElementReady={setVideoElement}
                 onCurrentTimeChange={(time) => setVideoTimestamp(time)}
               />
             </div>
 
-            {/* TAKE INFO & ACTION (2/3 WIDTH ON DESKTOP) */}
-            <div className="flex-1 flex flex-col justify-between self-stretch gap-3 w-full">
-              <div>
-                {!previousShot ? (
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-white">Opening Shot</span>
-                      <span className="text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full font-medium">
-                        Shot 1 of {shots.length || 1}
-                      </span>
-                    </div>
-                    <p className="text-xs text-zinc-400 mt-1.5 leading-relaxed">
-                      This is the first shot in the scene. Use the composer below or manual upload to stage the opening keyframe.
-                    </p>
-                  </div>
-                ) : previousHeroTake ? (
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-white">
-                        Shot {previousShot.shot_number}: {previousShot.shot_name || `Shot ${previousShot.shot_number}`}
-                      </span>
-                      <span className="text-[10px] bg-zinc-800 text-zinc-300 border border-zinc-700 px-1.5 py-0.5 rounded font-mono font-semibold">
-                        Take {previousHeroTake.take_number}
-                      </span>
-                      {previousHeroTake.is_hero && (
-                        <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded font-semibold">
-                          Hero Take
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-white">
-                        Shot {previousShot.shot_number}: {previousShot.shot_name || `Shot ${previousShot.shot_number}`}
-                      </span>
-                      <span className="text-[10px] bg-zinc-800 text-amber-400/80 border border-amber-500/30 px-1.5 py-0.5 rounded font-medium">
-                        Awaiting Render
-                      </span>
-                    </div>
-                    <p className="text-xs text-zinc-400 mt-1.5 leading-relaxed">
-                      Render a take for Shot {previousShot.shot_number} in the Takes/Renders tab to enable frame capture.
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* CAPTURE FRAME ACTION BUTTON */}
-              <div className="flex flex-wrap items-center gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={handleExtractFromPreviousShot}
-                  disabled={!previousShot || !previousHeroTake || isExtracting || assignedFirstFrame?.locked}
-                  className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 shadow-xs transition-colors cursor-pointer ${
-                    !previousShot || !previousHeroTake || assignedFirstFrame?.locked
-                      ? "bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-700/50"
-                      : "bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white"
-                  }`}
-                >
-                  <LinkIcon className="w-3.5 h-3.5" />
-                  <span>{isExtracting ? "Capturing Frame..." : "Capture Frame"}</span>
-                </button>
-              </div>
+            {/* ACTION AREA (50% WIDTH ON DESKTOP, CENTERED) */}
+            <div className="flex-1 w-full md:w-1/2 self-stretch flex flex-col items-center justify-center p-4">
+              <button
+                type="button"
+                onClick={handleExtractFromPreviousShot}
+                disabled={!previousShot || !previousHeroTake || isExtracting || assignedFirstFrame?.locked}
+                className={`px-6 py-2.5 rounded-lg text-sm font-bold shadow-xs transition-colors cursor-pointer text-center ${
+                  !previousShot || !previousHeroTake || assignedFirstFrame?.locked
+                    ? "bg-zinc-800 text-zinc-500 cursor-not-allowed border border-zinc-700/50"
+                    : "bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white"
+                }`}
+              >
+                {isExtracting ? "Capturing Frame..." : "Capture Frame"}
+              </button>
             </div>
           </div>
         </div>
