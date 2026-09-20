@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from "react";
 import { Play, Pause, ChevronLeft, ChevronRight, ChevronsRight, Film } from "lucide-react";
+import { useTheme } from "../../context/ThemeContext";
 
 interface ScrubbableFramePlayerProps {
   videoUrl?: string | null;
@@ -21,6 +22,8 @@ export const ScrubbableFramePlayer: React.FC<ScrubbableFramePlayerProps> = ({
   onVideoElementReady,
   onCurrentTimeChange
 }) => {
+  const { resolvedTheme } = useTheme();
+  const isLight = resolvedTheme === "light";
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -161,14 +164,22 @@ export const ScrubbableFramePlayer: React.FC<ScrubbableFramePlayerProps> = ({
 
         {/* TAKE NUMBER BADGE */}
         {takeNumber !== undefined && (
-          <span className="absolute top-2 left-2 bg-black/80 backdrop-blur-xs text-[10px] font-mono font-semibold text-amber-400 px-1.5 py-0.5 rounded border border-amber-500/30 pointer-events-none">
+          <span className={`frame-take-badge absolute top-2 left-2 backdrop-blur-md text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border pointer-events-none transition-colors shadow-xs ${
+            isLight
+              ? "bg-white/95 text-amber-800 border-amber-300 shadow-zinc-300/40"
+              : "bg-black/85 text-amber-400 border-amber-500/30"
+          }`}>
             Take {takeNumber} {isHero ? "★" : ""}
           </span>
         )}
 
         {/* TIMECODE & FRAME NUMBER OVERLAY */}
         {isLoaded && duration > 0 && (
-          <span className="absolute bottom-2 right-2 bg-black/85 backdrop-blur-xs text-[10px] font-mono font-semibold text-zinc-200 px-2 py-0.5 rounded border border-zinc-700/60 pointer-events-none">
+          <span className={`frame-timecode-badge absolute bottom-2 right-2 backdrop-blur-md text-[10px] font-mono font-bold px-2 py-0.5 rounded border pointer-events-none transition-colors shadow-xs ${
+            isLight
+              ? "bg-white/95 text-slate-900 border-slate-300 shadow-zinc-300/50"
+              : "bg-zinc-950/90 text-zinc-100 border-zinc-700/80"
+          }`}>
             {formatTime(currentTime)} • Frame {currentFrame}/{totalFrames}
           </span>
         )}
@@ -176,7 +187,7 @@ export const ScrubbableFramePlayer: React.FC<ScrubbableFramePlayerProps> = ({
 
       {/* SCRUB TIMELINE & TRANSPORT CONTROLS */}
       {isLoaded && duration > 0 && (
-        <div className="flex flex-col gap-1 px-0.5">
+        <div className="flex flex-col gap-1 px-0.5 mt-0.5">
           {/* SCRUB RANGE SLIDER */}
           <div className="flex items-center gap-2">
             <input
@@ -186,19 +197,25 @@ export const ScrubbableFramePlayer: React.FC<ScrubbableFramePlayerProps> = ({
               step={0.01}
               value={currentTime}
               onChange={handleSeek}
-              className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-blue-500 hover:accent-blue-400"
+              className={`w-full h-1.5 rounded-lg appearance-none cursor-pointer accent-blue-600 hover:accent-blue-500 transition-colors ${
+                isLight ? "bg-zinc-200" : "bg-zinc-800"
+              }`}
               title="Scrub video timeline"
             />
           </div>
 
           {/* TRANSPORT BUTTON BAR */}
-          <div className="flex items-center justify-between text-zinc-400 text-[11px] pt-0.5">
+          <div className="flex items-center justify-between text-[11px] pt-0.5">
             <div className="flex items-center gap-1">
               {/* PLAY / PAUSE */}
               <button
                 type="button"
                 onClick={handleTogglePlay}
-                className="p-1 hover:bg-zinc-800 text-zinc-300 hover:text-white rounded transition-colors cursor-pointer"
+                className={`p-1 rounded transition-colors cursor-pointer ${
+                  isLight
+                    ? "hover:bg-zinc-200 text-zinc-700 hover:text-zinc-900"
+                    : "hover:bg-zinc-800 text-zinc-300 hover:text-white"
+                }`}
                 title={isPlaying ? "Pause" : "Play"}
               >
                 {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
@@ -208,7 +225,11 @@ export const ScrubbableFramePlayer: React.FC<ScrubbableFramePlayerProps> = ({
               <button
                 type="button"
                 onClick={handleStepBackward}
-                className="px-1.5 py-0.5 hover:bg-zinc-800 text-zinc-300 hover:text-white rounded text-[10px] font-mono font-semibold flex items-center gap-0.5 border border-zinc-800 transition-colors cursor-pointer"
+                className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold flex items-center gap-0.5 border transition-colors cursor-pointer ${
+                  isLight
+                    ? "bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border-zinc-300"
+                    : "bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border-zinc-800"
+                }`}
                 title="Step backward 1 frame"
               >
                 <ChevronLeft className="w-3 h-3" />
@@ -219,7 +240,11 @@ export const ScrubbableFramePlayer: React.FC<ScrubbableFramePlayerProps> = ({
               <button
                 type="button"
                 onClick={handleStepForward}
-                className="px-1.5 py-0.5 hover:bg-zinc-800 text-zinc-300 hover:text-white rounded text-[10px] font-mono font-semibold flex items-center gap-0.5 border border-zinc-800 transition-colors cursor-pointer"
+                className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold flex items-center gap-0.5 border transition-colors cursor-pointer ${
+                  isLight
+                    ? "bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border-zinc-300"
+                    : "bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border-zinc-800"
+                }`}
                 title="Step forward 1 frame"
               >
                 <span>+1f</span>
@@ -231,11 +256,15 @@ export const ScrubbableFramePlayer: React.FC<ScrubbableFramePlayerProps> = ({
             <button
               type="button"
               onClick={handleJumpToLastFrame}
-              className="px-1.5 py-0.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-amber-300 rounded text-[10px] font-semibold flex items-center gap-1 border border-zinc-800 transition-colors cursor-pointer"
+              className={`px-1.5 py-0.5 rounded text-[10px] font-semibold flex items-center gap-1 border transition-colors cursor-pointer ${
+                isLight
+                  ? "bg-zinc-100 hover:bg-zinc-200 text-zinc-800 hover:text-amber-800 border-zinc-300"
+                  : "bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-amber-300 border-zinc-800"
+              }`}
               title="Snap playhead to the last frame"
             >
               <span>Last Frame</span>
-              <ChevronsRight className="w-3 h-3 text-amber-400" />
+              <ChevronsRight className={`w-3 h-3 ${isLight ? "text-amber-600" : "text-amber-400"}`} />
             </button>
           </div>
         </div>

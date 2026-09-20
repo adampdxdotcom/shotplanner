@@ -402,6 +402,33 @@ html.light .canvas-header-bar button:hover {
   color-scheme: dark;
 }
 
+/* Scrubbable Frame Player badges in Light & Dark Mode */
+html.light .frame-timecode-badge {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+}
+
+html.dark .frame-timecode-badge {
+  background-color: rgba(9, 9, 11, 0.9) !important;
+  color: #f4f4f5 !important;
+  border-color: #3f3f46 !important;
+}
+
+html.light .frame-take-badge {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  color: #92400e !important;
+  border-color: #fcd34d !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+}
+
+html.dark .frame-take-badge {
+  background-color: rgba(0, 0, 0, 0.85) !important;
+  color: #fbbf24 !important;
+  border-color: rgba(245, 158, 11, 0.3) !important;
+}
+
 /* 3. Staging Inspector Panels & Character Cards in Light Mode */
 html.light #staging-actor-inspector,
 html.light .staging-inspector-panel,

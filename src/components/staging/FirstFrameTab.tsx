@@ -335,13 +335,13 @@ export const FirstFrameTab: React.FC<FirstFrameTabProps> = ({
       {/* MAIN WORKBENCH (FULL WIDTH STACK) */}
       <div className="flex flex-col gap-5">
         
-        {/* OPTION 1: SHOT CONTINUITY BRIDGE */}
+        {/* FRAME GRAB: SHOT CONTINUITY BRIDGE */}
         <div className="bg-zinc-950/80 border border-purple-900/40 rounded-xl overflow-hidden shadow-sm flex flex-col">
           <div className="p-3.5 px-4 border-b border-zinc-800/80 bg-purple-950/20 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <LinkIcon className="w-4 h-4 text-purple-400" />
               <h3 className="text-xs font-bold text-white uppercase tracking-wider">
-                Option 1: Continuity Chaining from Previous Shot
+                Frame Grab
               </h3>
             </div>
             <span className="text-[10px] font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full">
@@ -374,7 +374,7 @@ export const FirstFrameTab: React.FC<FirstFrameTabProps> = ({
                       </span>
                     </div>
                     <p className="text-xs text-zinc-400 mt-1.5 leading-relaxed">
-                      This is the first shot in the scene. Use Option 2 below or manual upload to stage the opening keyframe.
+                      This is the first shot in the scene. Use the composer below or manual upload to stage the opening keyframe.
                     </p>
                   </div>
                 ) : previousHeroTake ? (
@@ -392,9 +392,6 @@ export const FirstFrameTab: React.FC<FirstFrameTabProps> = ({
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-zinc-400 mt-1.5 line-clamp-2 leading-relaxed">
-                      {previousHeroTake.expanded_prompt || previousHeroTake.basic_stub || "Rendered take available for frame capture"}
-                    </p>
                   </div>
                 ) : (
                   <div>
@@ -407,7 +404,7 @@ export const FirstFrameTab: React.FC<FirstFrameTabProps> = ({
                       </span>
                     </div>
                     <p className="text-xs text-zinc-400 mt-1.5 leading-relaxed">
-                      Render a take for Shot {previousShot.shot_number} in the Takes/Renders tab to enable one-click final frame capture.
+                      Render a take for Shot {previousShot.shot_number} in the Takes/Renders tab to enable frame capture.
                     </p>
                   </div>
                 )}
