@@ -48,7 +48,7 @@ export function useWorkflowManagement({
       onUpdateActiveShotParams(shot => ({
         ...shot,
         parameter_node_mappings: {
-          ...(shot.parameter_node_mappings || { steps: "", megapixels: "", frames: "" }),
+          ...(shot.parameter_node_mappings || {}),
           [key]: nodeId
         }
       }));
@@ -125,10 +125,24 @@ export function useWorkflowManagement({
           const detected = data.detected_nodes || data.nodes_info.detected_nodes;
           if (detected) {
             setParameterNodeMappings(prev => ({
-              steps: prev.steps || detected.steps || "",
-              megapixels: prev.megapixels || detected.megapixels || "",
-              frames: prev.frames || detected.frames || ""
+              steps: prev.steps || (detected.steps ? String(detected.steps) : ""),
+              megapixels: prev.megapixels || (detected.megapixels ? String(detected.megapixels) : ""),
+              frames: prev.frames || (detected.frames ? String(detected.frames) : "")
             }));
+
+            if (onUpdateActiveShotParams) {
+              onUpdateActiveShotParams(shot => {
+                const currentShotMappings = shot.parameter_node_mappings || {};
+                return {
+                  ...shot,
+                  parameter_node_mappings: {
+                    steps: currentShotMappings.steps || (detected.steps ? String(detected.steps) : ""),
+                    megapixels: currentShotMappings.megapixels || (detected.megapixels ? String(detected.megapixels) : ""),
+                    frames: currentShotMappings.frames || (detected.frames ? String(detected.frames) : "")
+                  }
+                };
+              });
+            }
           }
 
           if (data.detected_values) {

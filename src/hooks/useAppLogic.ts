@@ -28,10 +28,13 @@ export function useAppLogic() {
 
   // Mutable delegate ref to bridge shot operations to persistence actions
   const shotOpsRef = useRef<Partial<ShotOperationsDelegate>>({});
+  const updateActiveShotRef = useRef<((updater: (shot: any) => any) => void) | null>(null);
 
   // Forward bridge for shot param updates from workflow controls
   const handleUpdateActiveShotParams = useCallback((updater: (shot: any) => any) => {
-    updateActiveShot(updater);
+    if (updateActiveShotRef.current) {
+      updateActiveShotRef.current(updater);
+    }
   }, []);
 
   // 3. Workflow & Node Mappings
@@ -179,7 +182,8 @@ export function useAppLogic() {
     addToast
   });
 
-  // Keep shot operations delegate ref updated
+  // Keep shot operations delegate and updater ref updated
+  updateActiveShotRef.current = updateActiveShot;
   shotOpsRef.current = {
     llmProvider,
     setLlmProvider,

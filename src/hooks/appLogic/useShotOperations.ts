@@ -35,8 +35,8 @@ interface UseShotOperationsParams {
   setSelectedWorkflowFile: (file: string) => void;
   setSelectedPromptNodeId: (nodeId: string) => void;
   setNodeMappings: (mappings: Record<string, string>) => void;
-  setGenerationParams: (params: GenerationParameters) => void;
-  setParameterNodeMappings: (mappings: ParameterNodeMappings) => void;
+  setGenerationParams: React.Dispatch<React.SetStateAction<GenerationParameters>>;
+  setParameterNodeMappings: React.Dispatch<React.SetStateAction<ParameterNodeMappings>>;
   addToast: (text: string, type?: "success" | "error" | "info") => void;
 }
 
@@ -93,8 +93,38 @@ export function useShotOperations({
         if (shot.workflow_file !== undefined) setSelectedWorkflowFile(shot.workflow_file);
         if (shot.prompt_node_id !== undefined) setSelectedPromptNodeId(shot.prompt_node_id);
         setNodeMappings(shot.node_mappings || {});
-        if (shot.generation_params) setGenerationParams(shot.generation_params);
-        if (shot.parameter_node_mappings) setParameterNodeMappings(shot.parameter_node_mappings);
+        if (shot.generation_params) {
+          setGenerationParams(prev => {
+            if (
+              prev.steps === shot.generation_params?.steps &&
+              prev.megapixels === shot.generation_params?.megapixels &&
+              prev.frames === shot.generation_params?.frames
+            ) {
+              return prev;
+            }
+            return { ...prev, ...shot.generation_params };
+          });
+        }
+        if (shot.parameter_node_mappings) {
+          setParameterNodeMappings(prev => {
+            const sMap = shot.parameter_node_mappings;
+            const nextSteps = sMap?.steps || prev.steps || "";
+            const nextMegapixels = sMap?.megapixels || prev.megapixels || "";
+            const nextFrames = sMap?.frames || prev.frames || "";
+            if (
+              prev.steps === nextSteps &&
+              prev.megapixels === nextMegapixels &&
+              prev.frames === nextFrames
+            ) {
+              return prev;
+            }
+            return {
+              steps: nextSteps,
+              megapixels: nextMegapixels,
+              frames: nextFrames
+            };
+          });
+        }
       }
     } else if (!id) {
       setBasicStub("");
@@ -172,10 +202,36 @@ export function useShotOperations({
         if (shot.prompt_node_id !== undefined) setSelectedPromptNodeId(shot.prompt_node_id);
         setNodeMappings(shot.node_mappings || {});
         if (shot.generation_params) {
-          setGenerationParams(shot.generation_params);
+          setGenerationParams(prev => {
+            if (
+              prev.steps === shot.generation_params?.steps &&
+              prev.megapixels === shot.generation_params?.megapixels &&
+              prev.frames === shot.generation_params?.frames
+            ) {
+              return prev;
+            }
+            return { ...prev, ...shot.generation_params };
+          });
         }
         if (shot.parameter_node_mappings) {
-          setParameterNodeMappings(shot.parameter_node_mappings);
+          setParameterNodeMappings(prev => {
+            const sMap = shot.parameter_node_mappings;
+            const nextSteps = sMap?.steps || prev.steps || "";
+            const nextMegapixels = sMap?.megapixels || prev.megapixels || "";
+            const nextFrames = sMap?.frames || prev.frames || "";
+            if (
+              prev.steps === nextSteps &&
+              prev.megapixels === nextMegapixels &&
+              prev.frames === nextFrames
+            ) {
+              return prev;
+            }
+            return {
+              steps: nextSteps,
+              megapixels: nextMegapixels,
+              frames: nextFrames
+            };
+          });
         }
         setBasicStub(shot.basic_stub || "");
         setExpandedPrompt(shot.expanded_prompt || "");

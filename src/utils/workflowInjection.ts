@@ -363,8 +363,26 @@ export function generateLiveInjectedWorkflow(
           if (!isNaN(val)) {
             if (node.widgets_values_named && typeof node.widgets_values_named === "object" && "megapixels" in node.widgets_values_named) {
               node.widgets_values_named.megapixels = val;
-            } else if (Array.isArray(node.widgets_values) && node.widgets_values.length === 1) {
-              node.widgets_values[0] = val;
+            } else if (node.widgets_values_named && typeof node.widgets_values_named === "object" && "width" in node.widgets_values_named && "height" in node.widgets_values_named) {
+              const origW = Number(node.widgets_values_named.width) || 768;
+              const origH = Number(node.widgets_values_named.height) || 1024;
+              const currentPixels = origW * origH;
+              const targetPixels = val * 1024 * 1024;
+              const scaleFactor = Math.sqrt(targetPixels / Math.max(1, currentPixels));
+              node.widgets_values_named.width = Math.max(64, Math.round((origW * scaleFactor) / 16) * 16);
+              node.widgets_values_named.height = Math.max(64, Math.round((origH * scaleFactor) / 16) * 16);
+            } else if (Array.isArray(node.widgets_values)) {
+              if (node.widgets_values.length >= 2 && (classType === "EmptyLatentImage" || classType.includes("Latent") || metaTitle.toLowerCase().includes("latent") || metaTitle.toLowerCase().includes("resolution"))) {
+                const origW = Number(node.widgets_values[0]) || 768;
+                const origH = Number(node.widgets_values[1]) || 1024;
+                const currentPixels = origW * origH;
+                const targetPixels = val * 1024 * 1024;
+                const scaleFactor = Math.sqrt(targetPixels / Math.max(1, currentPixels));
+                node.widgets_values[0] = Math.max(64, Math.round((origW * scaleFactor) / 16) * 16);
+                node.widgets_values[1] = Math.max(64, Math.round((origH * scaleFactor) / 16) * 16);
+              } else if (node.widgets_values.length === 1) {
+                node.widgets_values[0] = val;
+              }
             }
           }
         }
@@ -478,8 +496,19 @@ export function generateLiveInjectedWorkflow(
         mNode.inputs = mNode.inputs || {};
         const val = parseFloat(String(effectiveParams.megapixels));
         if (!isNaN(val)) {
-          if ("megapixels" in mNode.inputs) mNode.inputs.megapixels = val;
-          else if ("value" in mNode.inputs) mNode.inputs.value = val;
+          if ("megapixels" in mNode.inputs) {
+            mNode.inputs.megapixels = val;
+          } else if ("width" in mNode.inputs && "height" in mNode.inputs && typeof mNode.inputs.width === "number" && typeof mNode.inputs.height === "number") {
+            const origW = mNode.inputs.width;
+            const origH = mNode.inputs.height;
+            const currentPixels = origW * origH;
+            const targetPixels = val * 1024 * 1024;
+            const scaleFactor = Math.sqrt(targetPixels / Math.max(1, currentPixels));
+            mNode.inputs.width = Math.max(64, Math.round((origW * scaleFactor) / 16) * 16);
+            mNode.inputs.height = Math.max(64, Math.round((origH * scaleFactor) / 16) * 16);
+          } else if ("value" in mNode.inputs) {
+            mNode.inputs.value = val;
+          }
         }
       }
       if (effectiveParamNodes.frames && cloned[effectiveParamNodes.frames] && effectiveParams.frames !== undefined && effectiveParams.frames !== null) {

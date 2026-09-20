@@ -203,8 +203,13 @@ export async function processAssetTransfer(options: AssetTransferOptions) {
         );
 
         // Determine final filename and remote path
-        const finalFilename = output_workflow_filename || workflow_filename;
         const activeSceneName = sanitizeFilenamePart(scene_name ?? scene_planning?.scene_name ?? planning?.scene_name ?? "Untitled_Scene");
+        const activeShotNum = shot_number ?? scene_planning?.shot_number ?? planning?.shot_number;
+        const defaultShotFilename = (activeShotNum !== undefined && activeShotNum !== null && activeShotNum !== "")
+          ? `${activeSceneName}_Shot_${formatShotNumber(activeShotNum)}.json`
+          : workflow_filename;
+
+        const finalFilename = output_workflow_filename || defaultShotFilename || workflow_filename;
         remoteWorkflowPath = `${cleanRemoteRoot}/user/default/workflows/${activeSceneName}/${finalFilename}`;
 
         // Save staged workflow version into active scene workflows directory locally
@@ -265,11 +270,15 @@ export async function processAssetTransfer(options: AssetTransferOptions) {
   const statusMessage = `Staged ${workflow_filename || "workflow"} and transferred ${uploadedFiles.length} file(s) into Remote ComfyUI (${cleanRemoteDir}). Ready for execution!`;
   console.log(`[SSH Staging Complete] ${statusMessage}`);
 
+  const effectiveStagedFilename = stagedWorkflowFilename || output_workflow_filename || workflow_filename;
   return {
     success: true,
     remote_dir: cleanRemoteDir,
     remote_workflow_path: remoteWorkflowPath,
-    staged_workflow_filename: stagedWorkflowFilename || workflow_filename,
+    remote_workflow_paths: remoteWorkflowPath ? [remoteWorkflowPath] : [],
+    staged_workflow_filename: effectiveStagedFilename,
+    staged_workflow_filenames: effectiveStagedFilename ? [effectiveStagedFilename] : [],
+    base_template_used: workflow_filename,
     save_video_prefix: resolvedSaveVideoPrefix,
     transferred_count: transferredCount,
     skipped_count: skippedCount,
@@ -547,6 +556,7 @@ export interface ExecuteWorkflowOptions {
   comfyui_api_url?: string;
   remote_api_token?: string;
   workflow_filename: string;
+  output_workflow_filename?: string;
   prompt_node_id?: string;
   expanded_prompt?: string;
   prompt_prefix?: string;
@@ -794,6 +804,10 @@ export async function executeWorkflow(options: ExecuteWorkflowOptions) {
       detail: `Successfully queued in ComfyUI (${queueResult.dispatch_method})! Prompt ID: ${queueResult.prompt_id}${queueResult.number ? ` (Queue #${queueResult.number})` : ""}`
     });
 
+    const synthesizedWfFilename = options.output_workflow_filename || `${cleanScene}_Shot_${formattedShot}.json`;
+    const cleanRoot = remote_comfyui_root.replace(/\/$/, "");
+    const expectedRemoteWfPath = `${cleanRoot}/user/default/workflows/${cleanScene}/${synthesizedWfFilename}`;
+
     return {
       success: true,
       prompt_id: queueResult.prompt_id,
@@ -803,7 +817,14 @@ export async function executeWorkflow(options: ExecuteWorkflowOptions) {
       steps: stepsLog,
       modified_workflow: modifiedWf,
       api_prompt: apiPrompt,
-      dispatch_method: queueResult.dispatch_method
+      dispatch_method: queueResult.dispatch_method,
+      remote_dir: transferResult?.remote_dir || `${cleanRoot}/input`,
+      remote_workflow_path: transferResult?.remote_workflow_path || expectedRemoteWfPath,
+      remote_workflow_paths: transferResult?.remote_workflow_paths || [expectedRemoteWfPath],
+      staged_workflow_filename: transferResult?.staged_workflow_filename || synthesizedWfFilename,
+      staged_workflow_filenames: transferResult?.staged_workflow_filenames || [synthesizedWfFilename],
+      base_template_used: resolvedWorkflowFilename,
+      uploaded_files: transferResult?.uploaded_files || []
     };
   } else {
     stepsLog.push({

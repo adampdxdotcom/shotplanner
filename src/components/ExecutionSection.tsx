@@ -194,6 +194,9 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
         (sceneProject as any).selected_workflow ||
         "default.json";
 
+      const shotNumFormatted = formatShotNumber(activeShot.shot_number);
+      const synthesizedFilename = `${sanitizedSceneName}_Shot_${shotNumFormatted}.json`;
+
       const formattedShot = {
         ...activeShot,
         shot_number: activeShot.shot_number,
@@ -208,6 +211,7 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
         parameter_node_mappings: activeShot.parameter_node_mappings,
         workflow_file: resolvedWorkflowFilename,
         workflow_filename: resolvedWorkflowFilename,
+        output_workflow_filename: synthesizedFilename
       };
 
       const res = await fetch("/api/workflow/stage-shot", {
@@ -223,7 +227,9 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
           ssh_private_key: config.ssh_private_key,
           remote_comfyui_root: config.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI",
           scene_name: sanitizedSceneName,
+          shot_number: activeShot.shot_number,
           workflow_filename: resolvedWorkflowFilename,
+          output_workflow_filename: synthesizedFilename,
           assigned_slots: activeShot.assigned_slots || {},
           generation_parameters: activeShot.generation_params,
           parameter_node_mappings: activeShot.parameter_node_mappings,
@@ -270,6 +276,10 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
     simulateProgress();
     
     try {
+      const baseWorkflow = activeShot.workflow_file || activeShot.monitored_workflow || sceneProject.workflow_file || "default.json";
+      const shotNumFormatted = formatShotNumber(activeShot.shot_number);
+      const synthesizedFilename = `${sanitizedSceneName}_Shot_${shotNumFormatted}.json`;
+
       const res = await fetch("/api/execute", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -283,9 +293,10 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
           remote_comfyui_root: config.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI",
           comfyui_api_url: config.comfyui_api_url,
           remote_api_token: config.remote_api_token,
-          workflow_filename: activeShot.workflow_file || activeShot.monitored_workflow || sceneProject.workflow_file,
+          workflow_filename: baseWorkflow,
+          output_workflow_filename: synthesizedFilename,
           monitored_workflow: activeShot.monitored_workflow,
-          workflow_file: activeShot.workflow_file || sceneProject.workflow_file,
+          workflow_file: baseWorkflow,
           prompt_node_id: activeShot.prompt_node_id,
           expanded_prompt: activeShot.expanded_prompt,
           scene_name: sanitizedSceneName,
@@ -296,7 +307,7 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
           generation_parameters: activeShot.generation_params,
           parameter_node_mappings: activeShot.parameter_node_mappings,
           client_id: monitorState?.clientId || (typeof window !== "undefined" ? (window as any).__comfyMonitorClientId : undefined) || "comfyui-bridge-session",
-          stage_assets_first: false
+          stage_assets_first: true
         })
       });
       

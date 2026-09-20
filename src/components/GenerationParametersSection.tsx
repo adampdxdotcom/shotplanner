@@ -92,10 +92,11 @@ export const GenerationParametersSection: React.FC<GenerationParametersSectionPr
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* 1. Sampling Steps */}
         {(() => {
-          const autoNode = detectedNodes.steps;
-          const activeNode = parameterNodeMappings.steps;
+          const autoNode = detectedNodes.steps ? String(detectedNodes.steps) : "";
+          const activeNode = parameterNodeMappings.steps || autoNode;
           const isMapped = !!activeNode;
           const isEditing = editingNode.steps;
+          const stepsValue = generationParams.steps ?? 30;
 
           return (
             <div className="bg-zinc-50/80 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-700 rounded-lg p-3.5 space-y-3 flex flex-col justify-between shadow-xs">
@@ -133,8 +134,13 @@ export const GenerationParametersSection: React.FC<GenerationParametersSectionPr
                         type="number"
                         min={1}
                         max={100}
-                        value={generationParams.steps}
-                        onChange={(e) => onChangeParam("steps", Math.max(1, parseInt(e.target.value) || 1))}
+                        value={stepsValue}
+                        onChange={(e) => {
+                          if (!parameterNodeMappings.steps && activeNode) {
+                            onChangeParameterMapping("steps", activeNode);
+                          }
+                          onChangeParam("steps", Math.max(1, parseInt(e.target.value) || 1));
+                        }}
                         className="w-14 bg-white dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 focus:border-indigo-500 rounded px-1.5 py-0.5 text-xs text-right font-mono text-indigo-700 dark:text-indigo-300 outline-none shadow-2xs"
                       />
                       <span className="text-[11px] text-zinc-500 dark:text-zinc-400">steps</span>
@@ -145,8 +151,13 @@ export const GenerationParametersSection: React.FC<GenerationParametersSectionPr
                     min={5}
                     max={60}
                     step={1}
-                    value={generationParams.steps}
-                    onChange={(e) => onChangeParam("steps", parseInt(e.target.value))}
+                    value={stepsValue}
+                    onChange={(e) => {
+                      if (!parameterNodeMappings.steps && activeNode) {
+                        onChangeParameterMapping("steps", activeNode);
+                      }
+                      onChangeParam("steps", parseInt(e.target.value));
+                    }}
                     className="w-full accent-indigo-600 dark:accent-indigo-500 cursor-pointer h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-lg appearance-none"
                   />
                   <div className="flex justify-between text-[9px] text-zinc-500 dark:text-zinc-400 font-mono">
@@ -229,10 +240,11 @@ export const GenerationParametersSection: React.FC<GenerationParametersSectionPr
 
         {/* 2. Megapixels */}
         {(() => {
-          const autoNode = detectedNodes.megapixels;
-          const activeNode = parameterNodeMappings.megapixels;
+          const autoNode = detectedNodes.megapixels ? String(detectedNodes.megapixels) : "";
+          const activeNode = parameterNodeMappings.megapixels || autoNode;
           const isMapped = !!activeNode;
           const isEditing = editingNode.megapixels;
+          const megapixelsValue = generationParams.megapixels ?? 0.5;
 
           return (
             <div className="bg-zinc-50/80 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-700 rounded-lg p-3.5 space-y-3 flex flex-col justify-between shadow-xs">
@@ -271,8 +283,13 @@ export const GenerationParametersSection: React.FC<GenerationParametersSectionPr
                         min={0.1}
                         max={2.0}
                         step={0.05}
-                        value={generationParams.megapixels}
-                        onChange={(e) => onChangeParam("megapixels", Math.max(0.1, parseFloat(e.target.value) || 0.1))}
+                        value={megapixelsValue}
+                        onChange={(e) => {
+                          if (!parameterNodeMappings.megapixels && activeNode) {
+                            onChangeParameterMapping("megapixels", activeNode);
+                          }
+                          onChangeParam("megapixels", Math.max(0.1, parseFloat(e.target.value) || 0.1));
+                        }}
                         className="w-14 bg-white dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 focus:border-amber-500 rounded px-1.5 py-0.5 text-xs text-right font-mono text-amber-700 dark:text-amber-300 outline-none shadow-2xs"
                       />
                       <span className="text-[11px] text-zinc-500 dark:text-zinc-400">MP</span>
@@ -283,8 +300,13 @@ export const GenerationParametersSection: React.FC<GenerationParametersSectionPr
                     min={0.1}
                     max={1.0}
                     step={0.05}
-                    value={generationParams.megapixels}
-                    onChange={(e) => onChangeParam("megapixels", parseFloat(e.target.value))}
+                    value={megapixelsValue}
+                    onChange={(e) => {
+                      if (!parameterNodeMappings.megapixels && activeNode) {
+                        onChangeParameterMapping("megapixels", activeNode);
+                      }
+                      onChangeParam("megapixels", parseFloat(e.target.value));
+                    }}
                     className="w-full accent-amber-600 dark:accent-amber-500 cursor-pointer h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-lg appearance-none"
                   />
                   <div className="flex justify-between text-[9px] text-zinc-500 dark:text-zinc-400 font-mono">
@@ -367,10 +389,11 @@ export const GenerationParametersSection: React.FC<GenerationParametersSectionPr
 
         {/* 3. Duration / Frames */}
         {(() => {
-          const autoNode = detectedNodes.frames;
-          const activeNode = parameterNodeMappings.frames;
+          const autoNode = detectedNodes.frames ? String(detectedNodes.frames) : "";
+          const activeNode = parameterNodeMappings.frames || autoNode;
           const isMapped = !!activeNode;
           const isEditing = editingNode.frames;
+          const framesValue = generationParams.frames ?? 81;
 
           return (
             <div className="bg-zinc-50/80 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-700 rounded-lg p-3.5 space-y-3 flex flex-col justify-between shadow-xs">
@@ -408,11 +431,16 @@ export const GenerationParametersSection: React.FC<GenerationParametersSectionPr
                         type="number"
                         min={1}
                         max={300}
-                        value={generationParams.frames}
-                        onChange={(e) => onChangeParam("frames", Math.max(1, parseInt(e.target.value) || 1))}
+                        value={framesValue}
+                        onChange={(e) => {
+                          if (!parameterNodeMappings.frames && activeNode) {
+                            onChangeParameterMapping("frames", activeNode);
+                          }
+                          onChangeParam("frames", Math.max(1, parseInt(e.target.value) || 1));
+                        }}
                         className="w-14 bg-white dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 focus:border-emerald-500 rounded px-1.5 py-0.5 text-xs text-right font-mono text-emerald-700 dark:text-emerald-300 outline-none shadow-2xs"
                       />
-                      <span className="text-[11px] text-zinc-500 dark:text-zinc-400">f (~{(generationParams.frames / 24).toFixed(1)}s)</span>
+                      <span className="text-[11px] text-zinc-500 dark:text-zinc-400">f (~{(framesValue / 24).toFixed(1)}s)</span>
                     </div>
                   </div>
                   <input
@@ -420,8 +448,13 @@ export const GenerationParametersSection: React.FC<GenerationParametersSectionPr
                     min={12}
                     max={161}
                     step={1}
-                    value={generationParams.frames}
-                    onChange={(e) => onChangeParam("frames", parseInt(e.target.value))}
+                    value={framesValue}
+                    onChange={(e) => {
+                      if (!parameterNodeMappings.frames && activeNode) {
+                        onChangeParameterMapping("frames", activeNode);
+                      }
+                      onChangeParam("frames", parseInt(e.target.value));
+                    }}
                     className="w-full accent-emerald-600 dark:accent-emerald-500 cursor-pointer h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-lg appearance-none"
                   />
                   <div className="flex justify-between text-[9px] text-zinc-500 dark:text-zinc-400 font-mono">
