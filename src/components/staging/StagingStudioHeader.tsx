@@ -1,5 +1,5 @@
 import React from "react";
-import { Layers, Film, Zap, LayoutGrid, Clapperboard } from "lucide-react";
+import { Layers, Zap, LayoutGrid, Clapperboard } from "lucide-react";
 import { SceneProjectFile } from "../../types";
 import { StagingWorkspaceTab } from "../../utils/workspaceSessionStore";
 
@@ -7,9 +7,9 @@ export interface StagingStudioHeaderProps {
   sceneProject?: SceneProjectFile;
   activeShotId?: string | null;
   onSelectShot?: (id: string | null) => void;
-  activeSubject: string;
-  setActiveSubject: (subject: string) => void;
-  availableCharacters: string[];
+  activeSubject?: string;
+  setActiveSubject?: (subject: string) => void;
+  availableCharacters?: string[];
   activeTab: StagingWorkspaceTab;
   setActiveTab: (tab: StagingWorkspaceTab) => void;
   saveStatus?: "saved" | "saving" | "unsaved" | "error";
@@ -17,76 +17,19 @@ export interface StagingStudioHeaderProps {
 }
 
 export const StagingStudioHeader: React.FC<StagingStudioHeaderProps> = ({
-  sceneProject,
-  activeShotId,
-  onSelectShot,
-  activeSubject,
-  setActiveSubject,
-  availableCharacters,
   activeTab,
   setActiveTab,
-  saveStatus = "saved",
-  lastSavedAt
 }) => {
   return (
     <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4 sm:p-5 shadow-sm flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-indigo-600/20 border border-indigo-500/30 flex items-center justify-center shadow-inner shrink-0">
-            <Layers className="w-5 h-5 text-indigo-400" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
-                Asset Creation
-              </h1>
-              <span className="text-[10px] font-semibold text-indigo-300 bg-indigo-950/80 border border-indigo-800/60 px-2 py-0.5 rounded-full">
-                Director's Workbench
-              </span>
-            </div>
-            <p className="text-xs text-zinc-400 mt-0.5">
-              Stage multi-actor blocking, generate AI character headshots, and assemble multi-panel reference sheets
-            </p>
-          </div>
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-indigo-600/20 border border-indigo-500/30 flex items-center justify-center shadow-inner shrink-0">
+          <Layers className="w-5 h-5 text-indigo-400" />
         </div>
-
-        {/* ACTIVE SHOT & CHARACTER CONTEXT SELECTORS */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          {/* Active Shot Selector */}
-          {sceneProject && onSelectShot && (
-            <div className="flex items-center gap-1.5 bg-zinc-950/80 border border-zinc-800 rounded-lg px-2.5 py-1.5 shadow-inner">
-              <Film className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-              <span className="text-xs text-zinc-400">Target Shot:</span>
-              <select
-                value={activeShotId || ""}
-                onChange={(e) => onSelectShot(e.target.value || null)}
-                className="bg-transparent text-xs font-semibold text-indigo-300 outline-none cursor-pointer"
-              >
-                <option value="" className="bg-zinc-900 text-zinc-400">-- None Selected --</option>
-                {sceneProject.shots.map((s, idx) => (
-                  <option key={s.id} value={s.id} className="bg-zinc-900 text-zinc-200">
-                    Shot {s.shot_number || idx + 1}: {s.shot_name || `Shot ${idx + 1}`} ({s.status || "unstaged"})
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Active Character Selector */}
-          <div className="flex items-center gap-1.5 bg-zinc-950/80 border border-zinc-800 rounded-lg px-2.5 py-1.5 shadow-inner">
-            <span className="text-xs text-zinc-400">Actor:</span>
-            <select
-              value={activeSubject}
-              onChange={(e) => setActiveSubject(e.target.value)}
-              className="bg-transparent text-xs font-semibold text-amber-400 outline-none cursor-pointer"
-            >
-              {availableCharacters.map(char => (
-                <option key={char} value={char} className="bg-zinc-900 text-amber-300">
-                  {char}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div>
+          <h1 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
+            Asset Creation
+          </h1>
         </div>
       </div>
 
@@ -105,9 +48,6 @@ export const StagingStudioHeader: React.FC<StagingStudioHeaderProps> = ({
           >
             <Layers className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate">Scene Staging &amp; Blocking</span>
-            <span className="text-[10px] px-1.5 py-0.5 bg-black/20 dark:bg-white/10 rounded font-mono shrink-0">
-              Stage
-            </span>
           </button>
 
           <button
@@ -122,9 +62,6 @@ export const StagingStudioHeader: React.FC<StagingStudioHeaderProps> = ({
           >
             <Clapperboard className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate">First Frame</span>
-            <span className="text-[10px] px-1.5 py-0.5 bg-black/20 dark:bg-white/10 rounded font-mono shrink-0">
-              Frame 0
-            </span>
           </button>
 
           <button
@@ -139,9 +76,6 @@ export const StagingStudioHeader: React.FC<StagingStudioHeaderProps> = ({
           >
             <Zap className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate">AI Headshots &amp; Variations</span>
-            <span className="text-[10px] px-1.5 py-0.5 bg-black/20 dark:bg-white/10 rounded font-mono shrink-0">
-              Gemini
-            </span>
           </button>
 
           <button
@@ -156,9 +90,6 @@ export const StagingStudioHeader: React.FC<StagingStudioHeaderProps> = ({
           >
             <LayoutGrid className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate">Reference Sheets</span>
-            <span className="text-[10px] px-1.5 py-0.5 bg-black/20 dark:bg-white/10 rounded font-mono shrink-0">
-              Panels
-            </span>
           </button>
         </div>
       </div>

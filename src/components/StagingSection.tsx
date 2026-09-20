@@ -6,6 +6,7 @@ import { StagingEnvironmentControls } from "./cast/StagingEnvironmentControls";
 import { StagingActorInspector } from "./cast/StagingActorInspector";
 import { StagingCompositeSavePanel } from "./cast/StagingCompositeSavePanel";
 import { ActorPoseKeyingPanel } from "./cast/ActorPoseKeyingPanel";
+import { ShotDossierCard } from "./ShotDossierCard";
 import {
   StagedActor,
   useStagingStage,
@@ -127,6 +128,52 @@ export const StagingSection: React.FC<StagingSectionProps> = ({
     initialSubject
   });
 
+  const handleNewShot = () => {
+    if (!onUpdateProject) return;
+    const newShot: ShotItem = {
+      id: "shot_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
+      shot_number: (sceneProject?.shots.length || 0) + 1,
+      shot_type: "Medium Shot",
+      camera_movement: "Locked Off",
+      lens_focal_length: "50mm Standard Prime",
+      aspect_ratio: "16:9 Widescreen",
+      basic_stub: "",
+      expanded_prompt: "",
+      assigned_slots: {},
+      status: "unstaged",
+      updated_at: new Date().toISOString()
+    };
+    onUpdateProject((prev: SceneProjectFile) => ({ ...prev, shots: [...(prev.shots || []), newShot] }));
+    if (onSelectShot) onSelectShot(newShot.id);
+    if (addToast) addToast(`Created Shot ${newShot.shot_number}`, "success");
+  };
+
+  const handleDuplicateShot = () => {
+    if (!activeShot || !onUpdateProject) return;
+    const newId = "shot_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
+    onUpdateProject((prev: SceneProjectFile) => {
+      const idx = (prev.shots || []).findIndex(s => s.id === activeShot.id);
+      const duplicatedShot: ShotItem = {
+        ...activeShot,
+        id: newId,
+        shot_number: activeShot.shot_number + 1,
+        shot_name: activeShot.shot_name ? `${activeShot.shot_name} (Copy)` : undefined,
+        status: "unstaged",
+        takes: [],
+        hero_take_id: undefined,
+        assigned_slots: { ...(activeShot.assigned_slots || {}) },
+        characters: activeShot.characters ? [...activeShot.characters] : [],
+        updated_at: new Date().toISOString()
+      };
+      const shots = [...(prev.shots || [])];
+      shots.splice(idx + 1, 0, duplicatedShot);
+      shots.forEach((s, i) => s.shot_number = i + 1);
+      return { ...prev, shots };
+    });
+    if (onSelectShot) onSelectShot(newId);
+    if (addToast) addToast(`Duplicated Shot ${activeShot.shot_number}`, "success");
+  };
+
   const effectiveSaveStatus: "saved" | "saving" | "unsaved" | "error" = 
     autosaveStatus === "saving" || stagingSaveStatus === "saving"
       ? "saving"
@@ -137,19 +184,22 @@ export const StagingSection: React.FC<StagingSectionProps> = ({
       : "saved";
 
   return (
-    <div id="staging-section" className="flex flex-col gap-6 min-h-0 flex-1">
+    <div id="staging-section" className="w-full flex flex-col gap-6 min-h-0 flex-1">
+      {/* SHOT DOSSIER CARD */}
+      <ShotDossierCard
+        shots={sceneProject?.shots || []}
+        activeShotId={activeShotId || null}
+        onSelectShot={onSelectShot || (() => {})}
+        assets={assets}
+        sceneName={activeSceneName || sceneProject?.scene_name || "Scene"}
+        onNewShot={onUpdateProject ? handleNewShot : undefined}
+        onDuplicateShot={activeShot && onUpdateProject ? handleDuplicateShot : undefined}
+      />
+
       {/* SECTION HEADER CARD */}
       <StagingStudioHeader
-        sceneProject={sceneProject}
-        activeShotId={activeShotId}
-        onSelectShot={onSelectShot}
-        activeSubject={activeSubject}
-        setActiveSubject={setActiveSubject}
-        availableCharacters={availableCharacters}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        saveStatus={effectiveSaveStatus}
-        lastSavedAt={lastSavedAt}
       />
 
       {/* WORKSPACE CONTENT BODY */}
