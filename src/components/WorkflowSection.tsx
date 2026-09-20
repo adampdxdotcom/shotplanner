@@ -6,7 +6,6 @@ import { copyToClipboard } from "../utils/clipboard";
 import { generateLiveInjectedWorkflow } from "../utils/workflowInjection";
 import { ShotDossierCard } from "./ShotDossierCard";
 import { WorkflowFileSelector } from "./workflow/WorkflowFileSelector";
-import { PromptNodeSelector } from "./workflow/PromptNodeSelector";
 import { MediaLoaderMapper } from "./workflow/MediaLoaderMapper";
 import { LiveWorkflowPreview } from "./workflow/LiveWorkflowPreview";
 import { GenerationParametersSection } from "./GenerationParametersSection";
@@ -268,12 +267,10 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
                 onChangeParameterMapping={onUpdateParameterMapping}
                 parsedWorkflow={parsedWorkflow}
                 workflowFilename={selectedWorkflowFile}
-              />
-
-              <PromptNodeSelector 
                 promptNodes={promptNodes}
                 selectedPromptNodeId={selectedPromptNodeId}
                 onSelectPromptNodeId={onSelectPromptNodeId}
+                activeShot={activeShot}
               />
 
               <MediaLoaderMapper 

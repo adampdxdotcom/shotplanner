@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
-import { Sliders, Gauge, Film, Layers, AlertCircle, CheckCircle2, Edit3, RotateCcw, Cpu } from "lucide-react";
-import { DetectedNodes, GenerationParameters, ParameterNodeMappings, ParsedWorkflow, WorkflowNodeInfo } from "../types";
+import { Sliders, Gauge, Film, Layers, AlertCircle, CheckCircle2, Edit3, RotateCcw, Cpu, Type, FileText } from "lucide-react";
+import { DetectedNodes, GenerationParameters, ParameterNodeMappings, ParsedWorkflow, WorkflowNodeInfo, ShotItem } from "../types";
 import { NodeScannerModal } from "./workflow/NodeScannerModal";
 import { extractAllWorkflowNodes } from "../utils/workflowNodes";
 
@@ -13,6 +13,10 @@ interface GenerationParametersSectionProps {
   parsedWorkflow?: ParsedWorkflow | null;
   workflowFilename?: string;
   workflowNodes?: WorkflowNodeInfo[];
+  promptNodes?: any[];
+  selectedPromptNodeId?: string;
+  onSelectPromptNodeId?: (id: string) => void;
+  activeShot?: ShotItem;
 }
 
 export const GenerationParametersSection: React.FC<GenerationParametersSectionProps> = ({
@@ -23,7 +27,11 @@ export const GenerationParametersSection: React.FC<GenerationParametersSectionPr
   onChangeParameterMapping,
   parsedWorkflow,
   workflowFilename,
-  workflowNodes: explicitNodes
+  workflowNodes: explicitNodes,
+  promptNodes = [],
+  selectedPromptNodeId = "",
+  onSelectPromptNodeId,
+  activeShot
 }) => {
   const [editingNode, setEditingNode] = useState<{ steps?: boolean; megapixels?: boolean; frames?: boolean }>({});
   const [isScannerOpen, setIsScannerOpen] = useState(false);
@@ -81,7 +89,7 @@ export const GenerationParametersSection: React.FC<GenerationParametersSectionPr
       </div>
 
       {/* Parameter Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* 1. Sampling Steps */}
         {(() => {
           const autoNode = detectedNodes.steps;
@@ -490,6 +498,77 @@ export const GenerationParametersSection: React.FC<GenerationParametersSectionPr
                   )}
                 </div>
               )}
+            </div>
+          );
+        })()}
+
+        {/* 4. Prompt Stub Display Card */}
+        {(() => {
+          const isMapped = !!selectedPromptNodeId;
+          const matchedPromptNode = promptNodes.find(n => String(n.id) === String(selectedPromptNodeId));
+          const stubText = activeShot?.basic_stub || activeShot?.expanded_prompt || "";
+
+          return (
+            <div className="bg-zinc-50/80 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-700 rounded-lg p-3.5 space-y-3 flex flex-col justify-between shadow-xs">
+              {/* Title & Badge */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-200 flex items-center gap-1.5">
+                    <Type className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                    Prompt
+                  </span>
+                  {isMapped ? (
+                    <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded font-mono bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-500/30 border">
+                      <CheckCircle2 className="w-2.5 h-2.5 text-indigo-600 dark:text-indigo-400" />
+                      Node #{selectedPromptNodeId}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded font-mono bg-zinc-100 text-zinc-600 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700 border">
+                      Auto-detected
+                    </span>
+                  )}
+                </div>
+                <p className="text-[10px] text-zinc-500 dark:text-zinc-400">
+                  Target field: <code className="text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded font-mono">inputs.text</code>
+                </p>
+              </div>
+
+              {/* Prompt Stub Display */}
+              <div className="space-y-1 bg-white/80 dark:bg-zinc-950/80 p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800/80 flex-1 flex flex-col justify-center min-h-[72px]">
+                <div className="flex items-center justify-between text-[10px] text-zinc-500 dark:text-zinc-400 pb-0.5">
+                  <span className="font-semibold uppercase tracking-wider flex items-center gap-1">
+                    <FileText className="w-3 h-3 text-indigo-500" />
+                    Shot Stub
+                  </span>
+                  {activeShot && (
+                    <span className="font-mono text-[9px] px-1.5 py-0.2 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300">
+                      Shot #{activeShot.shot_number}
+                    </span>
+                  )}
+                </div>
+                <p 
+                  className="text-[11px] text-zinc-800 dark:text-zinc-200 font-mono leading-relaxed line-clamp-3 overflow-hidden" 
+                  title={stubText || "No stub available"}
+                >
+                  {stubText ? (
+                    `"${stubText}"`
+                  ) : (
+                    <span className="italic text-zinc-400 dark:text-zinc-500">No prompt stub configured for this shot</span>
+                  )}
+                </p>
+              </div>
+
+              {/* Footer info */}
+              <div className="border-t border-zinc-200 dark:border-zinc-800/60 pt-2 flex items-center justify-between text-[10px] text-zinc-500 dark:text-zinc-400">
+                <span>{promptNodes.length} text node(s)</span>
+                {matchedPromptNode ? (
+                  <span className="font-mono text-[10px] text-indigo-600 dark:text-indigo-400 truncate max-w-[120px]" title={matchedPromptNode.title}>
+                    {matchedPromptNode.title}
+                  </span>
+                ) : (
+                  <span className="italic">Auto Target</span>
+                )}
+              </div>
             </div>
           );
         })()}
