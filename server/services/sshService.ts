@@ -262,37 +262,81 @@ export function openSFTP(conn: Client): Promise<SFTPWrapper> {
 
 /**
  * Upload single item via SFTP (file path or in-memory content)
+ * Uses direct Buffer write for files <= 25MB to avoid fastPut concurrency stalls on cloud containers.
+ * Guaranteed timeout prevents hanging the transfer queue.
  */
-export function uploadSFTPItem(sftp: SFTPWrapper, item: TransferItem): Promise<number> {
-  return new Promise((resolve, reject) => {
-    if (item.content !== undefined) {
-      const buffer = Buffer.isBuffer(item.content) ? item.content : Buffer.from(item.content, "utf-8");
-      sftp.writeFile(item.remotePath, buffer, (err) => {
-        if (err) return reject(err);
-        resolve(buffer.length);
-      });
-    } else if (item.localPath) {
-      if (!fs.existsSync(item.localPath)) {
-        return reject(new Error(`Local file not found: ${item.localPath}`));
-      }
-      const stats = fs.statSync(item.localPath);
-      sftp.fastPut(item.localPath, item.remotePath, {}, (err) => {
-        if (err) {
-          // Fallback to streaming upload if fastPut fails on certain SFTP configurations
-          const readStream = fs.createReadStream(item.localPath!);
-          const writeStream = sftp.createWriteStream(item.remotePath);
-          readStream.on("error", reject);
-          writeStream.on("error", reject);
-          writeStream.on("finish", () => resolve(stats.size));
-          readStream.pipe(writeStream);
-        } else {
-          resolve(stats.size);
+export function uploadSFTPItem(sftp: SFTPWrapper, item: TransferItem, timeoutMs: number = 30000): Promise<number> {
+  const performUpload = new Promise<number>((resolve, reject) => {
+    try {
+      if (item.content !== undefined) {
+        const buffer = Buffer.isBuffer(item.content) ? item.content : Buffer.from(item.content, "utf-8");
+        sftp.writeFile(item.remotePath, buffer, (err) => {
+          if (err) return reject(err);
+          resolve(buffer.length);
+        });
+      } else if (item.localPath) {
+        if (!fs.existsSync(item.localPath)) {
+          return reject(new Error(`Local file not found: ${item.localPath}`));
         }
-      });
-    } else {
-      reject(new Error(`No localPath or content provided for ${item.filename}`));
+        const stats = fs.statSync(item.localPath);
+
+        // For files <= 25MB (images, masks, configs), direct Buffer write is atomic & 100% reliable on Docker/NAT SFTP
+        if (stats.size <= 25 * 1024 * 1024) {
+          fs.readFile(item.localPath, (readErr, data) => {
+            if (readErr) return reject(readErr);
+            sftp.writeFile(item.remotePath, data, (writeErr) => {
+              if (writeErr) return reject(writeErr);
+              resolve(stats.size);
+            });
+          });
+        } else {
+          // For very large files (>25MB), use reliable stream piping
+          const readStream = fs.createReadStream(item.localPath);
+          const writeStream = sftp.createWriteStream(item.remotePath);
+          
+          let finished = false;
+          const onDone = () => {
+            if (!finished) {
+              finished = true;
+              resolve(stats.size);
+            }
+          };
+
+          readStream.on("error", (err) => {
+            if (!finished) {
+              finished = true;
+              reject(err);
+            }
+          });
+          writeStream.on("error", (err) => {
+            if (!finished) {
+              finished = true;
+              reject(err);
+            }
+          });
+          writeStream.on("finish", onDone);
+          writeStream.on("close", onDone);
+
+          readStream.pipe(writeStream);
+        }
+      } else {
+        reject(new Error(`No localPath or content provided for ${item.filename}`));
+      }
+    } catch (err: any) {
+      reject(err);
     }
   });
+
+  // Wrap in per-item timeout
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`SFTP transfer timed out after ${timeoutMs / 1000}s for ${item.filename}`));
+    }, timeoutMs);
+    // Unref timer if possible in Node environment
+    if (typeof timer.unref === "function") timer.unref();
+  });
+
+  return Promise.race([performUpload, timeoutPromise]);
 }
 
 /**
@@ -472,12 +516,19 @@ export async function executeSFTPBatchTransfer(
     for (const item of items) {
       if (summary.uploadedFiles.includes(item.filename)) {
         try {
-          const remoteStat = await new Promise<{ size: number }>((res, rej) => {
+          const statPromise = new Promise<{ size: number }>((res, rej) => {
             sftp.stat(item.remotePath, (err, stats) => {
               if (err) return rej(err);
               res({ size: stats.size });
             });
           });
+
+          const statTimeout = new Promise<never>((_, rej) => {
+            const t = setTimeout(() => rej(new Error("Verification timeout (10s)")), 10000);
+            if (typeof t.unref === "function") t.unref();
+          });
+
+          const remoteStat = await Promise.race([statPromise, statTimeout]);
 
           if (remoteStat.size === 0 && (item.sizeBytes ?? 1) > 0) {
             throw new Error(`File was staged but appears as 0 bytes on remote server (${item.remotePath})`);
