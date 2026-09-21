@@ -587,12 +587,16 @@ export interface TransferResult {
   remote_workflow_path?: string;
   remote_workflow_paths?: string[];
   staged_workflow_filename?: string;
+  staged_workflow_filenames?: string[];
+  base_template_used?: string;
   save_video_prefix?: string;
   transferred_count?: number;
   skipped_count?: number;
   total_checked?: number;
   uploaded_files?: string[];
   skipped_files?: string[];
+  verified_files?: string[];
+  unverified_files?: string[];
   transferred_files: TransferredFileItem[];
   updated_workflow_json?: Record<string, any>;
   message: string;

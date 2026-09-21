@@ -8,7 +8,7 @@ import {
   sanitizeFilenamePart,
   formatShotNumber
 } from "../utils/formatters";
-import { injectAndPrepareWorkflowData, parseWorkflowData, convertWorkflowToApiPrompt } from "./workflowService";
+import { injectAndPrepareWorkflowData, parseWorkflowData, convertWorkflowToApiPrompt, resolveWorkflowTemplate } from "./workflowService";
 import { assetService } from "./assetService";
 import { executeSFTPBatchTransfer, SSHCredentials, TransferItem } from "./sshService";
 import { queuePromptToRemoteComfy } from "./remoteComfyService";
@@ -124,7 +124,9 @@ export async function processAssetTransfer(options: AssetTransferOptions) {
   }
 
   const filesToTransfer = Array.from(fileSet);
-  const cleanRemoteRoot = remote_comfyui_root.replace(/\/$/, "");
+  const cleanRemoteRoot = (remote_comfyui_root || "/workspace/runpod-slim/ComfyUI")
+    .replace(/\/input\/?$/, "")
+    .replace(/\/+$/, "");
   const cleanRemoteDir = `${cleanRemoteRoot}/input`;
   const sftpItems: TransferItem[] = [];
   const transferredSummary: TransferFileSummary[] = [];
@@ -174,66 +176,69 @@ export async function processAssetTransfer(options: AssetTransferOptions) {
   let stagedWorkflowFilename: string | undefined = undefined;
   let remoteWorkflowPath: string | undefined = undefined;
   let updatedWorkflowJson: any = null;
+  let baseTemplateUsed: string = workflow_filename || "minimax_video_workflow.json";
 
-  if (workflow_filename) {
-    const wfPath = path.join(WORKFLOWS_DIR, workflow_filename);
-    if (fs.existsSync(wfPath)) {
-      try {
-        const rawWf = JSON.parse(fs.readFileSync(wfPath, "utf-8"));
-        updatedWorkflowJson = injectAndPrepareWorkflowData(
-          rawWf,
-          prompt_node_id,
-          expanded_prompt || "",
-          node_mappings,
-          bypass_missing,
-          safe_placeholder,
-          {
-            ...parameter_overrides,
-            ...(generation_parameters
-              ? {
-                  steps: generation_parameters.steps,
-                  frames: generation_parameters.frames,
-                  megapixels: generation_parameters.megapixels
-                }
-              : {})
-          },
-          parameter_node_mappings,
-          resolvedPromptPrefix,
-          resolvedSaveVideoPrefix
-        );
+  const activeSceneName = sanitizeFilenamePart(
+    scene_name ?? scene_planning?.scene_name ?? planning?.scene_name ?? "Untitled_Scene"
+  );
 
-        // Determine final filename and remote path
-        const activeSceneName = sanitizeFilenamePart(scene_name ?? scene_planning?.scene_name ?? planning?.scene_name ?? "Untitled_Scene");
-        const activeShotNum = shot_number ?? scene_planning?.shot_number ?? planning?.shot_number;
-        const defaultShotFilename = (activeShotNum !== undefined && activeShotNum !== null && activeShotNum !== "")
-          ? `${activeSceneName}_Shot_${formatShotNumber(activeShotNum)}.json`
-          : workflow_filename;
+  try {
+    const { resolvedFilename, rawWorkflow } = resolveWorkflowTemplate(workflow_filename, activeSceneName);
+    baseTemplateUsed = resolvedFilename;
 
-        const finalFilename = output_workflow_filename || defaultShotFilename || workflow_filename;
-        remoteWorkflowPath = `${cleanRemoteRoot}/user/default/workflows/${activeSceneName}/${finalFilename}`;
+    updatedWorkflowJson = injectAndPrepareWorkflowData(
+      rawWorkflow,
+      prompt_node_id,
+      expanded_prompt || "",
+      node_mappings,
+      bypass_missing,
+      safe_placeholder,
+      {
+        ...parameter_overrides,
+        ...(generation_parameters
+          ? {
+              steps: generation_parameters.steps,
+              frames: generation_parameters.frames,
+              megapixels: generation_parameters.megapixels
+            }
+          : {})
+      },
+      parameter_node_mappings,
+      resolvedPromptPrefix,
+      resolvedSaveVideoPrefix
+    );
 
-        // Save staged workflow version into active scene workflows directory locally
-        const sceneWfDir = getSceneDirectories(activeSceneName).workflows;
-        if (!fs.existsSync(sceneWfDir)) {
-          fs.mkdirSync(sceneWfDir, { recursive: true });
-        }
-        const stagedPath = path.join(sceneWfDir, finalFilename);
-        const wfContentStr = JSON.stringify(updatedWorkflowJson, null, 2);
-        fs.writeFileSync(stagedPath, wfContentStr);
-        stagedWorkflowFilename = finalFilename;
+    // Determine final filename and remote path
+    const activeShotNum = shot_number ?? scene_planning?.shot_number ?? planning?.shot_number;
+    const defaultShotFilename =
+      activeShotNum !== undefined && activeShotNum !== null && activeShotNum !== ""
+        ? `${activeSceneName}_Shot_${formatShotNumber(activeShotNum)}.json`
+        : (workflow_filename && !["default.json", "default"].includes(workflow_filename) ? workflow_filename : `${activeSceneName}_workflow.json`);
 
-        // Add workflow JSON to remote transfer queue
-        sftpItems.push({
-          filename: finalFilename,
-          content: wfContentStr,
-          remotePath: remoteWorkflowPath,
-          sizeBytes: Buffer.byteLength(wfContentStr)
-        });
-        console.log(`[SSH Staging] Prepared workflow JSON "${finalFilename}" for remote staging at ${remoteWorkflowPath}`);
-      } catch (e: any) {
-        console.warn("[SSH Staging] Failed to prepare staged workflow JSON:", e.message);
-      }
+    const finalFilename = output_workflow_filename || defaultShotFilename;
+    remoteWorkflowPath = `${cleanRemoteRoot}/user/default/workflows/${activeSceneName}/${finalFilename}`;
+
+    // Save staged workflow version into active scene workflows directory locally
+    const sceneWfDir = getSceneDirectories(activeSceneName).workflows;
+    if (!fs.existsSync(sceneWfDir)) {
+      fs.mkdirSync(sceneWfDir, { recursive: true });
     }
+    const stagedPath = path.join(sceneWfDir, finalFilename);
+    const wfContentStr = JSON.stringify(updatedWorkflowJson, null, 2);
+    fs.writeFileSync(stagedPath, wfContentStr);
+    stagedWorkflowFilename = finalFilename;
+
+    // Add workflow JSON to remote transfer queue
+    sftpItems.push({
+      filename: finalFilename,
+      content: wfContentStr,
+      remotePath: remoteWorkflowPath,
+      sizeBytes: Buffer.byteLength(wfContentStr)
+    });
+    console.log(`[SSH Staging] Prepared workflow JSON "${finalFilename}" (from template "${resolvedFilename}") for remote staging at ${remoteWorkflowPath}`);
+  } catch (wfErr: any) {
+    console.error("[SSH Staging ERROR] Failed to resolve and prepare workflow JSON:", wfErr.message);
+    throw new Error(`Failed to stage workflow: ${wfErr.message}`);
   }
 
   // 3. Perform real SFTP file transfers to remote ComfyUI instance
@@ -241,6 +246,8 @@ export async function processAssetTransfer(options: AssetTransferOptions) {
   let skippedCount = 0;
   const uploadedFiles: string[] = [];
   const skippedFiles: string[] = [];
+  const verifiedFiles: string[] = [];
+  const unverifiedFiles: string[] = [];
 
   if (sftpItems.length > 0) {
     console.log(`[SSH Staging] Starting SFTP transfer of ${sftpItems.length} file(s) to ${targetHost}...`);
@@ -249,9 +256,11 @@ export async function processAssetTransfer(options: AssetTransferOptions) {
     transferredCount = sftpSummary.transferredCount;
     uploadedFiles.push(...sftpSummary.uploadedFiles);
     skippedFiles.push(...sftpSummary.failedFiles);
+    verifiedFiles.push(...sftpSummary.verifiedFiles);
+    unverifiedFiles.push(...sftpSummary.unverifiedFiles);
 
     // Merge SFTP transfer results
-    sftpSummary.transferredFiles.forEach(t => {
+    sftpSummary.transferredFiles.forEach((t) => {
       transferredSummary.push({
         filename: t.filename,
         file: t.filename,
@@ -262,12 +271,14 @@ export async function processAssetTransfer(options: AssetTransferOptions) {
       });
     });
 
-    if (sftpSummary.failedCount > 0) {
-      console.warn(`[SSH Staging Notice] ${sftpSummary.failedCount} file(s) failed during SFTP transfer.`);
+    if (!sftpSummary.success || sftpSummary.failedCount > 0 || unverifiedFiles.length > 0) {
+      const errDetail = sftpSummary.error || `Failed or unverified files: ${[...sftpSummary.failedFiles, ...unverifiedFiles].join(", ")}`;
+      console.error(`[SSH Staging Verification Failed] ${errDetail}`);
+      throw new Error(`Remote staging verification failed on ${targetHost}: ${errDetail}`);
     }
   }
 
-  const statusMessage = `Staged ${workflow_filename || "workflow"} and transferred ${uploadedFiles.length} file(s) into Remote ComfyUI (${cleanRemoteDir}). Ready for execution!`;
+  const statusMessage = `Successfully verified and staged workflow '${stagedWorkflowFilename}' + ${uploadedFiles.length} file(s) into Remote ComfyUI. Workflow at: ${remoteWorkflowPath}`;
   console.log(`[SSH Staging Complete] ${statusMessage}`);
 
   const effectiveStagedFilename = stagedWorkflowFilename || output_workflow_filename || workflow_filename;
@@ -278,13 +289,15 @@ export async function processAssetTransfer(options: AssetTransferOptions) {
     remote_workflow_paths: remoteWorkflowPath ? [remoteWorkflowPath] : [],
     staged_workflow_filename: effectiveStagedFilename,
     staged_workflow_filenames: effectiveStagedFilename ? [effectiveStagedFilename] : [],
-    base_template_used: workflow_filename,
+    base_template_used: baseTemplateUsed,
     save_video_prefix: resolvedSaveVideoPrefix,
     transferred_count: transferredCount,
     skipped_count: skippedCount,
-    total_checked: filesToTransfer.length + (workflow_filename ? 1 : 0),
+    total_checked: filesToTransfer.length + (stagedWorkflowFilename ? 1 : 0),
     uploaded_files: uploadedFiles,
     skipped_files: skippedFiles,
+    verified_files: verifiedFiles,
+    unverified_files: unverifiedFiles,
     transferred_files: transferredSummary,
     updated_workflow_json: updatedWorkflowJson,
     message: statusMessage
@@ -333,7 +346,9 @@ export async function processSceneTransfer(options: SceneTransferOptions) {
   const activeSceneName = sanitizeFilenamePart(scene_name ?? "Untitled_Scene");
   console.log(`[SSH Scene Staging] Starting batch staging for scene: "${activeSceneName}" (${shots.length} shots) to host: ${targetHost || 'None'}`);
 
-  const cleanRemoteRoot = remote_comfyui_root.replace(/\/$/, "");
+  const cleanRemoteRoot = (remote_comfyui_root || "/workspace/runpod-slim/ComfyUI")
+    .replace(/\/input\/?$/, "")
+    .replace(/\/+$/, "");
   const cleanRemoteDir = `${cleanRemoteRoot}/input`;
   const sftpItems: TransferItem[] = [];
   const transferredSummary: TransferFileSummary[] = [];
@@ -410,20 +425,10 @@ export async function processSceneTransfer(options: SceneTransferOptions) {
   const updatedWorkflows: any[] = [];
 
   for (const shot of shots) {
-    const activeWorkflow = shot.workflow_filename || workflow_filename;
-    if (!activeWorkflow) {
-      console.warn(`[SSH Scene Staging] No workflow file specified for shot ${shot.shot_number}`);
-      continue;
-    }
-
-    const wfPath = path.join(WORKFLOWS_DIR, activeWorkflow);
-    if (!fs.existsSync(wfPath)) {
-      console.warn(`[SSH Scene Staging] Workflow file not found locally: ${wfPath}`);
-      continue;
-    }
+    const activeWorkflowName = shot.workflow_filename || workflow_filename;
 
     try {
-      const rawWf = JSON.parse(fs.readFileSync(wfPath, "utf-8"));
+      const { resolvedFilename, rawWorkflow } = resolveWorkflowTemplate(activeWorkflowName, activeSceneName);
       const activeShotNumber = formatShotNumber(shot.shot_number ?? "1");
       const finalFilename = `${activeSceneName}_Shot_${activeShotNumber}.json`;
       
@@ -439,7 +444,7 @@ export async function processSceneTransfer(options: SceneTransferOptions) {
       });
 
       const updatedWorkflowJson = injectAndPrepareWorkflowData(
-        rawWf,
+        rawWorkflow,
         shot.prompt_node_id,
         shot.expanded_prompt || "",
         shot.node_mappings || {},
@@ -474,8 +479,10 @@ export async function processSceneTransfer(options: SceneTransferOptions) {
         remotePath: remoteWorkflowPath,
         sizeBytes: Buffer.byteLength(wfContentStr)
       });
+      console.log(`[SSH Scene Staging] Prepared shot ${activeShotNumber} workflow JSON -> ${remoteWorkflowPath}`);
     } catch (e: any) {
-      console.warn(`[SSH Scene Staging] Failed to prepare staged workflow JSON for shot ${shot.shot_number}:`, e.message);
+      console.error(`[SSH Scene Staging ERROR] Failed to prepare staged workflow JSON for shot ${shot.shot_number}:`, e.message);
+      throw new Error(`Failed to stage shot ${shot.shot_number}: ${e.message}`);
     }
   }
 
@@ -484,6 +491,8 @@ export async function processSceneTransfer(options: SceneTransferOptions) {
   let skippedCount = 0;
   const uploadedFiles: string[] = [];
   const skippedFiles: string[] = [];
+  const verifiedFiles: string[] = [];
+  const unverifiedFiles: string[] = [];
 
   if (targetHost && sftpItems.length > 0) {
     console.log(`[SSH Scene Staging] Commencing SFTP batch upload of ${sftpItems.length} items (${filesToTransfer.length} assets, ${shots.length} workflows) to ${targetHost}...`);
@@ -492,6 +501,8 @@ export async function processSceneTransfer(options: SceneTransferOptions) {
     transferredCount = sftpSummary.transferredCount;
     uploadedFiles.push(...sftpSummary.uploadedFiles);
     skippedFiles.push(...sftpSummary.failedFiles);
+    verifiedFiles.push(...sftpSummary.verifiedFiles);
+    unverifiedFiles.push(...sftpSummary.unverifiedFiles);
 
     sftpSummary.transferredFiles.forEach(t => {
       transferredSummary.push({
@@ -504,8 +515,10 @@ export async function processSceneTransfer(options: SceneTransferOptions) {
       });
     });
 
-    if (sftpSummary.failedCount > 0) {
-      console.warn(`[SSH Scene Staging Notice] ${sftpSummary.failedCount} file(s) failed during scene SFTP transfer.`);
+    if (!sftpSummary.success || sftpSummary.failedCount > 0 || unverifiedFiles.length > 0) {
+      const errDetail = sftpSummary.error || `Failed or unverified files: ${[...sftpSummary.failedFiles, ...unverifiedFiles].join(", ")}`;
+      console.error(`[SSH Scene Staging Verification Failed] ${errDetail}`);
+      throw new Error(`Scene staging verification failed on ${targetHost}: ${errDetail}`);
     }
   } else if (!targetHost) {
     console.log(`[SSH Scene Staging] No remote host provided. Staged ${sftpItems.length} items locally only.`);
@@ -523,7 +536,7 @@ export async function processSceneTransfer(options: SceneTransferOptions) {
     });
   }
 
-  const statusMessage = `Staged ${shots.length} workflows and transferred ${uploadedFiles.length} file(s) into Remote ComfyUI (${cleanRemoteDir}). Ready for manual execution!`;
+  const statusMessage = `Successfully verified and staged ${shots.length} workflow(s) and ${uploadedFiles.length} file(s) into Remote ComfyUI. Workflows in: ${cleanRemoteRoot}/user/default/workflows/${activeSceneName}/`;
   console.log(`[SSH Scene Staging Complete] ${statusMessage}`);
 
   return {
@@ -534,7 +547,10 @@ export async function processSceneTransfer(options: SceneTransferOptions) {
     skipped_count: skippedCount,
     total_checked: filesToTransfer.length + shots.length,
     uploaded_files: uploadedFiles,
+    verified_files: verifiedFiles,
+    unverified_files: unverifiedFiles,
     transferred_assets: uploadedFiles.filter(f => !f.endsWith('.json')),
+    transferred_workflows: uploadedFiles.filter(f => f.endsWith('.json')),
     workflows_created: uploadedFiles.filter(f => f.endsWith('.json')),
     staged_workflows: uploadedFiles.filter(f => f.endsWith('.json')),
     skipped_files: skippedFiles,
@@ -654,34 +670,12 @@ export async function executeWorkflow(options: ExecuteWorkflowOptions) {
     resolvedWorkflowFilename = path.basename(resolvedWorkflowFilename);
   }
 
-  // Search for the workflow in WORKFLOWS_DIR, scene subdirectory, ASSETS_DIR, or root
-  let workflowPath = path.join(WORKFLOWS_DIR, resolvedWorkflowFilename);
-  if (!fs.existsSync(workflowPath)) {
-    const sceneWfPath = path.join(WORKFLOWS_DIR, cleanScene, resolvedWorkflowFilename);
-    const assetsWfPath = path.join(ASSETS_DIR, cleanScene, "workflows", resolvedWorkflowFilename);
-    const rootWfPath = path.join(process.cwd(), "workflows", resolvedWorkflowFilename);
-
-    if (fs.existsSync(sceneWfPath)) {
-      workflowPath = sceneWfPath;
-    } else if (fs.existsSync(assetsWfPath)) {
-      workflowPath = assetsWfPath;
-    } else if (fs.existsSync(rootWfPath)) {
-      workflowPath = rootWfPath;
-    } else if (fs.existsSync(WORKFLOWS_DIR)) {
-      // Find any json file in WORKFLOWS_DIR as fallback if specific one missing
-      const allWfs = fs.readdirSync(WORKFLOWS_DIR).filter(f => f.endsWith(".json"));
-      if (allWfs.length > 0) {
-        workflowPath = path.join(WORKFLOWS_DIR, allWfs[0]);
-        resolvedWorkflowFilename = allWfs[0];
-      }
-    }
-  }
-
-  if (!fs.existsSync(workflowPath)) {
-    throw new Error(`Workflow ${resolvedWorkflowFilename} not found locally or in project workflows directory`);
-  }
-
-  const workflow = JSON.parse(fs.readFileSync(workflowPath, "utf-8"));
+  // Resolve template using resilient workflow resolver
+  const { resolvedPath: workflowPath, resolvedFilename, rawWorkflow: workflow } = resolveWorkflowTemplate(
+    resolvedWorkflowFilename,
+    cleanScene
+  );
+  resolvedWorkflowFilename = resolvedFilename;
   const modifiedWf = injectAndPrepareWorkflowData(
     workflow,
     prompt_node_id,

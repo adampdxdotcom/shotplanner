@@ -211,24 +211,34 @@ export const ExecutionConsole: React.FC<ExecutionConsoleProps> = ({
 
               {/* Transferred Assets */}
               <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <HardDrive className="w-4 h-4 text-emerald-500/80 shrink-0" />
-                  <h4 className="text-xs font-semibold text-emerald-500/80 uppercase tracking-wider">Transferred Assets</h4>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <HardDrive className="w-4 h-4 text-emerald-500/80 shrink-0" />
+                    <h4 className="text-xs font-semibold text-emerald-500/80 uppercase tracking-wider">Transferred & Verified Files</h4>
+                  </div>
+                  {transferResult.verified_files?.length ? (
+                    <span className="text-[10px] text-emerald-400 font-mono bg-emerald-950/60 border border-emerald-800/50 px-1.5 py-0.5 rounded">
+                      ✓ {transferResult.verified_files.length} verified
+                    </span>
+                  ) : null}
                 </div>
                 {transferResult.uploaded_files?.length ? (
                   <div className="bg-zinc-950/80 border border-emerald-900/40 rounded p-2.5 max-h-[100px] overflow-y-auto">
                     <ul className="space-y-1">
                       {transferResult.uploaded_files.map((file, i) => (
-                        <li key={i} className="text-[11px] text-emerald-200/90 font-mono truncate flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/60 shrink-0" />
-                          {file}
+                        <li key={i} className="text-[11px] text-emerald-200/90 font-mono truncate flex items-center justify-between gap-1.5">
+                          <span className="flex items-center gap-1.5 truncate">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/60 shrink-0" />
+                            {file}
+                          </span>
+                          <span className="text-[9px] text-emerald-400/80 uppercase font-sans shrink-0">Verified</span>
                         </li>
                       ))}
                     </ul>
                   </div>
                 ) : (
                   <p className="text-xs text-emerald-300/60 italic bg-zinc-950/40 border border-emerald-900/20 rounded p-2.5">
-                    No new files transferred (assets cached in remote <code className="font-mono">/input</code>).
+                    No new files transferred (assets verified in remote <code className="font-mono">/input</code>).
                   </p>
                 )}
               </div>

@@ -57,6 +57,8 @@ export interface SFTPTransferSummary {
   skippedCount: number;
   uploadedFiles: string[];
   failedFiles: string[];
+  verifiedFiles: string[];
+  unverifiedFiles: string[];
   transferredFiles: TransferResultItem[];
   totalBytes: number;
   durationMs: number;
@@ -396,6 +398,8 @@ export async function executeSFTPBatchTransfer(
     skippedCount: 0,
     uploadedFiles: [],
     failedFiles: [],
+    verifiedFiles: [],
+    unverifiedFiles: [],
     transferredFiles: [],
     totalBytes: 0,
     durationMs: 0
@@ -414,9 +418,16 @@ export async function executeSFTPBatchTransfer(
       if (dir && dir !== ".") remoteDirs.add(dir);
     });
 
-    const mkdirCmd = Array.from(remoteDirs).map((d) => `mkdir -p "${d}"`).join(" && ");
-    console.log(`[SSH SFTP] Ensuring ${remoteDirs.size} remote directories exist...`);
-    await execSSHCommand(client, mkdirCmd);
+    console.log(`[SSH SFTP] Ensuring ${remoteDirs.size} remote directories exist on GPU...`);
+    for (const d of remoteDirs) {
+      console.log(`[SSH SFTP] Creating/verifying directory: ${d}`);
+      const mkdirRes = await execSSHCommand(client, `mkdir -p "${d}"`);
+      if (mkdirRes.code !== 0) {
+        const errMsg = mkdirRes.stderr.trim() || `Exit code ${mkdirRes.code}`;
+        console.error(`[SSH SFTP ERROR] Failed to create remote directory "${d}":`, errMsg);
+        throw new Error(`Failed to create remote directory "${d}" on GPU server. Reason: ${errMsg}`);
+      }
+    }
 
     // Open SFTP session
     const sftp = await openSFTP(client);
@@ -440,7 +451,7 @@ export async function executeSFTPBatchTransfer(
           remote_path: item.remotePath,
           message: `Transferred via SFTP (${(bytes / 1024).toFixed(1)} KB in ${elapsed}ms)`
         });
-        console.log(`[SSH SFTP] [OK] Completed: ${item.filename} (${bytes} bytes in ${elapsed}ms)`);
+        console.log(`[SSH SFTP] [OK] Completed upload: ${item.filename} (${bytes} bytes in ${elapsed}ms)`);
       } catch (uploadErr: any) {
         summary.failedCount++;
         summary.failedFiles.push(item.filename);
@@ -456,11 +467,53 @@ export async function executeSFTPBatchTransfer(
       }
     }
 
+    // Post-upload verification check: inspect remote filesystem directly
+    console.log(`[SSH SFTP] Running remote verification check on ${summary.uploadedFiles.length} uploaded files...`);
+    for (const item of items) {
+      if (summary.uploadedFiles.includes(item.filename)) {
+        try {
+          const remoteStat = await new Promise<{ size: number }>((res, rej) => {
+            sftp.stat(item.remotePath, (err, stats) => {
+              if (err) return rej(err);
+              res({ size: stats.size });
+            });
+          });
+
+          if (remoteStat.size === 0 && (item.sizeBytes ?? 1) > 0) {
+            throw new Error(`File was staged but appears as 0 bytes on remote server (${item.remotePath})`);
+          }
+
+          summary.verifiedFiles.push(item.filename);
+          console.log(`[SSH SFTP Verified] Successfully verified: ${item.remotePath} (${remoteStat.size} bytes)`);
+        } catch (verErr: any) {
+          console.error(`[SSH SFTP Verification Failure] Could not verify ${item.filename} at ${item.remotePath}:`, verErr.message);
+          summary.unverifiedFiles.push(item.filename);
+          summary.failedFiles.push(item.filename);
+          summary.uploadedFiles = summary.uploadedFiles.filter(f => f !== item.filename);
+          summary.transferredCount = Math.max(0, summary.transferredCount - 1);
+          summary.failedCount++;
+
+          const tf = summary.transferredFiles.find(t => t.filename === item.filename);
+          if (tf) {
+            tf.status = "failed";
+            tf.message = `Verification failed on remote host: ${verErr.message}`;
+          }
+        }
+      }
+    }
+
     summary.durationMs = Date.now() - startTime;
-    summary.success = summary.failedCount === 0;
+    summary.success = summary.failedCount === 0 && summary.unverifiedFiles.length === 0;
+
+    if (!summary.success) {
+      const errParts = [];
+      if (summary.failedFiles.length > 0) errParts.push(`Failed files: ${summary.failedFiles.join(", ")}`);
+      if (summary.unverifiedFiles.length > 0) errParts.push(`Unverified on remote: ${summary.unverifiedFiles.join(", ")}`);
+      summary.error = errParts.join(". ");
+    }
 
     console.log(
-      `[SSH SFTP Staging Complete] ${summary.transferredCount}/${items.length} transferred (${(summary.totalBytes / 1024).toFixed(1)} KB) in ${(summary.durationMs / 1000).toFixed(2)}s. Errors: ${summary.failedCount}`
+      `[SSH SFTP Staging Complete] ${summary.transferredCount}/${items.length} verified (${(summary.totalBytes / 1024).toFixed(1)} KB) in ${(summary.durationMs / 1000).toFixed(2)}s. Errors: ${summary.failedCount}`
     );
 
     return summary;

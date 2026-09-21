@@ -1048,3 +1048,114 @@ export function buildShotWorkflow(
     saveVideoPrefix
   );
 }
+
+export interface ResolvedWorkflowTemplate {
+  resolvedPath: string;
+  resolvedFilename: string;
+  rawWorkflow: any;
+}
+
+/**
+ * Resiliently resolve and parse a ComfyUI workflow JSON template from disk.
+ * Searches scene-specific directories, global workflows dir, and standard templates.
+ */
+export function resolveWorkflowTemplate(
+  requestedFilename?: string,
+  sceneName?: string
+): ResolvedWorkflowTemplate {
+  const cleanScene = sceneName ? formatSceneFolderName(sceneName) : "";
+  const candidates: string[] = [];
+
+  let cleanRequested = (requestedFilename || "").trim();
+  if (cleanRequested.includes("/") || cleanRequested.includes("\\")) {
+    cleanRequested = path.basename(cleanRequested);
+  }
+
+  const isGeneric =
+    !cleanRequested ||
+    cleanRequested === "default.json" ||
+    cleanRequested === "default" ||
+    cleanRequested === "undefined" ||
+    cleanRequested === "null";
+
+  if (!isGeneric) {
+    if (cleanScene) {
+      candidates.push(path.join(getSceneDirectories(cleanScene).workflows, cleanRequested));
+      candidates.push(path.join(ASSETS_DIR, cleanScene, "workflows", cleanRequested));
+      candidates.push(path.join(WORKFLOWS_DIR, cleanScene, cleanRequested));
+    }
+    candidates.push(path.join(WORKFLOWS_DIR, cleanRequested));
+    candidates.push(path.join(ASSETS_DIR, "workflows", cleanRequested));
+    candidates.push(path.join(process.cwd(), "workflows", cleanRequested));
+  }
+
+  // Fallback candidate templates
+  if (cleanScene) {
+    candidates.push(path.join(getSceneDirectories(cleanScene).workflows, "minimax_video_workflow.json"));
+    candidates.push(path.join(ASSETS_DIR, cleanScene, "workflows", "minimax_video_workflow.json"));
+  }
+  candidates.push(path.join(WORKFLOWS_DIR, "minimax_video_workflow.json"));
+  candidates.push(path.join(WORKFLOWS_DIR, "scene01", "minimax_video_workflow.json"));
+  candidates.push(path.join(process.cwd(), "workflows", "minimax_video_workflow.json"));
+
+  // Check candidates in order
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+      try {
+        const raw = JSON.parse(fs.readFileSync(candidate, "utf-8"));
+        return {
+          resolvedPath: candidate,
+          resolvedFilename: path.basename(candidate),
+          rawWorkflow: raw
+        };
+      } catch (e: any) {
+        console.warn(`[Workflow Resolver] Candidate ${candidate} exists but failed to parse: ${e.message}`);
+      }
+    }
+  }
+
+  // Search directory tree for any valid workflow json file
+  const searchDirs = [
+    cleanScene ? getSceneDirectories(cleanScene).workflows : null,
+    WORKFLOWS_DIR,
+    path.join(WORKFLOWS_DIR, "scene01"),
+    path.join(ASSETS_DIR, "workflows"),
+    ASSETS_DIR
+  ].filter(Boolean) as string[];
+
+  for (const searchDir of searchDirs) {
+    if (fs.existsSync(searchDir)) {
+      try {
+        const files = fs.readdirSync(searchDir);
+        for (const file of files) {
+          if (
+            file.endsWith(".json") &&
+            !file.includes(".scene.") &&
+            !file.includes("config") &&
+            !file.includes("universe") &&
+            !file.includes("characters") &&
+            !file.includes("assets_db")
+          ) {
+            const fullPath = path.join(searchDir, file);
+            if (fs.statSync(fullPath).isFile()) {
+              try {
+                const raw = JSON.parse(fs.readFileSync(fullPath, "utf-8"));
+                if (raw && (raw.nodes || Object.keys(raw).some(k => raw[k]?.class_type))) {
+                  return {
+                    resolvedPath: fullPath,
+                    resolvedFilename: file,
+                    rawWorkflow: raw
+                  };
+                }
+              } catch (e) {}
+            }
+          }
+        }
+      } catch (e) {}
+    }
+  }
+
+  throw new Error(
+    `Workflow template "${cleanRequested || "default"}" could not be found or loaded from workspace assets. Please upload or select a valid ComfyUI workflow JSON.`
+  );
+}
