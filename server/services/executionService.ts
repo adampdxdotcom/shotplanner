@@ -216,7 +216,7 @@ export async function processAssetTransfer(options: AssetTransferOptions) {
         : (workflow_filename && !["default.json", "default"].includes(workflow_filename) ? workflow_filename : `${activeSceneName}_workflow.json`);
 
     const finalFilename = output_workflow_filename || defaultShotFilename;
-    remoteWorkflowPath = `${cleanRemoteRoot}/user/default/workflows/${activeSceneName}/${finalFilename}`;
+    remoteWorkflowPath = `${cleanRemoteRoot}/user/default/workflows/${finalFilename}`;
 
     // Save staged workflow version into active scene workflows directory locally
     const sceneWfDir = getSceneDirectories(activeSceneName).workflows;
@@ -228,10 +228,10 @@ export async function processAssetTransfer(options: AssetTransferOptions) {
     fs.writeFileSync(stagedPath, wfContentStr);
     stagedWorkflowFilename = finalFilename;
 
-    // Add workflow JSON to remote transfer queue
+    // Add workflow JSON to remote transfer queue using identical localPath file mechanism
     sftpItems.push({
       filename: finalFilename,
-      content: wfContentStr,
+      localPath: stagedPath,
       remotePath: remoteWorkflowPath,
       sizeBytes: Buffer.byteLength(wfContentStr)
     });
@@ -461,7 +461,7 @@ export async function processSceneTransfer(options: SceneTransferOptions) {
 
       updatedWorkflows.push(updatedWorkflowJson);
 
-      const remoteWorkflowPath = `${cleanRemoteRoot}/user/default/workflows/${activeSceneName}/${finalFilename}`;
+      const remoteWorkflowPath = `${cleanRemoteRoot}/user/default/workflows/${finalFilename}`;
       remoteWorkflowPaths.push(remoteWorkflowPath);
 
       // Save staged workflow version into active scene workflows directory
@@ -475,7 +475,7 @@ export async function processSceneTransfer(options: SceneTransferOptions) {
 
       sftpItems.push({
         filename: finalFilename,
-        content: wfContentStr,
+        localPath: stagedPath,
         remotePath: remoteWorkflowPath,
         sizeBytes: Buffer.byteLength(wfContentStr)
       });
@@ -536,7 +536,7 @@ export async function processSceneTransfer(options: SceneTransferOptions) {
     });
   }
 
-  const statusMessage = `Successfully verified and staged ${shots.length} workflow(s) and ${uploadedFiles.length} file(s) into Remote ComfyUI. Workflows in: ${cleanRemoteRoot}/user/default/workflows/${activeSceneName}/`;
+  const statusMessage = `Successfully verified and staged ${shots.length} workflow(s) and ${uploadedFiles.length} file(s) into Remote ComfyUI. Workflows in: ${cleanRemoteRoot}/user/default/workflows/`;
   console.log(`[SSH Scene Staging Complete] ${statusMessage}`);
 
   return {
@@ -800,7 +800,7 @@ export async function executeWorkflow(options: ExecuteWorkflowOptions) {
 
     const synthesizedWfFilename = options.output_workflow_filename || `${cleanScene}_Shot_${formattedShot}.json`;
     const cleanRoot = remote_comfyui_root.replace(/\/$/, "");
-    const expectedRemoteWfPath = `${cleanRoot}/user/default/workflows/${cleanScene}/${synthesizedWfFilename}`;
+    const expectedRemoteWfPath = `${cleanRoot}/user/default/workflows/${synthesizedWfFilename}`;
 
     return {
       success: true,

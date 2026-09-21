@@ -260,118 +260,6 @@ export function openSFTP(conn: Client): Promise<SFTPWrapper> {
   });
 }
 
-/**
- * Upload single item via SSH exec streaming (cat > remotePath).
- * Bypasses SFTP subsystem and NAT packet window stalls on cloud GPU instances (RunPod, Lambda, etc).
- * Supports both in-memory content (workflows) and local files (images/masks).
- */
-export function uploadViaSSHStream(
-  client: Client,
-  item: TransferItem,
-  timeoutMs: number = 15000
-): Promise<number> {
-  return new Promise<number>((resolve, reject) => {
-    let finished = false;
-
-    const timer = setTimeout(() => {
-      if (!finished) {
-        finished = true;
-        reject(new Error(`Transfer timed out after ${timeoutMs / 1000}s for ${item.filename}`));
-      }
-    }, timeoutMs);
-    if (typeof timer.unref === "function") timer.unref();
-
-    const remoteDir = path.posix.dirname(item.remotePath);
-    const cmd = `mkdir -p "${remoteDir}" && cat > "${item.remotePath}"`;
-
-    client.exec(cmd, (err, stream) => {
-      if (err) {
-        if (!finished) {
-          finished = true;
-          clearTimeout(timer);
-          reject(err);
-        }
-        return;
-      }
-
-      stream.on("close", (code: number) => {
-        if (!finished) {
-          finished = true;
-          clearTimeout(timer);
-          if (code === 0) {
-            let bytes = 0;
-            if (item.content !== undefined) {
-              bytes = Buffer.isBuffer(item.content) ? item.content.length : Buffer.byteLength(item.content);
-            } else if (item.localPath && fs.existsSync(item.localPath)) {
-              bytes = fs.statSync(item.localPath).size;
-            }
-            resolve(bytes);
-          } else {
-            reject(new Error(`Remote write process for ${item.filename} exited with code ${code}`));
-          }
-        }
-      });
-
-      stream.on("error", (streamErr) => {
-        if (!finished) {
-          finished = true;
-          clearTimeout(timer);
-          reject(streamErr);
-        }
-      });
-
-      stream.stderr.on("data", (d: Buffer) => {
-        const msg = d.toString().trim();
-        if (msg) {
-          console.warn(`[SSH write stderr for ${item.filename}]:`, msg);
-        }
-      });
-
-      try {
-        if (item.content !== undefined) {
-          const buffer = Buffer.isBuffer(item.content) ? item.content : Buffer.from(item.content, "utf-8");
-          stream.end(buffer);
-        } else if (item.localPath) {
-          if (!fs.existsSync(item.localPath)) {
-            if (!finished) {
-              finished = true;
-              clearTimeout(timer);
-              reject(new Error(`Local file not found: ${item.localPath}`));
-            }
-            return;
-          }
-          const fileStream = fs.createReadStream(item.localPath);
-          fileStream.on("error", (readErr) => {
-            if (!finished) {
-              finished = true;
-              clearTimeout(timer);
-              reject(readErr);
-            }
-          });
-          fileStream.pipe(stream);
-        } else {
-          if (!finished) {
-            finished = true;
-            clearTimeout(timer);
-            reject(new Error(`No content or localPath for ${item.filename}`));
-          }
-        }
-      } catch (pipeErr: any) {
-        if (!finished) {
-          finished = true;
-          clearTimeout(timer);
-          reject(pipeErr);
-        }
-      }
-    });
-  });
-}
-
-/**
- * Upload single item via SFTP (file path or in-memory content)
- * Uses direct Buffer write for files <= 25MB to avoid fastPut concurrency stalls on cloud containers.
- * Guaranteed timeout prevents hanging the transfer queue.
- */
 export function uploadSFTPItem(sftp: SFTPWrapper, item: TransferItem, timeoutMs: number = 30000): Promise<number> {
   const performUpload = new Promise<number>((resolve, reject) => {
     try {
@@ -580,29 +468,16 @@ export async function executeSFTPBatchTransfer(
       }
     }
 
-    let sftp: SFTPWrapper | null = null;
-    console.log(`[SSH Staging] Transferring ${items.length} item(s) to remote GPU...`);
+    const sftp = await openSFTP(client);
+    console.log(`[SSH Staging] SFTP session opened. Transferring ${items.length} item(s) to remote GPU...`);
 
     for (const item of items) {
       const itemStart = Date.now();
       try {
         console.log(`[SSH Staging] [->] Transferring: ${item.filename} -> ${item.remotePath}`);
-        let bytes = 0;
-        let method = "SSH stream";
-
-        try {
-          // Primary: Fast, reliable SSH exec stream (bypasses RunPod SFTP NAT stalls)
-          bytes = await uploadViaSSHStream(client, item, 15000);
-        } catch (sshErr: any) {
-          console.warn(`[SSH Staging] SSH stream write failed for ${item.filename} (${sshErr.message}), attempting SFTP fallback...`);
-          if (!sftp) {
-            sftp = await openSFTP(client);
-          }
-          bytes = await uploadSFTPItem(sftp, item, 10000);
-          method = "SFTP";
-        }
-
+        const bytes = await uploadSFTPItem(sftp, item, 30000);
         const elapsed = Date.now() - itemStart;
+
         summary.transferredCount++;
         summary.totalBytes += bytes;
         summary.uploadedFiles.push(item.filename);
@@ -612,7 +487,7 @@ export async function executeSFTPBatchTransfer(
           size_bytes: bytes,
           status: "transferred",
           remote_path: item.remotePath,
-          message: `Transferred via ${method} (${(bytes / 1024).toFixed(1)} KB in ${elapsed}ms)`
+          message: `Transferred via SFTP (${(bytes / 1024).toFixed(1)} KB in ${elapsed}ms)`
         });
         console.log(`[SSH Staging] [OK] Completed upload: ${item.filename} (${bytes} bytes in ${elapsed}ms)`);
       } catch (uploadErr: any) {
@@ -629,7 +504,7 @@ export async function executeSFTPBatchTransfer(
         console.error(`[SSH Staging ERROR] Failed to transfer ${item.filename}:`, uploadErr.message);
 
         // Fail-fast on timeout or connection loss so UI gets immediate feedback
-        const isFatal = uploadErr.message?.includes("timed out") || uploadErr.message?.includes("closed") || uploadErr.message?.includes("ECONN");
+        const isFatal = uploadErr.message?.includes("timed out") || uploadErr.message?.includes("closed") || uploadErr.message?.includes("ECONN") || uploadErr.message?.includes("Not connected");
         if (isFatal) {
           console.warn(`[SSH Staging] Aborting remaining transfers after fatal error on ${item.filename}`);
           break;

@@ -203,7 +203,7 @@ export const ExecutionConsole: React.FC<ExecutionConsoleProps> = ({
                     ))
                   ) : (
                     <div className="bg-zinc-950/80 border border-emerald-900/40 px-3 py-2 rounded text-[11px] text-zinc-400 font-mono">
-                      {transferResult.remote_dir}/user/default/workflows/{sanitizedSceneName}/{stagedWorkflowFilename}
+                      {transferResult.remote_dir}/user/default/workflows/{stagedWorkflowFilename}
                     </div>
                   )}
                 </div>
