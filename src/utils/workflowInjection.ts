@@ -136,6 +136,22 @@ export function isExactNegativePromptNode(classType: string, title?: string): bo
   return false;
 }
 
+// Helper to format aspect ratio for ComfyUI ResolutionSelector (e.g. "16:9 (Widescreen)", "9:16 (Vertical)")
+export function formatAspectRatioForComfyUI(aspectRatio?: string): string {
+  const ar = (aspectRatio || "16:9").trim().toLowerCase();
+  if (ar.includes("16:9") || ar.includes("widescreen")) return "16:9 (Widescreen)";
+  if (ar.includes("9:16") || ar.includes("vertical") || ar.includes("tiktok") || ar.includes("reel")) return "9:16 (Vertical)";
+  if (ar.includes("1:1") || ar.includes("square")) return "1:1 (Square)";
+  if (ar.includes("4:3")) return "4:3 (Standard)";
+  if (ar.includes("3:4")) return "3:4 (Tall)";
+  if (ar.includes("2.39") || ar.includes("2.35") || ar.includes("anamorphic") || ar.includes("cinemascope")) return "2.39:1 (Anamorphic)";
+  if (ar.includes("21:9") || ar.includes("ultrawide")) return "21:9 (Ultrawide)";
+  if (ar.includes("4:5")) return "4:5 (Instagram)";
+  if (ar.includes("3:2")) return "3:2 (Classic 35mm)";
+  if (ar.includes("2:3")) return "2:3 (Vertical 35mm)";
+  return "16:9 (Widescreen)";
+}
+
 // Helper to calculate pixel dimensions from aspect ratio and megapixels
 export function getDimensionsFromAspectRatio(aspectRatio?: string, megapixels: number = 1.0): { width: number; height: number } {
   const ar = (aspectRatio || "16:9").trim().toLowerCase();
@@ -361,7 +377,27 @@ export function generateLiveInjectedWorkflow(
         if (effectiveParamNodes.megapixels && String(effectiveParamNodes.megapixels) === strId && effectiveParams.megapixels !== undefined && effectiveParams.megapixels !== null) {
           const val = parseFloat(String(effectiveParams.megapixels));
           if (!isNaN(val)) {
-            if (node.widgets_values_named && typeof node.widgets_values_named === "object" && "megapixels" in node.widgets_values_named) {
+            const isResolutionSelector = classType === "ResolutionSelector" || metaTitle.toLowerCase().includes("resolution selector");
+            if (isResolutionSelector && Array.isArray(node.widgets_values)) {
+              // ComfyUI ResolutionSelector widgets_values: [aspect_ratio_str, megapixels_float, multiplier_int]
+              // Update aspect ratio at index 0 from active shot
+              if (activeShot?.aspect_ratio) {
+                node.widgets_values[0] = formatAspectRatioForComfyUI(activeShot.aspect_ratio);
+              }
+              // Update megapixels at index 1
+              if (node.widgets_values.length > 1) {
+                node.widgets_values[1] = val;
+              }
+              // Multiplier at index 2 is left untouched
+              if (node.widgets_values_named && typeof node.widgets_values_named === "object") {
+                if ("aspect_ratio" in node.widgets_values_named && activeShot?.aspect_ratio) {
+                  node.widgets_values_named.aspect_ratio = formatAspectRatioForComfyUI(activeShot.aspect_ratio);
+                }
+                if ("megapixels" in node.widgets_values_named) {
+                  node.widgets_values_named.megapixels = val;
+                }
+              }
+            } else if (node.widgets_values_named && typeof node.widgets_values_named === "object" && "megapixels" in node.widgets_values_named) {
               node.widgets_values_named.megapixels = val;
             } else if (node.widgets_values_named && typeof node.widgets_values_named === "object" && "width" in node.widgets_values_named && "height" in node.widgets_values_named) {
               const origW = Number(node.widgets_values_named.width) || 768;
@@ -387,22 +423,34 @@ export function generateLiveInjectedWorkflow(
           }
         }
         if (effectiveParamNodes.frames && String(effectiveParamNodes.frames) === strId && effectiveParams.frames !== undefined && effectiveParams.frames !== null) {
-          const val = parseInt(String(effectiveParams.frames), 10);
-          if (!isNaN(val)) {
+          const rawVal = parseFloat(String(effectiveParams.frames));
+          if (!isNaN(rawVal)) {
+            // Keep float precision for seconds, but also support integer frames if node expects int
+            const isFloatNode = classType.toLowerCase().includes("float") || 
+              String(node.title || "").toLowerCase().includes("float") ||
+              String(node.title || "").toLowerCase().includes("second") ||
+              String(node.title || "").toLowerCase().includes("duration");
+            const val = isFloatNode ? rawVal : (Number.isInteger(rawVal) ? rawVal : rawVal);
+
             if (node.widgets_values_named && typeof node.widgets_values_named === "object") {
-              for (const k of ["frames", "length", "num_frames", "duration", "frame_count", "video_length"]) {
+              let matchedNamedKey: string | null = null;
+              for (const k of ["value", "seconds", "duration", "frames", "length", "num_frames", "frame_count", "video_length"]) {
                 if (k in node.widgets_values_named) {
-                  node.widgets_values_named[k] = val;
+                  matchedNamedKey = k;
                   break;
                 }
               }
-            } else if (classType === "VideoLengthConfig") {
+              if (matchedNamedKey) {
+                node.widgets_values_named[matchedNamedKey] = val;
+              }
+            }
+            if (classType === "VideoLengthConfig") {
               if (Array.isArray(node.widgets_values) && node.widgets_values.length > 1) {
                 node.widgets_values[1] = val;
               } else if (Array.isArray(node.widgets_values) && node.widgets_values.length === 1) {
                 node.widgets_values[0] = val;
               }
-            } else if (Array.isArray(node.widgets_values) && node.widgets_values.length === 1) {
+            } else if (Array.isArray(node.widgets_values) && node.widgets_values.length >= 1) {
               node.widgets_values[0] = val;
             }
           }
@@ -496,7 +544,16 @@ export function generateLiveInjectedWorkflow(
         mNode.inputs = mNode.inputs || {};
         const val = parseFloat(String(effectiveParams.megapixels));
         if (!isNaN(val)) {
-          if ("megapixels" in mNode.inputs) {
+          const classType = mNode.class_type || "";
+          const metaTitle = mNode._meta?.title || "";
+          const isResolutionSelector = classType === "ResolutionSelector" || metaTitle.toLowerCase().includes("resolution selector");
+          
+          if (isResolutionSelector) {
+            if (activeShot?.aspect_ratio) {
+              mNode.inputs.aspect_ratio = formatAspectRatioForComfyUI(activeShot.aspect_ratio);
+            }
+            mNode.inputs.megapixels = val;
+          } else if ("megapixels" in mNode.inputs) {
             mNode.inputs.megapixels = val;
           } else if ("width" in mNode.inputs && "height" in mNode.inputs && typeof mNode.inputs.width === "number" && typeof mNode.inputs.height === "number") {
             const origW = mNode.inputs.width;
@@ -514,10 +571,10 @@ export function generateLiveInjectedWorkflow(
       if (effectiveParamNodes.frames && cloned[effectiveParamNodes.frames] && effectiveParams.frames !== undefined && effectiveParams.frames !== null) {
         const fNode = cloned[effectiveParamNodes.frames];
         fNode.inputs = fNode.inputs || {};
-        const val = parseInt(String(effectiveParams.frames), 10);
+        const val = parseFloat(String(effectiveParams.frames));
         if (!isNaN(val)) {
           let matchedKey: string | null = null;
-          for (const k of ["frames", "length", "num_frames", "duration", "frame_count", "video_length"]) {
+          for (const k of ["value", "seconds", "duration", "frames", "length", "num_frames", "frame_count", "video_length"]) {
             if (k in fNode.inputs) {
               matchedKey = k;
               break;
@@ -526,6 +583,8 @@ export function generateLiveInjectedWorkflow(
           if (matchedKey) {
             fNode.inputs[matchedKey] = val;
           } else if ("value" in fNode.inputs) {
+            fNode.inputs.value = val;
+          } else {
             fNode.inputs.value = val;
           }
         }

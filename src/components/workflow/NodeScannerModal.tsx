@@ -268,7 +268,7 @@ export const NodeScannerModal: React.FC<NodeScannerModalProps> = ({
                           )}
                           {isFramesMapped && (
                             <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300 border border-teal-300 dark:border-teal-800 flex items-center gap-1">
-                              <Film className="w-2.5 h-2.5" /> Mapped: Frames
+                              <Film className="w-2.5 h-2.5" /> Mapped: Seconds
                             </span>
                           )}
 
@@ -325,10 +325,10 @@ export const NodeScannerModal: React.FC<NodeScannerModalProps> = ({
                               ? "bg-teal-600 text-white border-teal-600"
                               : "bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-teal-500 hover:text-teal-600 dark:hover:text-teal-400"
                           }`}
-                          title="Map this node to Frame Count / Duration override"
+                          title="Map this node to Seconds / Duration override"
                         >
                           <Film className="w-3 h-3" />
-                          <span>{isFramesMapped ? "Frames ✓" : "Frames"}</span>
+                          <span>{isFramesMapped ? "Sec ✓" : "Seconds"}</span>
                         </button>
                       </div>
                     )}

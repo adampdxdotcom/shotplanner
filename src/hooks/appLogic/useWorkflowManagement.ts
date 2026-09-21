@@ -21,7 +21,7 @@ export function useWorkflowManagement({
   const [generationParams, setGenerationParams] = useState<GenerationParameters>({
     steps: 30,
     megapixels: 0.5,
-    frames: 81
+    frames: 3.4
   });
   const [parameterNodeMappings, setParameterNodeMappings] = useState<ParameterNodeMappings>({
     steps: "",
@@ -35,7 +35,7 @@ export function useWorkflowManagement({
       onUpdateActiveShotParams(shot => ({
         ...shot,
         generation_params: {
-          ...(shot.generation_params || { steps: 30, megapixels: 0.5, frames: 81 }),
+          ...(shot.generation_params || { steps: 30, megapixels: 0.5, frames: 3.4 }),
           [key]: value
         }
       }));

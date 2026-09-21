@@ -387,13 +387,15 @@ export const GenerationParametersSection: React.FC<GenerationParametersSectionPr
           );
         })()}
 
-        {/* 3. Duration / Frames */}
+        {/* 3. Total Seconds / Duration */}
         {(() => {
           const autoNode = detectedNodes.frames ? String(detectedNodes.frames) : "";
           const activeNode = parameterNodeMappings.frames || autoNode;
           const isMapped = !!activeNode;
           const isEditing = editingNode.frames;
-          const framesValue = generationParams.frames ?? 81;
+          // generationParams.frames now stores total seconds as a float (e.g. 3.4, 4.2)
+          const secondsValue = generationParams.frames !== undefined ? Number(generationParams.frames) : 3.4;
+          const calculatedFrames = Math.round(secondsValue * 24);
 
           return (
             <div className="bg-zinc-50/80 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-700 rounded-lg p-3.5 space-y-3 flex flex-col justify-between shadow-xs">
@@ -402,7 +404,7 @@ export const GenerationParametersSection: React.FC<GenerationParametersSectionPr
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-200 flex items-center gap-1.5">
                     <Film className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                    Duration / Frames
+                    Total Seconds
                   </span>
                   {isMapped ? (
                     <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded font-mono bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-500/30 border">
@@ -417,7 +419,7 @@ export const GenerationParametersSection: React.FC<GenerationParametersSectionPr
                   )}
                 </div>
                 <p className="text-[10px] text-zinc-500 dark:text-zinc-400">
-                  Target field: <code className="text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded font-mono">frames / length / duration</code>
+                  Target field: <code className="text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded font-mono">seconds / float / duration</code>
                 </p>
               </div>
 
@@ -425,42 +427,44 @@ export const GenerationParametersSection: React.FC<GenerationParametersSectionPr
               {isMapped ? (
                 <div className="space-y-2.5 pt-1">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-zinc-600 dark:text-zinc-400">Total frames:</span>
+                    <span className="text-[11px] text-zinc-600 dark:text-zinc-400">Total seconds:</span>
                     <div className="flex items-center gap-1">
                       <input
                         type="number"
-                        min={1}
-                        max={300}
-                        value={framesValue}
+                        min={0.1}
+                        max={30.0}
+                        step={0.1}
+                        value={secondsValue}
                         onChange={(e) => {
                           if (!parameterNodeMappings.frames && activeNode) {
                             onChangeParameterMapping("frames", activeNode);
                           }
-                          onChangeParam("frames", Math.max(1, parseInt(e.target.value) || 1));
+                          const val = parseFloat(e.target.value);
+                          onChangeParam("frames", isNaN(val) ? 0.5 : val);
                         }}
-                        className="w-14 bg-white dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 focus:border-emerald-500 rounded px-1.5 py-0.5 text-xs text-right font-mono text-emerald-700 dark:text-emerald-300 outline-none shadow-2xs"
+                        className="w-16 bg-white dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 focus:border-emerald-500 rounded px-1.5 py-0.5 text-xs text-right font-mono text-emerald-700 dark:text-emerald-300 outline-none shadow-2xs"
                       />
-                      <span className="text-[11px] text-zinc-500 dark:text-zinc-400">f (~{(framesValue / 24).toFixed(1)}s)</span>
+                      <span className="text-[11px] text-zinc-500 dark:text-zinc-400">s (~{calculatedFrames}f)</span>
                     </div>
                   </div>
                   <input
                     type="range"
-                    min={12}
-                    max={161}
-                    step={1}
-                    value={framesValue}
+                    min={0.5}
+                    max={10.0}
+                    step={0.1}
+                    value={secondsValue}
                     onChange={(e) => {
                       if (!parameterNodeMappings.frames && activeNode) {
                         onChangeParameterMapping("frames", activeNode);
                       }
-                      onChangeParam("frames", parseInt(e.target.value));
+                      onChangeParam("frames", parseFloat(e.target.value));
                     }}
                     className="w-full accent-emerald-600 dark:accent-emerald-500 cursor-pointer h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-lg appearance-none"
                   />
                   <div className="flex justify-between text-[9px] text-zinc-500 dark:text-zinc-400 font-mono">
-                    <span>12f (0.5s)</span>
-                    <span>81f (3.4s)</span>
-                    <span>161f (6.7s)</span>
+                    <span>0.5s / 12f</span>
+                    <span>3.4s / 81f</span>
+                    <span>6.7s / 161f</span>
                   </div>
                 </div>
               ) : (
@@ -468,7 +472,7 @@ export const GenerationParametersSection: React.FC<GenerationParametersSectionPr
                 <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 rounded p-2.5 space-y-2">
                   <div className="flex items-start gap-1.5 text-amber-800 dark:text-amber-300 text-[11px]">
                     <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
-                    <span>No Duration / Frames node found. Enter node number:</span>
+                    <span>No Float / Duration node found. Enter node number:</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <input

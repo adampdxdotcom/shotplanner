@@ -140,6 +140,22 @@ export function isSaveVideoNode(classType: string, title?: string): boolean {
   return false;
 }
 
+// Helper to format aspect ratio string for ComfyUI ResolutionSelector (e.g. "16:9 (Widescreen)", "9:16 (Vertical)")
+export function formatAspectRatioForComfyUI(aspectRatio?: string): string {
+  const ar = (aspectRatio || "16:9").trim().toLowerCase();
+  if (ar.includes("16:9") || ar.includes("widescreen")) return "16:9 (Widescreen)";
+  if (ar.includes("9:16") || ar.includes("vertical") || ar.includes("tiktok") || ar.includes("reel")) return "9:16 (Vertical)";
+  if (ar.includes("1:1") || ar.includes("square")) return "1:1 (Square)";
+  if (ar.includes("4:3")) return "4:3 (Standard)";
+  if (ar.includes("3:4")) return "3:4 (Tall)";
+  if (ar.includes("2.39") || ar.includes("2.35") || ar.includes("anamorphic") || ar.includes("cinemascope")) return "2.39:1 (Anamorphic)";
+  if (ar.includes("21:9") || ar.includes("ultrawide")) return "21:9 (Ultrawide)";
+  if (ar.includes("4:5")) return "4:5 (Instagram)";
+  if (ar.includes("3:2")) return "3:2 (Classic 35mm)";
+  if (ar.includes("2:3")) return "2:3 (Vertical 35mm)";
+  return "16:9 (Widescreen)";
+}
+
 export function parseWorkflowData(workflow: any): ParsedWorkflowData {
   const promptNodes: WorkflowNodeInfo[] = [];
   const imageLoaderNodes: WorkflowNodeInfo[] = [];
@@ -245,12 +261,20 @@ export function parseWorkflowData(workflow: any): ParsedWorkflowData {
 
       // 2. Megapixels / Resolution Detection
       if (detectedNodes.megapixels === null) {
-        if (node.widgets_values_named && typeof node.widgets_values_named.megapixels === "number") {
+        if (classType === "ResolutionSelector" || titleLower.includes("resolution selector")) {
+          detectedNodes.megapixels = nodeId;
+          if (widgetsValues.length > 1 && typeof widgetsValues[1] === "number") {
+            detectedValues.megapixels = widgetsValues[1];
+          } else if (node.widgets_values_named && typeof node.widgets_values_named.megapixels === "number") {
+            detectedValues.megapixels = node.widgets_values_named.megapixels;
+          }
+        } else if (node.widgets_values_named && typeof node.widgets_values_named.megapixels === "number") {
           detectedNodes.megapixels = nodeId;
           detectedValues.megapixels = node.widgets_values_named.megapixels;
-        } else if (titleLower.includes("megapixel") || titleLower.includes("megapixels")) {
+        } else if (titleLower.includes("megapixel") || titleLower.includes("megapixels") || titleLower.includes("resolution")) {
           detectedNodes.megapixels = nodeId;
           if (typeof widgetsValues[0] === "number") detectedValues.megapixels = widgetsValues[0];
+          else if (widgetsValues.length > 1 && typeof widgetsValues[1] === "number") detectedValues.megapixels = widgetsValues[1];
         } else if (classLower.includes("emptylatentimage") || classLower.includes("modelsamplingsd3")) {
           detectedNodes.megapixels = nodeId;
           if (widgetsValues.length >= 2 && typeof widgetsValues[0] === "number" && typeof widgetsValues[1] === "number") {
@@ -376,7 +400,8 @@ export function injectAndPrepareWorkflowData(
   parameterOverrides: Record<string, any> = {},
   parameterNodeMappings: Record<string, string> = {},
   promptPrefix: string = "",
-  saveVideoPrefix: string = ""
+  saveVideoPrefix: string = "",
+  aspectRatio?: string
 ): any {
   const modifiedWf = JSON.parse(JSON.stringify(workflowData));
   const placeholder = safePlaceholder || "empty.png";
@@ -521,7 +546,27 @@ export function injectAndPrepareWorkflowData(
         if (parameterNodeMappings.megapixels && String(parameterNodeMappings.megapixels) === strId && parameterOverrides.megapixels !== undefined && parameterOverrides.megapixels !== null) {
           const val = parseFloat(String(parameterOverrides.megapixels));
           if (!isNaN(val)) {
-            if (node.widgets_values_named && typeof node.widgets_values_named === "object" && "megapixels" in node.widgets_values_named) {
+            const isResolutionSelector = classType === "ResolutionSelector" || metaTitle.toLowerCase().includes("resolution selector");
+            if (isResolutionSelector && Array.isArray(node.widgets_values)) {
+              // ComfyUI ResolutionSelector widgets_values: [aspect_ratio_str, megapixels_float, multiplier_int]
+              // Update aspect ratio at index 0 from shot aspect ratio
+              if (aspectRatio) {
+                node.widgets_values[0] = formatAspectRatioForComfyUI(aspectRatio);
+              }
+              // Update megapixels at index 1
+              if (node.widgets_values.length > 1) {
+                node.widgets_values[1] = val;
+              }
+              // Multiplier at index 2 is left untouched
+              if (node.widgets_values_named && typeof node.widgets_values_named === "object") {
+                if ("aspect_ratio" in node.widgets_values_named && aspectRatio) {
+                  node.widgets_values_named.aspect_ratio = formatAspectRatioForComfyUI(aspectRatio);
+                }
+                if ("megapixels" in node.widgets_values_named) {
+                  node.widgets_values_named.megapixels = val;
+                }
+              }
+            } else if (node.widgets_values_named && typeof node.widgets_values_named === "object" && "megapixels" in node.widgets_values_named) {
               node.widgets_values_named.megapixels = val;
             } else if (Array.isArray(node.widgets_values) && node.widgets_values.length === 1) {
               node.widgets_values[0] = val;
@@ -529,10 +574,10 @@ export function injectAndPrepareWorkflowData(
           }
         }
         if (parameterNodeMappings.frames && String(parameterNodeMappings.frames) === strId && parameterOverrides.frames !== undefined && parameterOverrides.frames !== null) {
-          const val = parseInt(String(parameterOverrides.frames), 10);
+          const val = parseFloat(String(parameterOverrides.frames));
           if (!isNaN(val)) {
             if (node.widgets_values_named && typeof node.widgets_values_named === "object") {
-              for (const k of ["frames", "length", "num_frames", "duration", "frame_count", "video_length"]) {
+              for (const k of ["value", "seconds", "duration", "frames", "length", "num_frames", "frame_count", "video_length"]) {
                 if (k in node.widgets_values_named) {
                   node.widgets_values_named[k] = val;
                   break;
@@ -544,7 +589,7 @@ export function injectAndPrepareWorkflowData(
               } else if (Array.isArray(node.widgets_values) && node.widgets_values.length === 1) {
                 node.widgets_values[0] = val;
               }
-            } else if (Array.isArray(node.widgets_values) && node.widgets_values.length === 1) {
+            } else if (Array.isArray(node.widgets_values) && node.widgets_values.length >= 1) {
               node.widgets_values[0] = val;
             }
           }
@@ -647,17 +692,36 @@ export function injectAndPrepareWorkflowData(
       mNode.inputs = mNode.inputs || {};
       const val = parseFloat(String(parameterOverrides.megapixels));
       if (!isNaN(val)) {
-        if ("megapixels" in mNode.inputs) mNode.inputs.megapixels = val;
-        else if ("value" in mNode.inputs) mNode.inputs.value = val;
+        const classType = mNode.class_type || "";
+        const metaTitle = mNode._meta?.title || "";
+        const isResolutionSelector = classType === "ResolutionSelector" || metaTitle.toLowerCase().includes("resolution selector");
+        if (isResolutionSelector) {
+          if (aspectRatio) {
+            mNode.inputs.aspect_ratio = formatAspectRatioForComfyUI(aspectRatio);
+          }
+          mNode.inputs.megapixels = val;
+        } else if ("megapixels" in mNode.inputs) {
+          mNode.inputs.megapixels = val;
+        } else if ("width" in mNode.inputs && "height" in mNode.inputs && typeof mNode.inputs.width === "number" && typeof mNode.inputs.height === "number") {
+          const origW = mNode.inputs.width;
+          const origH = mNode.inputs.height;
+          const currentPixels = origW * origH;
+          const targetPixels = val * 1024 * 1024;
+          const scaleFactor = Math.sqrt(targetPixels / Math.max(1, currentPixels));
+          mNode.inputs.width = Math.max(64, Math.round((origW * scaleFactor) / 16) * 16);
+          mNode.inputs.height = Math.max(64, Math.round((origH * scaleFactor) / 16) * 16);
+        } else if ("value" in mNode.inputs) {
+          mNode.inputs.value = val;
+        }
       }
     }
     if (parameterNodeMappings.frames && modifiedWf[parameterNodeMappings.frames] && parameterOverrides.frames !== undefined && parameterOverrides.frames !== null) {
       const fNode = modifiedWf[parameterNodeMappings.frames];
       fNode.inputs = fNode.inputs || {};
-      const val = parseInt(String(parameterOverrides.frames), 10);
+      const val = parseFloat(String(parameterOverrides.frames));
       if (!isNaN(val)) {
         let matchedKey: string | null = null;
-        for (const k of ["frames", "length", "num_frames", "duration", "frame_count", "video_length"]) {
+        for (const k of ["value", "seconds", "duration", "frames", "length", "num_frames", "frame_count", "video_length"]) {
           if (k in fNode.inputs) {
             matchedKey = k;
             break;
@@ -666,6 +730,8 @@ export function injectAndPrepareWorkflowData(
         if (matchedKey) {
           fNode.inputs[matchedKey] = val;
         } else if ("value" in fNode.inputs) {
+          fNode.inputs.value = val;
+        } else {
           fNode.inputs.value = val;
         }
       }
@@ -764,6 +830,13 @@ export function convertWorkflowToApiPrompt(workflowJson: any): Record<string, an
       } else if (classType === "EmptyLatentImage") {
         const latentKeys = ["width", "height", "batch_size"];
         latentKeys.forEach((key, idx) => {
+          if (idx < node.widgets_values.length && !(key in inputs)) {
+            inputs[key] = node.widgets_values[idx];
+          }
+        });
+      } else if (classType === "ResolutionSelector") {
+        const resKeys = ["aspect_ratio", "megapixels", "multiplier"];
+        resKeys.forEach((key, idx) => {
           if (idx < node.widgets_values.length && !(key in inputs)) {
             inputs[key] = node.widgets_values[idx];
           }
@@ -1034,6 +1107,7 @@ export function buildShotWorkflow(
   const saveVideoPrefix = shot.save_video_prefix || projectData.save_video_prefix || `${cleanScene}_shot_${shotNumStr}`;
   const bypassMissing = shot.bypass_missing ?? shot.bypassMissing ?? projectData.bypass_missing ?? projectData.bypassMissing ?? true;
   const safePlaceholder = shot.safe_placeholder || projectData.safe_placeholder || "empty.png";
+  const aspectRatio = shot.aspect_ratio || projectData.aspect_ratio;
 
   return injectAndPrepareWorkflowData(
     rawWf,
@@ -1045,7 +1119,8 @@ export function buildShotWorkflow(
     effectiveParams,
     effectiveParamNodes,
     "",
-    saveVideoPrefix
+    saveVideoPrefix,
+    aspectRatio
   );
 }
 
