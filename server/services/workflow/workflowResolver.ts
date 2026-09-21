@@ -1,0 +1,196 @@
+import fs from "fs";
+import path from "path";
+import { WORKFLOWS_DIR, ASSETS_DIR, formatSceneFolderName, getSceneDirectories } from "../../config/constants";
+import { parseWorkflowData } from "./workflowParser";
+
+export interface ResolvedWorkflowTemplate {
+  resolvedPath: string;
+  resolvedFilename: string;
+  rawWorkflow: any;
+}
+
+export function listWorkflows(sceneName?: string) {
+  const workflowMap = new Map<string, { filename: string; path: string; node_count: number; title: string }>();
+
+  const scanDir = (dirPath: string, folderLabel?: string, publicPathPrefix?: string) => {
+    if (!fs.existsSync(dirPath)) return;
+    try {
+      const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isFile() && /\.json$/i.test(entry.name)) {
+          const f = entry.name;
+          if (workflowMap.has(f.toLowerCase())) continue;
+          const fullPath = path.join(dirPath, f);
+          try {
+            const content = JSON.parse(fs.readFileSync(fullPath, "utf-8"));
+            const parsed = parseWorkflowData(content);
+            const prefix = folderLabel ? `[${folderLabel}] ` : "";
+            workflowMap.set(f.toLowerCase(), {
+              filename: f,
+              path: publicPathPrefix ? `${publicPathPrefix}/${f}` : `/assets/workflows/${f}`,
+              node_count: parsed.totalNodes,
+              title: `${prefix}${f.replace(/\.json$/i, "").replace(/[_-]/g, " ")}`
+            });
+          } catch {
+            workflowMap.set(f.toLowerCase(), {
+              filename: f,
+              path: publicPathPrefix ? `${publicPathPrefix}/${f}` : `/assets/workflows/${f}`,
+              node_count: 0,
+              title: `${folderLabel ? `[${folderLabel}] ` : ""}${f.replace(/\.json$/i, "")}`
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.warn(`[Workflow Scan Error] Failed reading ${dirPath}:`, e);
+    }
+  };
+
+  // 1. If scene specified, scan scene workflows first
+  if (sceneName) {
+    const sceneFolder = formatSceneFolderName(sceneName);
+    scanDir(getSceneDirectories(sceneName).workflows, sceneFolder, `/assets/${sceneFolder}/workflows`);
+    scanDir(path.join(WORKFLOWS_DIR, sceneFolder), sceneFolder, `/assets/workflows/${sceneFolder}`);
+  }
+
+  // 2. Scan all scenes under ASSETS_DIR (<scene>/workflows)
+  if (fs.existsSync(ASSETS_DIR)) {
+    try {
+      const dirs = fs.readdirSync(ASSETS_DIR, { withFileTypes: true });
+      for (const d of dirs) {
+        if (d.isDirectory() && d.name !== "workflows" && d.name !== "uploads") {
+          const sceneWfDir = path.join(ASSETS_DIR, d.name, "workflows");
+          scanDir(sceneWfDir, d.name, `/assets/${d.name}/workflows`);
+        }
+      }
+    } catch {}
+  }
+
+  // 3. Scan subdirectories under WORKFLOWS_DIR
+  if (fs.existsSync(WORKFLOWS_DIR)) {
+    try {
+      const dirs = fs.readdirSync(WORKFLOWS_DIR, { withFileTypes: true });
+      for (const d of dirs) {
+        if (d.isDirectory()) {
+          scanDir(path.join(WORKFLOWS_DIR, d.name), d.name, `/assets/workflows/${d.name}`);
+        }
+      }
+    } catch {}
+  }
+
+  // 4. Scan root WORKFLOWS_DIR and process.cwd() workflows if exists
+  scanDir(WORKFLOWS_DIR, undefined, "/assets/workflows");
+  const topLevelWfDir = path.join(process.cwd(), "workflows");
+  if (fs.existsSync(topLevelWfDir) && topLevelWfDir !== WORKFLOWS_DIR) {
+    scanDir(topLevelWfDir, undefined, "/workflows");
+  }
+
+  const workflowItems = Array.from(workflowMap.values());
+  const files = workflowItems.map((item) => item.filename);
+  return { workflows: files, workflow_items: workflowItems };
+}
+
+/**
+ * Resiliently resolve and parse a ComfyUI workflow JSON template from disk.
+ * Searches scene-specific directories, global workflows dir, and standard templates.
+ */
+export function resolveWorkflowTemplate(
+  requestedFilename?: string,
+  sceneName?: string
+): ResolvedWorkflowTemplate {
+  const cleanScene = sceneName ? formatSceneFolderName(sceneName) : "";
+  const candidates: string[] = [];
+
+  let cleanRequested = (requestedFilename || "").trim();
+  if (cleanRequested.includes("/") || cleanRequested.includes("\\")) {
+    cleanRequested = path.basename(cleanRequested);
+  }
+
+  const isGeneric =
+    !cleanRequested ||
+    cleanRequested === "default.json" ||
+    cleanRequested === "default" ||
+    cleanRequested === "undefined" ||
+    cleanRequested === "null";
+
+  if (!isGeneric) {
+    if (cleanScene) {
+      candidates.push(path.join(getSceneDirectories(cleanScene).workflows, cleanRequested));
+      candidates.push(path.join(ASSETS_DIR, cleanScene, "workflows", cleanRequested));
+      candidates.push(path.join(WORKFLOWS_DIR, cleanScene, cleanRequested));
+    }
+    candidates.push(path.join(WORKFLOWS_DIR, cleanRequested));
+    candidates.push(path.join(ASSETS_DIR, "workflows", cleanRequested));
+    candidates.push(path.join(process.cwd(), "workflows", cleanRequested));
+  }
+
+  // Fallback candidate templates
+  if (cleanScene) {
+    candidates.push(path.join(getSceneDirectories(cleanScene).workflows, "minimax_video_workflow.json"));
+    candidates.push(path.join(ASSETS_DIR, cleanScene, "workflows", "minimax_video_workflow.json"));
+  }
+  candidates.push(path.join(WORKFLOWS_DIR, "minimax_video_workflow.json"));
+  candidates.push(path.join(WORKFLOWS_DIR, "scene01", "minimax_video_workflow.json"));
+  candidates.push(path.join(process.cwd(), "workflows", "minimax_video_workflow.json"));
+
+  // Check candidates in order
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+      try {
+        const raw = JSON.parse(fs.readFileSync(candidate, "utf-8"));
+        return {
+          resolvedPath: candidate,
+          resolvedFilename: path.basename(candidate),
+          rawWorkflow: raw
+        };
+      } catch (e: any) {
+        console.warn(`[Workflow Resolver] Candidate ${candidate} exists but failed to parse: ${e.message}`);
+      }
+    }
+  }
+
+  // Search directory tree for any valid workflow json file
+  const searchDirs = [
+    cleanScene ? getSceneDirectories(cleanScene).workflows : null,
+    WORKFLOWS_DIR,
+    path.join(WORKFLOWS_DIR, "scene01"),
+    path.join(ASSETS_DIR, "workflows"),
+    ASSETS_DIR
+  ].filter(Boolean) as string[];
+
+  for (const searchDir of searchDirs) {
+    if (fs.existsSync(searchDir)) {
+      try {
+        const files = fs.readdirSync(searchDir);
+        for (const file of files) {
+          if (
+            file.endsWith(".json") &&
+            !file.includes(".scene.") &&
+            !file.includes("config") &&
+            !file.includes("universe") &&
+            !file.includes("characters") &&
+            !file.includes("assets_db")
+          ) {
+            const fullPath = path.join(searchDir, file);
+            if (fs.statSync(fullPath).isFile()) {
+              try {
+                const raw = JSON.parse(fs.readFileSync(fullPath, "utf-8"));
+                if (raw && (raw.nodes || Object.keys(raw).some(k => raw[k]?.class_type))) {
+                  return {
+                    resolvedPath: fullPath,
+                    resolvedFilename: file,
+                    rawWorkflow: raw
+                  };
+                }
+              } catch (e) {}
+            }
+          }
+        }
+      } catch (e) {}
+    }
+  }
+
+  throw new Error(
+    `Workflow template "${cleanRequested || "default"}" could not be found or loaded from workspace assets. Please upload or select a valid ComfyUI workflow JSON.`
+  );
+}
