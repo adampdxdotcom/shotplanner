@@ -258,11 +258,14 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
         const errorMsg = data.detail || data.error || data.message || (typeof data === "string" ? data : `Failed to stage shot (HTTP ${res.status}).`);
         setError(errorMsg);
         setTransferState("error");
+        onShowToast?.(errorMsg, "error");
       }
     } catch (err: any) {
       clearProgress();
-      setError(err.message || "Failed to connect to staging server.");
+      const errorMsg = err.message || "Failed to connect to staging server.";
+      setError(errorMsg);
       setTransferState("error");
+      onShowToast?.(errorMsg, "error");
     }
   };
 
@@ -335,11 +338,14 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
         const errorMsg = data.detail || data.error || data.message || (typeof data === "string" ? data : `Failed to execute shot (HTTP ${res.status}).`);
         setError(errorMsg);
         setTransferState("error");
+        onShowToast?.(errorMsg, "error");
       }
     } catch (err: any) {
       clearProgress();
-      setError(err.message || "Failed to connect to execution server.");
+      const errorMsg = err.message || "Failed to connect to execution server.";
+      setError(errorMsg);
       setTransferState("error");
+      onShowToast?.(errorMsg, "error");
     }
   };
 
@@ -418,11 +424,14 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
         const errorMsg = data.detail || data.error || data.message || (typeof data === "string" ? data : `Failed to stage scene (HTTP ${res.status}).`);
         setError(errorMsg);
         setTransferState("error");
+        onShowToast?.(errorMsg, "error");
       }
     } catch (err: any) {
       clearProgress();
-      setError(err.message || "Failed to connect to staging server.");
+      const errorMsg = err.message || "Failed to connect to staging server.";
+      setError(errorMsg);
       setTransferState("error");
+      onShowToast?.(errorMsg, "error");
     }
   };
 
@@ -507,8 +516,11 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
               isTransferring={isTransferring && lastAction === "shot"}
               isExecuting={isTransferring && lastAction === "execute_shot"}
               lastAction={lastAction as "shot" | "scene" | "execute_shot" | null}
+              transferState={transferState}
+              errorMessage={error}
               handleSendShot={handleSendShot}
               handleExecuteShot={handleExecuteShot}
+              handleDismissError={handleDismissError}
             />
             <SendScenePanel
               sceneProject={sceneProject}
@@ -516,7 +528,10 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
               allSceneAssets={allSceneAssets}
               isTransferring={isTransferring}
               lastAction={lastAction}
+              transferState={transferState}
+              errorMessage={error}
               handleSendScene={handleSendScene}
+              handleDismissError={handleDismissError}
             />
           </div>
 

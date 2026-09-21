@@ -261,6 +261,113 @@ export function openSFTP(conn: Client): Promise<SFTPWrapper> {
 }
 
 /**
+ * Upload single item via SSH exec streaming (cat > remotePath).
+ * Bypasses SFTP subsystem and NAT packet window stalls on cloud GPU instances (RunPod, Lambda, etc).
+ * Supports both in-memory content (workflows) and local files (images/masks).
+ */
+export function uploadViaSSHStream(
+  client: Client,
+  item: TransferItem,
+  timeoutMs: number = 15000
+): Promise<number> {
+  return new Promise<number>((resolve, reject) => {
+    let finished = false;
+
+    const timer = setTimeout(() => {
+      if (!finished) {
+        finished = true;
+        reject(new Error(`Transfer timed out after ${timeoutMs / 1000}s for ${item.filename}`));
+      }
+    }, timeoutMs);
+    if (typeof timer.unref === "function") timer.unref();
+
+    const remoteDir = path.posix.dirname(item.remotePath);
+    const cmd = `mkdir -p "${remoteDir}" && cat > "${item.remotePath}"`;
+
+    client.exec(cmd, (err, stream) => {
+      if (err) {
+        if (!finished) {
+          finished = true;
+          clearTimeout(timer);
+          reject(err);
+        }
+        return;
+      }
+
+      stream.on("close", (code: number) => {
+        if (!finished) {
+          finished = true;
+          clearTimeout(timer);
+          if (code === 0) {
+            let bytes = 0;
+            if (item.content !== undefined) {
+              bytes = Buffer.isBuffer(item.content) ? item.content.length : Buffer.byteLength(item.content);
+            } else if (item.localPath && fs.existsSync(item.localPath)) {
+              bytes = fs.statSync(item.localPath).size;
+            }
+            resolve(bytes);
+          } else {
+            reject(new Error(`Remote write process for ${item.filename} exited with code ${code}`));
+          }
+        }
+      });
+
+      stream.on("error", (streamErr) => {
+        if (!finished) {
+          finished = true;
+          clearTimeout(timer);
+          reject(streamErr);
+        }
+      });
+
+      stream.stderr.on("data", (d: Buffer) => {
+        const msg = d.toString().trim();
+        if (msg) {
+          console.warn(`[SSH write stderr for ${item.filename}]:`, msg);
+        }
+      });
+
+      try {
+        if (item.content !== undefined) {
+          const buffer = Buffer.isBuffer(item.content) ? item.content : Buffer.from(item.content, "utf-8");
+          stream.end(buffer);
+        } else if (item.localPath) {
+          if (!fs.existsSync(item.localPath)) {
+            if (!finished) {
+              finished = true;
+              clearTimeout(timer);
+              reject(new Error(`Local file not found: ${item.localPath}`));
+            }
+            return;
+          }
+          const fileStream = fs.createReadStream(item.localPath);
+          fileStream.on("error", (readErr) => {
+            if (!finished) {
+              finished = true;
+              clearTimeout(timer);
+              reject(readErr);
+            }
+          });
+          fileStream.pipe(stream);
+        } else {
+          if (!finished) {
+            finished = true;
+            clearTimeout(timer);
+            reject(new Error(`No content or localPath for ${item.filename}`));
+          }
+        }
+      } catch (pipeErr: any) {
+        if (!finished) {
+          finished = true;
+          clearTimeout(timer);
+          reject(pipeErr);
+        }
+      }
+    });
+  });
+}
+
+/**
  * Upload single item via SFTP (file path or in-memory content)
  * Uses direct Buffer write for files <= 25MB to avoid fastPut concurrency stalls on cloud containers.
  * Guaranteed timeout prevents hanging the transfer queue.
@@ -462,28 +569,40 @@ export async function executeSFTPBatchTransfer(
       if (dir && dir !== ".") remoteDirs.add(dir);
     });
 
-    console.log(`[SSH SFTP] Ensuring ${remoteDirs.size} remote directories exist on GPU...`);
+    console.log(`[SSH Staging] Ensuring ${remoteDirs.size} remote directories exist on GPU...`);
     for (const d of remoteDirs) {
-      console.log(`[SSH SFTP] Creating/verifying directory: ${d}`);
+      console.log(`[SSH Staging] Creating/verifying directory: ${d}`);
       const mkdirRes = await execSSHCommand(client, `mkdir -p "${d}"`);
       if (mkdirRes.code !== 0) {
         const errMsg = mkdirRes.stderr.trim() || `Exit code ${mkdirRes.code}`;
-        console.error(`[SSH SFTP ERROR] Failed to create remote directory "${d}":`, errMsg);
+        console.error(`[SSH Staging ERROR] Failed to create remote directory "${d}":`, errMsg);
         throw new Error(`Failed to create remote directory "${d}" on GPU server. Reason: ${errMsg}`);
       }
     }
 
-    // Open SFTP session
-    const sftp = await openSFTP(client);
-    console.log(`[SSH SFTP] SFTP session established. Starting transfers...`);
+    let sftp: SFTPWrapper | null = null;
+    console.log(`[SSH Staging] Transferring ${items.length} item(s) to remote GPU...`);
 
     for (const item of items) {
       const itemStart = Date.now();
       try {
-        console.log(`[SSH SFTP] [->] Transferring: ${item.filename} -> ${item.remotePath}`);
-        const bytes = await uploadSFTPItem(sftp, item);
-        const elapsed = Date.now() - itemStart;
+        console.log(`[SSH Staging] [->] Transferring: ${item.filename} -> ${item.remotePath}`);
+        let bytes = 0;
+        let method = "SSH stream";
 
+        try {
+          // Primary: Fast, reliable SSH exec stream (bypasses RunPod SFTP NAT stalls)
+          bytes = await uploadViaSSHStream(client, item, 15000);
+        } catch (sshErr: any) {
+          console.warn(`[SSH Staging] SSH stream write failed for ${item.filename} (${sshErr.message}), attempting SFTP fallback...`);
+          if (!sftp) {
+            sftp = await openSFTP(client);
+          }
+          bytes = await uploadSFTPItem(sftp, item, 10000);
+          method = "SFTP";
+        }
+
+        const elapsed = Date.now() - itemStart;
         summary.transferredCount++;
         summary.totalBytes += bytes;
         summary.uploadedFiles.push(item.filename);
@@ -493,9 +612,9 @@ export async function executeSFTPBatchTransfer(
           size_bytes: bytes,
           status: "transferred",
           remote_path: item.remotePath,
-          message: `Transferred via SFTP (${(bytes / 1024).toFixed(1)} KB in ${elapsed}ms)`
+          message: `Transferred via ${method} (${(bytes / 1024).toFixed(1)} KB in ${elapsed}ms)`
         });
-        console.log(`[SSH SFTP] [OK] Completed upload: ${item.filename} (${bytes} bytes in ${elapsed}ms)`);
+        console.log(`[SSH Staging] [OK] Completed upload: ${item.filename} (${bytes} bytes in ${elapsed}ms)`);
       } catch (uploadErr: any) {
         summary.failedCount++;
         summary.failedFiles.push(item.filename);
@@ -505,39 +624,47 @@ export async function executeSFTPBatchTransfer(
           size_bytes: 0,
           status: "failed",
           remote_path: item.remotePath,
-          message: `SFTP upload failed: ${uploadErr.message}`
+          message: `Upload failed: ${uploadErr.message}`
         });
-        console.error(`[SSH SFTP ERROR] Failed to transfer ${item.filename}:`, uploadErr.message);
+        console.error(`[SSH Staging ERROR] Failed to transfer ${item.filename}:`, uploadErr.message);
+
+        // Fail-fast on timeout or connection loss so UI gets immediate feedback
+        const isFatal = uploadErr.message?.includes("timed out") || uploadErr.message?.includes("closed") || uploadErr.message?.includes("ECONN");
+        if (isFatal) {
+          console.warn(`[SSH Staging] Aborting remaining transfers after fatal error on ${item.filename}`);
+          break;
+        }
       }
     }
 
-    // Post-upload verification check: inspect remote filesystem directly
-    console.log(`[SSH SFTP] Running remote verification check on ${summary.uploadedFiles.length} uploaded files...`);
+    // Post-upload verification check: inspect remote filesystem directly via SSH exec
+    console.log(`[SSH Staging] Running remote verification check on ${summary.uploadedFiles.length} uploaded files...`);
     for (const item of items) {
       if (summary.uploadedFiles.includes(item.filename)) {
         try {
-          const statPromise = new Promise<{ size: number }>((res, rej) => {
-            sftp.stat(item.remotePath, (err, stats) => {
-              if (err) return rej(err);
-              res({ size: stats.size });
-            });
-          });
+          const checkCmd = `stat -c %s "${item.remotePath}" 2>/dev/null || wc -c < "${item.remotePath}" 2>/dev/null`;
+          const statRes = await execSSHCommand(client, checkCmd);
 
-          const statTimeout = new Promise<never>((_, rej) => {
-            const t = setTimeout(() => rej(new Error("Verification timeout (10s)")), 10000);
-            if (typeof t.unref === "function") t.unref();
-          });
+          let remoteSize = -1;
+          if (statRes.code === 0 && statRes.stdout.trim()) {
+            const parsed = parseInt(statRes.stdout.trim(), 10);
+            if (!isNaN(parsed)) remoteSize = parsed;
+          }
 
-          const remoteStat = await Promise.race([statPromise, statTimeout]);
-
-          if (remoteStat.size === 0 && (item.sizeBytes ?? 1) > 0) {
+          if (remoteSize === 0 && (item.sizeBytes ?? 1) > 0) {
             throw new Error(`File was staged but appears as 0 bytes on remote server (${item.remotePath})`);
+          } else if (remoteSize === -1) {
+            // Verify existence if size check command wasn't standard
+            const existCheck = await execSSHCommand(client, `test -f "${item.remotePath}" && echo "OK"`);
+            if (existCheck.stdout.trim() !== "OK") {
+              throw new Error(`Remote file does not exist after transfer (${item.remotePath})`);
+            }
           }
 
           summary.verifiedFiles.push(item.filename);
-          console.log(`[SSH SFTP Verified] Successfully verified: ${item.remotePath} (${remoteStat.size} bytes)`);
+          console.log(`[SSH Staging Verified] Successfully verified: ${item.remotePath} (${remoteSize >= 0 ? `${remoteSize} bytes` : 'exists'})`);
         } catch (verErr: any) {
-          console.error(`[SSH SFTP Verification Failure] Could not verify ${item.filename} at ${item.remotePath}:`, verErr.message);
+          console.error(`[SSH Staging Verification Failure] Could not verify ${item.filename} at ${item.remotePath}:`, verErr.message);
           summary.unverifiedFiles.push(item.filename);
           summary.failedFiles.push(item.filename);
           summary.uploadedFiles = summary.uploadedFiles.filter(f => f !== item.filename);
@@ -564,7 +691,7 @@ export async function executeSFTPBatchTransfer(
     }
 
     console.log(
-      `[SSH SFTP Staging Complete] ${summary.transferredCount}/${items.length} verified (${(summary.totalBytes / 1024).toFixed(1)} KB) in ${(summary.durationMs / 1000).toFixed(2)}s. Errors: ${summary.failedCount}`
+      `[SSH Staging Complete] ${summary.transferredCount}/${items.length} verified (${(summary.totalBytes / 1024).toFixed(1)} KB) in ${(summary.durationMs / 1000).toFixed(2)}s. Errors: ${summary.failedCount}`
     );
 
     return summary;

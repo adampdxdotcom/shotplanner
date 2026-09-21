@@ -1,5 +1,5 @@
 import React from "react";
-import { Camera, Terminal, UploadCloud, Zap, Radio } from "lucide-react";
+import { Camera, Terminal, UploadCloud, Zap, Radio, AlertCircle, RefreshCw, X } from "lucide-react";
 import { ShotItem } from "../../types";
 import { formatShotNumber } from "../../utils/formatters";
 
@@ -10,8 +10,11 @@ export interface SendShotPanelProps {
   isTransferring: boolean;
   isExecuting?: boolean;
   lastAction: "shot" | "scene" | "execute_shot" | null;
+  transferState?: "idle" | "progress" | "error" | "success";
+  errorMessage?: string | null;
   handleSendShot: () => void;
   handleExecuteShot?: () => void;
+  handleDismissError?: () => void;
 }
 
 export const SendShotPanel: React.FC<SendShotPanelProps> = ({
@@ -21,12 +24,19 @@ export const SendShotPanel: React.FC<SendShotPanelProps> = ({
   isTransferring,
   isExecuting = false,
   lastAction,
+  transferState = "idle",
+  errorMessage = null,
   handleSendShot,
-  handleExecuteShot
+  handleExecuteShot,
+  handleDismissError
 }) => {
+  const isFailed = transferState === "error" && (lastAction === "shot" || lastAction === "execute_shot");
+
   return (
     <div className={`send-shot-box p-5 rounded-xl border-2 flex flex-col justify-between space-y-4 transition-all ${
-      activeShot 
+      isFailed
+        ? "bg-red-50/40 dark:bg-red-950/20 border-red-500/60 dark:border-red-500/40 shadow-sm"
+        : activeShot 
         ? "bg-white dark:bg-zinc-900/80 border-indigo-400/60 dark:border-indigo-500/30 shadow-sm dark:shadow-[0_0_15px_-3px_rgba(99,102,241,0.1)]" 
         : "bg-zinc-50/60 dark:bg-zinc-900/40 border-zinc-200 dark:border-zinc-800 opacity-75"
     }`}>
@@ -83,6 +93,49 @@ export const SendShotPanel: React.FC<SendShotPanelProps> = ({
           </div>
         )}
       </div>
+
+      {isFailed && errorMessage && (
+        <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-800/60 rounded-lg space-y-2 text-xs">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-start gap-2 text-red-700 dark:text-red-300">
+              <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold text-red-800 dark:text-red-200">
+                  {lastAction === "execute_shot" ? "Execution Failed" : "Staging Failed"}
+                </p>
+                <p className="text-[11px] font-mono break-words text-red-600 dark:text-red-300/90 mt-0.5">
+                  {errorMessage}
+                </p>
+              </div>
+            </div>
+            {handleDismissError && (
+              <button
+                onClick={handleDismissError}
+                className="text-red-400 hover:text-red-600 dark:hover:text-red-200 shrink-0 p-0.5 cursor-pointer"
+                title="Dismiss error"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          <div className="flex gap-2 pt-1 border-t border-red-200 dark:border-red-900/40">
+            <button
+              onClick={lastAction === "execute_shot" ? handleExecuteShot : handleSendShot}
+              className="px-2.5 py-1 bg-red-600 hover:bg-red-500 text-white rounded text-[11px] font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+            >
+              <RefreshCw className="w-3 h-3" /> Retry
+            </button>
+            {handleDismissError && (
+              <button
+                onClick={handleDismissError}
+                className="px-2.5 py-1 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded text-[11px] font-medium cursor-pointer transition-colors"
+              >
+                Dismiss
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="space-y-2 pt-2">
         <button
