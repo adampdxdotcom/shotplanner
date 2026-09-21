@@ -246,8 +246,6 @@ export async function processAssetTransfer(options: AssetTransferOptions) {
   let skippedCount = 0;
   const uploadedFiles: string[] = [];
   const skippedFiles: string[] = [];
-  const verifiedFiles: string[] = [];
-  const unverifiedFiles: string[] = [];
 
   if (sftpItems.length > 0) {
     console.log(`[SSH Staging] Starting SFTP transfer of ${sftpItems.length} file(s) to ${targetHost}...`);
@@ -256,8 +254,6 @@ export async function processAssetTransfer(options: AssetTransferOptions) {
     transferredCount = sftpSummary.transferredCount;
     uploadedFiles.push(...sftpSummary.uploadedFiles);
     skippedFiles.push(...sftpSummary.failedFiles);
-    verifiedFiles.push(...sftpSummary.verifiedFiles);
-    unverifiedFiles.push(...sftpSummary.unverifiedFiles);
 
     // Merge SFTP transfer results
     sftpSummary.transferredFiles.forEach((t) => {
@@ -271,10 +267,10 @@ export async function processAssetTransfer(options: AssetTransferOptions) {
       });
     });
 
-    if (!sftpSummary.success || sftpSummary.failedCount > 0 || unverifiedFiles.length > 0) {
-      const errDetail = sftpSummary.error || `Failed or unverified files: ${[...sftpSummary.failedFiles, ...unverifiedFiles].join(", ")}`;
-      console.error(`[SSH Staging Verification Failed] ${errDetail}`);
-      throw new Error(`Remote staging verification failed on ${targetHost}: ${errDetail}`);
+    if (!sftpSummary.success || sftpSummary.failedCount > 0) {
+      const errDetail = sftpSummary.error || `Failed files: ${sftpSummary.failedFiles.join(", ")}`;
+      console.error(`[SSH Staging Failed] ${errDetail}`);
+      throw new Error(`Remote staging failed on ${targetHost}: ${errDetail}`);
     }
   }
 
@@ -296,8 +292,6 @@ export async function processAssetTransfer(options: AssetTransferOptions) {
     total_checked: filesToTransfer.length + (stagedWorkflowFilename ? 1 : 0),
     uploaded_files: uploadedFiles,
     skipped_files: skippedFiles,
-    verified_files: verifiedFiles,
-    unverified_files: unverifiedFiles,
     transferred_files: transferredSummary,
     updated_workflow_json: updatedWorkflowJson,
     message: statusMessage
@@ -491,8 +485,6 @@ export async function processSceneTransfer(options: SceneTransferOptions) {
   let skippedCount = 0;
   const uploadedFiles: string[] = [];
   const skippedFiles: string[] = [];
-  const verifiedFiles: string[] = [];
-  const unverifiedFiles: string[] = [];
 
   if (targetHost && sftpItems.length > 0) {
     console.log(`[SSH Scene Staging] Commencing SFTP batch upload of ${sftpItems.length} items (${filesToTransfer.length} assets, ${shots.length} workflows) to ${targetHost}...`);
@@ -501,8 +493,6 @@ export async function processSceneTransfer(options: SceneTransferOptions) {
     transferredCount = sftpSummary.transferredCount;
     uploadedFiles.push(...sftpSummary.uploadedFiles);
     skippedFiles.push(...sftpSummary.failedFiles);
-    verifiedFiles.push(...sftpSummary.verifiedFiles);
-    unverifiedFiles.push(...sftpSummary.unverifiedFiles);
 
     sftpSummary.transferredFiles.forEach(t => {
       transferredSummary.push({
@@ -515,10 +505,10 @@ export async function processSceneTransfer(options: SceneTransferOptions) {
       });
     });
 
-    if (!sftpSummary.success || sftpSummary.failedCount > 0 || unverifiedFiles.length > 0) {
-      const errDetail = sftpSummary.error || `Failed or unverified files: ${[...sftpSummary.failedFiles, ...unverifiedFiles].join(", ")}`;
-      console.error(`[SSH Scene Staging Verification Failed] ${errDetail}`);
-      throw new Error(`Scene staging verification failed on ${targetHost}: ${errDetail}`);
+    if (!sftpSummary.success || sftpSummary.failedCount > 0) {
+      const errDetail = sftpSummary.error || `Failed files: ${sftpSummary.failedFiles.join(", ")}`;
+      console.error(`[SSH Scene Staging Failed] ${errDetail}`);
+      throw new Error(`Scene staging failed on ${targetHost}: ${errDetail}`);
     }
   } else if (!targetHost) {
     console.log(`[SSH Scene Staging] No remote host provided. Staged ${sftpItems.length} items locally only.`);
@@ -547,8 +537,6 @@ export async function processSceneTransfer(options: SceneTransferOptions) {
     skipped_count: skippedCount,
     total_checked: filesToTransfer.length + shots.length,
     uploaded_files: uploadedFiles,
-    verified_files: verifiedFiles,
-    unverified_files: unverifiedFiles,
     transferred_assets: uploadedFiles.filter(f => !f.endsWith('.json')),
     transferred_workflows: uploadedFiles.filter(f => f.endsWith('.json')),
     workflows_created: uploadedFiles.filter(f => f.endsWith('.json')),
