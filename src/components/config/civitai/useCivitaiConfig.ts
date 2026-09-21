@@ -134,9 +134,7 @@ export function useCivitaiConfig({
   const handleClearApiKey = async () => {
     try {
       await fetch("/api/settings/civitai", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ api_key: "" })
+        method: "DELETE"
       });
       setIsConfigured(false);
       setMaskedKey("");

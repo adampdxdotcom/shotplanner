@@ -12,7 +12,6 @@ import { GenerationParametersSection } from "./GenerationParametersSection";
 import { JsonViewerWithSearch } from "./JsonViewerWithSearch";
 import { 
   Workflow, 
-  Upload, 
   Layers, 
   Type, 
   Image as ImageIcon, 

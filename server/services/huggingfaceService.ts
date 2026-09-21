@@ -35,17 +35,18 @@ export interface HuggingFaceModelMetadata {
  * Retrieve saved Hugging Face token from environment or config file
  */
 export function getStoredHuggingFaceToken(): string {
+  if (fs.existsSync(HUGGINGFACE_CONFIG_FILE)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(HUGGINGFACE_CONFIG_FILE, "utf-8"));
+      const tok = (data.api_token || data.token || "").trim();
+      if (tok) return tok;
+    } catch (e) {}
+  }
   if (process.env.HUGGINGFACE_TOKEN && process.env.HUGGINGFACE_TOKEN.trim()) {
     return process.env.HUGGINGFACE_TOKEN.trim();
   }
   if (process.env.HF_TOKEN && process.env.HF_TOKEN.trim()) {
     return process.env.HF_TOKEN.trim();
-  }
-  if (fs.existsSync(HUGGINGFACE_CONFIG_FILE)) {
-    try {
-      const data = JSON.parse(fs.readFileSync(HUGGINGFACE_CONFIG_FILE, "utf-8"));
-      return (data.api_token || data.token || "").trim();
-    } catch (e) {}
   }
   return "";
 }
@@ -55,10 +56,34 @@ export function getStoredHuggingFaceToken(): string {
  */
 export function saveHuggingFaceToken(token: string): void {
   const cleanToken = (token || "").trim();
+  if (!cleanToken) {
+    removeHuggingFaceToken();
+    return;
+  }
+  const dir = path.dirname(HUGGINGFACE_CONFIG_FILE);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
   fs.writeFileSync(
     HUGGINGFACE_CONFIG_FILE,
     JSON.stringify({ api_token: cleanToken, updated_at: new Date().toISOString() }, null, 2)
   );
+}
+
+/**
+ * Remove Hugging Face token
+ */
+export function removeHuggingFaceToken(): void {
+  if (fs.existsSync(HUGGINGFACE_CONFIG_FILE)) {
+    try {
+      fs.unlinkSync(HUGGINGFACE_CONFIG_FILE);
+    } catch (e) {
+      fs.writeFileSync(
+        HUGGINGFACE_CONFIG_FILE,
+        JSON.stringify({ api_token: "" }, null, 2)
+      );
+    }
+  }
 }
 
 /**

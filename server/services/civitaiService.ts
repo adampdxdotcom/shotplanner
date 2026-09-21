@@ -92,14 +92,16 @@ export interface RemoteDownloadResult {
  * Retrieve saved Civitai API key from filesystem or environment
  */
 export function getStoredCivitaiKey(): string {
-  if (process.env.CIVITAI_API_KEY && process.env.CIVITAI_API_KEY.trim()) {
-    return process.env.CIVITAI_API_KEY.trim();
-  }
   if (fs.existsSync(CIVITAI_CONFIG_FILE)) {
     try {
       const data = JSON.parse(fs.readFileSync(CIVITAI_CONFIG_FILE, "utf-8"));
-      return (data.api_key || "").trim();
+      if (typeof data.api_key === "string" && data.api_key.trim()) {
+        return data.api_key.trim();
+      }
     } catch (e) {}
+  }
+  if (process.env.CIVITAI_API_KEY && process.env.CIVITAI_API_KEY.trim()) {
+    return process.env.CIVITAI_API_KEY.trim();
   }
   return "";
 }
@@ -109,7 +111,28 @@ export function getStoredCivitaiKey(): string {
  */
 export function saveCivitaiKey(apiKey: string): void {
   const cleanKey = (apiKey || "").trim();
+  if (!cleanKey) {
+    removeCivitaiKey();
+    return;
+  }
+  const dir = path.dirname(CIVITAI_CONFIG_FILE);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
   fs.writeFileSync(CIVITAI_CONFIG_FILE, JSON.stringify({ api_key: cleanKey, updated_at: new Date().toISOString() }, null, 2));
+}
+
+/**
+ * Remove Civitai API key
+ */
+export function removeCivitaiKey(): void {
+  if (fs.existsSync(CIVITAI_CONFIG_FILE)) {
+    try {
+      fs.unlinkSync(CIVITAI_CONFIG_FILE);
+    } catch (e) {
+      fs.writeFileSync(CIVITAI_CONFIG_FILE, JSON.stringify({ api_key: "" }, null, 2));
+    }
+  }
 }
 
 /**

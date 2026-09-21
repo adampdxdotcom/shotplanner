@@ -5,11 +5,12 @@ import multer from "multer";
 export const ROOT_DIR = process.cwd();
 export const ASSETS_DIR = path.join(ROOT_DIR, "assets");
 export const PROJECTS_DIR = path.join(ASSETS_DIR, "project_jsons");
-export const GEMINI_CONFIG_FILE = path.join(ASSETS_DIR, "gemini_config.json");
-export const CIVITAI_CONFIG_FILE = path.join(ASSETS_DIR, "civitai_config.json");
-export const CIVITAI_FAVORITES_FILE = path.join(ASSETS_DIR, "civitai_favorites.json");
-export const HUGGINGFACE_CONFIG_FILE = path.join(ASSETS_DIR, "huggingface_config.json");
-export const RUNPOD_CONFIG_FILE = path.join(ASSETS_DIR, "runpod_config.json");
+export const SERVER_CONFIG_DIR = path.join(ROOT_DIR, "data", "config");
+export const GEMINI_CONFIG_FILE = path.join(SERVER_CONFIG_DIR, "gemini_config.json");
+export const CIVITAI_CONFIG_FILE = path.join(SERVER_CONFIG_DIR, "civitai_config.json");
+export const CIVITAI_FAVORITES_FILE = path.join(SERVER_CONFIG_DIR, "civitai_favorites.json");
+export const HUGGINGFACE_CONFIG_FILE = path.join(SERVER_CONFIG_DIR, "huggingface_config.json");
+export const RUNPOD_CONFIG_FILE = path.join(SERVER_CONFIG_DIR, "runpod_config.json");
 export const ASSET_DB_FILE = path.join(ASSETS_DIR, "assets_db.json");
 export const UNIVERSE_DIR = path.join(ASSETS_DIR, "universe");
 export const UNIVERSE_CHARACTERS_FILE = path.join(UNIVERSE_DIR, "characters.json");
@@ -90,6 +91,7 @@ export const EMPTY_1X1_PNG_BUFFER = Buffer.from(
 export function initDirectories(): void {
   const baseDirs = [
     ASSETS_DIR,
+    SERVER_CONFIG_DIR,
     UNIVERSE_DIR,
     UNIVERSE_MEDIA_DIR,
     TMP_DIR
@@ -98,6 +100,29 @@ export function initDirectories(): void {
   baseDirs.forEach((dir) => {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
+    }
+  });
+
+  // Migrate any legacy config files from public ASSETS_DIR to protected SERVER_CONFIG_DIR
+  const legacyConfigNames = [
+    "gemini_config.json",
+    "civitai_config.json",
+    "civitai_favorites.json",
+    "huggingface_config.json",
+    "runpod_config.json"
+  ];
+  legacyConfigNames.forEach((fileName) => {
+    const legacyPath = path.join(ASSETS_DIR, fileName);
+    const targetPath = path.join(SERVER_CONFIG_DIR, fileName);
+    if (fs.existsSync(legacyPath)) {
+      try {
+        if (!fs.existsSync(targetPath)) {
+          fs.copyFileSync(legacyPath, targetPath);
+        }
+        fs.unlinkSync(legacyPath);
+      } catch (err) {
+        console.warn(`[Config] Migration note for ${fileName}:`, err);
+      }
     }
   });
 

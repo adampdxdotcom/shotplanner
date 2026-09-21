@@ -1,189 +1,32 @@
 import { ShotItem, GenerationParameters, ParameterNodeMappings } from "../types";
 import { formatShotNumber, generateSaveVideoPrefix } from "./formatters";
 
-// Helper to accurately identify true image loader nodes
-export function isExactImageLoader(classType: string, title?: string): boolean {
-  const ct = (classType || "").trim();
-  const t = (title || "").trim().toLowerCase();
+// Re-export and import shared ComfyUI node classifiers
+export {
+  isExactImageLoader,
+  isExactVideoLoader,
+  isExactAudioLoader,
+  isExactPromptNode,
+  isExactNegativePromptNode,
+  isSaveVideoNode,
+  KNOWN_IMAGE_LOADER_CLASSES,
+  KNOWN_VIDEO_LOADER_CLASSES,
+  KNOWN_AUDIO_LOADER_CLASSES,
+  KNOWN_PROMPT_CLASSES,
+  KNOWN_SAVE_VIDEO_CLASSES
+} from "../shared/comfyNodeClassifiers";
+import {
+  isExactImageLoader,
+  isExactVideoLoader,
+  isExactAudioLoader,
+  isExactPromptNode,
+  isExactNegativePromptNode,
+  isSaveVideoNode
+} from "../shared/comfyNodeClassifiers";
 
-  // Exclude latent generators, scalers, previews, saves, blends, crops, upscalers, converters
-  if (/latent|save|preview|scale|crop|blend|upscale|filter|transform|convert|composite/i.test(ct)) {
-    return false;
-  }
-
-  // Known ComfyUI image loader nodes
-  if ([
-    "LoadImage",
-    "LoadImageMask",
-    "LoadImageFromUrl",
-    "LoadImageBase64",
-    "LoadImageOutput",
-    "CR Load Image",
-    "LoadImagePath"
-  ].includes(ct)) {
-    return true;
-  }
-
-  if (/^LoadImage/i.test(ct) || /^ImageLoader/i.test(ct)) {
-    return true;
-  }
-
-  if (t === "load image" || t.startsWith("load image")) {
-    return true;
-  }
-
-  return false;
-}
-
-// Helper to accurately identify true video loader nodes
-export function isExactVideoLoader(classType: string, title?: string): boolean {
-  const ct = (classType || "").trim();
-  const t = (title || "").trim().toLowerCase();
-
-  if (/save|combine|preview|linear|cfg|encode|decode/i.test(ct)) {
-    return false;
-  }
-
-  if ([
-    "LoadVideo",
-    "VHS_LoadVideo",
-    "VHS_LoadVideoPath",
-    "VHS_LoadVideoFFmpeg",
-    "LoadVideoPath"
-  ].includes(ct)) {
-    return true;
-  }
-
-  if (/^LoadVideo/i.test(ct) || /^VideoLoader/i.test(ct) || /^VHS_LoadVideo/i.test(ct)) {
-    return true;
-  }
-
-  if (t === "load video" || t.startsWith("load video")) {
-    return true;
-  }
-
-  return false;
-}
-
-// Helper to accurately identify true audio loader nodes
-export function isExactAudioLoader(classType: string, title?: string): boolean {
-  const ct = (classType || "").trim();
-  const t = (title || "").trim().toLowerCase();
-
-  if (/vae|model|save|preview|combine|filter/i.test(ct)) {
-    return false;
-  }
-
-  if ([
-    "LoadAudio",
-    "VHS_LoadAudio",
-    "LoadAudioPath"
-  ].includes(ct)) {
-    return true;
-  }
-
-  if (/^LoadAudio/i.test(ct) || /^AudioLoader/i.test(ct) || /^VHS_LoadAudio/i.test(ct)) {
-    return true;
-  }
-
-  if (t === "load audio" || t.startsWith("load audio")) {
-    return true;
-  }
-
-  return false;
-}
-
-// Helper to accurately identify positive prompt nodes
-export function isExactPromptNode(classType: string, title?: string): boolean {
-  const ct = (classType || "").trim();
-  const t = (title || "").trim().toLowerCase();
-
-  if (t.includes("negative") || t.includes("neg prompt") || t.includes("neg_prompt") || t.includes("unwanted")) {
-    return false;
-  }
-
-  if ([
-    "PrimitiveStringMultiline",
-    "CLIPTextEncode",
-    "CLIPTextEncodeFlux",
-    "CLIPTextEncodeSDXL",
-    "StringLiteral",
-    "ShowText"
-  ].includes(ct)) {
-    return true;
-  }
-
-  if (t === "prompt" || t.includes("positive prompt") || t.includes("input text (prompt)") || t === "input prompt") {
-    return true;
-  }
-
-  return false;
-}
-
-// Helper to accurately identify negative prompt nodes
-export function isExactNegativePromptNode(classType: string, title?: string): boolean {
-  const ct = (classType || "").trim();
-  const t = (title || "").trim().toLowerCase();
-
-  if (t.includes("negative") || t.includes("neg prompt") || t.includes("neg_prompt") || t.includes("unwanted")) {
-    return true;
-  }
-
-  if (ct === "CLIPTextEncode" && (t.includes("neg") || t === "negative")) {
-    return true;
-  }
-
-  return false;
-}
-
-// Helper to format aspect ratio for ComfyUI ResolutionSelector (e.g. "16:9 (Widescreen)", "9:16 (Vertical)")
-export function formatAspectRatioForComfyUI(aspectRatio?: string): string {
-  const ar = (aspectRatio || "16:9").trim().toLowerCase();
-  if (ar.includes("16:9") || ar.includes("widescreen")) return "16:9 (Widescreen)";
-  if (ar.includes("9:16") || ar.includes("vertical") || ar.includes("tiktok") || ar.includes("reel")) return "9:16 (Vertical)";
-  if (ar.includes("1:1") || ar.includes("square")) return "1:1 (Square)";
-  if (ar.includes("4:3")) return "4:3 (Standard)";
-  if (ar.includes("3:4")) return "3:4 (Tall)";
-  if (ar.includes("2.39") || ar.includes("2.35") || ar.includes("anamorphic") || ar.includes("cinemascope")) return "2.39:1 (Anamorphic)";
-  if (ar.includes("21:9") || ar.includes("ultrawide")) return "21:9 (Ultrawide)";
-  if (ar.includes("4:5")) return "4:5 (Instagram)";
-  if (ar.includes("3:2")) return "3:2 (Classic 35mm)";
-  if (ar.includes("2:3")) return "2:3 (Vertical 35mm)";
-  return "16:9 (Widescreen)";
-}
-
-// Helper to calculate pixel dimensions from aspect ratio and megapixels
-export function getDimensionsFromAspectRatio(aspectRatio?: string, megapixels: number = 1.0): { width: number; height: number } {
-  const ar = (aspectRatio || "16:9").trim().toLowerCase();
-  const totalPixels = Math.round((megapixels || 1.0) * 1024 * 1024);
-  let ratio = 16 / 9;
-  if (ar === "9:16" || ar === "vertical") ratio = 9 / 16;
-  else if (ar === "1:1" || ar === "square") ratio = 1 / 1;
-  else if (ar === "4:3") ratio = 4 / 3;
-  else if (ar === "3:4") ratio = 3 / 4;
-  else if (ar === "2.39:1" || ar === "2.35:1" || ar === "cinemascope") ratio = 2.39;
-  else if (ar === "21:9") ratio = 21 / 9;
-
-  let width = Math.round(Math.sqrt(totalPixels * ratio));
-  let height = Math.round(totalPixels / width);
-  width = Math.max(256, Math.round(width / 64) * 64);
-  height = Math.max(256, Math.round(height / 64) * 64);
-  return { width, height };
-}
-
-// Helper to accurately identify save video output nodes
-export function isSaveVideoNode(classType: string, title?: string): boolean {
-  const ct = (classType || "").trim();
-  const t = (title || "").trim().toLowerCase();
-
-  if (ct === "SaveVideo" || ct === "VHS_VideoCombine") {
-    return true;
-  }
-  if (t === "save video" || t.includes("save generated video") || t === "savevideo") {
-    return true;
-  }
-  return false;
-}
+// Import shared aspect ratio utilities
+export { formatAspectRatioForComfyUI, getDimensionsFromAspectRatio } from "../shared/aspectRatioUtils";
+import { formatAspectRatioForComfyUI } from "../shared/aspectRatioUtils";
 
 export function generateLiveInjectedWorkflow(
   rawJson: any,

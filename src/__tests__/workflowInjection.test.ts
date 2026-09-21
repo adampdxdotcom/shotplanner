@@ -4,6 +4,10 @@ import {
   isExactVideoLoader,
   isExactAudioLoader,
   isExactPromptNode,
+  isExactNegativePromptNode,
+  isSaveVideoNode,
+  formatAspectRatioForComfyUI,
+  getDimensionsFromAspectRatio,
   generateLiveInjectedWorkflow
 } from "../utils/workflowInjection";
 import { ShotItem, GenerationParameters, ParameterNodeMappings } from "../types";
@@ -44,6 +48,32 @@ describe("workflowInjection", () => {
       expect(isExactPromptNode("PrimitiveStringMultiline")).toBe(true);
       expect(isExactPromptNode("CustomText", "Positive Prompt")).toBe(true);
       expect(isExactPromptNode("CustomText", "Negative Prompt")).toBe(false);
+    });
+
+    it("correctly identifies negative prompt conditioning nodes", () => {
+      expect(isExactNegativePromptNode("CLIPTextEncode", "Negative Prompt")).toBe(true);
+      expect(isExactNegativePromptNode("CLIPTextEncode", "neg_prompt")).toBe(true);
+      expect(isExactNegativePromptNode("CustomNode", "Negative Prompt")).toBe(true);
+      expect(isExactNegativePromptNode("CLIPTextEncode", "Positive Prompt")).toBe(false);
+    });
+
+    it("correctly identifies save video nodes", () => {
+      expect(isSaveVideoNode("SaveVideo")).toBe(true);
+      expect(isSaveVideoNode("VHS_VideoCombine")).toBe(true);
+      expect(isSaveVideoNode("CustomNode", "Save Video")).toBe(true);
+      expect(isSaveVideoNode("LoadVideo")).toBe(false);
+    });
+
+    it("correctly formats aspect ratios and calculates pixel dimensions", () => {
+      expect(formatAspectRatioForComfyUI("16:9")).toBe("16:9 (Widescreen)");
+      expect(formatAspectRatioForComfyUI("9:16")).toBe("9:16 (Vertical)");
+      expect(formatAspectRatioForComfyUI("1:1")).toBe("1:1 (Square)");
+
+      const dims = getDimensionsFromAspectRatio("16:9", 1.0);
+      expect(dims.width).toBeGreaterThan(0);
+      expect(dims.height).toBeGreaterThan(0);
+      expect(dims.width % 64).toBe(0);
+      expect(dims.height % 64).toBe(0);
     });
   });
 

@@ -53,7 +53,7 @@ export const GenerationParametersSection: React.FC<GenerationParametersSectionPr
   };
 
   return (
-    <div className="bg-white dark:bg-zinc-950/60 p-4 rounded-xl border border-zinc-200 dark:border-zinc-700/80 space-y-4 shadow-xs">
+    <div className="space-y-3">
       {/* Header with Blue 'Node Scanner' Button in the upper right hand corner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-200 dark:border-zinc-800 pb-3">
         <div className="flex items-center gap-2">

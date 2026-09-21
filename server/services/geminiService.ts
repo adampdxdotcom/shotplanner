@@ -1,19 +1,29 @@
 import fs from "fs";
+import path from "path";
 import { GoogleGenAI } from "@google/genai";
 import { GEMINI_CONFIG_FILE } from "../config/constants";
 
-export function getStoredGeminiKey(): string | undefined {
+export function getStoredGeminiKey(): string {
   if (fs.existsSync(GEMINI_CONFIG_FILE)) {
     try {
       const data = JSON.parse(fs.readFileSync(GEMINI_CONFIG_FILE, "utf-8"));
-      return data.api_key || "";
+      if (typeof data.api_key === "string" && data.api_key.trim()) {
+        return data.api_key.trim();
+      }
     } catch (e) {}
+  }
+  if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim()) {
+    return process.env.GEMINI_API_KEY.trim();
   }
   return "";
 }
 
 export function saveGeminiKey(apiKey: string): void {
-  fs.writeFileSync(GEMINI_CONFIG_FILE, JSON.stringify({ api_key: apiKey }, null, 2));
+  const dir = path.dirname(GEMINI_CONFIG_FILE);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  fs.writeFileSync(GEMINI_CONFIG_FILE, JSON.stringify({ api_key: apiKey.trim() }, null, 2), "utf-8");
 }
 
 export function removeGeminiKey(): void {
@@ -21,7 +31,7 @@ export function removeGeminiKey(): void {
     try {
       fs.unlinkSync(GEMINI_CONFIG_FILE);
     } catch (e) {
-      fs.writeFileSync(GEMINI_CONFIG_FILE, JSON.stringify({ api_key: "" }, null, 2));
+      fs.writeFileSync(GEMINI_CONFIG_FILE, JSON.stringify({ api_key: "" }, null, 2), "utf-8");
     }
   }
 }

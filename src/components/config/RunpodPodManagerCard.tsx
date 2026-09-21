@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { AppConfig, RunpodPodItem } from "../../types";
-import { Cpu, RefreshCw, Check, CheckCircle2, AlertCircle, Zap } from "lucide-react";
+import { Cpu, RefreshCw, Check, CheckCircle2, AlertCircle, Zap, Trash2 } from "lucide-react";
 import { RunpodPodStatsCard } from "./RunpodPodStatsCard";
 
 interface RunpodPodManagerCardProps {
@@ -127,6 +127,28 @@ export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
       setError(e.message || "Failed to save RunPod API Key.");
       setConnectionStatus("error");
       onShowToast?.("Failed to save RunPod API Key", "error");
+    }
+  };
+
+  const handleRemoveApiKey = async () => {
+    setError(null);
+    setSuccessMsg(null);
+    try {
+      setApiKey("");
+      handleInputChange("runpod_api_key", "");
+      setPods([]);
+      setConnectionStatus("untested");
+      const res = await fetch("/api/settings/runpod", {
+        method: "DELETE"
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data.success) {
+        setSuccessMsg("RunPod API Key removed from settings.");
+        onShowToast?.("RunPod API Key removed", "info");
+      }
+    } catch (e: any) {
+      setError(e.message || "Failed to remove RunPod API Key.");
+      onShowToast?.("Failed to remove RunPod API Key", "error");
     }
   };
 
@@ -363,6 +385,17 @@ export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
             <Check className="w-3.5 h-3.5" />
             <span>Save Key</span>
           </button>
+
+          {hasApiKey && (
+            <button
+              type="button"
+              onClick={handleRemoveApiKey}
+              className="p-2 rounded-lg bg-zinc-100 hover:bg-red-500/10 dark:bg-zinc-800 dark:hover:bg-red-500/20 text-zinc-500 hover:text-red-500 dark:text-zinc-400 dark:hover:text-red-400 border border-zinc-200 dark:border-zinc-700 transition-colors cursor-pointer shrink-0"
+              title="Remove RunPod API Key"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
 
           <button
             type="button"

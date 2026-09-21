@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { getStoredGeminiKey, saveGeminiKey, removeGeminiKey, generateWithGeminiAPI } from "../services/geminiService";
-import { getStoredCivitaiKey, saveCivitaiKey } from "../services/civitaiService";
-import { getStoredHuggingFaceToken, saveHuggingFaceToken } from "../services/huggingfaceService";
+import { getStoredCivitaiKey, saveCivitaiKey, removeCivitaiKey } from "../services/civitaiService";
+import { getStoredHuggingFaceToken, saveHuggingFaceToken, removeHuggingFaceToken } from "../services/huggingfaceService";
 import { getStoredRunpodApiKey, saveRunpodApiKey, removeRunpodApiKey } from "../services/runpodService";
 
 const router = Router();
@@ -41,8 +41,21 @@ router.get("/civitai", (req: Request, res: Response) => {
  */
 router.post("/civitai", (req: Request, res: Response) => {
   const { api_key, apiKey } = req.body || {};
-  saveCivitaiKey(api_key || apiKey || "");
+  const val = (api_key || apiKey || "").trim();
+  if (val) {
+    saveCivitaiKey(val);
+  } else {
+    removeCivitaiKey();
+  }
   res.json({ success: true });
+});
+
+/**
+ * Delete Civitai API key
+ */
+router.delete("/civitai", (req: Request, res: Response) => {
+  removeCivitaiKey();
+  res.json({ success: true, message: "Civitai API key removed." });
 });
 
 /**
@@ -59,8 +72,21 @@ router.get("/huggingface", (req: Request, res: Response) => {
  */
 router.post("/huggingface", (req: Request, res: Response) => {
   const { token, api_token, apiKey } = req.body || {};
-  saveHuggingFaceToken(token || api_token || apiKey || "");
+  const val = (token || api_token || apiKey || "").trim();
+  if (val) {
+    saveHuggingFaceToken(val);
+  } else {
+    removeHuggingFaceToken();
+  }
   res.json({ success: true });
+});
+
+/**
+ * Delete Hugging Face token
+ */
+router.delete("/huggingface", (req: Request, res: Response) => {
+  removeHuggingFaceToken();
+  res.json({ success: true, message: "Hugging Face token removed." });
 });
 
 /**

@@ -119,15 +119,14 @@ export const CivitaiIngestionTab: React.FC<CivitaiIngestionTabProps> = ({
     setSavingCivitaiKey(true);
     try {
       await fetch("/api/settings/civitai", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ api_key: "" })
+        method: "DELETE"
       });
       setCivitaiConfigured(false);
       setCivitaiMaskedKey("");
       setCivitaiKeyInput("");
       setCivitaiTokenFeedback({ success: true, message: "Civitai token cleared." });
       onChange({ ...config, civitai_api_key: "" });
+      if (onShowToast) onShowToast("Civitai API token removed", "info");
     } catch (e) {
     } finally {
       setSavingCivitaiKey(false);

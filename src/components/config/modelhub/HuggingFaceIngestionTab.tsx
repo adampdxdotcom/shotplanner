@@ -105,15 +105,14 @@ export const HuggingFaceIngestionTab: React.FC<HuggingFaceIngestionTabProps> = (
     setSavingHfToken(true);
     try {
       await fetch("/api/settings/huggingface", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: "" })
+        method: "DELETE"
       });
       setHfConfigured(false);
       setHfMaskedToken("");
       setHfTokenInput("");
       setHfTokenFeedback({ success: true, message: "Hugging Face token cleared." });
       onChange({ ...config, huggingface_token: "" });
+      if (onShowToast) onShowToast("Hugging Face token removed", "info");
     } catch (e) {
     } finally {
       setSavingHfToken(false);

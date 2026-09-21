@@ -11,9 +11,6 @@ const getFetch = (): typeof fetch => {
 };
 
 export function getStoredRunpodApiKey(): string | null {
-  if (process.env.RUNPOD_API_KEY && process.env.RUNPOD_API_KEY.trim()) {
-    return process.env.RUNPOD_API_KEY.trim();
-  }
   try {
     if (fs.existsSync(RUNPOD_CONFIG_FILE)) {
       const data = JSON.parse(fs.readFileSync(RUNPOD_CONFIG_FILE, "utf-8"));
@@ -23,6 +20,9 @@ export function getStoredRunpodApiKey(): string | null {
     }
   } catch (err) {
     console.error("[RunPod] Error reading runpod_config.json:", err);
+  }
+  if (process.env.RUNPOD_API_KEY && process.env.RUNPOD_API_KEY.trim()) {
+    return process.env.RUNPOD_API_KEY.trim();
   }
   return null;
 }
