@@ -260,6 +260,211 @@ export function openSFTP(conn: Client): Promise<SFTPWrapper> {
   });
 }
 
+/**
+ * Upload single item via SCP protocol (scp -t) over SSH channel.
+ * Bypasses SFTP subsystem to eliminate RunPod NAT proxy packet window stalls.
+ */
+export function uploadViaSCP(
+  client: Client,
+  item: TransferItem,
+  timeoutMs: number = 30000
+): Promise<number> {
+  return new Promise<number>((resolve, reject) => {
+    let finished = false;
+    const timer = setTimeout(() => {
+      if (!finished) {
+        finished = true;
+        reject(new Error(`SCP transfer timed out after ${timeoutMs / 1000}s for ${item.filename}`));
+      }
+    }, timeoutMs);
+    if (typeof timer.unref === "function") timer.unref();
+
+    let contentBuffer: Buffer;
+    try {
+      if (item.content !== undefined) {
+        contentBuffer = Buffer.isBuffer(item.content) ? item.content : Buffer.from(item.content, "utf-8");
+      } else if (item.localPath) {
+        if (!fs.existsSync(item.localPath)) {
+          clearTimeout(timer);
+          return reject(new Error(`Local file not found: ${item.localPath}`));
+        }
+        contentBuffer = fs.readFileSync(item.localPath);
+      } else {
+        clearTimeout(timer);
+        return reject(new Error(`No content or localPath for ${item.filename}`));
+      }
+    } catch (readErr: any) {
+      clearTimeout(timer);
+      return reject(readErr);
+    }
+
+    const remoteDir = path.posix.dirname(item.remotePath);
+    const basename = path.posix.basename(item.remotePath);
+    const fileSize = contentBuffer.length;
+
+    client.exec(`scp -t "${remoteDir}"`, (err, stream) => {
+      if (err) {
+        if (!finished) {
+          finished = true;
+          clearTimeout(timer);
+          reject(err);
+        }
+        return;
+      }
+
+      let step = 0;
+
+      stream.on("close", (code: number) => {
+        if (!finished) {
+          finished = true;
+          clearTimeout(timer);
+          if (code === 0) {
+            resolve(fileSize);
+          } else {
+            reject(new Error(`SCP process for ${item.filename} exited with code ${code}`));
+          }
+        }
+      });
+
+      stream.on("error", (streamErr) => {
+        if (!finished) {
+          finished = true;
+          clearTimeout(timer);
+          reject(streamErr);
+        }
+      });
+
+      let stderrMsg = "";
+      stream.stderr.on("data", (d: Buffer) => {
+        stderrMsg += d.toString();
+      });
+
+      stream.on("data", (data: Buffer) => {
+        if (finished) return;
+
+        if (data[0] === 1 || data[0] === 2) {
+          finished = true;
+          clearTimeout(timer);
+          const msg = data.slice(1).toString("utf-8").trim() || stderrMsg || `SCP error ${data[0]}`;
+          reject(new Error(`SCP remote error: ${msg}`));
+          return;
+        }
+
+        if (data[0] === 0) {
+          if (step === 0) {
+            step = 1;
+            stream.write(`C0644 ${fileSize} ${basename}\n`);
+          } else if (step === 1) {
+            step = 2;
+            stream.write(contentBuffer, (writeErr) => {
+              if (writeErr && !finished) {
+                finished = true;
+                clearTimeout(timer);
+                return reject(writeErr);
+              }
+              stream.write(Buffer.from([0]));
+            });
+          } else if (step === 2) {
+            step = 3;
+            finished = true;
+            clearTimeout(timer);
+            stream.end();
+            resolve(fileSize);
+          }
+        }
+      });
+    });
+  });
+}
+
+/**
+ * Upload single item via direct shell exec (cat > remotePath).
+ * Universal fallback that works in all container environments.
+ */
+export function uploadViaPipedShell(
+  client: Client,
+  item: TransferItem,
+  timeoutMs: number = 30000
+): Promise<number> {
+  return new Promise<number>((resolve, reject) => {
+    let finished = false;
+    const timer = setTimeout(() => {
+      if (!finished) {
+        finished = true;
+        reject(new Error(`Shell stream transfer timed out after ${timeoutMs / 1000}s for ${item.filename}`));
+      }
+    }, timeoutMs);
+    if (typeof timer.unref === "function") timer.unref();
+
+    let contentBuffer: Buffer;
+    try {
+      if (item.content !== undefined) {
+        contentBuffer = Buffer.isBuffer(item.content) ? item.content : Buffer.from(item.content, "utf-8");
+      } else if (item.localPath) {
+        if (!fs.existsSync(item.localPath)) {
+          clearTimeout(timer);
+          return reject(new Error(`Local file not found: ${item.localPath}`));
+        }
+        contentBuffer = fs.readFileSync(item.localPath);
+      } else {
+        clearTimeout(timer);
+        return reject(new Error(`No content or localPath for ${item.filename}`));
+      }
+    } catch (readErr: any) {
+      clearTimeout(timer);
+      return reject(readErr);
+    }
+
+    const remoteDir = path.posix.dirname(item.remotePath);
+    const cmd = `mkdir -p "${remoteDir}" && cat > "${item.remotePath}"`;
+
+    client.exec(cmd, (err, stream) => {
+      if (err) {
+        if (!finished) {
+          finished = true;
+          clearTimeout(timer);
+          reject(err);
+        }
+        return;
+      }
+
+      stream.on("close", (code: number) => {
+        if (!finished) {
+          finished = true;
+          clearTimeout(timer);
+          if (code === 0) {
+            resolve(contentBuffer.length);
+          } else {
+            reject(new Error(`Remote cat write process for ${item.filename} exited with code ${code}`));
+          }
+        }
+      });
+
+      stream.on("error", (streamErr) => {
+        if (!finished) {
+          finished = true;
+          clearTimeout(timer);
+          reject(streamErr);
+        }
+      });
+
+      stream.stderr.on("data", (d: Buffer) => {
+        const msg = d.toString().trim();
+        if (msg) console.warn(`[Shell write stderr for ${item.filename}]:`, msg);
+      });
+
+      stream.write(contentBuffer, (writeErr) => {
+        if (writeErr && !finished) {
+          finished = true;
+          clearTimeout(timer);
+          return reject(writeErr);
+        }
+        stream.end();
+      });
+    });
+  });
+}
+
 export function uploadSFTPItem(sftp: SFTPWrapper, item: TransferItem, timeoutMs: number = 30000): Promise<number> {
   const performUpload = new Promise<number>((resolve, reject) => {
     try {
@@ -468,14 +673,31 @@ export async function executeSFTPBatchTransfer(
       }
     }
 
-    const sftp = await openSFTP(client);
-    console.log(`[SSH Staging] SFTP session opened. Transferring ${items.length} item(s) to remote GPU...`);
+    // Check remote SCP capability
+    const scpProbe = await execSSHCommand(client, "which scp 2>/dev/null || command -v scp 2>/dev/null");
+    const remoteHasSCP = scpProbe.code === 0 && scpProbe.stdout.trim().length > 0;
+    console.log(`[SSH Staging] Remote SCP tool status: ${remoteHasSCP ? `Available (${scpProbe.stdout.trim()})` : "Not present, using direct shell stream"}`);
 
     for (const item of items) {
       const itemStart = Date.now();
       try {
         console.log(`[SSH Staging] [->] Transferring: ${item.filename} -> ${item.remotePath}`);
-        const bytes = await uploadSFTPItem(sftp, item, 30000);
+        let bytes = 0;
+        let method = "SCP";
+
+        if (remoteHasSCP) {
+          try {
+            bytes = await uploadViaSCP(client, item, 30000);
+          } catch (scpErr: any) {
+            console.warn(`[SSH Staging] SCP transfer failed for ${item.filename} (${scpErr.message}), falling back to direct shell stream...`);
+            bytes = await uploadViaPipedShell(client, item, 30000);
+            method = "Shell Stream";
+          }
+        } else {
+          bytes = await uploadViaPipedShell(client, item, 30000);
+          method = "Shell Stream";
+        }
+
         const elapsed = Date.now() - itemStart;
 
         summary.transferredCount++;
@@ -487,9 +709,9 @@ export async function executeSFTPBatchTransfer(
           size_bytes: bytes,
           status: "transferred",
           remote_path: item.remotePath,
-          message: `Transferred via SFTP (${(bytes / 1024).toFixed(1)} KB in ${elapsed}ms)`
+          message: `Transferred via ${method} (${(bytes / 1024).toFixed(1)} KB in ${elapsed}ms)`
         });
-        console.log(`[SSH Staging] [OK] Completed upload: ${item.filename} (${bytes} bytes in ${elapsed}ms)`);
+        console.log(`[SSH Staging] [OK] Completed upload: ${item.filename} (${bytes} bytes via ${method} in ${elapsed}ms)`);
       } catch (uploadErr: any) {
         summary.failedCount++;
         summary.failedFiles.push(item.filename);
