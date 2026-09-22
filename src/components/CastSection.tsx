@@ -337,6 +337,8 @@ export const CastSection: React.FC<CastSectionProps> = ({
         subjects={renderedSubjects}
         characters={characters}
         config={config}
+        sceneProject={sceneProject}
+        onUpdateProject={onUpdateProject}
         onRegisterSubject={onRegisterSubject}
         onClose={() => setEditingAsset(null)}
         onAssetUpdated={handleAssetUpdated}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { AppConfig, MediaAsset } from "../types";
-import { Edit3, X, AlertCircle, UploadCloud, Undo2, Trash2, CheckCircle, Sparkles, Loader2 } from "lucide-react";
+import { AppConfig, MediaAsset, SceneProjectFile, ImageVisualAnalysis } from "../types";
+import { Edit3, X, AlertCircle, UploadCloud, Undo2, Trash2, CheckCircle, Sparkles, Loader2, Eye, Shirt, Sun, Camera, Palette, Save } from "lucide-react";
 import { SubjectCombobox } from "./SubjectCombobox";
 import { getAssetMediaUrl } from "../utils/assetUrl";
 import { 
@@ -17,6 +17,8 @@ interface AssetEditModalProps {
   subjects: string[];
   characters: Record<string, any>;
   config?: AppConfig;
+  sceneProject?: SceneProjectFile;
+  onUpdateProject?: React.Dispatch<React.SetStateAction<any>>;
   onRegisterSubject?: (name: string) => void;
   onClose: () => void;
   onAssetUpdated: (oldFilename: string, newAsset: MediaAsset) => void;
@@ -36,6 +38,8 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
   subjects,
   characters,
   config,
+  sceneProject,
+  onUpdateProject,
   onRegisterSubject,
   onClose,
   onAssetUpdated
@@ -52,6 +56,24 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
   const [editError, setEditError] = useState<string | null>(null);
   const [isCaptioning, setIsCaptioning] = useState(false);
   const [captionToast, setCaptionToast] = useState<string | null>(null);
+
+  // Editable Visual Intelligence Breakdown Fields
+  const [viSummary, setViSummary] = useState<string>("");
+  const [viSubjectIdentifiedName, setViSubjectIdentifiedName] = useState<string>("");
+  const [viSubjectAge, setViSubjectAge] = useState<string>("");
+  const [viSubjectExpression, setViSubjectExpression] = useState<string>("");
+  const [viSubjectHair, setViSubjectHair] = useState<string>("");
+  const [viWardrobeGarments, setViWardrobeGarments] = useState<string>("");
+  const [viWardrobeColors, setViWardrobeColors] = useState<string>("");
+  const [viWardrobeEra, setViWardrobeEra] = useState<string>("");
+  const [viLightingQuality, setViLightingQuality] = useState<string>("");
+  const [viLightingDirection, setViLightingDirection] = useState<string>("");
+  const [viLightingTemp, setViLightingTemp] = useState<string>("");
+  const [viCinemaFraming, setViCinemaFraming] = useState<string>("");
+  const [viCinemaLens, setViCinemaLens] = useState<string>("");
+  const [viCinemaAngle, setViCinemaAngle] = useState<string>("");
+  const [viEnvLocationType, setViEnvLocationType] = useState<string>("");
+  const [viEnvPalette, setViEnvPalette] = useState<string>("");
 
   const visionState = useVisionCaption(config);
 
@@ -96,8 +118,46 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
       setEditError(null);
       setIsCaptioning(false);
       setCaptionToast(null);
+
+      // Populate Visual Intelligence fields from project cache
+      const cached = sceneProject?.visual_analysis_cache?.[asset.filename];
+      if (cached) {
+        setViSummary(cached.summary || "");
+        setViSubjectIdentifiedName(cached.subject?.identified_name || "");
+        setViSubjectAge(cached.subject?.apparent_age || "");
+        setViSubjectExpression(cached.subject?.expression || "");
+        setViSubjectHair(cached.subject?.hair || "");
+        setViWardrobeGarments(cached.wardrobe?.garments || "");
+        setViWardrobeColors(cached.wardrobe?.colors || "");
+        setViWardrobeEra(cached.wardrobe?.era_style || "");
+        setViLightingQuality(cached.lighting?.quality || "");
+        setViLightingDirection(cached.lighting?.key_direction || "");
+        setViLightingTemp(cached.lighting?.color_temperature || "");
+        setViCinemaFraming(cached.cinematography?.framing || "");
+        setViCinemaLens(cached.cinematography?.lens_feel || "");
+        setViCinemaAngle(cached.cinematography?.camera_angle || "");
+        setViEnvLocationType(cached.environment_palette?.location_type || "");
+        setViEnvPalette(cached.environment_palette?.dominant_colors || "");
+      } else {
+        setViSummary("");
+        setViSubjectIdentifiedName("");
+        setViSubjectAge("");
+        setViSubjectExpression("");
+        setViSubjectHair("");
+        setViWardrobeGarments("");
+        setViWardrobeColors("");
+        setViWardrobeEra("");
+        setViLightingQuality("");
+        setViLightingDirection("");
+        setViLightingTemp("");
+        setViCinemaFraming("");
+        setViCinemaLens("");
+        setViCinemaAngle("");
+        setViEnvLocationType("");
+        setViEnvPalette("");
+      }
     }
-  }, [asset]);
+  }, [asset, sceneProject]);
 
   const effectiveType = useMemo(() => {
     if (assetType === "Other") {
@@ -216,8 +276,46 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
         };
       }
 
-      if (onRegisterSubject && editSubjectName.trim()) {
-        onRegisterSubject(editSubjectName.trim());
+      // Persist Visual Intelligence Analysis updates to project cache
+      if (onUpdateProject) {
+        const updatedAnalysis: ImageVisualAnalysis = {
+          filename: asset.filename,
+          scanned_at: new Date().toISOString(),
+          summary: viSummary.trim(),
+          subject: {
+            identified_name: viSubjectIdentifiedName.trim() || undefined,
+            apparent_age: viSubjectAge.trim() || undefined,
+            expression: viSubjectExpression.trim() || undefined,
+            hair: viSubjectHair.trim() || undefined
+          },
+          wardrobe: {
+            garments: viWardrobeGarments.trim() || undefined,
+            colors: viWardrobeColors.trim() || undefined,
+            era_style: viWardrobeEra.trim() || undefined
+          },
+          lighting: {
+            quality: viLightingQuality.trim() || undefined,
+            key_direction: viLightingDirection.trim() || undefined,
+            color_temperature: viLightingTemp.trim() || undefined
+          },
+          cinematography: {
+            framing: viCinemaFraming.trim() || undefined,
+            lens_feel: viCinemaLens.trim() || undefined,
+            camera_angle: viCinemaAngle.trim() || undefined
+          },
+          environment_palette: {
+            location_type: viEnvLocationType.trim() || undefined,
+            dominant_colors: viEnvPalette.trim() || undefined
+          }
+        };
+
+        onUpdateProject((prev: any) => ({
+          ...prev,
+          visual_analysis_cache: {
+            ...(prev?.visual_analysis_cache || {}),
+            [asset.filename]: updatedAnalysis
+          }
+        }));
       }
 
       onAssetUpdated(asset.filename, updatedAsset);
@@ -389,10 +487,222 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
             />
           </div>
 
-          {/* Preview Metadata Tag */}
-          <div className="bg-amber-950/20 border border-amber-900/30 rounded-lg p-3 flex flex-col gap-1">
-            <span className="text-[10px] font-semibold text-amber-500/80 uppercase tracking-wider">Semantic Metadata Tag</span>
-            <span className="text-xs text-amber-200/90 font-mono break-all">{previewMetadata}</span>
+          {/* Visual Intelligence Breakdown (Editable) */}
+          <div className="bg-zinc-950/80 border border-zinc-800 rounded-xl p-3.5 space-y-3">
+            <div className="flex items-center justify-between border-b border-zinc-800/80 pb-2">
+              <span className="text-xs font-semibold text-amber-400 flex items-center gap-1.5 uppercase tracking-wider">
+                <Eye className="w-3.5 h-3.5 text-amber-400" />
+                Visual Intelligence Breakdown
+              </span>
+              <span className="text-[10px] text-zinc-500 font-mono">Editable Cache</span>
+            </div>
+
+            {/* Overall Summary */}
+            <div>
+              <label className="block text-[11px] font-medium text-zinc-400 mb-1">Visual Summary</label>
+              <textarea
+                value={viSummary}
+                onChange={(e) => setViSummary(e.target.value)}
+                rows={2}
+                placeholder="Overall description of subject, lighting, framing..."
+                className="w-full bg-zinc-900 border border-zinc-700/80 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 focus:border-amber-500 outline-none resize-none placeholder-zinc-600"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+              {/* Subject Details */}
+              <div className="p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800 flex flex-col gap-1.5">
+                <span className="font-semibold text-indigo-400 text-[11px] flex items-center gap-1">
+                  Subject / Actor Details
+                </span>
+                <div>
+                  <label className="block text-[10px] text-zinc-400">Identified Name</label>
+                  <input
+                    type="text"
+                    value={viSubjectIdentifiedName}
+                    onChange={(e) => setViSubjectIdentifiedName(e.target.value)}
+                    placeholder="e.g., John / Hero"
+                    className="w-full bg-zinc-950 border border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-200 focus:border-indigo-500 outline-none"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <div>
+                    <label className="block text-[10px] text-zinc-400">Apparent Age</label>
+                    <input
+                      type="text"
+                      value={viSubjectAge}
+                      onChange={(e) => setViSubjectAge(e.target.value)}
+                      placeholder="e.g., Late 20s"
+                      className="w-full bg-zinc-950 border border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-200 focus:border-indigo-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-zinc-400">Expression</label>
+                    <input
+                      type="text"
+                      value={viSubjectExpression}
+                      onChange={(e) => setViSubjectExpression(e.target.value)}
+                      placeholder="e.g., Stern, focused"
+                      className="w-full bg-zinc-950 border border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-200 focus:border-indigo-500 outline-none"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] text-zinc-400">Hair & Features</label>
+                  <input
+                    type="text"
+                    value={viSubjectHair}
+                    onChange={(e) => setViSubjectHair(e.target.value)}
+                    placeholder="e.g., Short dark hair"
+                    className="w-full bg-zinc-950 border border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-200 focus:border-indigo-500 outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Wardrobe & Style */}
+              <div className="p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800 flex flex-col gap-1.5">
+                <span className="font-semibold text-amber-400 text-[11px] flex items-center gap-1">
+                  <Shirt className="w-3 h-3" />
+                  Wardrobe & Style
+                </span>
+                <div>
+                  <label className="block text-[10px] text-zinc-400">Garments</label>
+                  <input
+                    type="text"
+                    value={viWardrobeGarments}
+                    onChange={(e) => setViWardrobeGarments(e.target.value)}
+                    placeholder="e.g., Leather jacket, t-shirt"
+                    className="w-full bg-zinc-950 border border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-200 focus:border-amber-500 outline-none"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <div>
+                    <label className="block text-[10px] text-zinc-400">Colors</label>
+                    <input
+                      type="text"
+                      value={viWardrobeColors}
+                      onChange={(e) => setViWardrobeColors(e.target.value)}
+                      placeholder="e.g., Black, crimson"
+                      className="w-full bg-zinc-950 border border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-200 focus:border-amber-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-zinc-400">Era / Style</label>
+                    <input
+                      type="text"
+                      value={viWardrobeEra}
+                      onChange={(e) => setViWardrobeEra(e.target.value)}
+                      placeholder="e.g., Cyberpunk, 90s"
+                      className="w-full bg-zinc-950 border border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-200 focus:border-amber-500 outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Lighting Setup */}
+              <div className="p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800 flex flex-col gap-1.5">
+                <span className="font-semibold text-yellow-400 text-[11px] flex items-center gap-1">
+                  <Sun className="w-3 h-3" />
+                  Lighting Setup
+                </span>
+                <div>
+                  <label className="block text-[10px] text-zinc-400">Quality</label>
+                  <input
+                    type="text"
+                    value={viLightingQuality}
+                    onChange={(e) => setViLightingQuality(e.target.value)}
+                    placeholder="e.g., Hard contrast, soft diffuse"
+                    className="w-full bg-zinc-950 border border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-200 focus:border-yellow-500 outline-none"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <div>
+                    <label className="block text-[10px] text-zinc-400">Key Direction</label>
+                    <input
+                      type="text"
+                      value={viLightingDirection}
+                      onChange={(e) => setViLightingDirection(e.target.value)}
+                      placeholder="e.g., Side-lit 45 deg"
+                      className="w-full bg-zinc-950 border border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-200 focus:border-yellow-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-zinc-400">Color Temp</label>
+                    <input
+                      type="text"
+                      value={viLightingTemp}
+                      onChange={(e) => setViLightingTemp(e.target.value)}
+                      placeholder="e.g., Cool blue, warm tungsten"
+                      className="w-full bg-zinc-950 border border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-200 focus:border-yellow-500 outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Cinematography */}
+              <div className="p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800 flex flex-col gap-1.5">
+                <span className="font-semibold text-blue-400 text-[11px] flex items-center gap-1">
+                  <Camera className="w-3 h-3" />
+                  Cinematography
+                </span>
+                <div>
+                  <label className="block text-[10px] text-zinc-400">Framing / Shot Type</label>
+                  <input
+                    type="text"
+                    value={viCinemaFraming}
+                    onChange={(e) => setViCinemaFraming(e.target.value)}
+                    placeholder="e.g., Close-Up, Medium Shot"
+                    className="w-full bg-zinc-950 border border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-200 focus:border-blue-500 outline-none"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <div>
+                    <label className="block text-[10px] text-zinc-400">Lens Feel</label>
+                    <input
+                      type="text"
+                      value={viCinemaLens}
+                      onChange={(e) => setViCinemaLens(e.target.value)}
+                      placeholder="e.g., 50mm, anamorphic"
+                      className="w-full bg-zinc-950 border border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-200 focus:border-blue-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-zinc-400">Camera Angle</label>
+                    <input
+                      type="text"
+                      value={viCinemaAngle}
+                      onChange={(e) => setViCinemaAngle(e.target.value)}
+                      placeholder="e.g., Eye-level, low angle"
+                      className="w-full bg-zinc-950 border border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-200 focus:border-blue-500 outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Environment & Palette */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1 border-t border-zinc-800/60">
+              <div>
+                <label className="block text-[10px] font-medium text-zinc-400 mb-0.5">Location Type</label>
+                <input
+                  type="text"
+                  value={viEnvLocationType}
+                  onChange={(e) => setViEnvLocationType(e.target.value)}
+                  placeholder="e.g., Cyberpunk alleyway, studio interior"
+                  className="w-full bg-zinc-900 border border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-200 focus:border-emerald-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-medium text-zinc-400 mb-0.5">Dominant Palette</label>
+                <input
+                  type="text"
+                  value={viEnvPalette}
+                  onChange={(e) => setViEnvPalette(e.target.value)}
+                  placeholder="e.g., Neon cyan, dark purple"
+                  className="w-full bg-zinc-900 border border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-200 focus:border-emerald-500 outline-none"
+                />
+              </div>
+            </div>
           </div>
 
           {/* Media File Replacement Option */}

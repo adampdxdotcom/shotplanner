@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Bot, Clapperboard, Loader2, CheckCheck, X, Clock } from "lucide-react";
 import Markdown from "react-markdown";
 import { AssistantChatMessage } from "../../services/assistantClient";
@@ -52,6 +52,23 @@ export const AssistantMessageList: React.FC<AssistantMessageListProps> = ({
   onUndoAction,
   onApplyAllActions
 }) => {
+  // Auto-apply `save_visual_analysis` actions immediately upon message arrival
+  useEffect(() => {
+    messages.forEach((msg, idx) => {
+      if (msg.role === "assistant" && msg.content) {
+        const { actions } = parseAssistantActions(msg.content);
+        actions.forEach((act, actIdx) => {
+          if (act.type === "save_visual_analysis") {
+            const actionKey = `${idx}_save_visual_analysis_${actIdx}`;
+            if (!appliedActionKeys[actionKey] && !dismissedActionKeys[actionKey]) {
+              onApplyAction(act, actionKey);
+            }
+          }
+        });
+      }
+    });
+  }, [messages, appliedActionKeys, dismissedActionKeys, onApplyAction]);
+
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-4 text-sm bg-slate-50/60 dark:bg-zinc-950">
       {messages.map((msg, idx) => {
