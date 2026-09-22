@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { WorkflowItem, ParsedWorkflow, GenerationParameters, ParameterNodeMappings } from '../../types';
+import { apiClient } from '../../api';
 
 interface UseWorkflowManagementParams {
   activeSceneName: string;
@@ -71,8 +72,7 @@ export function useWorkflowManagement({
   const fetchWorkflows = useCallback(async () => {
     try {
       const activeName = activeSceneName || "Untitled_Scene";
-      const res = await fetch(`/api/workflows?scene=${encodeURIComponent(activeName)}`);
-      const data = await res.json();
+      const data: any = await apiClient.get("/api/workflows", { params: { scene: activeName } });
       const rawList: any[] = data.workflow_items || data.workflows || [];
       const normalized: WorkflowItem[] = rawList.map((item: any) => {
         if (typeof item === "string") {
@@ -106,13 +106,11 @@ export function useWorkflowManagement({
     const parseSelectedWorkflow = async () => {
       try {
         const activeName = activeSceneName || "Untitled_Scene";
-        const res = await fetch("/api/workflows/parse", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ filename: selectedWorkflowFile, scene_name: activeName })
+        const data: any = await apiClient.post("/api/workflows/parse", {
+          filename: selectedWorkflowFile,
+          scene_name: activeName
         });
-        const data = await res.json();
-        if (res.ok && data.nodes_info) {
+        if (data && data.nodes_info) {
           const rawPayload = data.raw_json || data.workflow || data.raw_workflow || {};
           setParsedWorkflow({
             ...data,
@@ -208,32 +206,27 @@ export function useWorkflowManagement({
     syncRemoteWorkflow: async (remotePath: string, config: any) => {
       try {
         const activeName = activeSceneName || "Untitled_Scene";
-        const res = await fetch("/api/workflows/sync-remote", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            remote_path: remotePath,
-            scene_name: activeName,
-            remote_host: config.remote_host,
-            ssh_port: config.ssh_port,
-            ssh_username: config.ssh_username,
-            ssh_password: config.ssh_password,
-            ssh_key_path: config.ssh_key_path,
-            ssh_private_key: config.ssh_private_key,
-            remote_comfyui_root: config.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI",
-            comfyui_api_url: config.comfyui_api_url,
-            remote_api_token: config.remote_api_token
-          })
+        const data: any = await apiClient.post("/api/workflows/sync-remote", {
+          remote_path: remotePath,
+          scene_name: activeName,
+          remote_host: config.remote_host,
+          ssh_port: config.ssh_port,
+          ssh_username: config.ssh_username,
+          ssh_password: config.ssh_password,
+          ssh_key_path: config.ssh_key_path,
+          ssh_private_key: config.ssh_private_key,
+          remote_comfyui_root: config.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI",
+          comfyui_api_url: config.comfyui_api_url,
+          remote_api_token: config.remote_api_token
         });
-        const data = await res.json();
-        if (res.ok && data.success) {
+        if (data && data.success) {
           await fetchWorkflows();
           if (data.filename) {
             setSelectedWorkflowFile(data.filename);
           }
           return { success: true, data };
         }
-        return { success: false, error: data.error || "Failed to sync remote workflow" };
+        return { success: false, error: data?.error || "Failed to sync remote workflow" };
       } catch (err: any) {
         return { success: false, error: err.message || "Failed to sync remote workflow" };
       }

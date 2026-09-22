@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { apiClient } from '../api';
 
 export interface ComfyMonitorState {
   isConnected: boolean;
@@ -204,29 +205,21 @@ export function useComfyMonitor(
               resetState();
               onStatusUpdated?.();
               if (activeSceneName) {
-                fetch('/api/outputs/sync-history', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    scene_name: activeSceneName,
-                    comfyui_api_url: comfyApiUrl,
-                    max_prompts: 5
-                  })
+                apiClient.post('/api/outputs/sync-history', {
+                  scene_name: activeSceneName,
+                  comfyui_api_url: comfyApiUrl,
+                  max_prompts: 5
                 }).catch(() => {});
               }
             } else if (msg.type === 'executed') {
               onStatusUpdated?.();
               if (activeSceneName) {
-                fetch('/api/outputs/sync-history', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    scene_name: activeSceneName,
-                    comfyui_api_url: comfyApiUrl,
-                    prompt_id: msg.data?.prompt_id,
-                    max_prompts: 3
-                  })
-                }).then(res => res.json()).then(data => {
+                apiClient.post('/api/outputs/sync-history', {
+                  scene_name: activeSceneName,
+                  comfyui_api_url: comfyApiUrl,
+                  prompt_id: msg.data?.prompt_id,
+                  max_prompts: 3
+                }).then((data: any) => {
                   if (data?.ingested_count > 0 && onOutputPulled) {
                     data.ingested.forEach((item: any) => {
                       onOutputPulled(item.filename, {

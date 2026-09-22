@@ -10,6 +10,7 @@ import {
   addCivitaiFavorite, 
   removeCivitaiFavorite 
 } from "../../../services/civitaiFavoritesService";
+import { settingsApi } from "../../../api";
 import { CivitaiFavoritesTray } from "../CivitaiFavoritesTray";
 import { COMFYUI_MODEL_CATEGORIES } from "./modelHubConstants";
 import { CivitaiModelCard } from "./CivitaiModelCard";
@@ -94,12 +95,7 @@ export const CivitaiIngestionTab: React.FC<CivitaiIngestionTabProps> = ({
     setCivitaiTokenFeedback(null);
 
     try {
-      const res = await fetch("/api/settings/civitai", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ api_key: clean })
-      });
-      if (!res.ok) throw new Error("Failed to save Civitai API token");
+      await settingsApi.saveCivitaiKey(clean);
 
       setCivitaiConfigured(true);
       const masked = clean.length > 8 ? `${clean.slice(0, 4)}...${clean.slice(-4)}` : "***";
@@ -118,9 +114,7 @@ export const CivitaiIngestionTab: React.FC<CivitaiIngestionTabProps> = ({
   const handleClearCivitaiKey = async () => {
     setSavingCivitaiKey(true);
     try {
-      await fetch("/api/settings/civitai", {
-        method: "DELETE"
-      });
+      await settingsApi.deleteCivitaiKey();
       setCivitaiConfigured(false);
       setCivitaiMaskedKey("");
       setCivitaiKeyInput("");

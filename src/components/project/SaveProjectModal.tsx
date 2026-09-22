@@ -8,6 +8,7 @@ import {
   FolderArchive,
   Info
 } from "lucide-react";
+import { assetsApi, projectsApi } from "../../api";
 
 interface ProjectTakesSummary {
   projectName: string;
@@ -102,9 +103,8 @@ export const SaveProjectModal: React.FC<SaveProjectModalProps> = ({
   // Fetch asset count whenever the active scene changes
   useEffect(() => {
     if (!isOpen || !activeSceneName) return;
-    fetch(`/api/assets?scene_name=${encodeURIComponent(activeSceneName)}`)
-      .then((res) => res.json())
-      .then((data) => {
+    assetsApi.list(activeSceneName)
+      .then((data: any) => {
         if (data && Array.isArray(data.assets)) {
           setAssetCount(data.assets.length);
         }
@@ -117,9 +117,8 @@ export const SaveProjectModal: React.FC<SaveProjectModalProps> = ({
     if (!clean) return;
     setLoadingSummary(true);
     try {
-      const res = await fetch(`/api/projects/${encodeURIComponent(clean)}/takes-summary`);
-      if (res.ok) {
-        const data = await res.json();
+      const data = await projectsApi.getTakesSummary(clean);
+      if (data) {
         setTakesSummary(data);
       }
     } catch (e) {

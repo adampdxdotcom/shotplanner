@@ -1,4 +1,5 @@
 import { SceneProjectFile, AssistantChatMessage } from "../types";
+import { llmApi } from "../api";
 
 export type { AssistantChatMessage };
 
@@ -22,16 +23,6 @@ export interface AssistantChatResponse {
  * Sends messages and live project context to the assistant backend.
  */
 export async function sendAssistantChatMessage(request: AssistantChatRequest): Promise<AssistantChatResponse> {
-  const response = await fetch("/api/assistant/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(request)
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error || `Server responded with HTTP ${response.status}`);
-  }
-
-  return response.json();
+  const data = await llmApi.chat(request);
+  return data as AssistantChatResponse;
 }

@@ -8,6 +8,7 @@ import {
 } from "../config/constants";
 import { UniverseCharacterProfile } from "../types";
 import { assetService } from "./assetService";
+import { writeJsonAtomicSync } from "../utils/atomicFs";
 
 // Ensure universe directory and database file exist
 initDirectories();
@@ -20,7 +21,7 @@ export class UniverseService {
     try {
       if (!fs.existsSync(UNIVERSE_CHARACTERS_FILE)) {
         fs.mkdirSync(UNIVERSE_DIR, { recursive: true });
-        fs.writeFileSync(UNIVERSE_CHARACTERS_FILE, JSON.stringify({}, null, 2), "utf-8");
+        writeJsonAtomicSync(UNIVERSE_CHARACTERS_FILE, {});
         return {};
       }
       const raw = fs.readFileSync(UNIVERSE_CHARACTERS_FILE, "utf-8");
@@ -47,7 +48,7 @@ export class UniverseService {
       if (!fs.existsSync(UNIVERSE_DIR)) {
         fs.mkdirSync(UNIVERSE_DIR, { recursive: true });
       }
-      fs.writeFileSync(UNIVERSE_CHARACTERS_FILE, JSON.stringify(characters, null, 2), "utf-8");
+      writeJsonAtomicSync(UNIVERSE_CHARACTERS_FILE, characters);
       return true;
     } catch (err) {
       console.error("[UniverseService] Error saving characters:", err);
@@ -151,7 +152,7 @@ export class UniverseService {
             if (item) {
               item.is_universe = true;
               item.scene_name = "universe";
-              fs.writeFileSync(ASSET_DB_FILE, JSON.stringify(dbRecords, null, 2), "utf-8");
+              writeJsonAtomicSync(ASSET_DB_FILE, dbRecords);
             }
           }
         }

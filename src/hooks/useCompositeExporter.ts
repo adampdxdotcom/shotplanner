@@ -5,6 +5,7 @@ import { getAssetMediaUrl } from "../utils/assetUrl";
 import { sanitizeSlug } from "../types";
 import { renderCompositeToBlob, downloadCompositeBlob } from "../utils/compositeCanvasExport";
 import { StagedActor } from "../components/cast/AiReferenceStagingStudioModal";
+import { assetsApi } from "../api";
 
 export interface UseCompositeExporterProps {
   stagedActors: StagedActor[];
@@ -86,18 +87,9 @@ export function useCompositeExporter({
       }
 
       // Upload flattened composite to backend asset endpoint
-      const res = await fetch("/api/assets/upload", {
-        method: "POST",
-        body: formData
-      });
-
-      if (!res.ok) {
-        throw new Error(`Upload failed with status ${res.status}`);
-      }
-
-      const data = await res.json();
-      if (!data.success || !data.asset) {
-        throw new Error(data.error || "Server failed to return created composite asset.");
+      const data: any = await assetsApi.upload(formData);
+      if (!data || !data.asset) {
+        throw new Error(data?.error || "Server failed to return created composite asset.");
       }
 
       const newAsset: MediaAsset = data.asset;

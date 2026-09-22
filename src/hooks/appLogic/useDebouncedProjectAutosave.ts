@@ -8,6 +8,7 @@ import {
 } from "../../types";
 import { sanitizeProjectForPersistence } from "../../utils/recipeSanitizer";
 import { normalizeProjectCastAndAssets } from "../../utils/subjectUtils";
+import { projectsApi } from "../../api";
 import type { ShotOperationsDelegate } from "./useScenePersistence";
 
 export type AutosaveStatus = "saved" | "saving" | "unsaved" | "error";
@@ -123,18 +124,7 @@ export function useDebouncedProjectAutosave({
 
       const payload = sanitizeProjectForPersistence(rawPayload);
 
-      const res = await fetch("/api/projects", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename, data: payload })
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        console.error("Autosave response error:", err);
-        setAutosaveStatus("error");
-        return false;
-      }
+      await projectsApi.save(filename, payload);
 
       setIsDirty(false);
       setAutosaveStatus("saved");

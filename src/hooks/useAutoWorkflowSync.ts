@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { AppConfig, ShotItem, SceneProjectFile, RemoteWorkflowItem } from "../types";
 import { filterRemoteWorkflows } from "../utils/remoteWorkflowFilter";
+import { apiClient } from "../api";
 
 interface UseAutoWorkflowSyncOptions {
   config: AppConfig;
@@ -50,25 +51,20 @@ export function useAutoWorkflowSync({
 
     try {
       const sceneName = sceneProject.scene_name || "";
-      const res = await fetch("/api/workflow/remote-list", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          remote_host: config.remote_host,
-          ssh_port: config.ssh_port,
-          ssh_username: config.ssh_username,
-          ssh_password: config.ssh_password,
-          ssh_key_path: config.ssh_key_path,
-          ssh_private_key: config.ssh_private_key,
-          remote_comfyui_root: config.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI",
-          comfyui_api_url: config.comfyui_api_url,
-          remote_api_token: config.remote_api_token,
-          project_name: sceneName
-        })
+      const data: any = await apiClient.post("/api/workflow/remote-list", {
+        remote_host: config.remote_host,
+        ssh_port: config.ssh_port,
+        ssh_username: config.ssh_username,
+        ssh_password: config.ssh_password,
+        ssh_key_path: config.ssh_key_path,
+        ssh_private_key: config.ssh_private_key,
+        remote_comfyui_root: config.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI",
+        comfyui_api_url: config.comfyui_api_url,
+        remote_api_token: config.remote_api_token,
+        project_name: sceneName
       });
 
-      const data = await res.json();
-      if (data.success && Array.isArray(data.workflows)) {
+      if (data && data.success && Array.isArray(data.workflows)) {
         const cleaned = filterRemoteWorkflows(data.workflows);
         setRemoteWorkflows(cleaned);
         setLastAutoScannedAt(Date.now());

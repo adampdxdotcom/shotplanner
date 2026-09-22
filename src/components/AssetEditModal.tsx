@@ -10,6 +10,7 @@ import {
   detectActiveModifier 
 } from "../utils/assetModifiers";
 import { useVisionCaption, generateCaptionForFile, generateCaptionForAsset } from "../hooks/useVisionCaption";
+import { assetsApi } from "../api";
 
 interface AssetEditModalProps {
   asset: MediaAsset | null;
@@ -196,10 +197,7 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
     }
 
     try {
-      const res = await fetch(`/api/assets/${encodeURIComponent(asset.filename)}`, {
-        method: "PUT",
-        body: formData
-      });
+      const data: any = await assetsApi.update(encodeURIComponent(asset.filename), formData as any);
 
       let updatedAsset: MediaAsset = {
         ...asset,
@@ -208,26 +206,14 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
         description: editDescription.trim()
       };
 
-      if (res.ok) {
-        try {
-          const data = await res.json();
-          if (data.asset) {
-            updatedAsset = {
-              ...asset,
-              ...data.asset,
-              type: effectiveType,
-              subject_name: editSubjectName.trim(),
-              description: editDescription.trim()
-            };
-          }
-        } catch {}
-      } else {
-        let errStr = "Failed to update asset";
-        try {
-          const eJson = await res.json();
-          errStr = eJson.error || errStr;
-        } catch {}
-        throw new Error(errStr);
+      if (data && data.asset) {
+        updatedAsset = {
+          ...asset,
+          ...data.asset,
+          type: effectiveType,
+          subject_name: editSubjectName.trim(),
+          description: editDescription.trim()
+        };
       }
 
       if (onRegisterSubject && editSubjectName.trim()) {

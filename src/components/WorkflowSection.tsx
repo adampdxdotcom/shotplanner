@@ -10,6 +10,7 @@ import { MediaLoaderMapper } from "./workflow/MediaLoaderMapper";
 import { LiveWorkflowPreview } from "./workflow/LiveWorkflowPreview";
 import { GenerationParametersSection } from "./GenerationParametersSection";
 import { JsonViewerWithSearch } from "./JsonViewerWithSearch";
+import { workflowsApi } from "../api";
 import { 
   Workflow, 
   Layers, 
@@ -195,19 +196,15 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
     formData.append("scene_name", activeSceneName);
 
     try {
-      const res = await fetch("/api/workflows/upload", {
-        method: "POST",
-        body: formData
-      });
-      const data = await res.json();
-      if (res.ok) {
+      const data: any = await workflowsApi.upload(formData);
+      if (data && data.filename) {
         onRefreshWorkflows();
         onSelectWorkflow(data.filename);
         if (activeShotId) {
           onUpdateShot(prev => ({ ...prev, workflow_file: data.filename }));
         }
       } else {
-        setUploadError(data.error || "Failed to upload workflow");
+        setUploadError(data?.error || "Failed to upload workflow");
       }
     } catch (err: any) {
       setUploadError(err.message);

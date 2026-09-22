@@ -3,6 +3,7 @@ import { ShotItem, ShotTake } from "../types";
 import { formatTakeFilename } from "../utils/formatters";
 import { copyToClipboard } from "../utils/clipboard";
 import { Clapperboard } from "lucide-react";
+import { apiClient } from "../api";
 import { 
   TakeIngestCard, 
   TakeFilterBar, 
@@ -91,19 +92,10 @@ export const ShotTakesManager: React.FC<ShotTakesManagerProps> = ({
     formData.append("target_filename", targetName);
 
     try {
-      const response = await fetch("/api/outputs/upload", {
-        method: "POST",
-        body: formData
-      });
+      const data: any = await apiClient.upload("/api/outputs/upload", formData);
 
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || `Upload failed with status ${response.status}`);
-      }
-
-      const data = await response.json();
-      const savedFilename = data.filename || targetName;
-      const streamUrl = data.stream_url || `/api/outputs/stream/${encodeURIComponent(sceneName)}/${encodeURIComponent(savedFilename)}`;
+      const savedFilename = data?.filename || targetName;
+      const streamUrl = data?.stream_url || `/api/outputs/stream/${encodeURIComponent(sceneName)}/${encodeURIComponent(savedFilename)}`;
 
       const newTake: ShotTake = {
         id: "take_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
@@ -230,9 +222,7 @@ export const ShotTakesManager: React.FC<ShotTakesManagerProps> = ({
 
     if (take.video_filename) {
       try {
-        await fetch(`/api/outputs/${encodeURIComponent(sceneName)}/${encodeURIComponent(take.video_filename)}`, {
-          method: "DELETE"
-        });
+        await apiClient.delete(`/api/outputs/${encodeURIComponent(sceneName)}/${encodeURIComponent(take.video_filename)}`);
       } catch (e) {
         console.warn("Could not delete file from disk:", e);
       }

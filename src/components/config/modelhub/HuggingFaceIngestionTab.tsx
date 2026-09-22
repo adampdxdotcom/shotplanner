@@ -7,6 +7,7 @@ import {
 import { copyToClipboard } from "../../../utils/clipboard";
 import { COMFYUI_MODEL_CATEGORIES } from "./modelHubConstants";
 import { HuggingFaceModelCard } from "./HuggingFaceModelCard";
+import { settingsApi } from "../../../api";
 import { 
   Key, 
   Save, 
@@ -79,12 +80,7 @@ export const HuggingFaceIngestionTab: React.FC<HuggingFaceIngestionTabProps> = (
     setHfTokenFeedback(null);
 
     try {
-      const res = await fetch("/api/settings/huggingface", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: clean })
-      });
-      if (!res.ok) throw new Error("Failed to save Hugging Face token");
+      await settingsApi.saveHuggingFaceToken(clean);
 
       setHfConfigured(true);
       const masked = clean.length > 8 ? `${clean.slice(0, 4)}...${clean.slice(-4)}` : "***";
@@ -104,9 +100,7 @@ export const HuggingFaceIngestionTab: React.FC<HuggingFaceIngestionTabProps> = (
   const handleClearHfToken = async () => {
     setSavingHfToken(true);
     try {
-      await fetch("/api/settings/huggingface", {
-        method: "DELETE"
-      });
+      await settingsApi.deleteHuggingFaceToken();
       setHfConfigured(false);
       setHfMaskedToken("");
       setHfTokenInput("");

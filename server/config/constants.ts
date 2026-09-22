@@ -1,6 +1,7 @@
 import path from "path";
 import fs from "fs";
 import multer from "multer";
+import { writeJsonAtomicSync } from "../utils/atomicFs";
 
 export const ROOT_DIR = process.cwd();
 export const ASSETS_DIR = path.join(ROOT_DIR, "assets");
@@ -128,7 +129,7 @@ export function initDirectories(): void {
 
   if (!fs.existsSync(UNIVERSE_CHARACTERS_FILE)) {
     try {
-      fs.writeFileSync(UNIVERSE_CHARACTERS_FILE, JSON.stringify({}, null, 2), "utf-8");
+      writeJsonAtomicSync(UNIVERSE_CHARACTERS_FILE, {});
     } catch (e) {}
   }
 }

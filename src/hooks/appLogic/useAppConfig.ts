@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { AppConfig, LLMProvider } from '../../types';
+import { settingsApi } from '../../api';
 
 export const getDefaultLlmProvider = (): LLMProvider => {
   try {
@@ -92,8 +93,7 @@ export function useAppConfig({ addToast, onUpdateProjectConfig }: UseAppConfigPa
 
   // Fetch program-level RunPod API key from server on mount
   useEffect(() => {
-    fetch("/api/settings/runpod")
-      .then(res => res.json())
+    settingsApi.getRunpodKey()
       .then(data => {
         if (data && data.api_key) {
           setConfig(prev => ({ ...prev, runpod_api_key: data.api_key }));

@@ -18,6 +18,7 @@ import {
   getLastActiveShotId,
   clearDemoProjectSession
 } from '../../utils/workspaceSessionStore';
+import { projectsApi, assetsApi, ApiError } from '../../api';
 
 export interface ShotOperationsDelegate {
   llmProvider: LLMProvider;
@@ -104,11 +105,15 @@ export function useScenePersistence({
   const [availableScenes, setAvailableScenes] = useState<string[]>([]);
 
   useEffect(() => {
-    fetch("/api/projects")
-      .then(res => res.json())
+    projectsApi.list()
       .then(data => {
         if (data.projects) {
-          setAvailableScenes(data.projects.map((p: any) => typeof p === 'string' ? p : p.filename).filter((p: string) => p.endsWith(".json")).map((p: string) => p.replace(/\.json$/i, "")));
+          setAvailableScenes(
+            data.projects
+              .map((p: any) => typeof p === 'string' ? p : p.filename)
+              .filter((p: string) => p.endsWith(".json"))
+              .map((p: string) => p.replace(/\.json$/i, ""))
+          );
         }
       })
       .catch(e => console.error("Failed to load scene list", e));
@@ -151,15 +156,12 @@ export function useScenePersistence({
 
   const fetchAssets = useCallback(async (sceneName?: string) => {
     try {
-      const baseUrl = sceneName ? `/api/assets?scene_name=${encodeURIComponent(sceneName)}` : "/api/assets";
-      const cacheBuster = `&_t=${Date.now()}`;
-      const url = baseUrl.includes("?") ? `${baseUrl}${cacheBuster}` : `${baseUrl}?${cacheBuster}`;
-      const res = await fetch(url, { headers: { "Cache-Control": "no-store" } });
-      const data = await res.json();
-      if (data.assets) {
+      const data: any = await assetsApi.getAll(sceneName);
+      const assetList = Array.isArray(data) ? data : (data.assets || []);
+      if (assetList.length > 0) {
         setSceneProject(prev => {
           const currentAssets = prev.assets || [];
-          const newAssets = data.assets.map((a: any, idx: number) => {
+          const newAssets = assetList.map((a: any, idx: number) => {
             const existing = currentAssets.find(ca => ca.filename === a.filename);
             if (existing) {
               return existing;
@@ -222,18 +224,7 @@ export function useScenePersistence({
 
     const sanitizedPayload = sanitizeProjectForPersistence(payload);
     
-    const res = await fetch("/api/projects", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filename, data: sanitizedPayload })
-    });
-    
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || "Failed to save project.");
-    }
-    
-    const resData = await res.json();
+    const resData = await projectsApi.save(filename, sanitizedPayload);
     const actualFilename = resData.filename || filename;
     const cleanName = actualFilename.replace(/\.json$/i, "");
     
@@ -251,18 +242,19 @@ export function useScenePersistence({
       return;
     }
 
-    const res = await fetch(`/api/projects/${filename}`);
-    if (!res.ok) {
+    let rawData: SceneProjectFile;
+    try {
+      rawData = await projectsApi.get(filename);
+    } catch (err: any) {
       if (options?.isInitialRestore) {
         clearDemoProjectSession();
         setHasLoadedProject(true);
         setIsDirty(false);
         return;
       }
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || "Failed to load project.");
+      throw new Error(err.message || "Failed to load project.");
     }
-    const rawData = await res.json();
+
     const normalizedData = normalizeProjectCastAndAssets(rawData);
     const data = {
       ...rawData,
@@ -274,14 +266,14 @@ export function useScenePersistence({
     const delegate = getShotOperationsDelegate?.();
 
     // Restore local LLM IP / URL & provider
-    const restoredLlmUrl = data.lm_studio_url || data.config?.lm_studio_url || data.local_llm_url || data.llm_url || data.llm_endpoint;
+    const restoredLlmUrl = (data as any).lm_studio_url || data.config?.lm_studio_url || (data as any).local_llm_url || (data as any).llm_url || (data as any).llm_endpoint;
     if (restoredLlmUrl) {
       setConfig(prev => ({
         ...prev,
         lm_studio_url: restoredLlmUrl
       }));
     }
-    const explicitLlmProvider = data.llmProvider || data.llm_provider || data.llmChoice || data.providerChoice || data.config?.llm_provider || data.config?.llmProvider;
+    const explicitLlmProvider = (data as any).llmProvider || data.llm_provider || (data as any).llmChoice || (data as any).providerChoice || data.config?.llm_provider || (data.config as any)?.llmProvider;
     const resolvedLlmProvider: LLMProvider = (explicitLlmProvider === "gemini" || explicitLlmProvider === "lm_studio")
       ? explicitLlmProvider
       : defaultLlmProvider;
@@ -292,16 +284,16 @@ export function useScenePersistence({
 
     if (data.schema_version === "1.0") {
       setNodeMappings({});
-      if (data.parameter_node_mappings || data.parameterNodeMappings) {
-        setParameterNodeMappings(data.parameter_node_mappings || data.parameterNodeMappings);
+      if (data.parameter_node_mappings || (data as any).parameterNodeMappings) {
+        setParameterNodeMappings((data.parameter_node_mappings || (data as any).parameterNodeMappings) as ParameterNodeMappings);
       } else if (data.shots && data.shots.length > 0 && data.shots[0].parameter_node_mappings) {
-        setParameterNodeMappings(data.shots[0].parameter_node_mappings);
+        setParameterNodeMappings(data.shots[0].parameter_node_mappings as ParameterNodeMappings);
       } else {
         setParameterNodeMappings({ steps: "", megapixels: "", frames: "" });
       }
 
-      if (data.generation_params || data.generationParams) {
-        setGenerationParams(data.generation_params || data.generationParams);
+      if (data.generation_params || (data as any).generationParams) {
+        setGenerationParams(data.generation_params || (data as any).generationParams);
       } else if (data.shots && data.shots.length > 0 && data.shots[0].generation_params) {
         setGenerationParams(data.shots[0].generation_params);
       }
@@ -310,13 +302,13 @@ export function useScenePersistence({
       if (delegate?.setExpandedPrompt) delegate.setExpandedPrompt("");
       
       // Restore config if bundled
-      if (data.config || data.vision_enabled !== undefined) {
+      if (data.config || (data as any).vision_enabled !== undefined) {
         const isVision = data.config?.vision_enabled !== undefined
           ? Boolean(data.config.vision_enabled)
-          : (data.vision_enabled !== undefined ? Boolean(data.vision_enabled) : undefined);
+          : ((data as any).vision_enabled !== undefined ? Boolean((data as any).vision_enabled) : undefined);
         const isAutoCaption = data.config?.auto_caption_enabled !== undefined
           ? Boolean(data.config.auto_caption_enabled)
-          : (data.auto_caption_enabled !== undefined ? Boolean(data.auto_caption_enabled) : undefined);
+          : ((data as any).auto_caption_enabled !== undefined ? Boolean((data as any).auto_caption_enabled) : undefined);
 
         setConfig(prev => ({
           ...prev,
@@ -397,11 +389,7 @@ export function useScenePersistence({
         preview_url: getAssetMediaUrl(a.filename)
       }));
       try {
-        await fetch("/api/assets/sync", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ assets: normalizedAssets })
-        });
+        await assetsApi.sync(normalizedAssets);
       } catch (e) {
         console.error("Failed to sync project assets", e);
       }
@@ -410,6 +398,7 @@ export function useScenePersistence({
     }
 
     if (data.config) {
+      const cfg = data.config as any;
       setConfig(prev => ({
         ...prev,
         ...data.config,
@@ -417,23 +406,23 @@ export function useScenePersistence({
         civitai_api_key: data.config.civitai_api_key || prev.civitai_api_key || "",
         huggingface_token: prev.huggingface_token || "",
         runpod_api_key: prev.runpod_api_key || "",
-        remote_host: data.config.remote_host || data.config.runpod_ip || prev.remote_host,
-        remote_api_token: data.config.remote_api_token || data.config.runpod_api_token || prev.remote_api_token,
-        remote_comfyui_root: data.config.remote_comfyui_root || (data.config.remote_input_dir ? data.config.remote_input_dir.replace(/\/input\/?$/, "") : null) || prev.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI"
+        remote_host: data.config.remote_host || cfg.runpod_ip || prev.remote_host,
+        remote_api_token: data.config.remote_api_token || cfg.runpod_api_token || prev.remote_api_token,
+        remote_comfyui_root: data.config.remote_comfyui_root || (cfg.remote_input_dir ? cfg.remote_input_dir.replace(/\/input\/?$/, "") : null) || prev.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI"
       }));
     }
-    setSelectedWorkflowFile(data.selectedWorkflowFile || "");
-    setSelectedPromptNodeId(data.selectedPromptNodeId || "");
-    setNodeMappings(data.nodeMappings || {});
-    setBypassMissing(data.bypassMissing ?? true);
-    if (data.generationParams) {
-      setGenerationParams(data.generationParams);
+    setSelectedWorkflowFile((data as any).selectedWorkflowFile || "");
+    setSelectedPromptNodeId((data as any).selectedPromptNodeId || "");
+    setNodeMappings((data as any).nodeMappings || {});
+    setBypassMissing((data as any).bypassMissing ?? true);
+    if ((data as any).generationParams) {
+      setGenerationParams((data as any).generationParams);
     }
-    if (data.parameterNodeMappings) {
-      setParameterNodeMappings(data.parameterNodeMappings);
+    if ((data as any).parameterNodeMappings) {
+      setParameterNodeMappings((data as any).parameterNodeMappings);
     }
-    if (data.scenePlanning || data.scene_planning) {
-      const loadedPlanning = data.scenePlanning || data.scene_planning;
+    if ((data as any).scenePlanning || data.scene_planning) {
+      const loadedPlanning = (data as any).scenePlanning || data.scene_planning;
       if (delegate?.setScenePlanning) {
         delegate.setScenePlanning({
           scene_name: loadedPlanning.scene_name || "",
@@ -445,8 +434,8 @@ export function useScenePersistence({
         });
       }
     }
-    if (delegate?.setBasicStub) delegate.setBasicStub(data.basicStub || "");
-    if (delegate?.setExpandedPrompt) delegate.setExpandedPrompt(data.expandedPrompt || "");
+    if (delegate?.setBasicStub) delegate.setBasicStub((data as any).basicStub || "");
+    if (delegate?.setExpandedPrompt) delegate.setExpandedPrompt((data as any).expandedPrompt || "");
     setCurrentProjectName(filename.replace(/\.json$/i, ""));
     
     await fetchWorkflows();

@@ -4,6 +4,7 @@ import unzipper from "unzipper";
 import { ensureSceneDirectories, formatSceneFolderName, ASSETS_DIR, ASSET_DB_FILE, UNIVERSE_MEDIA_DIR } from "../../config/constants";
 import { universeService } from "../universeService";
 import { sanitizeProjectName, IGNORED_JSON_FILENAMES } from "./projectCrud";
+import { writeJsonAtomicSync } from "../../utils/atomicFs";
 
 export async function importProjectZip(
   uploadedFilePath: string,
@@ -237,7 +238,7 @@ export async function importProjectZip(
     } else if (normPath.endsWith(".json") && !normPath.includes("/")) {
       if (!IGNORED_JSON_FILENAMES.has(fname.toLowerCase())) {
         const destBase = path.join(sceneDirs.base, `${sceneDirName}.json`);
-        fs.writeFileSync(destBase, JSON.stringify(projectJsonData || {}, null, 2));
+        writeJsonAtomicSync(destBase, projectJsonData || {});
         console.log(`[ZIP Import] Extracted project scene file to base: "${destBase}"`);
       }
     }
@@ -246,7 +247,7 @@ export async function importProjectZip(
   // Ensure authoritative json exists
   const authoritativeJson = path.join(sceneDirs.base, `${sceneDirName}.json`);
   if (!fs.existsSync(authoritativeJson) && projectJsonData) {
-    fs.writeFileSync(authoritativeJson, JSON.stringify(projectJsonData, null, 2));
+    writeJsonAtomicSync(authoritativeJson, projectJsonData);
     console.log(`[ZIP Import] Assured authoritative scene JSON file is written to: "${authoritativeJson}"`);
   }
 
@@ -293,7 +294,7 @@ export async function importProjectZip(
       }
 
       const mergedRecords = Array.from(existingMap.values());
-      fs.writeFileSync(ASSET_DB_FILE, JSON.stringify(mergedRecords, null, 2), "utf-8");
+      writeJsonAtomicSync(ASSET_DB_FILE, mergedRecords);
       console.log(`[ZIP Import] Merged and saved ${registeredAssets.length} asset metadata records into "${ASSET_DB_FILE}"`);
     } catch (e) {
       console.error(`[ZIP Import] Error merging asset records in ASSET_DB_FILE:`, e);

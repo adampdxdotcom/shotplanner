@@ -22,6 +22,9 @@ const jobStates = new Map<string, ComfyJobState>();
 // Maps comfyApiUrl -> Set of active SSE client connections
 const sseClients = new Map<string, Set<Response>>();
 
+// Maps comfyApiUrl -> timestamp of last connection warning to avoid log spamming
+const lastWarnTime = new Map<string, number>();
+
 /**
  * Normalizes ComfyUI base HTTP URL to a WebSocket URL (ws:// or wss://)
  */
@@ -56,7 +59,6 @@ export function connectComfyWebSocket(apiUrl: string): WebSocket | null {
   }
 
   const wsUrl = getComfyWsUrl(normalizedUrl);
-  console.log(`[ComfySocketService] Connecting backend WS to ComfyUI stream: ${wsUrl}`);
 
   try {
     const ws = new WebSocket(wsUrl);
@@ -64,6 +66,7 @@ export function connectComfyWebSocket(apiUrl: string): WebSocket | null {
 
     ws.on("open", () => {
       console.log(`[ComfySocketService] WS connection successfully established with ${normalizedUrl}`);
+      lastWarnTime.delete(normalizedUrl);
       broadcastToClients(normalizedUrl, { type: "connected", url: normalizedUrl });
     });
 
@@ -77,27 +80,38 @@ export function connectComfyWebSocket(apiUrl: string): WebSocket | null {
       }
     });
 
-    ws.on("error", (err) => {
-      console.warn(`[ComfySocketService] WS Error on ${normalizedUrl}:`, err.message);
-      broadcastToClients(normalizedUrl, { type: "error", message: err.message });
+    ws.on("error", (err: any) => {
+      const isConnRefused = err?.code === "ECONNREFUSED" || (err?.message && err.message.includes("ECONNREFUSED"));
+      const now = Date.now();
+      const lastWarn = lastWarnTime.get(normalizedUrl) || 0;
+
+      // Throttle repetitive ECONNREFUSED notices to once every 30 seconds as an informative warning
+      if (isConnRefused) {
+        if (now - lastWarn > 30000) {
+          console.warn(`[ComfySocketService] ComfyUI instance at ${normalizedUrl} is currently offline (ECONNREFUSED). Waiting for connection.`);
+          lastWarnTime.set(normalizedUrl, now);
+        }
+      } else {
+        console.warn(`[ComfySocketService] WS Notice on ${normalizedUrl}:`, err?.message || err);
+      }
+
+      broadcastToClients(normalizedUrl, { type: "error", message: err?.message || String(err) });
     });
 
     ws.on("close", (code, reason) => {
-      console.log(`[ComfySocketService] WS connection closed for ${normalizedUrl}. Code: ${code}, Reason: ${reason}`);
       wsPool.delete(normalizedUrl);
       broadcastToClients(normalizedUrl, { type: "disconnected", url: normalizedUrl });
 
       // Automatically attempt reconnection if there are active SSE clients listening
       const clients = sseClients.get(normalizedUrl);
       if (clients && clients.size > 0) {
-        console.log(`[ComfySocketService] Active clients waiting, scheduling reconnect to ${normalizedUrl} in 3s...`);
-        setTimeout(() => connectComfyWebSocket(normalizedUrl), 3000);
+        setTimeout(() => connectComfyWebSocket(normalizedUrl), 5000);
       }
     });
 
     return ws;
   } catch (err: any) {
-    console.error(`[ComfySocketService] Failed to construct WS for ${normalizedUrl}:`, err.message);
+    console.warn(`[ComfySocketService] Could not initiate WS for ${normalizedUrl}:`, err.message);
     return null;
   }
 }

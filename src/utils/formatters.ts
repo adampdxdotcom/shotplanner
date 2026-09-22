@@ -1,4 +1,4 @@
-import { ScenePlanning, SCENE_REFERENCE_DIRECTIVE } from "../types";
+import { ScenePlanning, SCENE_REFERENCE_DIRECTIVE } from "../shared/types";
 
 export const generateUUID = (): string => {
   if (typeof window !== "undefined" && window.crypto && typeof window.crypto.randomUUID === "function") {

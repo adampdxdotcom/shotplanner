@@ -10,6 +10,7 @@ import { getAssetMediaUrl } from "../../utils/assetUrl";
 import { extractAndUploadTakeLastFrame } from "../../utils/frameExtraction";
 import { MultimodalFrameComposer } from "./MultimodalFrameComposer";
 import { ScrubbableFramePlayer } from "./ScrubbableFramePlayer";
+import { assetsApi } from "../../api";
 import { 
   Clapperboard, 
   Lock, 
@@ -199,16 +200,15 @@ export const FirstFrameTab: React.FC<FirstFrameTabProps> = ({
       formData.append("tags", JSON.stringify(["First Frame", "Frame 0", `Shot_${paddedShot}`]));
       formData.append("subject_name", cleanScene);
 
-      const res = await fetch("/api/assets/upload", { method: "POST", body: formData });
-      if (!res.ok) throw new Error("Upload failed");
-      const data = await res.json();
+      const data: any = await assetsApi.upload(formData);
 
-      if (data.success && data.asset) {
-        if (onAssetUploaded) onAssetUploaded(data.asset);
+      if (data && (data.success || data.asset)) {
+        const asset = data.asset || data;
+        if (onAssetUploaded) onAssetUploaded(asset);
         
         const newFirstFrame: ShotFirstFrame = {
           source: "manual_upload",
-          asset_filename: data.asset.filename,
+          asset_filename: asset.filename,
           locked: false,
           updated_at: new Date().toISOString()
         };

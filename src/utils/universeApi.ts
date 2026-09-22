@@ -1,14 +1,13 @@
 import { UniverseCharacterProfile } from "../types";
+import { universeApi } from "../api";
 
 /**
  * Fetch all characters from the global universe roster
  */
 export async function fetchUniverseCharacters(): Promise<Record<string, UniverseCharacterProfile>> {
   try {
-    const res = await fetch("/api/universe/characters");
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-    const data = await res.json();
-    return data.characters || {};
+    const data = await universeApi.getCharacters();
+    return data?.characters || {};
   } catch (err) {
     console.error("Failed to load universe characters:", err);
     return {};
@@ -22,14 +21,8 @@ export async function saveUniverseCharacter(
   profile: Partial<UniverseCharacterProfile> & { name: string }
 ): Promise<UniverseCharacterProfile | null> {
   try {
-    const res = await fetch("/api/universe/characters", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(profile)
-    });
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-    const data = await res.json();
-    return data.character || null;
+    const data = await universeApi.saveCharacter(profile);
+    return data?.character || null;
   } catch (err) {
     console.error("Failed to save universe character:", err);
     return null;
@@ -41,12 +34,8 @@ export async function saveUniverseCharacter(
  */
 export async function deleteUniverseCharacter(name: string): Promise<boolean> {
   try {
-    const res = await fetch(`/api/universe/characters/${encodeURIComponent(name)}`, {
-      method: "DELETE"
-    });
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-    const data = await res.json();
-    return !!data.deleted;
+    const data = await universeApi.deleteCharacter(name);
+    return !!data?.deleted;
   } catch (err) {
     console.error("Failed to delete universe character:", err);
     return false;
@@ -58,10 +47,8 @@ export async function deleteUniverseCharacter(name: string): Promise<boolean> {
  */
 export async function fetchUniverseAssets(): Promise<any[]> {
   try {
-    const res = await fetch("/api/universe/assets");
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-    const data = await res.json();
-    return data.assets || [];
+    const data = await universeApi.getAssets();
+    return data?.assets || [];
   } catch (err) {
     console.error("Failed to load universe media assets:", err);
     return [];
@@ -73,13 +60,8 @@ export async function fetchUniverseAssets(): Promise<any[]> {
  */
 export async function promoteAssetToUniverse(filename: string): Promise<{ success: boolean; filename: string; error?: string }> {
   try {
-    const res = await fetch("/api/universe/characters/promote-asset", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filename })
-    });
-    const data = await res.json();
-    return data;
+    const data = await universeApi.promoteAsset(filename);
+    return data || { success: true, filename };
   } catch (err: any) {
     return { success: false, filename, error: err.message };
   }

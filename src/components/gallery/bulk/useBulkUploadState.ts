@@ -10,6 +10,7 @@ import {
 } from "../CharacterReferencePackGrid";
 import { revokeManagedBlobUrl, purgeManagedBlobUrls } from "../../../utils/blobRegistry";
 import { BulkQueueItem, UploadSummary } from "./types";
+import { assetsApi } from "../../../api";
 
 interface UseBulkUploadStateProps {
   isOpen: boolean;
@@ -216,11 +217,10 @@ export function useBulkUploadState({
       formData.append("slot_id", slot.id);
 
       try {
-        const res = await fetch("/api/assets/upload", { method: "POST", body: formData });
+        const resJson: any = await assetsApi.upload(formData);
         handleUpdatePackSlot(slot.id, { progress: 85 });
 
-        if (res.ok) {
-          const resJson = await res.json();
+        if (resJson) {
           const newAsset = resJson.asset || resJson;
           onAssetUploaded(newAsset);
           if (canonicalSubject) {
@@ -229,8 +229,7 @@ export function useBulkUploadState({
           handleUpdatePackSlot(slot.id, { status: "success", progress: 100 });
           completedCount++;
         } else {
-          const text = await res.text();
-          throw new Error(text || `Failed to upload ${slot.title}`);
+          throw new Error(`Failed to upload ${slot.title}`);
         }
       } catch (err: any) {
         errorCount++;
@@ -262,15 +261,14 @@ export function useBulkUploadState({
       formData.append("description", bulkDescription.trim());
 
       try {
-        const res = await fetch("/api/assets/upload", { method: "POST", body: formData });
+        const resJson: any = await assetsApi.upload(formData);
         setBulkQueue(prev => {
           const next = [...prev];
           next[i] = { ...next[i], progress: 85 };
           return next;
         });
 
-        if (res.ok) {
-          const resJson = await res.json();
+        if (resJson) {
           const newAsset = resJson.asset || resJson;
           onAssetUploaded(newAsset);
           if (canonicalSubject) {
@@ -283,8 +281,7 @@ export function useBulkUploadState({
           });
           completedCount++;
         } else {
-          const text = await res.text();
-          throw new Error(text || `Failed to upload ${item.file.name}`);
+          throw new Error(`Failed to upload ${item.file.name}`);
         }
       } catch (err: any) {
         errorCount++;

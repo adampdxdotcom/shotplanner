@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import fs from "fs";
 import path from "path";
 import { upload } from "../config/constants";
+import { safeUnlinkSync } from "../utils/fileCleanup";
 import { 
   exportProjectZip, 
   exportTakesZip,
@@ -107,8 +108,8 @@ router.post("/inspect-zip", upload.single("file"), async (req: Request, res: Res
       ...inspection
     });
   } catch (err: any) {
-    if (req.file && fs.existsSync(req.file.path)) {
-      try { fs.unlinkSync(req.file.path); } catch (e) {}
+    if (req.file?.path) {
+      safeUnlinkSync(req.file.path);
     }
     console.error("Inspect ZIP error:", err);
     res.status(500).json({ error: err.message || "Failed to inspect ZIP archive" });
@@ -117,8 +118,8 @@ router.post("/inspect-zip", upload.single("file"), async (req: Request, res: Res
 
 // Import project from ZIP (supports direct file or pre-inspected temp file + resolutions)
 router.post("/import", upload.single("file"), async (req: Request, res: Response) => {
+  let filePath = req.file?.path;
   try {
-    let filePath = req.file?.path;
     let resolutions: any = undefined;
 
     if (req.body?.universe_resolutions) {
@@ -145,6 +146,10 @@ router.post("/import", upload.single("file"), async (req: Request, res: Response
   } catch (err: any) {
     console.error("Import error:", err);
     res.status(500).json({ error: err.message || "Failed to import zip" });
+  } finally {
+    if (filePath) {
+      safeUnlinkSync(filePath);
+    }
   }
 });
 

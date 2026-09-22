@@ -4,6 +4,7 @@ import { copyToClipboard } from "../../utils/clipboard";
 import { probeGeminiConnection } from "./GeminiConfig";
 import { probeLMStudioConnection } from "./lmStudioProbe";
 import { ConfigTab } from "./ConfigTabBar";
+import { settingsApi } from "../../api";
 
 interface UseConfigSectionStateProps {
   config: AppConfig;
@@ -64,10 +65,9 @@ export function useConfigSectionState({
 
   // Initial Gemini check on mount
   useEffect(() => {
-    fetch("/api/settings/gemini")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.configured) {
+    settingsApi.getGeminiSettings()
+      .then((data: any) => {
+        if (data && data.configured) {
           setIsGeminiConnected(true);
         }
       })
@@ -224,12 +224,7 @@ export function useConfigSectionState({
         ssh_private_key: config.ssh_private_key || "",
         remote_dir: config.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI/input/"
       };
-      const res = await fetch("/api/ssh/test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      const data = await res.json();
+      const data: any = await settingsApi.testSsh(payload);
       setTestResult(data);
     } catch (e: any) {
       setTestResult({ success: false, message: e.message });
@@ -241,16 +236,8 @@ export function useConfigSectionState({
   const handleGenerateKeyPair = async () => {
     setIsGeneratingKeyPair(true);
     try {
-      const res = await fetch("/api/ssh/generate_keypair", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" }
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || err.detail || `Failed to generate key pair (${res.status})`);
-      }
-      const data = await res.json();
-      if (data.private_key && data.public_key) {
+      const data: any = await settingsApi.generateSshKeyPair();
+      if (data && data.private_key && data.public_key) {
         // Unconditionally persist generated key pair into application state
         onChange({
           ...config,
@@ -263,9 +250,13 @@ export function useConfigSectionState({
         if (onShowToast) {
           onShowToast("Generated fresh SSH keypair! Fields updated below.", "success");
         }
+      } else {
+        throw new Error(data?.error || data?.detail || "Failed to generate key pair");
       }
     } catch (err: any) {
-      alert("Failed to generate SSH key pair: " + (err.message || "Unknown error"));
+      if (onShowToast) {
+        onShowToast("Failed to generate SSH key pair: " + (err.message || "Unknown error"), "error");
+      }
     } finally {
       setIsGeneratingKeyPair(false);
     }

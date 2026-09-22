@@ -6,6 +6,7 @@
  */
 
 import { MediaAsset } from "../types";
+import { assetsApi } from "../api";
 
 export interface FrameExtractionResult {
   success: boolean;
@@ -178,29 +179,16 @@ export async function extractAndUploadTakeLastFrame({
     formData.append("tags", JSON.stringify(["First Frame", "Frame 0", "Continuity", `Shot_${paddedSourceShot}`, `Take_${sourceTakeNumber}`]));
     formData.append("subject_name", cleanScene);
 
-    const res = await fetch("/api/assets/upload", {
-      method: "POST",
-      body: formData
-    });
+    const data: any = await assetsApi.upload(formData);
 
-    if (!res.ok) {
-      const errText = await res.text().catch(() => "Upload failed");
-      return {
-        success: false,
-        blob,
-        dataUrl,
-        error: `Server responded with ${res.status}: ${errText}`
-      };
-    }
-
-    const data = await res.json();
-    if (data.success && data.asset) {
+    if (data && (data.success || data.asset)) {
+      const asset = data.asset || data;
       return {
         success: true,
         blob,
         dataUrl,
-        asset: data.asset,
-        assetFilename: data.asset.filename || baseName,
+        asset: asset,
+        assetFilename: asset.filename || baseName,
         width,
         height
       };

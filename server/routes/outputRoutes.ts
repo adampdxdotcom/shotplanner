@@ -16,6 +16,8 @@ import {
   downloadAndIngestTake, 
   syncComfyOutputsFromHistory 
 } from "../services/outputIngestionService";
+import { safeUnlinkSync } from "../utils/fileCleanup";
+import { writeJsonAtomicSync } from "../utils/atomicFs";
 
 const router = Router();
 
@@ -66,6 +68,8 @@ router.post("/outputs/upload", upload.single("file"), async (req: Request, res: 
   } catch (err: any) {
     console.error("Take video upload error:", err);
     return res.status(500).json({ error: err.message || "Failed to upload video take" });
+  } finally {
+    if (req.file?.path) safeUnlinkSync(req.file.path);
   }
 });
 
@@ -206,7 +210,7 @@ router.post("/outputs/review", (req: Request, res: Response) => {
     }
     
     metadata[filename] = status;
-    fs.writeFileSync(metadataFile, JSON.stringify(metadata, null, 2));
+    writeJsonAtomicSync(metadataFile, metadata);
     
     res.json({ status: "success" });
   } catch (err: any) {

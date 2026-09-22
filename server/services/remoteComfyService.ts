@@ -13,6 +13,7 @@ import { SSHCredentials, resolveSSHConfig, connectSSH, execSSHCommand } from "./
 import { isCacheOrTempWorkflow } from "../utils/workflowFilter";
 import { WORKFLOWS_DIR, getSceneDirectories, formatSceneFolderName } from "../config/constants";
 import { parseWorkflowData } from "./workflowService";
+import { writeJsonAtomicSync } from "../utils/atomicFs";
 
 export interface RemoteWorkflowItem {
   filename: string;
@@ -401,10 +402,9 @@ export async function syncRemoteWorkflowToLocal(
   const targetGlobalScenePath = path.join(globalSceneWfDir, filename);
   const targetRootPath = path.join(WORKFLOWS_DIR, filename);
 
-  const jsonContent = JSON.stringify(rawWorkflow, null, 2);
-  fs.writeFileSync(targetScenePath, jsonContent, "utf-8");
-  fs.writeFileSync(targetGlobalScenePath, jsonContent, "utf-8");
-  fs.writeFileSync(targetRootPath, jsonContent, "utf-8");
+  writeJsonAtomicSync(targetScenePath, rawWorkflow);
+  writeJsonAtomicSync(targetGlobalScenePath, rawWorkflow);
+  writeJsonAtomicSync(targetRootPath, rawWorkflow);
 
   const parsed = parseWorkflowData(rawWorkflow);
 

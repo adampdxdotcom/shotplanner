@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { AppConfig } from "../../types";
+import { settingsApi } from "../../api";
 import { Sparkles, Save, CheckCircle2, AlertCircle, RefreshCw, Star, Trash2 } from "lucide-react";
 
 export interface GeminiConfigProps {
@@ -15,16 +16,11 @@ export interface GeminiConfigProps {
 export async function probeGeminiConnection(apiKey?: string): Promise<{ success: boolean; message: string }> {
   const keyToTest = apiKey?.trim() || "";
   try {
-    const res = await fetch("/api/settings/test-gemini", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ api_key: keyToTest })
-    });
-    const data = await res.json();
-    if (res.ok && data.success) {
+    const data: any = await settingsApi.testGemini(keyToTest);
+    if (data && (data.success || data.status === "ok")) {
       return { success: true, message: data.message || "Gemini API verified successfully" };
     }
-    const errorMsg = data.error || data.detail || "Invalid API key or unauthorized";
+    const errorMsg = data?.error || data?.detail || "Invalid API key or unauthorized";
     return { success: false, message: errorMsg };
   } catch (err: any) {
     return { success: false, message: err.message || "Network request failed" };
@@ -49,9 +45,8 @@ export const GeminiConfig: React.FC<GeminiConfigProps> = ({
   const [geminiFeedback, setGeminiFeedback] = useState<{ success?: boolean; message?: string } | null>(null);
 
   useEffect(() => {
-    fetch("/api/settings/gemini")
-      .then((res) => res.json())
-      .then((data) => {
+    settingsApi.getGeminiKey()
+      .then((data: any) => {
         if (data.configured) {
           setIsGeminiConfigured(true);
           setMaskedGeminiKey(data.masked_key || (data.api_key ? `${data.api_key}...` : "Configured"));
@@ -76,13 +71,8 @@ export const GeminiConfig: React.FC<GeminiConfigProps> = ({
     setGeminiFeedback(null);
 
     try {
-      const res = await fetch("/api/settings/gemini", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ api_key: geminiKeyInput })
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const data: any = await settingsApi.saveGeminiKey(geminiKeyInput);
+      if (data && (data.success || data.message)) {
         setIsGeminiConfigured(true);
         setMaskedGeminiKey(geminiKeyInput.length > 8 ? `${geminiKeyInput.slice(0, 4)}...${geminiKeyInput.slice(-4)}` : "***");
         setGeminiKeyInput("");
@@ -93,7 +83,7 @@ export const GeminiConfig: React.FC<GeminiConfigProps> = ({
           onShowToast("Gemini API key saved successfully", "success");
         }
       } else {
-        setGeminiFeedback({ success: false, message: data.error || data.detail || "Failed to save API key." });
+        setGeminiFeedback({ success: false, message: data?.error || data?.detail || "Failed to save API key." });
         if (onConnectionStatusChange) onConnectionStatusChange(false);
       }
     } catch (e: any) {
@@ -110,27 +100,20 @@ export const GeminiConfig: React.FC<GeminiConfigProps> = ({
 
     try {
       // Call DELETE to clear persistent key storage
-      const res = await fetch("/api/settings/gemini", {
-        method: "DELETE"
-      });
-      const data = await res.json().catch(() => ({}));
+      await settingsApi.deleteGeminiKey();
 
-      if (res.ok && data.success) {
-        setIsGeminiConfigured(false);
-        setMaskedGeminiKey("");
-        setGeminiKeyInput("");
-        setGeminiFeedback({ success: true, message: "Gemini API key removed and deactivated." });
-        
-        // Clear from active state and notify parent
-        onChange({ ...config, gemini_api_key: "" });
-        if (onConnectionStatusChange) onConnectionStatusChange(false);
-        if (onDeactivateGemini) onDeactivateGemini();
+      setIsGeminiConfigured(false);
+      setMaskedGeminiKey("");
+      setGeminiKeyInput("");
+      setGeminiFeedback({ success: true, message: "Gemini API key removed and deactivated." });
+      
+      // Clear from active state and notify parent
+      onChange({ ...config, gemini_api_key: "" });
+      if (onConnectionStatusChange) onConnectionStatusChange(false);
+      if (onDeactivateGemini) onDeactivateGemini();
 
-        if (onShowToast) {
-          onShowToast("Gemini API key removed and deactivated", "info");
-        }
-      } else {
-        setGeminiFeedback({ success: false, message: data.error || data.detail || "Failed to remove API key." });
+      if (onShowToast) {
+        onShowToast("Gemini API key removed and deactivated", "info");
       }
     } catch (e: any) {
       setGeminiFeedback({ success: false, message: e.message || "Failed to contact settings service." });

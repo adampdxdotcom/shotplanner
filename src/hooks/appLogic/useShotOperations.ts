@@ -20,6 +20,7 @@ import {
   getLastActiveShotId, 
   setLastActiveShotId 
 } from '../../utils/workspaceSessionStore';
+import { apiClient } from '../../api';
 
 interface UseShotOperationsParams {
   sceneProject: SceneProjectFile;
@@ -409,10 +410,8 @@ export function useShotOperations({
       }
     });
     
-    const response = await fetch("/api/generate-prompt", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    try {
+      const data: any = await apiClient.post("/api/generate-prompt", {
         basic_stub: shot.basic_stub,
         assets: shotAssets,
         prompt_prefix: shotPrefix,
@@ -433,19 +432,17 @@ export function useShotOperations({
         custom_system_prompt: config.llm_custom_system_prompt,
         temperature: config.llm_temperature,
         max_tokens: config.llm_max_tokens
-      }),
-    });
-    const data = await response.json();
-    if (!response.ok) {
-      const errorMsg = data.error || "LLM prompt generation failed";
+      });
+      return data.expanded_prompt;
+    } catch (err: any) {
+      const errorMsg = err.message || "LLM prompt generation failed";
       addToast(`LLM prompt expansion failed: ${errorMsg}`, "error");
       if (shot.expanded_prompt && shot.expanded_prompt.trim()) {
         addToast(`Presenting last generated prompt for Shot ${shot.shot_number}.`, "info");
         return shot.expanded_prompt;
       }
-      throw new Error(errorMsg);
+      throw err;
     }
-    return data.expanded_prompt;
   }, [assets, sceneProject, llmProvider, config]);
 
   const handleSceneTransfer = useCallback(async (shot: ShotItem): Promise<boolean> => {
@@ -484,15 +481,8 @@ export function useShotOperations({
       shot_number: activeShotNumber
     };
 
-    const response = await fetch("/api/workflow/stage", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-    
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Transfer failed");
-    return data.success;
+    const data: any = await apiClient.post("/api/workflow/stage", payload);
+    return Boolean(data?.success);
   }, [parsedWorkflow, sceneProject, config, selectedWorkflowFile, selectedPromptNodeId, bypassMissing, generationParams, parameterNodeMappings]);
 
   const handleSceneTransferAll = useCallback(async (): Promise<boolean> => {
@@ -534,15 +524,8 @@ export function useShotOperations({
       parameter_node_mappings: parameterNodeMappings
     };
 
-    const response = await fetch("/api/workflow/stage-scene", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-    
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Scene transfer failed");
-    return data.success;
+    const data: any = await apiClient.post("/api/workflow/stage-scene", payload);
+    return Boolean(data?.success);
   }, [sceneProject, parsedWorkflow, selectedPromptNodeId, config, selectedWorkflowFile, bypassMissing, generationParams, parameterNodeMappings]);
 
   return {

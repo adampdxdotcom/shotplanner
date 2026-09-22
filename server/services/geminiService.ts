@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { GoogleGenAI } from "@google/genai";
 import { GEMINI_CONFIG_FILE } from "../config/constants";
+import { writeJsonAtomicSync } from "../utils/atomicFs";
 
 export function getStoredGeminiKey(): string {
   if (fs.existsSync(GEMINI_CONFIG_FILE)) {
@@ -19,11 +20,7 @@ export function getStoredGeminiKey(): string {
 }
 
 export function saveGeminiKey(apiKey: string): void {
-  const dir = path.dirname(GEMINI_CONFIG_FILE);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  fs.writeFileSync(GEMINI_CONFIG_FILE, JSON.stringify({ api_key: apiKey.trim() }, null, 2), "utf-8");
+  writeJsonAtomicSync(GEMINI_CONFIG_FILE, { api_key: apiKey.trim() });
 }
 
 export function removeGeminiKey(): void {
@@ -31,7 +28,7 @@ export function removeGeminiKey(): void {
     try {
       fs.unlinkSync(GEMINI_CONFIG_FILE);
     } catch (e) {
-      fs.writeFileSync(GEMINI_CONFIG_FILE, JSON.stringify({ api_key: "" }, null, 2), "utf-8");
+      writeJsonAtomicSync(GEMINI_CONFIG_FILE, { api_key: "" });
     }
   }
 }

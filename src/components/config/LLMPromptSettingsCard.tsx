@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { AppConfig, LLMProvider, PromptDebugInfo } from "../../types";
+import { apiClient } from "../../api";
 import { PromptDebugModal } from "../PromptDebugModal";
 import { copyToClipboard } from "../../utils/clipboard";
 import { 
@@ -147,36 +148,31 @@ export const LLMPromptSettingsCard: React.FC<LLMPromptSettingsCardProps> = ({
   const handleRunTestExchange = async () => {
     setIsRunningTest(true);
     try {
-      const res = await fetch("/api/generate-prompt", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          basic_stub: testStub,
-          assets: [
-            { media_type: "image", filename: "elena_ref.png", subject_name: "Elena" },
-            { media_type: "image", filename: "marcus_ref.png", subject_name: "Marcus" }
-          ],
-          camera_movement: "Locked off (Static tripod)",
-          lens_focal_length: "50mm standard prime",
-          aspect_ratio: "2.39:1 Anamorphic",
-          framing_directive: "Over-the-shoulder (OTS) past Marcus looking toward Elena",
-          custom_system_prompt: activePrompt,
-          temperature: activeTemperature,
-          max_tokens: activeMaxTokens,
-          provider: activeProvider,
-          lm_studio_url: config.lm_studio_url,
-          gemini_api_key: config.gemini_api_key
-        })
+      const data: any = await apiClient.post<any>("/api/generate-prompt", {
+        basic_stub: testStub,
+        assets: [
+          { media_type: "image", filename: "elena_ref.png", subject_name: "Elena" },
+          { media_type: "image", filename: "marcus_ref.png", subject_name: "Marcus" }
+        ],
+        camera_movement: "Locked off (Static tripod)",
+        lens_focal_length: "50mm standard prime",
+        aspect_ratio: "2.39:1 Anamorphic",
+        framing_directive: "Over-the-shoulder (OTS) past Marcus looking toward Elena",
+        custom_system_prompt: activePrompt,
+        temperature: activeTemperature,
+        max_tokens: activeMaxTokens,
+        provider: activeProvider,
+        lm_studio_url: config.lm_studio_url,
+        gemini_api_key: config.gemini_api_key
       });
 
-      const data = await res.json();
-      if (res.ok && data.debug) {
+      if (data && data.debug) {
         setLastDebugInfo(data.debug);
         setLastAssembledPrompt(data.expanded_prompt || "");
         setShowInspectorModal(true);
         onShowToast?.(`Test completed in ${data.debug.latency_ms}ms! Inspector opened.`, "success");
       } else {
-        onShowToast?.(data.error || "Failed to execute test prompt with LLM", "error");
+        onShowToast?.(data?.error || "Failed to execute test prompt with LLM", "error");
       }
     } catch (err: any) {
       onShowToast?.(`Test error: ${err.message}`, "error");

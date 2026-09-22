@@ -10,6 +10,7 @@ import { COMFYUI_MODEL_CATEGORIES } from "./modelhub/modelHubConstants";
 import { HuggingFaceIngestionTab } from "./modelhub/HuggingFaceIngestionTab";
 import { CivitaiIngestionTab } from "./modelhub/CivitaiIngestionTab";
 import { ModelDownloadStatusCard, DownloadResult } from "./modelhub/ModelDownloadStatusCard";
+import { settingsApi, modelHubApi } from "../../api";
 
 // Re-export constants for backwards compatibility
 export { COMFYUI_MODEL_CATEGORIES };
@@ -44,9 +45,8 @@ export const ModelHubConfig: React.FC<ModelHubConfigProps> = ({
   // Initial check for configured API keys
   useEffect(() => {
     // Civitai
-    fetch("/api/settings/civitai")
-      .then((res) => res.json())
-      .then((data) => {
+    settingsApi.getCivitaiKey()
+      .then((data: any) => {
         if (data.configured) {
           setCivitaiConfigured(true);
           setCivitaiMaskedKey(data.masked_key || (data.api_key ? `${data.api_key}...` : "Configured"));
@@ -55,12 +55,11 @@ export const ModelHubConfig: React.FC<ModelHubConfigProps> = ({
       .catch(() => {});
 
     // Hugging Face
-    fetch("/api/settings/huggingface")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.configured) {
+    settingsApi.getHuggingFaceToken()
+      .then((data: any) => {
+        if (data.has_token || data.configured) {
           setHfConfigured(true);
-          setHfMaskedToken(data.masked_token || (data.token ? `${data.token}...` : "Configured"));
+          setHfMaskedToken((data as any).masked_token || (data.api_token ? `${data.api_token.slice(0, 4)}...` : "Configured"));
         }
       })
       .catch(() => {});
@@ -126,22 +125,16 @@ export const ModelHubConfig: React.FC<ModelHubConfigProps> = ({
         remote_comfyui_root: config.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI"
       };
 
-      const res = await fetch("/api/model-hub/download-remote", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      const result = await res.json();
+      const result: any = await modelHubApi.downloadRemote(payload);
       setDownloadResult(result);
 
-      if (result.success) {
+      if (result && result.success) {
         if (onShowToast) {
           onShowToast(`Model '${filename}' downloaded successfully to remote ComfyUI!`, "success");
         }
       } else {
         if (onShowToast) {
-          onShowToast(`Remote Download Failed: ${result.error || result.message}`, "error");
+          onShowToast(`Remote Download Failed: ${result?.error || result?.message}`, "error");
         }
       }
     } catch (err: any) {

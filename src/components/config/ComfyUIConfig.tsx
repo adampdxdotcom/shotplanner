@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { AppConfig } from "../../types";
+import { settingsApi } from "../../api";
 import { FolderOpen, Server, ShieldCheck, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
 
 export interface ComfyUIConfigProps {
@@ -21,26 +22,21 @@ export const ComfyUIConfig: React.FC<ComfyUIConfigProps> = ({ config, handleInpu
     setComfyTestResult(null);
 
     try {
-      const res = await fetch("/api/settings/test-comfyui", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          comfyui_url: config.comfyui_api_url,
-          url: config.comfyui_api_url, 
-          comfyui_api_url: config.comfyui_api_url,
-          token: config.remote_api_token,
-          remote_api_token: config.remote_api_token
-        })
+      const data: any = await settingsApi.testComfyUI({ 
+        comfyui_url: config.comfyui_api_url,
+        url: config.comfyui_api_url, 
+        comfyui_api_url: config.comfyui_api_url,
+        token: config.remote_api_token,
+        remote_api_token: config.remote_api_token
       });
-      const data = await res.json();
 
-      if (res.ok && data.success) {
-        setComfyTestResult({ success: true, message: data.message, systemInfo: data.systemInfo });
+      if (data && (data.success || data.status === "ok")) {
+        setComfyTestResult({ success: true, message: data.message || "Connected successfully", systemInfo: data.systemInfo });
         if (onShowToast) {
           onShowToast("✓ ComfyUI connected successfully", "success");
         }
       } else {
-        const errorMsg = data.error || "Connection failed";
+        const errorMsg = data?.error || data?.message || "Connection failed";
         setComfyTestResult({ success: false, message: errorMsg });
         if (onShowToast) {
           onShowToast(`⚠ ComfyUI connection failed: ${errorMsg}`, "error");

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { AppConfig, RunpodPodItem } from "../../types";
+import { settingsApi } from "../../api";
 import { Zap, RefreshCw, ShieldCheck, Check, AlertCircle, Server } from "lucide-react";
 
 interface RunpodQuickSyncBarProps {
@@ -34,15 +35,10 @@ export const RunpodQuickSyncBar: React.FC<RunpodQuickSyncBarProps> = ({
     setStatusType(null);
 
     try {
-      const res = await fetch("/api/runpod/pods", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ runpod_api_key: apiKey })
-      });
+      const data: any = await settingsApi.getRunpodPods(apiKey);
 
-      const data = await res.json();
-      if (!data.success) {
-        throw new Error(data.error || "Failed to fetch active pods");
+      if (!data || !data.success) {
+        throw new Error(data?.error || "Failed to fetch active pods");
       }
 
       const activePods: RunpodPodItem[] = data.pods || [];
@@ -104,20 +100,12 @@ export const RunpodQuickSyncBar: React.FC<RunpodQuickSyncBarProps> = ({
 
     setIsRegisteringKey(true);
     try {
-      const res = await fetch("/api/runpod/add-key", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          runpod_api_key: apiKey,
-          public_key: pubKey.trim()
-        })
-      });
+      const data: any = await settingsApi.addRunpodKey(apiKey, pubKey.trim());
 
-      const data = await res.json();
-      if (data.success) {
+      if (data && data.success) {
         onShowToast?.("SSH Key registered to RunPod account!", "success");
       } else {
-        throw new Error(data.error || "Failed to register key");
+        throw new Error(data?.error || "Failed to register key");
       }
     } catch (err: any) {
       onShowToast?.(err.message || "Key registration failed", "error");

@@ -4,6 +4,7 @@ import { Terminal, Key, Sparkles, Copy, Check, ChevronDown, ChevronRight, Slider
 import { copyToClipboard } from "../../utils/clipboard";
 import { RunpodPodManagerCard } from "./RunpodPodManagerCard";
 import { ComfyUIConfig } from "./ComfyUIConfig";
+import { settingsApi } from "../../api";
 
 export interface RemoteGPUConfigProps {
   config: AppConfig;
@@ -71,20 +72,14 @@ export const RemoteGPUConfig: React.FC<RemoteGPUConfigProps> = ({
         remote_dir: config.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI/input/"
       };
 
-      const res = await fetch("/api/ssh/test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      const data = await res.json();
-      if (data.success) {
+      const data: any = await settingsApi.testSsh(payload);
+      if (data && data.success) {
         setSshStatus("connected");
         const msg = data.message || "SSH Connection Verified Successfully!";
         setSshSuccessMsg(msg);
         onShowToast?.("SSH Connected Successfully", "success");
       } else {
-        throw new Error(data.message || data.error || "Failed to establish SSH connection");
+        throw new Error(data?.message || data?.error || "Failed to establish SSH connection");
       }
     } catch (err: any) {
       setSshStatus("error");

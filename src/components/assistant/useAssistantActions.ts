@@ -14,6 +14,7 @@ import {
 } from "../../types/assistantActions";
 import { toCanonicalSubjectName, findCanonicalSubject } from "../../utils/subjectUtils";
 import { generateUUID } from "../../utils/formatters";
+import { apiClient, llmApi } from "../../api";
 
 export interface StagingProgressState {
   status: "idle" | "staging" | "success" | "error";
@@ -385,14 +386,9 @@ export function useAssistantActions({
             shot_number: targetShot.shot_number
           };
 
-          const response = await fetch("/api/execution/stage-shot", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-          });
-          const data = await response.json();
-          success = !!data.success || response.ok;
-          if (!response.ok) throw new Error(data.error || "Failed to stage shot assets.");
+          const data: any = await apiClient.post("/api/execution/stage-shot", payload);
+          success = !!data?.success || (data && !data?.error);
+          if (data?.error) throw new Error(data.error || "Failed to stage shot assets.");
         }
 
         clearInterval(progressTimer);
@@ -436,29 +432,25 @@ export function useAssistantActions({
         if (onExpandPrompt) {
           newPrompt = await onExpandPrompt(targetShot);
         } else {
-          const response = await fetch("/api/generate-prompt", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              basic_stub: action.guidance || targetShot.basic_stub,
-              assets: assets,
-              prompt_prefix: `[Scene: ${sceneProject.scene_name}] [Shot: ${targetShot.shot_number}]`,
-              provider: effectiveDefault,
-              lm_studio_url: lmStudioUrl,
-              gemini_api_key: geminiApiKey,
-              active_shot: targetShot,
-              shot_type: targetShot.shot_type,
-              camera_movement: targetShot.camera_movement,
-              lens_focal_length: targetShot.lens_focal_length,
-              aspect_ratio: targetShot.aspect_ratio,
-              shot_number: targetShot.shot_number,
-              scene_name: sceneProject.scene_name,
-              characters: sceneProject.characters
-            })
-          });
-          const data = await response.json();
-          if (!response.ok) throw new Error(data.error || "Prompt expansion failed");
-          newPrompt = data.expanded_prompt;
+          const payload: any = {
+            basic_stub: action.guidance || targetShot.basic_stub,
+            assets: assets,
+            prompt_prefix: `[Scene: ${sceneProject.scene_name}] [Shot: ${targetShot.shot_number}]`,
+            provider: effectiveDefault,
+            lm_studio_url: lmStudioUrl,
+            gemini_api_key: geminiApiKey,
+            active_shot: targetShot,
+            shot_type: targetShot.shot_type,
+            camera_movement: targetShot.camera_movement,
+            lens_focal_length: targetShot.lens_focal_length,
+            aspect_ratio: targetShot.aspect_ratio,
+            shot_number: targetShot.shot_number,
+            scene_name: sceneProject.scene_name,
+            characters: sceneProject.characters
+          };
+          const data: any = await llmApi.generatePrompt(payload);
+          if (data?.error) throw new Error(data.error || "Prompt expansion failed");
+          newPrompt = data.expanded_prompt || data.response || "";
         }
 
         if (newPrompt && onUpdateProject) {

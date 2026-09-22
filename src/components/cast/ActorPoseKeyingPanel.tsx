@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { getAssetMediaUrl } from "../../utils/assetUrl";
 import { useBlobUrlTracker } from "../../hooks/useSafeObjectUrl";
+import { assetsApi } from "../../api";
 import {
   ActorPoseKeyingPanelProps,
   useChromaKeyEngine,
@@ -145,13 +146,9 @@ export const ActorPoseKeyingPanel: React.FC<ActorPoseKeyingPanelProps> = ({
     }
 
     try {
-      const res = await fetch("/api/assets/upload", {
-        method: "POST",
-        body: formData,
-      });
+      const data: any = await assetsApi.upload(formData);
 
-      if (res.ok) {
-        const data = await res.json();
+      if (data) {
         const newAsset = data.asset || data;
         if (onAssetUploaded) {
           onAssetUploaded(newAsset);

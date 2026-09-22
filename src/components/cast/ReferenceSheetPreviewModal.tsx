@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { X, Download, Save, CheckCircle2, Loader2, Sparkles, LayoutGrid } from "lucide-react";
 import { MediaAsset, sanitizeSlug } from "../../types";
 import { downloadReferenceSheetBlob } from "../../utils/referenceSheetRenderer";
+import { assetsApi } from "../../api";
 
 export interface ReferenceSheetPreviewModalProps {
   isOpen: boolean;
@@ -55,20 +56,14 @@ export const ReferenceSheetPreviewModal: React.FC<ReferenceSheetPreviewModalProp
       formData.append("description", `Composite reference sheet (${layoutPreset}) for ${activeSubject || "actor"}`);
       formData.append("tags", JSON.stringify(["Reference Sheet", layoutPreset, "Model Reference", activeSubject]));
 
-      const res = await fetch("/api/assets/upload", {
-        method: "POST",
-        body: formData
-      });
+      const data: any = await assetsApi.upload(formData);
 
-      if (!res.ok) throw new Error(`Upload failed with status ${res.status}`);
-      const data = await res.json();
-
-      if (data.success && data.asset) {
-        if (onAssetSaved) onAssetSaved(data.asset);
+      if (data && (data.success || data.asset)) {
+        if (onAssetSaved && data.asset) onAssetSaved(data.asset);
         setHasSaved(true);
         if (addToast) addToast(`Saved reference sheet to ${activeSubject || "library"}!`, "success");
       } else {
-        throw new Error(data.error || "Failed to persist reference sheet.");
+        throw new Error(data?.error || "Failed to persist reference sheet.");
       }
     } catch (err: any) {
       console.error("Save error:", err);

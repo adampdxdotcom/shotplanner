@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { HUGGINGFACE_CONFIG_FILE } from "../config/constants";
+import { writeJsonAtomicSync } from "../utils/atomicFs";
 
 export interface HuggingFaceFileOption {
   filename: string;
@@ -60,14 +61,7 @@ export function saveHuggingFaceToken(token: string): void {
     removeHuggingFaceToken();
     return;
   }
-  const dir = path.dirname(HUGGINGFACE_CONFIG_FILE);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  fs.writeFileSync(
-    HUGGINGFACE_CONFIG_FILE,
-    JSON.stringify({ api_token: cleanToken, updated_at: new Date().toISOString() }, null, 2)
-  );
+  writeJsonAtomicSync(HUGGINGFACE_CONFIG_FILE, { api_token: cleanToken, updated_at: new Date().toISOString() });
 }
 
 /**
@@ -78,10 +72,7 @@ export function removeHuggingFaceToken(): void {
     try {
       fs.unlinkSync(HUGGINGFACE_CONFIG_FILE);
     } catch (e) {
-      fs.writeFileSync(
-        HUGGINGFACE_CONFIG_FILE,
-        JSON.stringify({ api_token: "" }, null, 2)
-      );
+      writeJsonAtomicSync(HUGGINGFACE_CONFIG_FILE, { api_token: "" });
     }
   }
 }

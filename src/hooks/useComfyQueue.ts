@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { ComfyQueueStatus, ComfySystemStats } from "../types";
+import { executionApi } from "../api";
 
 interface UseComfyQueueOptions {
   apiUrl: string;
@@ -47,19 +48,14 @@ export function useComfyQueue({
     isSyncingHistory.current = true;
 
     try {
-      const res = await fetch("/api/outputs/sync-history", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          scene_name: sceneName,
-          comfyui_api_url: apiUrl,
-          remote_api_token: authToken,
-          prompt_id: promptId,
-          max_prompts: 5
-        })
+      const data = await executionApi.syncHistory({
+        scene_name: sceneName,
+        comfyui_api_url: apiUrl,
+        remote_api_token: authToken,
+        prompt_id: promptId,
+        max_prompts: 5
       });
 
-      const data = await res.json();
       if (data.success && data.ingested_count > 0) {
         onShowToast?.(`🎬 Ingested ${data.ingested_count} take(s) from ComfyUI`, "success");
         onTakesIngested?.(data.ingested_count);
@@ -79,19 +75,10 @@ export function useComfyQueue({
     if (!quiet) setIsLoading(true);
 
     try {
-      const queryParams = new URLSearchParams({
-        comfyui_api_url: apiUrl
+      const data = await executionApi.getComfyQueue({
+        comfyui_api_url: apiUrl,
+        remote_api_token: authToken
       });
-      if (authToken) {
-        queryParams.append("remote_api_token", authToken);
-      }
-
-      const res = await fetch(`/api/comfy/queue?${queryParams.toString()}`);
-      if (!res.ok) {
-        throw new Error(`Queue fetch returned HTTP ${res.status}`);
-      }
-
-      const data: ComfyQueueStatus = await res.json();
       setQueueStatus(data);
       setLastRefreshedAt(Date.now());
 
@@ -118,17 +105,10 @@ export function useComfyQueue({
     if (!enabled || !apiUrl) return;
 
     try {
-      const queryParams = new URLSearchParams({
-        comfyui_api_url: apiUrl
+      const data = await executionApi.getComfySystemStats({
+        comfyui_api_url: apiUrl,
+        remote_api_token: authToken
       });
-      if (authToken) {
-        queryParams.append("remote_api_token", authToken);
-      }
-
-      const res = await fetch(`/api/comfy/system-stats?${queryParams.toString()}`);
-      if (!res.ok) return;
-
-      const data: ComfySystemStats = await res.json();
       if (data.success) {
         setSystemStats(data);
       }
@@ -145,16 +125,11 @@ export function useComfyQueue({
     setIsInterrupting(true);
 
     try {
-      const res = await fetch("/api/comfy/interrupt", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          comfyui_api_url: apiUrl,
-          remote_api_token: authToken
-        })
+      const data = await executionApi.interrupt({
+        comfyui_api_url: apiUrl,
+        remote_api_token: authToken
       });
 
-      const data = await res.json();
       if (data.success) {
         onShowToast?.("🛑 Execution interrupted on ComfyUI", "info");
         await refreshQueue(true);
@@ -179,17 +154,12 @@ export function useComfyQueue({
     setDeletingPromptId(promptId);
 
     try {
-      const res = await fetch("/api/comfy/delete-job", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt_id: promptId,
-          comfyui_api_url: apiUrl,
-          remote_api_token: authToken
-        })
+      const data = await executionApi.deleteComfyJob({
+        prompt_id: promptId,
+        comfyui_api_url: apiUrl,
+        remote_api_token: authToken
       });
 
-      const data = await res.json();
       if (data.success) {
         onShowToast?.(`Removed job ${promptId.slice(0, 8)}... from queue`, "info");
         await refreshQueue(true);
@@ -214,16 +184,11 @@ export function useComfyQueue({
     setIsClearingQueue(true);
 
     try {
-      const res = await fetch("/api/comfy/clear-queue", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          comfyui_api_url: apiUrl,
-          remote_api_token: authToken
-        })
+      const data = await executionApi.clearComfyQueue({
+        comfyui_api_url: apiUrl,
+        remote_api_token: authToken
       });
 
-      const data = await res.json();
       if (data.success) {
         onShowToast?.("Pending queue cleared", "info");
         await refreshQueue(true);

@@ -4,6 +4,7 @@ import path from "path";
 import { upload } from "../config/constants";
 import { assetService } from "../services/assetService";
 import { generateThumbnailFile } from "../services/thumbnailService";
+import { safeUnlinkSync } from "../utils/fileCleanup";
 
 const router = Router();
 
@@ -90,6 +91,8 @@ router.put("/update", upload.single("file"), async (req: Request, res: Response)
     res.json({ success: true, asset: updated });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
+  } finally {
+    if (req.file?.path) safeUnlinkSync(req.file.path);
   }
 });
 
@@ -109,6 +112,8 @@ router.put("/:filename", upload.single("file"), async (req: Request, res: Respon
     res.json({ success: true, asset: updated });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
+  } finally {
+    if (req.file?.path) safeUnlinkSync(req.file.path);
   }
 });
 
@@ -130,6 +135,8 @@ router.post("/upload", upload.single("file"), async (req: Request, res: Response
     res.json({ success: true, asset: assetRecord });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
+  } finally {
+    if (req.file?.path) safeUnlinkSync(req.file.path);
   }
 });
 
@@ -150,6 +157,8 @@ router.post("/upload_chunk", upload.single("file"), async (req: Request, res: Re
   } catch (err: any) {
     console.error("Chunk upload error:", err);
     res.status(500).json({ error: err ? err.message || String(err) : "Unknown chunk error" });
+  } finally {
+    if (req.file?.path) safeUnlinkSync(req.file.path);
   }
 });
 

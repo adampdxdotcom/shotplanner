@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { Client, ConnectConfig } from "ssh2";
 import { CIVITAI_CONFIG_FILE, CIVITAI_FAVORITES_FILE } from "../config/constants";
+import { writeJsonAtomicSync } from "../utils/atomicFs";
 
 export interface CivitaiModelVersionOption {
   id: number;
@@ -115,11 +116,7 @@ export function saveCivitaiKey(apiKey: string): void {
     removeCivitaiKey();
     return;
   }
-  const dir = path.dirname(CIVITAI_CONFIG_FILE);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  fs.writeFileSync(CIVITAI_CONFIG_FILE, JSON.stringify({ api_key: cleanKey, updated_at: new Date().toISOString() }, null, 2));
+  writeJsonAtomicSync(CIVITAI_CONFIG_FILE, { api_key: cleanKey, updated_at: new Date().toISOString() });
 }
 
 /**
@@ -130,7 +127,7 @@ export function removeCivitaiKey(): void {
     try {
       fs.unlinkSync(CIVITAI_CONFIG_FILE);
     } catch (e) {
-      fs.writeFileSync(CIVITAI_CONFIG_FILE, JSON.stringify({ api_key: "" }, null, 2));
+      writeJsonAtomicSync(CIVITAI_CONFIG_FILE, { api_key: "" });
     }
   }
 }
@@ -209,12 +206,7 @@ export function saveCivitaiFavorite(modelData: Partial<CivitaiFavorite> & { [key
     favorites.unshift(cleanItem);
   }
 
-  const dir = path.dirname(CIVITAI_FAVORITES_FILE);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-
-  fs.writeFileSync(CIVITAI_FAVORITES_FILE, JSON.stringify(favorites, null, 2), "utf-8");
+  writeJsonAtomicSync(CIVITAI_FAVORITES_FILE, favorites);
   return cleanItem;
 }
 
@@ -230,12 +222,7 @@ export function deleteCivitaiFavorite(versionId: string | number): boolean {
     return false;
   }
 
-  const dir = path.dirname(CIVITAI_FAVORITES_FILE);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-
-  fs.writeFileSync(CIVITAI_FAVORITES_FILE, JSON.stringify(filtered, null, 2), "utf-8");
+  writeJsonAtomicSync(CIVITAI_FAVORITES_FILE, filtered);
   return true;
 }
 

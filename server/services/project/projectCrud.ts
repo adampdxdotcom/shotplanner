@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { ASSETS_DIR, PROJECTS_DIR, ensureSceneDirectories, formatSceneFolderName } from "../../config/constants";
+import { writeJsonAtomicSync } from "../../utils/atomicFs";
 
 export const IGNORED_JSON_FILENAMES = new Set([
   "assets_db.json",
@@ -182,7 +183,7 @@ export function saveProjectData(projectName: string, projectData: any): string {
   const dirs = ensureSceneDirectories(sceneDirName);
   const targetPath = path.join(dirs.base, `${sceneDirName}.json`);
   
-  fs.writeFileSync(targetPath, JSON.stringify(projectData, null, 2));
+  writeJsonAtomicSync(targetPath, projectData);
 
   return `${sceneDirName}.json`;
 }

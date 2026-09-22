@@ -1,5 +1,6 @@
 import { useMemo, useState, useCallback } from "react";
 import { AppConfig, MediaAsset } from "../types";
+import { llmApi } from "../api";
 
 export interface VisionCaptionState {
   /** True if vision is enabled and local LLM endpoint is configured */
@@ -151,19 +152,15 @@ export async function requestVisionCaption(params: RequestVisionCaptionParams): 
   error?: string;
 }> {
   try {
-    const res = await fetch("/api/llm/caption", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        thumbnailPath: params.thumbnailPath,
-        imageBase64: params.imageBase64,
-        contextType: params.contextType,
-        subjectName: params.subjectName,
-        lm_studio_url: params.lmStudioUrl
-      })
+    const data = await llmApi.generateCaption({
+      thumbnailPath: params.thumbnailPath,
+      imageBase64: params.imageBase64,
+      contextType: params.contextType,
+      subjectName: params.subjectName,
+      lm_studio_url: params.lmStudioUrl
     });
-    const data = await res.json();
-    if (!res.ok || !data.success) {
+
+    if (!data.success) {
       return { 
         success: false, 
         caption: "", 

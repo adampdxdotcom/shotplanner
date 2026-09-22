@@ -11,6 +11,7 @@ import {
   addCivitaiFavorite, 
   removeCivitaiFavorite 
 } from "../../../services/civitaiFavoritesService";
+import { settingsApi, modelHubApi, apiClient } from "../../../api";
 
 export interface UseCivitaiConfigProps {
   config: AppConfig;
@@ -62,9 +63,8 @@ export function useCivitaiConfig({
 
   // Initial fetch of Civitai token configuration status and favorites
   useEffect(() => {
-    fetch("/api/settings/civitai")
-      .then((res) => res.json())
-      .then((data) => {
+    settingsApi.getCivitaiKey()
+      .then((data: any) => {
         if (data.configured) {
           setIsConfigured(true);
           setMaskedKey(data.masked_key || (data.api_key ? `${data.api_key}...` : "Configured"));
@@ -105,13 +105,8 @@ export function useCivitaiConfig({
     setTokenFeedback(null);
 
     try {
-      const res = await fetch("/api/settings/civitai", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ api_key: clean })
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const data: any = await settingsApi.saveCivitaiKey(clean);
+      if (data && (data.success || data.message)) {
         setIsConfigured(true);
         setMaskedKey(clean.length > 8 ? `${clean.slice(0, 4)}...${clean.slice(-4)}` : "***");
         setApiKeyInput("");
@@ -121,7 +116,7 @@ export function useCivitaiConfig({
           onShowToast("Civitai API key saved successfully", "success");
         }
       } else {
-        setTokenFeedback({ success: false, message: data.error || "Failed to save Civitai API key." });
+        setTokenFeedback({ success: false, message: data?.error || "Failed to save Civitai API key." });
       }
     } catch (e: any) {
       setTokenFeedback({ success: false, message: e.message || "Network error" });
@@ -133,9 +128,7 @@ export function useCivitaiConfig({
   // Handle clearing Civitai API Key
   const handleClearApiKey = async () => {
     try {
-      await fetch("/api/settings/civitai", {
-        method: "DELETE"
-      });
+      await settingsApi.deleteCivitaiKey();
       setIsConfigured(false);
       setMaskedKey("");
       setApiKeyInput("");
@@ -160,11 +153,11 @@ export function useCivitaiConfig({
     setDownloadResult(null);
 
     try {
-      const url = `/api/civitai/model-info?query=${encodeURIComponent(q)}`;
-      const res = await fetch(url);
-      const data = await res.json();
+      const data: any = await apiClient.get<any>("/api/civitai/model-info", {
+        params: { query: q }
+      });
 
-      if (res.ok && data.success && data.data) {
+      if (data && data.success && data.data) {
         const meta: CivitaiModelMetadata = data.data;
         setModelMetadata(meta);
         setTargetDestination(meta.default_destination_folder || "models/checkpoints/");
@@ -172,7 +165,7 @@ export function useCivitaiConfig({
         setSelectedVersionId(meta.version_id);
       } else {
         setModelMetadata(null);
-        setLookupError(data.error || "Could not find or inspect this Civitai model.");
+        setLookupError(data?.error || "Could not find or inspect this Civitai model.");
       }
     } catch (err: any) {
       setModelMetadata(null);
@@ -217,22 +210,16 @@ export function useCivitaiConfig({
         remote_comfyui_root: config.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI"
       };
 
-      const res = await fetch("/api/civitai/download-remote", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      const data = await res.json();
+      const data: any = await apiClient.post<any>("/api/civitai/download-remote", payload);
       setDownloadResult(data);
 
-      if (res.ok && data.success) {
+      if (data && data.success) {
         if (onShowToast) {
           onShowToast(`Downloaded '${targetFilename || modelMetadata.filename}' to Remote ComfyUI successfully!`, "success");
         }
       } else {
         if (onShowToast) {
-          onShowToast(data.error || "Remote model download failed", "error");
+          onShowToast(data?.error || "Remote model download failed", "error");
         }
       }
     } catch (err: any) {

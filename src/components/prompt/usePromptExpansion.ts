@@ -9,6 +9,7 @@ import {
   AppConfig, 
   MediaAsset 
 } from "../../types";
+import { llmApi } from "../../api";
 
 export interface UsePromptExpansionParams {
   providerChoice: LLMProvider;
@@ -136,38 +137,33 @@ export function usePromptExpansion({
     setProviderUsed(null);
 
     try {
-      const res = await fetch("/api/generate-prompt", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: controller.signal,
-        body: JSON.stringify({
-          basic_stub: stubToUse,
-          assets: relevantAssets,
-          lm_studio_url: lmStudioUrl,
-          provider: providerChoice,
-          prompt_prefix: activeShotPrefix,
-          scene_planning: planning,
-          planning: planning,
-          active_shot: targetShot || undefined,
-          shot_type: targetShot ? targetShot.shot_type : planning?.shot_type,
-          camera_movement: targetShot ? targetShot.camera_movement : planning?.camera_movement,
-          lens_focal_length: targetShot ? targetShot.lens_focal_length : planning?.lens_focal_length,
-          aspect_ratio: targetShot ? targetShot.aspect_ratio : planning?.aspect_ratio,
-          ots_anchor_subject: targetShot?.ots_anchor_subject || planning?.ots_anchor_subject,
-          ots_focus_subject: targetShot?.ots_focus_subject || planning?.ots_focus_subject,
-          ots_side: targetShot?.ots_side || planning?.ots_side,
-          shot_number: targetShot ? targetShot.shot_number : planning?.shot_number,
-          scene_name: sceneProject?.scene_name || planning?.scene_name,
-          characters: sceneProject?.characters,
-          gemini_api_key: geminiApiKey,
-          custom_system_prompt: config?.llm_custom_system_prompt,
-          temperature: config?.llm_temperature,
-          max_tokens: config?.llm_max_tokens
-        })
-      });
+      const payload: any = {
+        basic_stub: stubToUse,
+        assets: relevantAssets,
+        lm_studio_url: lmStudioUrl,
+        provider: providerChoice,
+        prompt_prefix: activeShotPrefix,
+        scene_planning: planning,
+        planning: planning,
+        active_shot: targetShot || undefined,
+        shot_type: targetShot ? targetShot.shot_type : planning?.shot_type,
+        camera_movement: targetShot ? targetShot.camera_movement : planning?.camera_movement,
+        lens_focal_length: targetShot ? targetShot.lens_focal_length : planning?.lens_focal_length,
+        aspect_ratio: targetShot ? targetShot.aspect_ratio : planning?.aspect_ratio,
+        ots_anchor_subject: targetShot?.ots_anchor_subject || planning?.ots_anchor_subject,
+        ots_focus_subject: targetShot?.ots_focus_subject || planning?.ots_focus_subject,
+        ots_side: targetShot?.ots_side || planning?.ots_side,
+        shot_number: targetShot ? targetShot.shot_number : planning?.shot_number,
+        scene_name: sceneProject?.scene_name || planning?.scene_name,
+        characters: sceneProject?.characters,
+        gemini_api_key: geminiApiKey,
+        custom_system_prompt: config?.llm_custom_system_prompt,
+        temperature: config?.llm_temperature,
+        max_tokens: config?.llm_max_tokens
+      };
 
-      const data = await res.json();
-      if (res.ok && data.expanded_prompt) {
+      const data: any = await llmApi.generatePrompt(payload, { signal: controller.signal });
+      if (data && data.expanded_prompt) {
         setPresentedFallbackNotice(null);
 
         let createdVariationNumber = 1;

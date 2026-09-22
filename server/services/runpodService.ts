@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import nodeFetchModule from "node-fetch";
 import { RUNPOD_CONFIG_FILE } from "../config/constants";
+import { writeJsonAtomicSync } from "../utils/atomicFs";
 
 const getFetch = (): typeof fetch => {
   if (typeof globalThis.fetch === "function") {
@@ -29,11 +30,7 @@ export function getStoredRunpodApiKey(): string | null {
 
 export function saveRunpodApiKey(apiKey: string): void {
   try {
-    const dir = path.dirname(RUNPOD_CONFIG_FILE);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    fs.writeFileSync(RUNPOD_CONFIG_FILE, JSON.stringify({ api_key: apiKey.trim() }, null, 2), "utf-8");
+    writeJsonAtomicSync(RUNPOD_CONFIG_FILE, { api_key: apiKey.trim() });
   } catch (err) {
     console.error("[RunPod] Error saving runpod_config.json:", err);
   }

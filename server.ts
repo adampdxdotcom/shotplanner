@@ -2,6 +2,7 @@ import express, { Request, Response } from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { ASSETS_DIR, LEGACY_UPLOADS_DIR, initDirectories } from "./server/config/constants";
+import { cleanupStaleChunks } from "./server/utils/fileCleanup";
 import assetRoutes, { serveAssetFile, serveThumbnailFile } from "./server/routes/assetRoutes";
 import executionRoutes from "./server/routes/executionRoutes";
 import projectRoutes from "./server/routes/projectRoutes";
@@ -31,8 +32,12 @@ export {
   sanitizeSlug
 } from "./server/utils/formatters";
 
-// Initialize runtime filesystem directories
+// Initialize runtime filesystem directories and clean stale temporary uploads
 initDirectories();
+cleanupStaleChunks();
+setInterval(() => {
+  cleanupStaleChunks();
+}, 6 * 60 * 60 * 1000);
 
 const app = express();
 const PORT = 3000;

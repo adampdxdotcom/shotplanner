@@ -13,6 +13,7 @@ import {
   setLastActiveSubject,
   StagingWorkspaceTab
 } from "../../utils/workspaceSessionStore";
+import { assetsApi } from "../../api";
 
 export interface UseStagingStageProps {
   sceneProject?: SceneProjectFile;
@@ -504,19 +505,17 @@ export function useStagingStage({
       formData.append("tags", JSON.stringify(["Scene Reference", "Location", "Environment"]));
       formData.append("subject_name", activeScene);
 
-      const res = await fetch("/api/assets/upload", { method: "POST", body: formData });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && data.asset) {
-          if (onAssetUploaded) onAssetUploaded(data.asset);
-          setSelectedLocationFilename(data.asset.filename);
-          setCustomBackgroundUrl(prev => {
-            if (prev) revokeManagedBlobUrl(prev);
-            return undefined;
-          });
-          if (addToast) addToast(`Room photo uploaded as location reference: ${data.asset.filename}`, "success");
-          return;
-        }
+      const data: any = await assetsApi.upload(formData);
+      if (data && (data.success || data.asset)) {
+        const asset = data.asset || data;
+        if (onAssetUploaded) onAssetUploaded(asset);
+        setSelectedLocationFilename(asset.filename);
+        setCustomBackgroundUrl(prev => {
+          if (prev) revokeManagedBlobUrl(prev);
+          return undefined;
+        });
+        if (addToast) addToast(`Room photo uploaded as location reference: ${asset.filename}`, "success");
+        return;
       }
     } catch (err) {
       console.warn("Could not upload environment to server, reading as managed blob URL:", err);

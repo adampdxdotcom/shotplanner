@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { MediaAsset } from "../types";
+import { apiClient } from "../api";
 
 export interface HeadshotCandidate {
   key: string;
@@ -60,18 +61,7 @@ export function useHeadshotGenerator({
         payload.imageMimeType = seedMimeType;
       }
 
-      const res = await fetch("/api/headshots/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.detail || data.error || `HTTP ${res.status}: Failed to generate variations`);
-      }
-
-      const data = await res.json();
+      const data: any = await apiClient.post("/api/headshots/generate", payload);
       const generatedList = data.results || data.candidates || [];
       setCandidates(generatedList);
       setSelectedCandidates(new Set(generatedList.map((_: any, i: number) => i)));
@@ -90,24 +80,14 @@ export function useHeadshotGenerator({
     const selections = Array.from(selectedCandidates).map(idx => candidates[idx]);
 
     try {
-      const res = await fetch("/api/headshots/save-selected", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          selections,
-          characterName: activeSubject,
-          sceneName: activeScene,
-          activeSceneName: activeScene,
-          tags: ["AI Generated"]
-        })
+      const data: any = await apiClient.post("/api/headshots/save-selected", {
+        selections,
+        characterName: activeSubject,
+        sceneName: activeScene,
+        activeSceneName: activeScene,
+        tags: ["AI Generated"]
       });
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.detail || data.error || "Failed to save selected headshots");
-      }
-
-      const data = await res.json();
       const savedList: MediaAsset[] = data.savedAssets || data.savedRecords || data.assets || [];
       savedList.forEach((asset: MediaAsset) => {
         if (onAssetSaved) onAssetSaved(asset);

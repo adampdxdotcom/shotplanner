@@ -1,6 +1,6 @@
 import { CivitaiFavorite, CivitaiModelMetadata } from "../types";
+import { modelHubApi } from "../api";
 
-const FAVORITES_API_URL = "/api/civitai/favorites";
 const LOCAL_STORAGE_KEY = "civitai_saved_favorites_cache";
 
 /**
@@ -8,15 +8,12 @@ const LOCAL_STORAGE_KEY = "civitai_saved_favorites_cache";
  */
 export async function fetchCivitaiFavorites(): Promise<CivitaiFavorite[]> {
   try {
-    const res = await fetch(FAVORITES_API_URL);
-    if (res.ok) {
-      const data = await res.json();
-      const list = Array.isArray(data.favorites) ? data.favorites : Array.isArray(data) ? data : [];
-      try {
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(list));
-      } catch (e) {}
-      return list;
-    }
+    const data: any = await modelHubApi.getCivitaiFavorites();
+    const list = Array.isArray(data?.favorites) ? data.favorites : Array.isArray(data) ? data : [];
+    try {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(list));
+    } catch (e) {}
+    return list;
   } catch (err) {
     console.warn("[Civitai Favorites] Backend fetch failed, reading from localStorage:", err);
   }
@@ -78,15 +75,8 @@ export async function addCivitaiFavorite(
   };
 
   try {
-    const res = await fetch(FAVORITES_API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-    if (res.ok) {
-      const data = await res.json();
-      return data.favorite || payload;
-    }
+    const data: any = await modelHubApi.addCivitaiFavorite(payload);
+    return data?.favorite || payload;
   } catch (err) {
     console.warn("[Civitai Favorites] Save POST failed, updating localStorage:", err);
   }
@@ -113,12 +103,8 @@ export async function addCivitaiFavorite(
 export async function removeCivitaiFavorite(versionId: number | string): Promise<boolean> {
   const normId = String(versionId);
   try {
-    const res = await fetch(`${FAVORITES_API_URL}/${encodeURIComponent(normId)}`, {
-      method: "DELETE"
-    });
-    if (res.ok) {
-      return true;
-    }
+    await modelHubApi.removeCivitaiFavorite(Number(normId) || (normId as any));
+    return true;
   } catch (err) {
     console.warn("[Civitai Favorites] Delete request failed:", err);
   }

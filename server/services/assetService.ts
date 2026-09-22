@@ -16,6 +16,7 @@ import {
 import { AssetRecord } from "../types";
 import { sanitizeSlug } from "../utils/formatters";
 import { generateThumbnailFile } from "./thumbnailService";
+import { writeJsonAtomicSync } from "../utils/atomicFs";
 
 const COMPOUND_REFERENCE_TYPES = [
   "scene_location_reference",
@@ -362,7 +363,7 @@ class AssetService {
         });
       }
 
-      fs.writeFileSync(ASSET_DB_FILE, JSON.stringify(dbRecords, null, 2), "utf-8");
+      writeJsonAtomicSync(ASSET_DB_FILE, dbRecords);
     } catch (e) {
       console.error("[AssetService] Error updating ASSET_DB_FILE:", e);
     }
@@ -416,7 +417,7 @@ class AssetService {
                   }
 
                   if (modified) {
-                    fs.writeFileSync(projPath, JSON.stringify(proj, null, 2), "utf-8");
+                    writeJsonAtomicSync(projPath, proj);
                   }
                 } catch (e) {}
               }
@@ -554,7 +555,7 @@ class AssetService {
       } else {
         dbRecords.push(record);
       }
-      fs.writeFileSync(ASSET_DB_FILE, JSON.stringify(dbRecords, null, 2), "utf-8");
+      writeJsonAtomicSync(ASSET_DB_FILE, dbRecords);
     } catch (e) {}
 
     return record;

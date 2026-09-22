@@ -14,6 +14,7 @@ import { SceneCastList } from "./cast/SceneCastList";
 import { RegisterCharacterModal } from "./cast/RegisterCharacterModal";
 import { DeleteCharacterModal } from "./cast/DeleteCharacterModal";
 import { useUniverseSync } from "./cast/useUniverseSync";
+import { assetsApi } from "../api";
 
 interface CastSectionProps {
   assets: MediaAsset[];
@@ -89,22 +90,15 @@ export const CastSection: React.FC<CastSectionProps> = ({
       return;
     }
     try {
-      const res = await fetch(`/api/assets/${encodeURIComponent(asset.filename)}?scene_name=${encodeURIComponent(activeSceneName)}`, {
-        method: "DELETE"
-      });
-      if (res.ok) {
-        onAssetDeleted(asset.filename);
-        if (lightboxAsset?.filename === asset.filename) {
-          setLightboxAsset(null);
-        }
-        if (editingAsset?.filename === asset.filename) {
-          setEditingAsset(null);
-        }
-        addToast(`Deleted asset "${displayName}"`, "success");
-      } else {
-        const data = await res.json().catch(() => ({}));
-        addToast(data.error || "Failed to delete asset", "error");
+      await assetsApi.delete(`${encodeURIComponent(asset.filename)}?scene_name=${encodeURIComponent(activeSceneName)}`);
+      onAssetDeleted(asset.filename);
+      if (lightboxAsset?.filename === asset.filename) {
+        setLightboxAsset(null);
       }
+      if (editingAsset?.filename === asset.filename) {
+        setEditingAsset(null);
+      }
+      addToast(`Deleted asset "${displayName}"`, "success");
     } catch (err: any) {
       console.error("Failed to delete asset:", err);
       addToast("Error deleting asset: " + (err.message || "Network error"), "error");

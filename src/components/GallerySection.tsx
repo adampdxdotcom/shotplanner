@@ -9,6 +9,7 @@ import { AssetLightbox } from "./AssetLightbox";
 import { GalleryBulkUploadModal } from "./gallery/GalleryBulkUploadModal";
 import { GalleryGridView } from "./gallery/GalleryGridView";
 import { GalleryListView } from "./gallery/GalleryListView";
+import { assetsApi } from "../api";
 
 interface GallerySectionProps {
   assets: MediaAsset[];
@@ -78,7 +79,7 @@ export const GallerySection: React.FC<GallerySectionProps> = ({
   const handleDeleteAsset = async (asset: MediaAsset) => {
     if (confirm(`Are you sure you want to delete ${asset.original_name}?`)) {
       try {
-        await fetch(`/api/assets/${asset.filename}`, { method: "DELETE" });
+        await assetsApi.delete(asset.filename);
         onAssetDeleted(asset.filename);
         if (lightboxAsset?.filename === asset.filename) setLightboxAsset(null);
       } catch (e) {

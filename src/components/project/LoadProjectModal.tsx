@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { X, Save, FolderOpen, AlertCircle, Download, Upload, Plus, Trash2, Loader2, FileArchive } from "lucide-react";
 import { UniverseIngestionModal } from "../cast/UniverseIngestionModal";
 import { UniverseInspectionResult } from "../../types";
+import { projectsApi } from "../../api";
 
 interface LoadProjectModalProps {
   onReloadProjects?: () => void;
@@ -27,10 +28,9 @@ export const LoadProjectModal: React.FC<LoadProjectModalProps> = ({ isOpen, onCl
   useEffect(() => {
     if (isOpen) {
       setLoading(true);
-      fetch("/api/projects")
-        .then(res => res.json())
-        .then(data => {
-          if (data.projects) {
+      projectsApi.list()
+        .then((data: any) => {
+          if (data && data.projects) {
             const mapped = data.projects.map((p: any) => 
               typeof p === "string" 
                 ? { filename: p, display_name: p.replace(/\.json$/i, ""), mtime: "", size: 0 } 
@@ -39,7 +39,7 @@ export const LoadProjectModal: React.FC<LoadProjectModalProps> = ({ isOpen, onCl
             setProjects(mapped);
           }
         })
-        .catch(err => setError("Failed to load project list."))
+        .catch(() => setError("Failed to load project list."))
         .finally(() => setLoading(false));
     } else {
       setError(null);
@@ -64,21 +64,11 @@ export const LoadProjectModal: React.FC<LoadProjectModalProps> = ({ isOpen, onCl
 
     try {
       // First, run inspection pass
-      const inspectRes = await fetch("/api/projects/inspect-zip", {
-        method: "POST",
-        body: formData
-      });
+      const inspectData: any = await projectsApi.inspectZip(formData);
 
-      if (!inspectRes.ok) {
-        let errMessage = `Failed to inspect project (HTTP ${inspectRes.status})`;
-        try {
-          const errData = await inspectRes.json();
-          errMessage = errData.detail || errData.error || errMessage;
-        } catch {}
-        throw new Error(errMessage);
+      if (!inspectData) {
+        throw new Error("Failed to inspect project ZIP file.");
       }
-
-      const inspectData = await inspectRes.json();
       
       // If there are Universe character conflicts or new universe characters in the archive
       if (inspectData.has_universe_data && inspectData.items && inspectData.items.length > 0) {
@@ -111,43 +101,26 @@ export const LoadProjectModal: React.FC<LoadProjectModalProps> = ({ isOpen, onCl
     setError(null);
 
     try {
-      const res = await fetch("/api/projects/import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          temp_file_path: tempPath,
-          universe_resolutions: resolutions
-        })
+      const data: any = await projectsApi.importProject({
+        temp_file_path: tempPath || undefined,
+        universe_resolutions: resolutions
       });
 
-      if (!res.ok) {
-        let errMessage = `Failed to complete import (HTTP ${res.status})`;
-        try {
-          const errData = await res.json();
-          errMessage = errData.detail || errData.error || errMessage;
-        } catch {}
-        throw new Error(errMessage);
-      }
-
-      const data = await res.json();
       setUploadStatus("Extraction complete! Refreshing projects...");
       
       // Refresh list
-      const listRes = await fetch("/api/projects");
-      if (listRes.ok) {
-        const listData = await listRes.json();
-        if (listData.projects) {
-          const mapped = listData.projects.map((p: any) => 
-            typeof p === "string" 
-              ? { filename: p, display_name: p.replace(/\.json$/i, ""), mtime: "", size: 0 } 
-              : p
-          );
-          setProjects(mapped);
-        }
+      const listData: any = await projectsApi.list().catch(() => null);
+      if (listData && listData.projects) {
+        const mapped = listData.projects.map((p: any) => 
+          typeof p === "string" 
+            ? { filename: p, display_name: p.replace(/\.json$/i, ""), mtime: "", size: 0 } 
+            : p
+        );
+        setProjects(mapped);
       }
       
       // Automatically load the newly imported scene
-      if (data.filename) {
+      if (data && data.filename) {
         await handleLoad(data.filename);
       }
     } catch (err: any) {
@@ -181,20 +154,11 @@ export const LoadProjectModal: React.FC<LoadProjectModalProps> = ({ isOpen, onCl
 
     setError(null);
     try {
-      const res = await fetch(`/api/projects/${filename}`, {
-        method: "DELETE"
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Failed to delete project.");
-      }
+      await projectsApi.delete(filename);
       setProjects(prev => prev.filter(p => p.filename !== filename));
-      const listRes = await fetch("/api/projects");
-      if (listRes.ok) {
-        const listData = await listRes.json();
-        if (listData.projects) {
-          setProjects(listData.projects);
-        }
+      const listData: any = await projectsApi.list().catch(() => null);
+      if (listData && listData.projects) {
+        setProjects(listData.projects);
       }
     } catch (err: any) {
       setError(err.message || "Failed to delete project.");

@@ -11,6 +11,7 @@ import { SendScenePanel } from "./execution/SendScenePanel";
 import { ExecutionConsole } from "./execution/ExecutionConsole";
 import { RemoteWorkflowMonitorPanel } from "./execution/RemoteWorkflowMonitorPanel";
 import { RunpodQuickSyncBar } from "./execution/RunpodQuickSyncBar";
+import { settingsApi, apiClient } from "../api";
 
 interface ExecutionSectionProps {
   config: AppConfig;
@@ -59,14 +60,9 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
       !hasAutoConnectedRef.current
     ) {
       hasAutoConnectedRef.current = true;
-      fetch("/api/runpod/pods", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ runpod_api_key: config.runpod_api_key.trim() })
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.success && data.pods && data.pods.length === 1) {
+      settingsApi.getRunpodPods(config.runpod_api_key.trim())
+        .then((data: any) => {
+          if (data && data.success && data.pods && data.pods.length === 1) {
             const pod = data.pods[0];
             if (
               pod.ip &&
@@ -214,48 +210,38 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
         output_workflow_filename: synthesizedFilename
       };
 
-      const res = await fetch("/api/workflow/stage-shot", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          remote_host: config.remote_host,
-          runpod_ip: config.remote_host,
-          ssh_port: config.ssh_port,
-          ssh_username: config.ssh_username,
-          ssh_password: config.ssh_password,
-          ssh_key_path: config.ssh_key_path,
-          ssh_private_key: config.ssh_private_key,
-          remote_comfyui_root: config.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI",
-          scene_name: sanitizedSceneName,
-          shot_number: activeShot.shot_number,
-          workflow_filename: resolvedWorkflowFilename,
-          output_workflow_filename: synthesizedFilename,
-          assigned_slots: activeShot.assigned_slots || {},
-          generation_parameters: activeShot.generation_params,
-          parameter_node_mappings: activeShot.parameter_node_mappings,
-          shots: [formattedShot],
-          project_data: sceneProject
-        })
-      });
-      
-      const resText = await res.text();
-      let data: any = {};
-      try {
-        data = JSON.parse(resText);
-      } catch {
-        data = { detail: resText || `Server returned HTTP status ${res.status} (${res.statusText})` };
-      }
+      const payload = {
+        remote_host: config.remote_host,
+        runpod_ip: config.remote_host,
+        ssh_port: config.ssh_port,
+        ssh_username: config.ssh_username,
+        ssh_password: config.ssh_password,
+        ssh_key_path: config.ssh_key_path,
+        ssh_private_key: config.ssh_private_key,
+        remote_comfyui_root: config.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI",
+        scene_name: sanitizedSceneName,
+        shot_number: activeShot.shot_number,
+        workflow_filename: resolvedWorkflowFilename,
+        output_workflow_filename: synthesizedFilename,
+        assigned_slots: activeShot.assigned_slots || {},
+        generation_parameters: activeShot.generation_params,
+        parameter_node_mappings: activeShot.parameter_node_mappings,
+        shots: [formattedShot],
+        project_data: sceneProject
+      };
+
+      const data: any = await apiClient.post("/api/workflow/stage-shot", payload);
       clearProgress();
       setProgressPercent(100);
       
-      if (res.ok) {
+      if (data && !data.error) {
         setTransferResult(data);
         setTransferState("success");
         setLastStagedTime(new Date().toLocaleTimeString());
         onUpdateShot(prev => ({ ...prev, status: "staged" as const }));
         onShowToast?.("Shot staged successfully!", "success");
       } else {
-        const errorMsg = data.detail || data.error || data.message || (typeof data === "string" ? data : `Failed to stage shot (HTTP ${res.status}).`);
+        const errorMsg = data?.detail || data?.error || data?.message || "Failed to stage shot.";
         setError(errorMsg);
         setTransferState("error");
         onShowToast?.(errorMsg, "error");
@@ -283,48 +269,38 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
       const shotNumFormatted = formatShotNumber(activeShot.shot_number);
       const synthesizedFilename = `${sanitizedSceneName}_Shot_${shotNumFormatted}.json`;
 
-      const res = await fetch("/api/execute", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          remote_host: config.remote_host,
-          ssh_port: config.ssh_port,
-          ssh_username: config.ssh_username,
-          ssh_password: config.ssh_password,
-          ssh_key_path: config.ssh_key_path,
-          ssh_private_key: config.ssh_private_key,
-          remote_comfyui_root: config.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI",
-          comfyui_api_url: config.comfyui_api_url,
-          remote_api_token: config.remote_api_token,
-          workflow_filename: baseWorkflow,
-          output_workflow_filename: synthesizedFilename,
-          monitored_workflow: activeShot.monitored_workflow,
-          workflow_file: baseWorkflow,
-          prompt_node_id: activeShot.prompt_node_id,
-          expanded_prompt: activeShot.expanded_prompt,
-          scene_name: sanitizedSceneName,
-          shot_number: activeShot.shot_number,
-          shot_type: activeShot.shot_type,
-          camera_movement: activeShot.camera_movement,
-          node_mappings: activeShot.assigned_slots,
-          generation_parameters: activeShot.generation_params,
-          parameter_node_mappings: activeShot.parameter_node_mappings,
-          client_id: monitorState?.clientId || (typeof window !== "undefined" ? (window as any).__comfyMonitorClientId : undefined) || "comfyui-bridge-session",
-          stage_assets_first: true
-        })
-      });
-      
-      const resText = await res.text();
-      let data: any = {};
-      try {
-        data = JSON.parse(resText);
-      } catch {
-        data = { detail: resText || `Server returned HTTP status ${res.status} (${res.statusText})` };
-      }
+      const payload = {
+        remote_host: config.remote_host,
+        ssh_port: config.ssh_port,
+        ssh_username: config.ssh_username,
+        ssh_password: config.ssh_password,
+        ssh_key_path: config.ssh_key_path,
+        ssh_private_key: config.ssh_private_key,
+        remote_comfyui_root: config.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI",
+        comfyui_api_url: config.comfyui_api_url,
+        remote_api_token: config.remote_api_token,
+        workflow_filename: baseWorkflow,
+        output_workflow_filename: synthesizedFilename,
+        monitored_workflow: activeShot.monitored_workflow,
+        workflow_file: baseWorkflow,
+        prompt_node_id: activeShot.prompt_node_id,
+        expanded_prompt: activeShot.expanded_prompt,
+        scene_name: sanitizedSceneName,
+        shot_number: activeShot.shot_number,
+        shot_type: activeShot.shot_type,
+        camera_movement: activeShot.camera_movement,
+        node_mappings: activeShot.assigned_slots,
+        generation_parameters: activeShot.generation_params,
+        parameter_node_mappings: activeShot.parameter_node_mappings,
+        client_id: monitorState?.clientId || (typeof window !== "undefined" ? (window as any).__comfyMonitorClientId : undefined) || "comfyui-bridge-session",
+        stage_assets_first: true
+      };
+
+      const data: any = await apiClient.post("/api/execute", payload);
       clearProgress();
       setProgressPercent(100);
       
-      if (res.ok) {
+      if (data && !data.error) {
         setTransferResult(data);
         setTransferState("success");
         setLastStagedTime(new Date().toLocaleTimeString());
@@ -335,7 +311,7 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
         }));
         onShowToast?.(`Sent to ComfyUI! Prompt ID: ${data.prompt_id || 'Unknown'}`, "success");
       } else {
-        const errorMsg = data.detail || data.error || data.message || (typeof data === "string" ? data : `Failed to execute shot (HTTP ${res.status}).`);
+        const errorMsg = data?.detail || data?.error || data?.message || "Failed to execute shot.";
         setError(errorMsg);
         setTransferState("error");
         onShowToast?.(errorMsg, "error");
@@ -363,55 +339,45 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
         (sceneProject as any).selected_workflow ||
         "default.json";
 
-      const res = await fetch("/api/workflow/stage-scene", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          remote_host: config.remote_host,
-          runpod_ip: config.remote_host,
-          ssh_port: config.ssh_port,
-          ssh_username: config.ssh_username,
-          ssh_password: config.ssh_password,
-          ssh_key_path: config.ssh_key_path,
-          ssh_private_key: config.ssh_private_key,
-          remote_comfyui_root: config.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI",
-          scene_name: sanitizedSceneName,
-          workflow_filename: sceneWorkflowFilename,
-          shots: sceneProject.shots.map(s => {
-            const shotWf =
-              s.workflow_file ||
-              sceneWorkflowFilename;
-            return {
-              ...s,
-              shot_number: s.shot_number,
-              shot_type: s.shot_type,
-              camera_movement: s.camera_movement,
-              expanded_prompt: s.expanded_prompt,
-              prompt_node_id: s.prompt_node_id,
-              assigned_slots: s.assigned_slots || {},
-              node_mappings: s.assigned_slots || {},
-              generation_params: s.generation_params,
-              generation_parameters: s.generation_params,
-              parameter_node_mappings: s.parameter_node_mappings,
-              workflow_file: shotWf,
-              workflow_filename: shotWf,
-            };
-          }),
-          project_data: sceneProject
-        })
-      });
-      
-      const resText = await res.text();
-      let data: any = {};
-      try {
-        data = JSON.parse(resText);
-      } catch {
-        data = { detail: resText || `Server returned HTTP status ${res.status} (${res.statusText})` };
-      }
+      const payload = {
+        remote_host: config.remote_host,
+        runpod_ip: config.remote_host,
+        ssh_port: config.ssh_port,
+        ssh_username: config.ssh_username,
+        ssh_password: config.ssh_password,
+        ssh_key_path: config.ssh_key_path,
+        ssh_private_key: config.ssh_private_key,
+        remote_comfyui_root: config.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI",
+        scene_name: sanitizedSceneName,
+        workflow_filename: sceneWorkflowFilename,
+        shots: sceneProject.shots.map(s => {
+          const shotWf =
+            s.workflow_file ||
+            sceneWorkflowFilename;
+          return {
+            ...s,
+            shot_number: s.shot_number,
+            shot_type: s.shot_type,
+            camera_movement: s.camera_movement,
+            expanded_prompt: s.expanded_prompt,
+            prompt_node_id: s.prompt_node_id,
+            assigned_slots: s.assigned_slots || {},
+            node_mappings: s.assigned_slots || {},
+            generation_params: s.generation_params,
+            generation_parameters: s.generation_params,
+            parameter_node_mappings: s.parameter_node_mappings,
+            workflow_file: shotWf,
+            workflow_filename: shotWf,
+          };
+        }),
+        project_data: sceneProject
+      };
+
+      const data: any = await apiClient.post("/api/workflow/stage-scene", payload);
       clearProgress();
       setProgressPercent(100);
       
-      if (res.ok) {
+      if (data && !data.error) {
         setTransferResult(data);
         setTransferState("success");
         setLastStagedTime(new Date().toLocaleTimeString());
@@ -421,7 +387,7 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
         }));
         onShowToast?.("Scene staged successfully!", "success");
       } else {
-        const errorMsg = data.detail || data.error || data.message || (typeof data === "string" ? data : `Failed to stage scene (HTTP ${res.status}).`);
+        const errorMsg = data?.detail || data?.error || data?.message || "Failed to stage scene.";
         setError(errorMsg);
         setTransferState("error");
         onShowToast?.(errorMsg, "error");

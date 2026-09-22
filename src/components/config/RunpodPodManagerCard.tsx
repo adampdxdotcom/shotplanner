@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { AppConfig, RunpodPodItem } from "../../types";
+import { settingsApi } from "../../api";
 import { Cpu, RefreshCw, Check, CheckCircle2, AlertCircle, Zap, Trash2 } from "lucide-react";
 import { RunpodPodStatsCard } from "./RunpodPodStatsCard";
 
@@ -57,14 +58,9 @@ export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
     setSuccessMsg(null);
 
     try {
-      const res = await fetch("/api/runpod/pods", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ runpod_api_key: keyToUse })
-      });
+      const data: any = await settingsApi.getRunpodPods(keyToUse);
 
-      const data = await res.json();
-      if (data.success) {
+      if (data && data.success) {
         const discoveredPods: RunpodPodItem[] = data.pods || [];
         setPods(discoveredPods);
         setLastSyncedAt(new Date());
@@ -89,7 +85,7 @@ export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
           onShowToast?.("API Connected (No active pods found)", "info");
         }
       } else {
-        throw new Error(data.error || "Failed to connect to RunPod API");
+        throw new Error(data?.error || "Failed to connect to RunPod API");
       }
     } catch (err: any) {
       setConnectionStatus("error");
@@ -109,19 +105,14 @@ export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
     setSuccessMsg(null);
     try {
       handleInputChange("runpod_api_key", cleanKey);
-      const res = await fetch("/api/settings/runpod", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ runpod_api_key: cleanKey })
-      });
-      const data = await res.json();
-      if (data.success) {
+      const data: any = await settingsApi.saveRunpodKey(cleanKey);
+      if (data && (data.success || data.message)) {
         setSuccessMsg("RunPod API Key saved to program settings!");
         onShowToast?.("RunPod API Key saved to program settings", "success");
         // Trigger immediate fetch & test upon saving key
         handleFetchPods(false);
       } else {
-        throw new Error(data.error || "Failed to save key");
+        throw new Error(data?.error || "Failed to save key");
       }
     } catch (e: any) {
       setError(e.message || "Failed to save RunPod API Key.");
@@ -138,11 +129,8 @@ export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
       handleInputChange("runpod_api_key", "");
       setPods([]);
       setConnectionStatus("untested");
-      const res = await fetch("/api/settings/runpod", {
-        method: "DELETE"
-      });
-      const data = await res.json().catch(() => ({}));
-      if (data.success) {
+      const data: any = await settingsApi.deleteRunpodKey().catch(() => ({ success: true }));
+      if (data && (data.success || data.message)) {
         setSuccessMsg("RunPod API Key removed from settings.");
         onShowToast?.("RunPod API Key removed", "info");
       }
@@ -168,14 +156,9 @@ export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
     }
 
     try {
-      const res = await fetch("/api/runpod/pods", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ runpod_api_key: keyToUse })
-      });
+      const data: any = await settingsApi.getRunpodPods(keyToUse);
 
-      const data = await res.json();
-      if (data.success) {
+      if (data && data.success) {
         const discoveredPods: RunpodPodItem[] = data.pods || [];
         setPods(discoveredPods);
         setLastSyncedAt(new Date());
@@ -203,7 +186,7 @@ export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
           onShowToast?.("No active pods found on RunPod", "info");
         }
       } else {
-        throw new Error(data.error || "Failed to fetch pods");
+        throw new Error(data?.error || "Failed to fetch pods");
       }
     } catch (err: any) {
       if (!silent) {

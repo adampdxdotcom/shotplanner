@@ -5,6 +5,7 @@ import { upload, LEGACY_WORKFLOWS_DIR, WORKFLOWS_DIR, formatSceneFolderName, get
 import { listWorkflows, parseWorkflowData } from "../services/workflowService";
 import { processAssetTransfer, processSceneTransfer } from "../services/executionService";
 import { listRemoteWorkflows, fetchRemoteWorkflowJson, syncRemoteWorkflowToLocal, getRemoteComfyObjectInfo } from "../services/remoteComfyService";
+import { safeUnlinkSync } from "../utils/fileCleanup";
 
 const router = Router();
 
@@ -15,72 +16,76 @@ router.get("/", (req: Request, res: Response) => {
 });
 
 router.post("/upload", upload.single("file"), (req: Request, res: Response) => {
-  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-  const sceneName = (req.body.scene_name as string) || "scene01";
-  const sceneFolder = formatSceneFolderName(sceneName);
-  const targetDir = getSceneDirectories(sceneName).workflows;
-  
-  if (!fs.existsSync(targetDir)) {
-    fs.mkdirSync(targetDir, { recursive: true });
-  }
-
-  // Also ensure global workflows directory and scene workflows directory exist
-  const globalSceneWfDir = path.join(WORKFLOWS_DIR, sceneFolder);
-  if (!fs.existsSync(globalSceneWfDir)) {
-    fs.mkdirSync(globalSceneWfDir, { recursive: true });
-  }
-  if (!fs.existsSync(WORKFLOWS_DIR)) {
-    fs.mkdirSync(WORKFLOWS_DIR, { recursive: true });
-  }
-
-  const target = path.join(targetDir, req.file.originalname);
-  const globalSceneTarget = path.join(globalSceneWfDir, req.file.originalname);
-  const rootTarget = path.join(WORKFLOWS_DIR, req.file.originalname);
-
-  fs.copyFileSync(req.file.path, target);
-  fs.copyFileSync(req.file.path, globalSceneTarget);
-  fs.copyFileSync(req.file.path, rootTarget);
-
-  console.log(`[Workflow Upload] Stored "${req.file.originalname}" in ${targetDir} and ${WORKFLOWS_DIR}`);
-
-  // Immediate local parse so UI responds instantly with parsed metadata
-  let parsedInfo: any = null;
-  let rawWorkflow: any = null;
   try {
-    rawWorkflow = JSON.parse(fs.readFileSync(target, "utf-8"));
-    parsedInfo = parseWorkflowData(rawWorkflow);
-  } catch (e) {}
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    const originalFilename = req.file.originalname;
+    const sceneName = (req.body.scene_name as string) || "scene01";
+    const sceneFolder = formatSceneFolderName(sceneName);
+    const targetDir = getSceneDirectories(sceneName).workflows;
+    
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+    }
 
-  try {
-    fs.unlinkSync(req.file.path);
-  } catch (e) {}
+    // Also ensure global workflows directory and scene workflows directory exist
+    const globalSceneWfDir = path.join(WORKFLOWS_DIR, sceneFolder);
+    if (!fs.existsSync(globalSceneWfDir)) {
+      fs.mkdirSync(globalSceneWfDir, { recursive: true });
+    }
+    if (!fs.existsSync(WORKFLOWS_DIR)) {
+      fs.mkdirSync(WORKFLOWS_DIR, { recursive: true });
+    }
 
-  // Respond immediately (<10ms) without waiting for remote SSH transfer
-  res.json({ 
-    success: true, 
-    filename: req.file.originalname, 
-    folder: sceneFolder,
-    parsed: parsedInfo ? {
-      total_nodes: parsedInfo.totalNodes,
-      detected_nodes: parsedInfo.detectedNodes,
-      detected_values: parsedInfo.detectedValues
-    } : undefined,
-    workflow: rawWorkflow
-  });
+    const target = path.join(targetDir, originalFilename);
+    const globalSceneTarget = path.join(globalSceneWfDir, originalFilename);
+    const rootTarget = path.join(WORKFLOWS_DIR, originalFilename);
 
-  // Non-blocking background SSH write (one-shot cat pipe, completes in <1s)
-  const remoteHost = req.body.remote_host || req.body.host || req.body.runpod_ip;
-  if (remoteHost && rawWorkflow) {
-    setImmediate(async () => {
-      try {
-        const { executeOneShotSSHWrite } = await import("../services/sshService");
-        const remoteComfyRoot = req.body.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI";
-        const remoteDest = `${remoteComfyRoot}/user/default/workflows/${req.file.originalname}`;
-        await executeOneShotSSHWrite(req.body, remoteDest, JSON.stringify(rawWorkflow, null, 2));
-      } catch (bgErr: any) {
-        console.warn(`[Background SSH Sync Notice] ${bgErr.message}`);
-      }
+    fs.copyFileSync(req.file.path, target);
+    fs.copyFileSync(req.file.path, globalSceneTarget);
+    fs.copyFileSync(req.file.path, rootTarget);
+
+    console.log(`[Workflow Upload] Stored "${originalFilename}" in ${targetDir} and ${WORKFLOWS_DIR}`);
+
+    // Immediate local parse so UI responds instantly with parsed metadata
+    let parsedInfo: any = null;
+    let rawWorkflow: any = null;
+    try {
+      rawWorkflow = JSON.parse(fs.readFileSync(target, "utf-8"));
+      parsedInfo = parseWorkflowData(rawWorkflow);
+    } catch (e) {}
+
+    // Respond immediately (<10ms) without waiting for remote SSH transfer
+    res.json({ 
+      success: true, 
+      filename: originalFilename, 
+      folder: sceneFolder,
+      parsed: parsedInfo ? {
+        total_nodes: parsedInfo.totalNodes,
+        detected_nodes: parsedInfo.detectedNodes,
+        detected_values: parsedInfo.detectedValues
+      } : undefined,
+      workflow: rawWorkflow
     });
+
+    // Non-blocking background SSH write (one-shot cat pipe, completes in <1s)
+    const remoteHost = req.body.remote_host || req.body.host || req.body.runpod_ip;
+    if (remoteHost && rawWorkflow) {
+      const uploadBody = req.body;
+      setImmediate(async () => {
+        try {
+          const { executeOneShotSSHWrite } = await import("../services/sshService");
+          const remoteComfyRoot = uploadBody.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI";
+          const remoteDest = `${remoteComfyRoot}/user/default/workflows/${originalFilename}`;
+          await executeOneShotSSHWrite(uploadBody, remoteDest, JSON.stringify(rawWorkflow, null, 2));
+        } catch (bgErr: any) {
+          console.warn(`[Background SSH Sync Notice] ${bgErr.message}`);
+        }
+      });
+    }
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    if (req.file?.path) safeUnlinkSync(req.file.path);
   }
 });
 
