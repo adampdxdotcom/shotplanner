@@ -1,5 +1,5 @@
 import React from "react";
-import { Bot, Clapperboard, Loader2, CheckCheck, Eye } from "lucide-react";
+import { Bot, Clapperboard, Loader2, CheckCheck, X, Clock } from "lucide-react";
 import Markdown from "react-markdown";
 import { AssistantChatMessage } from "../../services/assistantClient";
 import { AssistantAction, parseAssistantActions, validateActionSafety } from "../../types/assistantActions";
@@ -10,6 +10,8 @@ import { CharacterProfile, MediaAsset } from "../../types";
 interface AssistantMessageListProps {
   messages: AssistantChatMessage[];
   isLoading: boolean;
+  elapsedSeconds?: number;
+  onCancelRequest?: () => void;
   messagesEndRef: React.RefObject<HTMLDivElement>;
   existingShotNumbers: number[];
   appliedActionKeys: Record<string, boolean>;
@@ -33,6 +35,8 @@ interface AssistantMessageListProps {
 export const AssistantMessageList: React.FC<AssistantMessageListProps> = ({
   messages,
   isLoading,
+  elapsedSeconds = 0,
+  onCancelRequest,
   messagesEndRef,
   existingShotNumbers,
   appliedActionKeys,
@@ -82,32 +86,7 @@ export const AssistantMessageList: React.FC<AssistantMessageListProps> = ({
               }`}
             >
               {msg.role === "user" ? (
-                <div className="space-y-2">
-                  {msg.attached_image && (
-                    <div className="flex items-center gap-2 p-1.5 rounded-xl bg-white/10 border border-white/20 text-xs">
-                      {msg.attached_image.preview_url ? (
-                        <img
-                          src={msg.attached_image.preview_url}
-                          alt={msg.attached_image.filename}
-                          className="w-10 h-10 rounded-lg object-cover bg-black/20 shrink-0"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
-                          <Eye className="w-4 h-4 text-white" />
-                        </div>
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <div className="font-semibold truncate text-[11px] text-white">
-                          {msg.attached_image.filename}
-                        </div>
-                        <div className="text-[10px] text-indigo-100 truncate">
-                          {msg.attached_image.subject_name ? `Subject: ${msg.attached_image.subject_name}` : "Vision Inspection"}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  <div className="whitespace-pre-wrap">{msg.content}</div>
-                </div>
+                <div className="whitespace-pre-wrap">{msg.content}</div>
               ) : (() => {
                 const { cleanContent, actions } = parseAssistantActions(msg.content);
                 const validActions = actions.filter((act) => validateActionSafety(act, existingShotNumbers).valid);
@@ -183,15 +162,35 @@ export const AssistantMessageList: React.FC<AssistantMessageListProps> = ({
         );
       })}
 
-      {/* Thinking / Loading State */}
+      {/* Thinking / Loading State with timer and Cancel button */}
       {isLoading && (
         <div className="flex gap-2.5 justify-start">
           <div className="w-7 h-7 rounded-lg bg-white border border-slate-200 text-indigo-600 shadow-2xs dark:bg-zinc-800 dark:border-zinc-700 dark:text-indigo-400 dark:shadow-none flex items-center justify-center shrink-0">
             <Clapperboard className="w-3.5 h-3.5 animate-pulse" />
           </div>
-          <div className="rounded-2xl rounded-tl-xs px-3.5 py-2.5 bg-white border border-slate-200 text-slate-600 dark:bg-zinc-800/90 dark:border-zinc-700/70 dark:text-zinc-400 flex items-center gap-2 text-xs shadow-xs">
-            <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600 dark:text-indigo-400" />
-            <span>Consulting project dossier...</span>
+          <div className="rounded-2xl rounded-tl-xs px-3.5 py-2.5 bg-white border border-slate-200 text-slate-600 dark:bg-zinc-800/90 dark:border-zinc-700/70 dark:text-zinc-300 flex items-center gap-2.5 text-xs shadow-xs">
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600 dark:text-indigo-400 shrink-0" />
+            <span className="font-medium">Consulting project dossier...</span>
+            
+            {/* Live Timer Counter */}
+            <div className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-zinc-700/80 text-[11px] font-mono text-slate-600 dark:text-zinc-300 flex items-center gap-1 border border-slate-200 dark:border-zinc-600">
+              <Clock className="w-3 h-3 text-slate-400" />
+              <span>
+                {Math.floor(elapsedSeconds / 60)}:{(elapsedSeconds % 60).toString().padStart(2, "0")} / 5:00
+              </span>
+            </div>
+
+            {/* Cancel Button */}
+            {onCancelRequest && (
+              <button
+                onClick={onCancelRequest}
+                className="ml-1 px-2 py-0.5 rounded-md bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 dark:hover:bg-rose-900/80 text-rose-600 dark:text-rose-400 text-[11px] font-semibold border border-rose-200 dark:border-rose-800 transition-colors flex items-center gap-1 cursor-pointer"
+                title="Cancel request"
+              >
+                <X className="w-3 h-3" />
+                <span>Cancel</span>
+              </button>
+            )}
           </div>
         </div>
       )}

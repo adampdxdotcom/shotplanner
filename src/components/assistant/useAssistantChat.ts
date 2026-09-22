@@ -143,6 +143,34 @@ export function useAssistantChat({
     setStagedAsset(null);
   };
 
+  const [abortController, setAbortController] = useState<AbortController | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
+
+  // Timer interval for tracking elapsed seconds while loading
+  useEffect(() => {
+    let interval: any = null;
+    if (isLoading) {
+      setElapsedSeconds(0);
+      interval = setInterval(() => {
+        setElapsedSeconds((prev) => prev + 1);
+      }, 1000);
+    } else {
+      setElapsedSeconds(0);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isLoading]);
+
+  const handleCancelRequest = useCallback(() => {
+    if (abortController) {
+      abortController.abort();
+      setAbortController(null);
+      setIsLoading(false);
+      onShowToast?.("Cancelled Assistant request.", "info");
+    }
+  }, [abortController, onShowToast]);
+
   const handleSendMessage = async () => {
     const rawTrimmed = inputQuery.trim();
     if ((!rawTrimmed && !stagedAsset) || isLoading) return;
@@ -171,24 +199,30 @@ export function useAssistantChat({
     setStagedAsset(null);
     setIsLoading(true);
 
+    const controller = new AbortController();
+    setAbortController(controller);
+
     try {
-      const response = await sendAssistantChatMessage({
-        messages: getRollingChatWindow(newMessages, 16),
-        scene_project: sceneProject,
-        active_shot_id: activeShotId,
-        active_section: activeSection,
-        provider: effectiveDefault,
-        lm_studio_url: lmStudioUrl,
-        attached_asset_filename: currentStagedAsset?.filename,
-        attached_asset: currentStagedAsset
-          ? {
-              id: currentStagedAsset.id,
-              filename: currentStagedAsset.filename,
-              subject_name: currentStagedAsset.subject_name,
-              type: currentStagedAsset.type
-            }
-          : undefined
-      });
+      const response = await sendAssistantChatMessage(
+        {
+          messages: getRollingChatWindow(newMessages, 16),
+          scene_project: sceneProject,
+          active_shot_id: activeShotId,
+          active_section: activeSection,
+          provider: effectiveDefault,
+          lm_studio_url: lmStudioUrl,
+          attached_asset_filename: currentStagedAsset?.filename,
+          attached_asset: currentStagedAsset
+            ? {
+                id: currentStagedAsset.id,
+                filename: currentStagedAsset.filename,
+                subject_name: currentStagedAsset.subject_name,
+                type: currentStagedAsset.type
+              }
+            : undefined
+        },
+        { signal: controller.signal }
+      );
 
       if (response && response.reply) {
         const finalMessages: AssistantChatMessage[] = [
@@ -202,24 +236,37 @@ export function useAssistantChat({
         throw new Error("Received empty response from assistant.");
       }
     } catch (err: any) {
-      console.error("[AssistantFloatingChat] Error chatting with assistant:", err);
-      const errText = err.message || "Failed to communicate with LLM provider.";
-      setErrorMessage(errText);
-      setIsDefaultLlmConnected(false);
+      if (err.name === "AbortError" || controller.signal.aborted) {
+        const cancelMessages: AssistantChatMessage[] = [
+          ...newMessages,
+          {
+            role: "assistant",
+            content: `🛑 *Request cancelled by user after ${elapsedSeconds} seconds.*`
+          }
+        ];
+        setMessages(cancelMessages);
+        persistMessages(cancelMessages);
+      } else {
+        console.error("[AssistantFloatingChat] Error chatting with assistant:", err);
+        const errText = err.message || "Failed to communicate with LLM provider.";
+        setErrorMessage(errText);
+        setIsDefaultLlmConnected(false);
 
-      const errorMessages: AssistantChatMessage[] = [
-        ...newMessages,
-        {
-          role: "assistant",
-          content: `⚠️ **Connection Error**: ${errText}\n\nPlease verify that your **${
-            effectiveDefault === "gemini" ? "Google Gemini API Key" : "LM Studio instance"
-          }** is running and configured correctly in the settings.`
-        }
-      ];
-      setMessages(errorMessages);
-      persistMessages(errorMessages);
+        const errorMessages: AssistantChatMessage[] = [
+          ...newMessages,
+          {
+            role: "assistant",
+            content: `⚠️ **Connection Error**: ${errText}\n\nPlease verify that your **${
+              effectiveDefault === "gemini" ? "Google Gemini API Key" : "LM Studio instance"
+            }** is running and configured correctly in the settings.`
+          }
+        ];
+        setMessages(errorMessages);
+        persistMessages(errorMessages);
+      }
     } finally {
       setIsLoading(false);
+      setAbortController(null);
     }
   };
 
@@ -271,6 +318,8 @@ export function useAssistantChat({
     isDefaultLlmConnected,
     isCheckingConnection,
     checkConnection,
+    elapsedSeconds,
+    handleCancelRequest,
     handleSendMessage,
     handleKeyDown,
     handleResetChat,

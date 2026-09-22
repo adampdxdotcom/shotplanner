@@ -537,7 +537,7 @@ Only include fields that are changing or relevant. Always keep your conversation
       messages: llmMessages,
       temperature,
       max_tokens,
-      timeoutMs: 60000
+      timeoutMs: 300000
     });
 
     reply = localRes.content;

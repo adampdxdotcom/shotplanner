@@ -54,7 +54,7 @@ export async function callLocalLLM(options: LocalLLMRequestOptions): Promise<Loc
   const targetUrl = options.url || options.lm_studio_url || options.lmStudioUrl || "http://localhost:1234/v1";
   const endpoint = resolveLocalLLMEndpoint(targetUrl);
   const model = options.model || "local-model";
-  const timeoutMs = options.timeoutMs || 60000;
+  const timeoutMs = options.timeoutMs || 300000;
 
   // Build messages array if not provided directly
   let rawMessages = options.messages;

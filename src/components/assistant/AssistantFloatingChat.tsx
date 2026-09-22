@@ -79,6 +79,8 @@ export const AssistantFloatingChat: React.FC<AssistantFloatingChatProps> = ({
     isDefaultLlmConnected,
     isCheckingConnection,
     checkConnection,
+    elapsedSeconds,
+    handleCancelRequest,
     handleSendMessage,
     handleKeyDown,
     handleResetChat,
@@ -166,6 +168,8 @@ export const AssistantFloatingChat: React.FC<AssistantFloatingChatProps> = ({
           <AssistantMessageList
             messages={messages}
             isLoading={isLoading}
+            elapsedSeconds={elapsedSeconds}
+            onCancelRequest={handleCancelRequest}
             messagesEndRef={messagesEndRef as React.RefObject<HTMLDivElement>}
             existingShotNumbers={existingShotNumbers}
             appliedActionKeys={appliedActionKeys}
