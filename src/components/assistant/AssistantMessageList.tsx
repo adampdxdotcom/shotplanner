@@ -5,6 +5,7 @@ import { AssistantChatMessage } from "../../services/assistantClient";
 import { AssistantAction, parseAssistantActions, validateActionSafety } from "../../types/assistantActions";
 import { AssistantActionCard } from "./AssistantActionCard";
 import { StagingProgressState, ExpandingProgressState } from "./useAssistantActions";
+import { CharacterProfile, MediaAsset } from "../../types";
 
 interface AssistantMessageListProps {
   messages: AssistantChatMessage[];
@@ -15,6 +16,10 @@ interface AssistantMessageListProps {
   dismissedActionKeys: Record<string, boolean>;
   stagingProgressMap: Record<string, StagingProgressState>;
   expandingProgressMap: Record<string, ExpandingProgressState>;
+  characters?: Record<string, CharacterProfile>;
+  assets?: MediaAsset[];
+  sceneName?: string;
+  onNavigateToSection?: (section: string) => void;
   onApplyAction: (action: AssistantAction, actionKey: string) => void;
   onDismissAction: (action: AssistantAction, actionKey: string) => void;
   onUndoAction: (action: AssistantAction, actionKey: string) => void;
@@ -34,6 +39,10 @@ export const AssistantMessageList: React.FC<AssistantMessageListProps> = ({
   dismissedActionKeys,
   stagingProgressMap,
   expandingProgressMap,
+  characters,
+  assets,
+  sceneName,
+  onNavigateToSection,
   onApplyAction,
   onDismissAction,
   onUndoAction,
@@ -127,6 +136,10 @@ export const AssistantMessageList: React.FC<AssistantMessageListProps> = ({
                               isApplied={isApplied}
                               isDismissed={isDismissed}
                               validationError={!safetyCheck.valid ? safetyCheck.reason : null}
+                              characters={characters}
+                              assets={assets}
+                              sceneName={sceneName}
+                              onNavigateToSection={onNavigateToSection}
                               onApply={(action) => onApplyAction(action, actionKey)}
                               onDismiss={(action) => onDismissAction(action, actionKey)}
                               onUndo={(action) => onUndoAction(action, actionKey)}

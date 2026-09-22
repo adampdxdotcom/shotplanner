@@ -117,11 +117,12 @@ function buildProjectDossier(
       const name = c.name || c.character_name || "Unknown";
       const outfit = c.scene_outfit_ref ? `Outfit: ${c.scene_outfit_ref}` : null;
       const notes = c.notes || c.wardrobe_notes || c.visual_traits || null;
-      const quickCount = Array.isArray(c.quick_slots) ? c.quick_slots.filter(Boolean).length : 0;
+      const quickSlots: string[] = Array.isArray(c.quick_slots) ? c.quick_slots.filter(Boolean) : [];
+      const quickCount = quickSlots.length;
       const refStatus = quickCount > 0 
-        ? `${quickCount}/4 reference photos configured in card slots 1-4 (${c.quick_slots.filter(Boolean).join(", ")})` 
-        : "NO reference photos in card slots 1-4 (User will need to assign reference photos before prompt expansion)";
-      const details = [outfit, notes ? `Notes: ${notes}` : null, `Photos: ${refStatus}`].filter(Boolean).join(" | ");
+        ? `${quickCount}/4 Cast Card reference photos configured ([${quickSlots.join(", ")}]) - Ready to be staged to shot slots 0-${quickCount - 1}` 
+        : "NO reference photos in Cast Card slots 1-4 (EMPTY - Needs reference photos assigned or uploaded in Cast/Character Hub)";
+      const details = [outfit, notes ? `Notes: ${notes}` : null, `Cast Photos: ${refStatus}`].filter(Boolean).join(" | ");
       return `- ${name}: ${details || "Standard scene attire"}`;
     }).join("\n");
     sections.push(`### SCENE CAST & WARDROBE:\n${charSummary}`);
@@ -228,7 +229,10 @@ BEHAVIOR GUIDELINES:
 - When referencing characters, shots, or camera settings, ground your answers in the Project Dossier above.
 - Overarching Scene Goal: If an Overarching Scene Goal is provided in the Project Dossier, use it as your creative north star. When the user asks for advice, critique, pacing feedback, or next-shot ideas, evaluate how each shot serves this overarching goal of the sequence, ensuring dramatic progression and visual cohesion.
 - Conversational Memory & Continuity: You have access to recent conversation history for this scene. Actively reference earlier decisions, shot critiques, alternative camera angles, wardrobe changes, and creative ideas discussed throughout this scene when answering questions or refining shots.
-- Reference Photos & Cast Awareness: Notice whether cast members have reference photos in their card slots 1–4. Prompt expansion relies on reference photos (<Picture 1>, <Picture 2>). When proposing or adding a shot featuring a character who has NO reference photos in slots 1–4, explicitly remind the user: "Note: [Character] does not yet have reference photos in slots 1–4 on their character card. You'll need to assign reference photos in the Cast or Asset Manager section before expanding the prompt."
+- Reference Photos & Cast Card Staging Awareness:
+  1. Prompt expansion relies on reference photos (<Picture 1>, <Picture 2>, etc.). When you propose an \`update_shot\` or \`add_shot\` featuring a character, the system will automatically bundle and stage that character's up-to-4 Cast Card reference photos into the shot's image slots (Slots 0–3).
+  2. If a character featured in a proposed shot HAS reference photos in their Cast Card slots 1–4, acknowledge that their reference photos will be staged to the shot.
+  3. If a character featured in a proposed shot has NO reference photos in slots 1–4 (empty Cast Card), explicitly alert the user: "Note: [Character] does not have reference photos on their Cast Card yet. You can assign or upload reference photos in the Cast Card or Character Hub to enable reference-guided prompt expansion."
 - If asked for shot recommendations, provide specific cinematography parameters: Shot Type / Framing, Camera Movement, Lens Focal Length, and a brief description of the action.
 - Use standard camera movements: "Locked Off", "Slow Push In", "Pull Out", "Pan Left", "Pan Right", "Tilt Up", "Tilt Down", "Tracking Shot", "Crane / Jib Shot", "Handheld Organic".
 - Never output sections or headings titled "Suggested Directives" or output generic prompt directive blocks; keep all suggestions grounded in concrete cinematography parameters and structured action blocks.

@@ -8,12 +8,17 @@ import { UpdateScenePlanningActionCard } from "./actionCards/UpdateScenePlanning
 import { UpdateCharacterActionCard } from "./actionCards/UpdateCharacterActionCard";
 import { StageShotAssetsActionCard } from "./actionCards/StageShotAssetsActionCard";
 import { ExpandShotPromptActionCard } from "./actionCards/ExpandShotPromptActionCard";
+import { CharacterProfile, MediaAsset } from "../../types";
 
 interface AssistantActionCardProps {
   action: AssistantAction;
   isApplied: boolean;
   isDismissed?: boolean;
   validationError?: string | null;
+  characters?: Record<string, CharacterProfile>;
+  assets?: MediaAsset[];
+  sceneName?: string;
+  onNavigateToSection?: (section: string) => void;
   onApply: (action: AssistantAction) => void;
   onDismiss?: (action: AssistantAction) => void;
   onUndo?: (action: AssistantAction) => void;
@@ -38,6 +43,10 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
   isApplied,
   isDismissed,
   validationError,
+  characters,
+  assets,
+  sceneName,
+  onNavigateToSection,
   onApply,
   onDismiss,
   onUndo,
@@ -66,6 +75,10 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
         <UpdateShotActionCard
           action={action}
           isApplied={isApplied}
+          characters={characters}
+          assets={assets}
+          sceneName={sceneName}
+          onNavigateToSection={onNavigateToSection}
           onApply={onApply}
           onDismiss={onDismiss}
           onUndo={onUndo}
@@ -77,6 +90,10 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
         <AddShotActionCard
           action={action}
           isApplied={isApplied}
+          characters={characters}
+          assets={assets}
+          sceneName={sceneName}
+          onNavigateToSection={onNavigateToSection}
           onApply={onApply}
           onDismiss={onDismiss}
           onUndo={onUndo}

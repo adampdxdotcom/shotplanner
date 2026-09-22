@@ -1,21 +1,31 @@
 import React from "react";
 import { PlusCircle, Check, Undo2, ArrowRight, X } from "lucide-react";
 import { AddShotAction, AssistantAction } from "../../../types/assistantActions";
+import { CharacterProfile, MediaAsset } from "../../../types";
+import { StagedCastReferencePreview } from "./StagedCastReferencePreview";
 
 interface AddShotActionCardProps {
   action: AddShotAction;
   isApplied: boolean;
+  characters?: Record<string, CharacterProfile>;
+  assets?: MediaAsset[];
+  sceneName?: string;
+  onNavigateToSection?: (section: string) => void;
   onApply: (action: AssistantAction) => void;
   onDismiss?: (action: AssistantAction) => void;
   onUndo?: (action: AssistantAction) => void;
 }
 
 /**
- * Action card rendering proposed new shot creation with camera/framing parameters.
+ * Action card rendering proposed new shot creation with camera/framing parameters and bundled cast references.
  */
 export const AddShotActionCard: React.FC<AddShotActionCardProps> = ({
   action,
   isApplied,
+  characters: allCharacters = {},
+  assets = [],
+  sceneName,
+  onNavigateToSection,
   onApply,
   onDismiss,
   onUndo
@@ -99,6 +109,18 @@ export const AddShotActionCard: React.FC<AddShotActionCardProps> = ({
               {shotData.basic_stub}
             </p>
           </div>
+        )}
+
+        {/* Bundled Cast Card References Preview */}
+        {shotData.characters && shotData.characters.length > 0 && (
+          <StagedCastReferencePreview
+            characters={shotData.characters}
+            allCharacters={allCharacters}
+            assets={assets}
+            sceneName={sceneName}
+            isApplied={isApplied}
+            onNavigateToSection={onNavigateToSection}
+          />
         )}
       </div>
 

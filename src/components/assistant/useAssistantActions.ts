@@ -99,46 +99,62 @@ export function useAssistantActions({
       // Save snapshot for undo
       setUndoShotSnapshots((prev) => ({ ...prev, [actionKey]: { ...existingShot } }));
 
+      let totalLinkedPhotos = 0;
+      const linkedChars: string[] = [];
+      const missingPhotoChars: string[] = [];
+
       onUpdateProject((prev) => {
         const shots = [...prev.shots];
         const idx = shots.findIndex((s) => s.shot_number === shotNumber);
         if (idx !== -1) {
           const current = shots[idx];
           const changes = action.changes || {};
-          const mergedCharacters = changes.characters || current.characters;
+          const mergedCharacters = changes.characters || current.characters || [];
           
-          // Auto-link reference photos if character cast changed
+          // Auto-link up-to-4 Cast Card reference photos for all featured characters
           const updatedSlots = { ...(current.assigned_slots || {}) };
-          if (changes.characters && Array.isArray(changes.characters)) {
-            const allSceneChars = sceneProject.characters || {};
-            changes.characters.forEach((charName) => {
-              const profile = (allSceneChars as any)[charName] || 
-                Object.entries(allSceneChars).find(([k]) => k.toLowerCase() === charName.toLowerCase())?.[1];
-              let candidatePhotos: string[] = [];
-              if (profile && Array.isArray(profile.quick_slots)) {
-                candidatePhotos = profile.quick_slots.filter(Boolean);
-              }
-              if (candidatePhotos.length === 0) {
-                candidatePhotos = assets
-                  .filter((a) => (a.subject_name || "").trim().toLowerCase() === charName.trim().toLowerCase())
-                  .map((a) => a.filename);
-              }
+          const allSceneChars = sceneProject.characters || {};
+
+          mergedCharacters.forEach((charName: string) => {
+            const profile = (allSceneChars as any)[charName] || 
+              Object.entries(allSceneChars).find(([k]) => k.toLowerCase() === charName.toLowerCase())?.[1];
+            
+            let candidatePhotos: string[] = [];
+            if (profile && Array.isArray(profile.quick_slots)) {
+              candidatePhotos = profile.quick_slots.filter(Boolean);
+            }
+            if (candidatePhotos.length === 0) {
+              candidatePhotos = assets
+                .filter((a) => (a.subject_name || (a as any).character_name || "").trim().toLowerCase() === charName.trim().toLowerCase())
+                .slice(0, 4)
+                .map((a) => a.filename);
+            }
+
+            if (candidatePhotos.length === 0) {
+              missingPhotoChars.push(charName);
+            } else {
+              let linkedForThisChar = 0;
               candidatePhotos.forEach((fn) => {
                 if (Object.values(updatedSlots).includes(fn)) return;
                 for (let i = 0; i < 8; i++) {
                   if (!updatedSlots[i] && !updatedSlots[`slot_${i}`]) {
                     updatedSlots[i] = fn;
+                    totalLinkedPhotos++;
+                    linkedForThisChar++;
                     break;
                   }
                 }
               });
-            });
-          }
+              if (linkedForThisChar > 0) {
+                linkedChars.push(charName);
+              }
+            }
+          });
 
           shots[idx] = {
             ...current,
             ...changes,
-            characters: mergedCharacters,
+            characters: mergedCharacters.length > 0 ? mergedCharacters : undefined,
             assigned_slots: updatedSlots,
             status: "unstaged",
             updated_at: new Date().toISOString()
@@ -153,7 +169,15 @@ export function useAssistantActions({
 
       setAppliedActionKeys((prev) => ({ ...prev, [actionKey]: true }));
       injectStateFeedback(`User applied proposed changes to Shot #${shotNumber}`);
-      onShowToast?.(`Applied assistant updates to Shot #${shotNumber}.`, "success");
+      if (onShowToast) {
+        if (totalLinkedPhotos > 0) {
+          onShowToast(`Applied updates to Shot #${shotNumber} & staged ${totalLinkedPhotos} reference photo(s) for ${linkedChars.join(", ")}.`, "success");
+        } else if (missingPhotoChars.length > 0) {
+          onShowToast(`Applied updates to Shot #${shotNumber}. Note: "${missingPhotoChars.join(", ")}" has no Cast Card reference photos yet.`, "info");
+        } else {
+          onShowToast(`Applied assistant updates to Shot #${shotNumber}.`, "success");
+        }
+      }
 
     } else if (action.type === "add_shot") {
       if (!onUpdateProject) {

@@ -1,21 +1,31 @@
 import React from "react";
 import { Camera, Check, Undo2, Sparkles, ArrowRight, X } from "lucide-react";
 import { UpdateShotAction, AssistantAction } from "../../../types/assistantActions";
+import { CharacterProfile, MediaAsset } from "../../../types";
+import { StagedCastReferencePreview } from "./StagedCastReferencePreview";
 
 interface UpdateShotActionCardProps {
   action: UpdateShotAction;
   isApplied: boolean;
+  characters?: Record<string, CharacterProfile>;
+  assets?: MediaAsset[];
+  sceneName?: string;
+  onNavigateToSection?: (section: string) => void;
   onApply: (action: AssistantAction) => void;
   onDismiss?: (action: AssistantAction) => void;
   onUndo?: (action: AssistantAction) => void;
 }
 
 /**
- * Action card rendering proposed updates to an existing shot (framing, lens, cast, lighting, stub).
+ * Action card rendering proposed updates to an existing shot (framing, lens, cast, lighting, stub, and bundled cast references).
  */
 export const UpdateShotActionCard: React.FC<UpdateShotActionCardProps> = ({
   action,
   isApplied,
+  characters: allCharacters = {},
+  assets = [],
+  sceneName,
+  onNavigateToSection,
   onApply,
   onDismiss,
   onUndo
@@ -112,6 +122,18 @@ export const UpdateShotActionCard: React.FC<UpdateShotActionCardProps> = ({
               {changes.basic_stub}
             </p>
           </div>
+        )}
+
+        {/* Bundled Cast Card References Preview */}
+        {changes.characters && changes.characters.length > 0 && (
+          <StagedCastReferencePreview
+            characters={changes.characters}
+            allCharacters={allCharacters}
+            assets={assets}
+            sceneName={sceneName}
+            isApplied={isApplied}
+            onNavigateToSection={onNavigateToSection}
+          />
         )}
       </div>
 

@@ -332,6 +332,7 @@ export default function App() {
             setActiveConfigTab(tab);
             scrollToSection("config");
           }}
+          onNavigateToSection={scrollToSection}
           onUpdateProject={(updater) => {
             setSceneProject(updater);
             setIsDirty(true);

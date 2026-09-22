@@ -25,6 +25,7 @@ interface AssistantFloatingChatProps {
   defaultLlmProvider?: LLMProvider;
   geminiApiKey?: string;
   onNavigateToConfig?: (tab?: "llm" | "remote" | "models" | "general") => void;
+  onNavigateToSection?: (section: string) => void;
   onUpdateProject?: React.Dispatch<React.SetStateAction<SceneProjectFile>>;
   onShowToast?: (text: string, type?: "success" | "error" | "info") => void;
   onStageShot?: (shot: ShotItem) => Promise<boolean>;
@@ -48,6 +49,7 @@ export const AssistantFloatingChat: React.FC<AssistantFloatingChatProps> = ({
   defaultLlmProvider = "lm_studio",
   geminiApiKey,
   onNavigateToConfig,
+  onNavigateToSection,
   onUpdateProject,
   onShowToast,
   onStageShot,
@@ -164,6 +166,10 @@ export const AssistantFloatingChat: React.FC<AssistantFloatingChatProps> = ({
             dismissedActionKeys={dismissedActionKeys}
             stagingProgressMap={stagingProgressMap}
             expandingProgressMap={expandingProgressMap}
+            characters={sceneProject.characters}
+            assets={assets}
+            sceneName={sceneProject.scene_name}
+            onNavigateToSection={onNavigateToSection}
             onApplyAction={handleApplyAction}
             onDismissAction={handleDismissAction}
             onUndoAction={handleUndoAction}
