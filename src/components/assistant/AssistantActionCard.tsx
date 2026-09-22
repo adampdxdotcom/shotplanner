@@ -8,6 +8,7 @@ import { UpdateScenePlanningActionCard } from "./actionCards/UpdateScenePlanning
 import { UpdateCharacterActionCard } from "./actionCards/UpdateCharacterActionCard";
 import { StageShotAssetsActionCard } from "./actionCards/StageShotAssetsActionCard";
 import { ExpandShotPromptActionCard } from "./actionCards/ExpandShotPromptActionCard";
+import { SaveVisualAnalysisActionCard } from "./actionCards/SaveVisualAnalysisActionCard";
 import { CharacterProfile, MediaAsset } from "../../types";
 
 interface AssistantActionCardProps {
@@ -141,6 +142,19 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
           onApply={onApply}
           onDismiss={onDismiss}
           expandingProgress={expandingProgress}
+        />
+      );
+
+    case "save_visual_analysis":
+      return (
+        <SaveVisualAnalysisActionCard
+          action={action}
+          isApplied={isApplied}
+          isDismissed={Boolean(isDismissed)}
+          assets={assets}
+          onApply={() => onApply(action)}
+          onDismiss={() => onDismiss?.(action)}
+          onUndo={() => onUndo?.(action)}
         />
       );
 

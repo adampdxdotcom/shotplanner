@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { SceneProjectFile, LLMProvider } from "../../types";
+import { SceneProjectFile, LLMProvider, MediaAsset } from "../../types";
 import { sendAssistantChatMessage, AssistantChatMessage } from "../../services/assistantClient";
 import { probeLMStudioConnection } from "../config/lmStudioProbe";
 import { probeGeminiConnection } from "../config/GeminiConfig";
@@ -42,6 +42,9 @@ export function useAssistantChat({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const [stagedAsset, setStagedAsset] = useState<MediaAsset | null>(null);
+  const [isMediaBrowserOpen, setIsMediaBrowserOpen] = useState(false);
+
   const [isDefaultLlmConnected, setIsDefaultLlmConnected] = useState<boolean | null>(null);
   const [isCheckingConnection, setIsCheckingConnection] = useState<boolean>(false);
 
@@ -63,6 +66,7 @@ export function useAssistantChat({
       const sceneChat = getStoredAssistantChat(currentSceneId, sceneProject);
       setMessages(sceneChat);
       setErrorMessage(null);
+      setStagedAsset(null);
     }
   }, [sceneProject?.scene_id, sceneProject]);
 
@@ -129,19 +133,42 @@ export function useAssistantChat({
     [sceneProject?.scene_id, onUpdateProject]
   );
 
+  const handleSelectAsset = (asset: MediaAsset) => {
+    setStagedAsset(asset);
+    onShowToast?.(`Selected ${asset.subject_name || asset.filename} for Vision analysis.`, "info");
+    setTimeout(() => inputRef.current?.focus(), 100);
+  };
+
+  const handleClearStagedAsset = () => {
+    setStagedAsset(null);
+  };
+
   const handleSendMessage = async () => {
-    const trimmed = inputQuery.trim();
-    if (!trimmed || isLoading) return;
+    const rawTrimmed = inputQuery.trim();
+    if ((!rawTrimmed && !stagedAsset) || isLoading) return;
+
+    // Determine final message text
+    let userMessageText = rawTrimmed;
+    if (stagedAsset) {
+      const assetPrefix = `[👁️ Vision Inspection: ${stagedAsset.filename}${stagedAsset.subject_name ? ` (${stagedAsset.subject_name})` : ""}]`;
+      if (!rawTrimmed) {
+        userMessageText = `${assetPrefix}\nPlease perform a full visual inspection and analysis of this image asset.`;
+      } else {
+        userMessageText = `${assetPrefix}\n${rawTrimmed}`;
+      }
+    }
 
     setErrorMessage(null);
     const newMessages: AssistantChatMessage[] = [
       ...messages,
-      { role: "user", content: trimmed }
+      { role: "user", content: userMessageText }
     ];
 
+    const currentStagedAsset = stagedAsset;
     setMessages(newMessages);
     persistMessages(newMessages);
     setInputQuery("");
+    setStagedAsset(null);
     setIsLoading(true);
 
     try {
@@ -151,7 +178,16 @@ export function useAssistantChat({
         active_shot_id: activeShotId,
         active_section: activeSection,
         provider: effectiveDefault,
-        lm_studio_url: lmStudioUrl
+        lm_studio_url: lmStudioUrl,
+        attached_asset_filename: currentStagedAsset?.filename,
+        attached_asset: currentStagedAsset
+          ? {
+              id: currentStagedAsset.id,
+              filename: currentStagedAsset.filename,
+              subject_name: currentStagedAsset.subject_name,
+              type: currentStagedAsset.type
+            }
+          : undefined
       });
 
       if (response && response.reply) {
@@ -227,6 +263,11 @@ export function useAssistantChat({
     messages,
     messagesEndRef,
     inputRef,
+    stagedAsset,
+    isMediaBrowserOpen,
+    setIsMediaBrowserOpen,
+    handleSelectAsset,
+    handleClearStagedAsset,
     isDefaultLlmConnected,
     isCheckingConnection,
     checkConnection,

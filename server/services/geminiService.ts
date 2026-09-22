@@ -33,7 +33,11 @@ export function removeGeminiKey(): void {
   }
 }
 
-export async function generateWithGeminiAPI(apiKey: string, promptText: string) {
+export async function generateWithGeminiAPI(
+  apiKey: string,
+  promptText: string,
+  imageData?: { mimeType: string; base64Data: string } | null
+) {
   const genAI = new GoogleGenAI({
     apiKey,
     httpOptions: {
@@ -42,9 +46,23 @@ export async function generateWithGeminiAPI(apiKey: string, promptText: string) 
       }
     }
   });
+
+  let contents: any = promptText;
+  if (imageData && imageData.base64Data) {
+    contents = [
+      {
+        inlineData: {
+          mimeType: imageData.mimeType || "image/jpeg",
+          data: imageData.base64Data
+        }
+      },
+      promptText
+    ];
+  }
+
   const result = await genAI.models.generateContent({
     model: "gemini-3.7-flash",
-    contents: promptText
+    contents
   });
   return { text: result.text || "", modelUsed: "gemini-3.7-flash" };
 }

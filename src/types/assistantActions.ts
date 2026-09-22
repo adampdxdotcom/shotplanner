@@ -110,13 +110,55 @@ export interface ExpandShotPromptAction {
   guidance?: string;
 }
 
+// Phase 4: Vision & Visual Analysis Action
+export interface SaveVisualAnalysisAction {
+  type: "save_visual_analysis";
+  title?: string;
+  description?: string;
+  filename: string;
+  analysis: {
+    summary: string;
+    subject?: {
+      identified_name?: string;
+      apparent_age?: string;
+      expression?: string;
+      hair?: string;
+      features?: string;
+    };
+    wardrobe?: {
+      garments?: string;
+      colors?: string;
+      era_style?: string;
+      accessories?: string;
+    };
+    lighting?: {
+      key_direction?: string;
+      quality?: string;
+      color_temperature?: string;
+      contrast_ratio?: string;
+    };
+    cinematography?: {
+      framing?: string;
+      lens_feel?: string;
+      depth_of_field?: string;
+      camera_angle?: string;
+    };
+    environment_palette?: {
+      setting?: string;
+      dominant_colors?: string[];
+      mood?: string;
+    };
+  };
+}
+
 export type AssistantAction = 
   | UpdateShotAction 
   | AddShotAction 
   | UpdateScenePlanningAction 
   | UpdateCharacterAction
   | StageShotAssetsAction
-  | ExpandShotPromptAction;
+  | ExpandShotPromptAction
+  | SaveVisualAnalysisAction;
 
 export interface ParsedAssistantMessage {
   cleanContent: string;
@@ -234,6 +276,9 @@ function isValidAction(obj: any): obj is AssistantAction {
     return true;
   }
   if (obj.type === "expand_shot_prompt" && (typeof obj.shot_number === "number" || typeof obj.shot_number === "string")) {
+    return true;
+  }
+  if (obj.type === "save_visual_analysis" && typeof obj.filename === "string" && obj.analysis) {
     return true;
   }
   return false;

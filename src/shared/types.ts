@@ -263,6 +263,50 @@ export type AssetRecord = MediaAsset;
 export interface AssistantChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
+  attached_image?: {
+    filename: string;
+    preview_url?: string;
+    subject_name?: string;
+  };
+}
+
+/**
+ * Structured deep visual analysis cached per image asset to enable instant, zero-cost multimodal recall.
+ */
+export interface ImageVisualAnalysis {
+  filename: string;
+  scanned_at: string;
+  summary: string;
+  subject?: {
+    identified_name?: string;
+    apparent_age?: string;
+    expression?: string;
+    hair?: string;
+    features?: string;
+  };
+  wardrobe?: {
+    garments?: string;
+    colors?: string;
+    era_style?: string;
+    accessories?: string;
+  };
+  lighting?: {
+    key_direction?: string;
+    quality?: "hard" | "soft" | "diffused" | "dramatic" | string;
+    color_temperature?: "warm" | "cool" | "neutral" | string;
+    contrast_ratio?: string;
+  };
+  cinematography?: {
+    framing?: string;
+    lens_feel?: string;
+    depth_of_field?: string;
+    camera_angle?: string;
+  };
+  environment_palette?: {
+    setting?: string;
+    dominant_colors?: string[];
+    mood?: string;
+  };
 }
 
 export interface SceneProjectFile {
@@ -281,6 +325,7 @@ export interface SceneProjectFile {
   subjects?: string[];
   characters?: Record<string, CharacterProfile>;
   scene_planning?: ScenePlanningDetails;
+  visual_analysis_cache?: Record<string, ImageVisualAnalysis>;
   lm_studio_url?: string;
   local_llm_url?: string;
   vision_enabled?: boolean;

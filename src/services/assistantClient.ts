@@ -11,6 +11,14 @@ export interface AssistantChatRequest {
   lm_studio_url?: string;
   provider?: string;
   model?: string;
+  attached_asset_filename?: string;
+  attached_asset?: {
+    id?: string;
+    filename: string;
+    subject_name?: string;
+    type?: string;
+    url?: string;
+  };
 }
 
 export interface AssistantChatResponse {

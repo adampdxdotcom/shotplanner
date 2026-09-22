@@ -19,7 +19,9 @@ router.post("/chat", async (req: Request, res: Response) => {
       provider,
       model,
       temperature,
-      max_tokens
+      max_tokens,
+      attached_asset_filename,
+      attached_asset
     } = req.body || {};
 
     if (!Array.isArray(messages) || messages.length === 0) {
@@ -38,7 +40,9 @@ router.post("/chat", async (req: Request, res: Response) => {
       provider: effectiveProvider,
       model,
       temperature,
-      max_tokens
+      max_tokens,
+      attached_asset_filename,
+      attached_asset
     });
 
     res.json(result);

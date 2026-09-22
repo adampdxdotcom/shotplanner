@@ -1,5 +1,5 @@
 import React from "react";
-import { Bot, Clapperboard, Loader2, CheckCheck } from "lucide-react";
+import { Bot, Clapperboard, Loader2, CheckCheck, Eye } from "lucide-react";
 import Markdown from "react-markdown";
 import { AssistantChatMessage } from "../../services/assistantClient";
 import { AssistantAction, parseAssistantActions, validateActionSafety } from "../../types/assistantActions";
@@ -82,7 +82,32 @@ export const AssistantMessageList: React.FC<AssistantMessageListProps> = ({
               }`}
             >
               {msg.role === "user" ? (
-                <div className="whitespace-pre-wrap">{msg.content}</div>
+                <div className="space-y-2">
+                  {msg.attached_image && (
+                    <div className="flex items-center gap-2 p-1.5 rounded-xl bg-white/10 border border-white/20 text-xs">
+                      {msg.attached_image.preview_url ? (
+                        <img
+                          src={msg.attached_image.preview_url}
+                          alt={msg.attached_image.filename}
+                          className="w-10 h-10 rounded-lg object-cover bg-black/20 shrink-0"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
+                          <Eye className="w-4 h-4 text-white" />
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="font-semibold truncate text-[11px] text-white">
+                          {msg.attached_image.filename}
+                        </div>
+                        <div className="text-[10px] text-indigo-100 truncate">
+                          {msg.attached_image.subject_name ? `Subject: ${msg.attached_image.subject_name}` : "Vision Inspection"}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div className="whitespace-pre-wrap">{msg.content}</div>
+                </div>
               ) : (() => {
                 const { cleanContent, actions } = parseAssistantActions(msg.content);
                 const validActions = actions.filter((act) => validateActionSafety(act, existingShotNumbers).valid);

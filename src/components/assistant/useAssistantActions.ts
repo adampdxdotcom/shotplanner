@@ -507,6 +507,32 @@ export function useAssistantActions({
         }));
         onShowToast?.(`Prompt expansion failed: ${errorMsg}`, "error");
       }
+    } else if (action.type === "save_visual_analysis") {
+      if (!onUpdateProject) return;
+      const fn = action.filename;
+      if (!fn || !action.analysis) return;
+
+      onUpdateProject((prev) => {
+        const nextCache = { ...(prev.visual_analysis_cache || {}) };
+        nextCache[fn] = {
+          filename: fn,
+          scanned_at: new Date().toISOString(),
+          summary: action.analysis.summary || "Visual analysis recorded.",
+          subject: action.analysis.subject as any,
+          wardrobe: action.analysis.wardrobe as any,
+          lighting: action.analysis.lighting as any,
+          cinematography: action.analysis.cinematography as any,
+          environment_palette: action.analysis.environment_palette as any
+        };
+        return {
+          ...prev,
+          visual_analysis_cache: nextCache
+        };
+      });
+
+      setAppliedActionKeys((prev) => ({ ...prev, [actionKey]: true }));
+      injectStateFeedback(`Visual analysis cached into project for '${fn}'`);
+      onShowToast?.(`Cached visual analysis for ${fn}.`, "success");
     }
   }, [
     onUpdateProject, 

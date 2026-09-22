@@ -1,3 +1,5 @@
+import fs from "fs";
+import path from "path";
 import { SceneProjectFile, ShotItem, UniverseCharacterProfile, MediaAsset } from "../types";
 import { UniverseService } from "./universeService";
 import { assetService } from "./assetService";
@@ -21,6 +23,13 @@ export interface AssistantChatOptions {
   model?: string;
   temperature?: number;
   max_tokens?: number;
+  attached_asset_filename?: string;
+  attached_asset?: {
+    id?: string;
+    filename: string;
+    subject_name?: string;
+    type?: string;
+  };
 }
 
 export interface AssistantChatResult {
@@ -150,17 +159,48 @@ function buildProjectDossier(
     console.warn("[AssistantService] Could not read universe characters:", err);
   }
 
-  // 6. Registered Media Assets / Locations
+  // 6. Registered Media Assets / Locations & Cached Visual Intelligence
   try {
     const allAssets: MediaAsset[] = assetService.getAllAssets(sceneProject?.scene_name);
+    const visualCache = sceneProject?.visual_analysis_cache || {};
+
     if (allAssets.length > 0) {
-      // Group a concise sample of assets
-      const assetList = allAssets.slice(0, 20).map(a => {
+      // Group a concise sample of assets with any cached visual scan notes
+      const assetList = allAssets.slice(0, 25).map(a => {
         const tag = (a as any).semantic_type || a.type ? `[${(a as any).semantic_type || a.type}]` : "";
         const sub = a.subject_name ? `(${a.subject_name})` : "";
-        return `- ${a.filename} ${tag} ${sub}`.trim();
+        const cached = visualCache[a.filename];
+        let visualNote = "";
+        if (cached) {
+          const parts: string[] = [];
+          if (cached.summary) parts.push(`Summary: "${cached.summary}"`);
+          if (cached.lighting?.key_direction || cached.lighting?.quality) {
+            parts.push(`Lighting: ${[cached.lighting.quality, cached.lighting.key_direction].filter(Boolean).join(", ")}`);
+          }
+          if (cached.wardrobe?.garments || cached.wardrobe?.colors) {
+            parts.push(`Wardrobe: ${[cached.wardrobe.colors, cached.wardrobe.garments].filter(Boolean).join(" ")}`);
+          }
+          if (cached.cinematography?.framing || cached.cinematography?.lens_feel) {
+            parts.push(`Camera: ${[cached.cinematography.framing, cached.cinematography.lens_feel].filter(Boolean).join(" / ")}`);
+          }
+          visualNote = ` -> [SCANNED VISUAL KNOWLEDGE: ${parts.join(" | ")}]`;
+        }
+        return `- ${a.filename} ${tag} ${sub}${visualNote}`.trim();
       }).join("\n");
       sections.push(`### MEDIA ASSETS & REFERENCES (Sample):\n${assetList}`);
+    }
+
+    // Explicitly highlight any additional cached visual analyses if not already listed
+    const cachedEntries = Object.entries(visualCache);
+    if (cachedEntries.length > 0) {
+      const visualSummary = cachedEntries.map(([fn, v]) => {
+        const lightInfo = v.lighting ? `Lighting: ${v.lighting.quality || ''} ${v.lighting.color_temperature || ''}` : '';
+        const wardrobeInfo = v.wardrobe ? `Wardrobe: ${v.wardrobe.garments || ''} (${v.wardrobe.colors || ''})` : '';
+        const envInfo = v.environment_palette ? `Palette/Mood: ${v.environment_palette.mood || ''} [${(v.environment_palette.dominant_colors || []).join(", ")}]` : '';
+        const details = [v.summary, lightInfo, wardrobeInfo, envInfo].filter(Boolean).join(" | ");
+        return `- ${fn}: ${details}`;
+      }).join("\n");
+      sections.push(`### SCANNED VISUAL INTELLIGENCE REGISTRY (Pre-analyzed project images):\n${visualSummary}`);
     }
   } catch (err) {
     console.warn("[AssistantService] Could not read assets:", err);
@@ -198,11 +238,43 @@ export async function chatWithAssistant(options: AssistantChatOptions): Promise<
     provider,
     model,
     temperature = 0.5,
-    max_tokens = 1000
+    max_tokens = 1000,
+    attached_asset_filename,
+    attached_asset
   } = options;
 
   if (!messages || messages.length === 0) {
     throw new Error("Chat messages are required.");
+  }
+
+  // Load image asset file for multimodal vision pipeline if requested
+  let imagePayload: { mimeType: string; base64Data: string; filename: string } | null = null;
+  const targetFilename = attached_asset_filename || attached_asset?.filename;
+
+  if (targetFilename) {
+    const filePath = assetService.getAssetFilePath(targetFilename);
+    if (filePath && fs.existsSync(filePath)) {
+      try {
+        const fileBuf = fs.readFileSync(filePath);
+        const ext = path.extname(targetFilename).toLowerCase();
+        let mimeType = "image/jpeg";
+        if (ext === ".png") mimeType = "image/png";
+        else if (ext === ".webp") mimeType = "image/webp";
+        else if (ext === ".gif") mimeType = "image/gif";
+        else if (ext === ".bmp") mimeType = "image/bmp";
+
+        imagePayload = {
+          mimeType,
+          base64Data: fileBuf.toString("base64"),
+          filename: targetFilename
+        };
+        console.log(`[Assistant Vision Pipeline] Loaded image asset '${targetFilename}' (${fileBuf.length} bytes, ${mimeType})`);
+      } catch (e: any) {
+        console.warn(`[Assistant Vision Pipeline] Failed to read asset file '${targetFilename}':`, e?.message || e);
+      }
+    } else {
+      console.warn(`[Assistant Vision Pipeline] Asset file '${targetFilename}' not found on disk.`);
+    }
   }
 
   // Rolling window of recent conversation turns to keep LLM context limits safe
@@ -331,7 +403,50 @@ Action formats:
 }
 \`\`\`
 
-7. Multi-Action Coordinated Batch (Array format):
+7. Save Visual Analysis (Image Inspection):
+When an image asset is inspected or attached for visual analysis, you MUST include a \`save_visual_analysis\` action so the visual breakdown is automatically cached into the project file for future turns:
+\`\`\`action
+{
+  "type": "save_visual_analysis",
+  "filename": "character_headshot.png",
+  "title": "Cache visual analysis for character_headshot.png",
+  "analysis": {
+    "summary": "Close-up portrait of a mid-30s woman with dark hair and sharp jawline under warm directional lighting.",
+    "subject": {
+      "identified_name": "Elena",
+      "apparent_age": "Mid-30s",
+      "expression": "Focused, serious",
+      "hair": "Dark brown pulled back",
+      "features": "High cheekbones, sharp jawline, light eye color"
+    },
+    "wardrobe": {
+      "garments": "Dark graphite high-collar jacket",
+      "colors": "Charcoal gray, matte black",
+      "era_style": "Near-future tactical",
+      "accessories": "Subtle silver ear stud"
+    },
+    "lighting": {
+      "key_direction": "Key light from camera left at 45 degrees",
+      "quality": "Diffused soft light with subtle fill",
+      "color_temperature": "Warm tungsten (~3200K)",
+      "contrast_ratio": "Medium contrast"
+    },
+    "cinematography": {
+      "framing": "Close-Up (CU)",
+      "lens_feel": "85mm Portrait lens with smooth background bokeh",
+      "depth_of_field": "Shallow depth of field",
+      "camera_angle": "Eye Level"
+    },
+    "environment_palette": {
+      "setting": "Studio backdrop with subtle warm gradient",
+      "dominant_colors": ["#2A2A2A", "#8B5A2B", "#1A1A1A"],
+      "mood": "Intimate, cinematic portraiture"
+    }
+  }
+}
+\`\`\`
+
+8. Multi-Action Coordinated Batch (Array format):
 \`\`\`action
 [
   {
@@ -372,7 +487,11 @@ Only include fields that are changing or relevant. Always keep your conversation
     // Assemble conversational history for Gemini (using rolling window)
     const conversationHistory = windowedMessages.map(m => `${m.role.toUpperCase()}: ${m.content}`).join("\n\n");
     const fullPrompt = `${systemPrompt}\n\nCONVERSATION HISTORY:\n${conversationHistory}\n\nASSISTANT:`;
-    const result = await generateWithGeminiAPI(storedGeminiKey, fullPrompt);
+    const result = await generateWithGeminiAPI(
+      storedGeminiKey,
+      fullPrompt,
+      imagePayload ? { mimeType: imagePayload.mimeType, base64Data: imagePayload.base64Data } : null
+    );
     reply = result.text;
     modelUsed = result.modelUsed;
     providerUsed = `Gemini (${result.modelUsed})`;
@@ -383,13 +502,31 @@ Only include fields that are changing or relevant. Always keep your conversation
     // with a [System Notice] prefix so conversation history remains compliant.
     const llmMessages = [
       { role: "system" as const, content: systemPrompt },
-      ...windowedMessages.map(m => {
+      ...windowedMessages.map((m, idx) => {
         if (m.role === "assistant") {
           return { role: "assistant" as const, content: m.content };
         }
         if (m.role === "system") {
           return { role: "user" as const, content: `[System Notice]: ${m.content}` };
         }
+        
+        // Attach multimodal image payload to the final user turn if present
+        const isLastMessage = idx === windowedMessages.length - 1;
+        if (isLastMessage && imagePayload) {
+          return {
+            role: "user" as const,
+            content: [
+              { type: "text" as const, text: m.content },
+              {
+                type: "image_url" as const,
+                image_url: {
+                  url: `data:${imagePayload.mimeType};base64,${imagePayload.base64Data}`
+                }
+              }
+            ]
+          };
+        }
+
         return { role: "user" as const, content: m.content };
       })
     ];

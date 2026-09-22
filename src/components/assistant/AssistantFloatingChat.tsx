@@ -13,6 +13,7 @@ import { AssistantChatHeader } from "./AssistantChatHeader";
 import { AssistantConnectionBanner } from "./AssistantConnectionBanner";
 import { AssistantMessageList } from "./AssistantMessageList";
 import { AssistantInputBar } from "./AssistantInputBar";
+import { AssistantMediaBrowserModal } from "./AssistantMediaBrowserModal";
 
 interface AssistantFloatingChatProps {
   sceneProject: SceneProjectFile;
@@ -70,6 +71,11 @@ export const AssistantFloatingChat: React.FC<AssistantFloatingChatProps> = ({
     messages,
     messagesEndRef,
     inputRef,
+    stagedAsset,
+    isMediaBrowserOpen,
+    setIsMediaBrowserOpen,
+    handleSelectAsset,
+    handleClearStagedAsset,
     isDefaultLlmConnected,
     isCheckingConnection,
     checkConnection,
@@ -181,13 +187,26 @@ export const AssistantFloatingChat: React.FC<AssistantFloatingChatProps> = ({
             inputRef={inputRef as React.RefObject<HTMLTextAreaElement>}
             inputQuery={inputQuery}
             isLoading={isLoading}
+            stagedAsset={stagedAsset}
+            isAssetScanned={stagedAsset ? Boolean(sceneProject.visual_analysis_cache?.[stagedAsset.filename]) : false}
             onInputChange={setInputQuery}
             onKeyDown={handleKeyDown}
             onSendMessage={handleSendMessage}
             onResetChat={handleResetChat}
+            onOpenMediaBrowser={() => setIsMediaBrowserOpen(true)}
+            onClearStagedAsset={handleClearStagedAsset}
           />
         </div>
       )}
+
+      {/* Media Browser Modal for Vision Skills */}
+      <AssistantMediaBrowserModal
+        isOpen={isMediaBrowserOpen}
+        onClose={() => setIsMediaBrowserOpen(false)}
+        assets={assets.length > 0 ? assets : sceneProject.assets || []}
+        visualCache={sceneProject.visual_analysis_cache}
+        onSelectAsset={handleSelectAsset}
+      />
     </>
   );
 };
