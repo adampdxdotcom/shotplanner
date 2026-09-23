@@ -192,6 +192,7 @@ export interface ExpandPromptOptions {
 
 /**
  * Programmatically constructs the Global Subject Definitions block.
+ * Groups multiple reference assets for the same subject together to prevent LLMs from treating them as multiple distinct entities.
  */
 export function buildSubjectDefinitionsHeader(assetList: any[]): string {
   if (!assetList || assetList.length === 0) return "";
@@ -205,6 +206,8 @@ export function buildSubjectDefinitionsHeader(assetList: any[]): string {
     return (a.slot_index ?? 0) - (b.slot_index ?? 0);
   });
 
+  const groups = new Map<string, Array<{ tag: string; desc: string; isLocation: boolean }>>();
+
   sorted.forEach((a, idx) => {
     const slotNum = a.slot_index !== undefined ? a.slot_index + 1 : idx + 1;
     const tag =
@@ -214,19 +217,36 @@ export function buildSubjectDefinitionsHeader(assetList: any[]): string {
         ? `<Audio ${slotNum}>`
         : `<Picture ${slotNum}>`;
     const cat = (a.type || "Reference").toLowerCase();
-    const sname = a.subject_name || `Subject ${slotNum}`;
-    const desc = (a.description || "Facial features, styling").replace(/\.$/, "");
-    if (
+    const rawSname = (a.subject_name || "").trim();
+    const isLocation =
       cat.includes("location") ||
       cat.includes("scene") ||
       cat.includes("environment") ||
-      sname.toLowerCase().includes("location")
-    ) {
-      lines.push(`Location(${tag}): ${desc}.`);
+      rawSname.toLowerCase().includes("location");
+
+    const groupKey = isLocation ? "Location" : (rawSname || `Subject ${slotNum}`);
+    const desc = (a.description || "Facial features, styling").trim().replace(/^[,\s]+|[,\s\.]+$/g, "");
+
+    if (!groups.has(groupKey)) {
+      groups.set(groupKey, []);
+    }
+    groups.get(groupKey)!.push({ tag, desc, isLocation });
+  });
+
+  groups.forEach((items, subjectKey) => {
+    if (items.length === 1) {
+      const item = items[0];
+      if (item.isLocation) {
+        lines.push(`Location(${item.tag}): ${item.desc}.`);
+      } else {
+        lines.push(`${subjectKey} (${item.tag}): ${item.desc}.`);
+      }
     } else {
-      lines.push(`${sname} (${tag}): ${desc}.`);
+      const parts = items.map(it => `${it.tag} (${it.desc})`);
+      lines.push(`${subjectKey}: ${parts.join(", ")}.`);
     }
   });
+
   return lines.join("\n");
 }
 
@@ -249,6 +269,7 @@ export function buildDefaultSystemPrompt(params?: {
 Your task is to generate ONLY the integrated_multimodal_description content. Do not generate headers, footers, or subject definitions. Use exact asset tags (<Picture N>, <Video N>) provided in the context.
 
 ### Strict Output Constraints:
+- Core Story & Action Ground Truth: The user's creative concept/stub is the immutable ground truth for the scene's action and character performance. You must preserve and expand around the user's specific action, rather than replacing or rewriting it.
 - Spatial Initialization: Always define the subject's exact spatial position and initial posture at the very beginning (e.g., "[Shot 1] Live-action, cinematic... At the start of the shot, [Subject] is positioned at...").
 - Exact Tags: Differentiate between facial likeness and styling using the exact tags provided (e.g., "<Picture 1>"). Do NOT invent new tags or reference off-screen characters.
 - Cinematography & Optical Rendering: Reflect the visual characteristics of the selected lens (${lens}) and framing (${aspect}) in depth-of-field, perspective compression, and environmental sharpness, while strictly adhering to camera motion constraints.
@@ -491,7 +512,7 @@ export async function expandPrompt(
     ? `\nFRAMING DIRECTIVE:\n${resolvedFramingDirective}\nA Framing Directive is provided; utilize the specific anchor and focus subject likenesses provided in the Global Subject Definitions to execute this framing.\n`
     : "";
 
-  const userPrompt = `CREATIVE CONCEPT / STUB:
+  const userPrompt = `CREATIVE CONCEPT / STUB (IMMUTABLE STORY & ACTION GROUND TRUTH):
 "${basic_stub}"
 
 SHOT PLANNING CONTEXT:
@@ -500,7 +521,7 @@ ${cameraContextBlock}${opticsContextBlock}${framingContextBlock}
 AVAILABLE MULTIMODAL REFERENCE ASSETS:
 ${subjectDefinitions || "No reference definitions"}
 
-Generate ONLY the integrated_multimodal_description paragraph incorporating the reference tags naturally while strictly adhering to all camera, optics, and framing constraints.`;
+Generate ONLY the integrated_multimodal_description narrative incorporating the reference tags naturally while strictly preserving the core action from the creative stub and adhering to all camera, optics, and framing constraints.`;
 
   let rawLlmDescription = "";
   let providerUsed = "Local LM Studio";

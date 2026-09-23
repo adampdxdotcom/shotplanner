@@ -194,10 +194,13 @@ export function assembleFinalPrompt(
     cleanDesc = `integrated_multimodal_description: ${cleanDesc}`;
   }
 
+  // Deduplicate soundscape and non-diegetic music if already generated in LLM description
+  const hasSoundscapeInDesc = /\boverall_soundscape\s*:/i.test(cleanDesc);
+
   const sections: string[] = [];
   if (header) sections.push(header);
   if (cleanDesc) sections.push(cleanDesc);
-  if (footer) sections.push(footer);
+  if (footer && !hasSoundscapeInDesc) sections.push(footer);
 
   return sections.join("\n\n");
 }

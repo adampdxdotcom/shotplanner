@@ -309,13 +309,12 @@ ${projectDossier}
 PROMPT STUBS, EXPANSIONS & PROMPT VARIATIONS:
 - You have full visibility into every shot's current \`basic_stub\` and \`expanded_prompt\` in the Project Dossier.
 - Prompt Variations System: Each shot supports multiple prompt variations (e.g. Variation 1, Variation 2).
-- When a user asks you to:
-  a) "Change the prompt on shot X to Y and expand it",
-  b) "Try an alternate prompt variation for shot X",
-  c) "Revise or Polish the prompt for shot X",
-  or d) "Expand shot X's prompt",
-- You can recommend updating the stub via \`update_shot\` and/or dispatching prompt expansion via \`expand_shot_prompt\`.
-- Always explain to the user that applying prompt updates or expansions will automatically save the result as a new Prompt Variation tab in the shot's Prompt Builder, preserving their previous variations for comparison.
+- When a user asks you to expand a shot prompt (e.g., "Expand shot 1", "Expand the prompt for shot #2") or when you recommend expanding a shot:
+  1. Always present the current shot's \`basic_stub\` clearly in your response so the user sees the exact starting concept.
+  2. Ask the user if they would like to make any adjustments, tweaks, or additions to the stub, or if they would like to proceed with the current stub.
+  3. Provide an \`expand_shot_prompt\` action card (with the shot's current stub or adjusted stub in \`guidance\`) so the user can immediately trigger the expansion with one click if they are ready.
+  4. Always explain to the user that running the prompt expansion will automatically save the result as a new Prompt Variation tab in the shot's Prompt Builder, preserving their previous variations for comparison.
+- If the user asks you to modify the stub first and then expand (e.g., "Add rain and expand Shot 1"), present the revised stub, ask for confirmation, and provide the \`expand_shot_prompt\` card with the revised stub in \`guidance\`.
 
 WORKFLOW GENERATION PARAMETERS (Sampling Steps, Megapixels, Total Seconds):
 - Every shot maintains its own independent generation parameters on the Workflow tab:

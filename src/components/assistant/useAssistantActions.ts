@@ -539,17 +539,23 @@ export function useAssistantActions({
 
       try {
         let newPrompt = "";
+        const effectiveStub = (action.guidance && action.guidance.trim()) || targetShot.basic_stub;
+        const shotForExpansion: ShotItem = {
+          ...targetShot,
+          basic_stub: effectiveStub
+        };
+
         if (onExpandPrompt) {
-          newPrompt = await onExpandPrompt(targetShot);
+          newPrompt = await onExpandPrompt(shotForExpansion);
         } else {
           const payload: any = {
-            basic_stub: action.guidance || targetShot.basic_stub,
+            basic_stub: effectiveStub,
             assets: assets,
             prompt_prefix: `[Scene: ${sceneProject.scene_name}] [Shot: ${targetShot.shot_number}]`,
             provider: effectiveDefault,
             lm_studio_url: lmStudioUrl,
             gemini_api_key: geminiApiKey,
-            active_shot: targetShot,
+            active_shot: shotForExpansion,
             shot_type: targetShot.shot_type,
             camera_movement: targetShot.camera_movement,
             lens_focal_length: targetShot.lens_focal_length,
@@ -571,7 +577,7 @@ export function useAssistantActions({
               shots[idx] = applyPromptVariationToShot(
                 shots[idx],
                 newPrompt,
-                action.guidance || shots[idx].basic_stub,
+                effectiveStub,
                 "Assistant Expansion"
               );
             }

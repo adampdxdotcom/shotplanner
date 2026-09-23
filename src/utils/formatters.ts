@@ -109,18 +109,42 @@ export const buildSubjectDefinitions = (assets?: SubjectAssetDefinition[]): stri
     return (a.slot_index ?? 0) - (b.slot_index ?? 0);
   });
 
+  const groups = new Map<string, Array<{ tag: string; desc: string; isLocation: boolean }>>();
+
   sorted.forEach((a, idx) => {
     const slotNum = a.slot_index !== undefined ? a.slot_index + 1 : idx + 1;
     const tag = a.media_type === "video" ? `<Video ${slotNum}>` : a.media_type === "audio" ? `<Audio ${slotNum}>` : `<Picture ${slotNum}>`;
     const cat = (a.type || "Reference").toLowerCase();
-    const sname = a.subject_name || `Subject ${slotNum}`;
-    const desc = (a.description || "Facial features, styling").replace(/\.$/, "");
-    if (cat.includes("location") || cat.includes("scene") || cat.includes("environment") || sname.toLowerCase().includes("location")) {
-      lines.push(`Location(${tag}): ${desc}.`);
+    const rawSname = (a.subject_name || "").trim();
+    const isLocation =
+      cat.includes("location") ||
+      cat.includes("scene") ||
+      cat.includes("environment") ||
+      rawSname.toLowerCase().includes("location");
+
+    const groupKey = isLocation ? "Location" : (rawSname || `Subject ${slotNum}`);
+    const desc = (a.description || "Facial features, styling").trim().replace(/^[,\s]+|[,\s\.]+$/g, "");
+
+    if (!groups.has(groupKey)) {
+      groups.set(groupKey, []);
+    }
+    groups.get(groupKey)!.push({ tag, desc, isLocation });
+  });
+
+  groups.forEach((items, subjectKey) => {
+    if (items.length === 1) {
+      const item = items[0];
+      if (item.isLocation) {
+        lines.push(`Location(${item.tag}): ${item.desc}.`);
+      } else {
+        lines.push(`${subjectKey} (${item.tag}): ${item.desc}.`);
+      }
     } else {
-      lines.push(`${sname} (${tag}): ${desc}.`);
+      const parts = items.map(it => `${it.tag} (${it.desc})`);
+      lines.push(`${subjectKey}: ${parts.join(", ")}.`);
     }
   });
+
   return lines.join("\n");
 };
 

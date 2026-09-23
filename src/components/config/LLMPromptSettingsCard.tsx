@@ -33,6 +33,7 @@ const DEFAULT_SYSTEM_PROMPT = `You are an expert AI Screenwriter and Prompt Engi
 Your task is to generate ONLY the integrated_multimodal_description content. Do not generate headers, footers, or subject definitions. Use exact asset tags (<Picture N>, <Video N>) provided in the context.
 
 ### Strict Output Constraints:
+- Core Story & Action Ground Truth: The user's creative concept/stub is the immutable ground truth for the scene's action and character performance. You must preserve and expand around the user's specific action, rather than replacing or rewriting it.
 - Spatial Initialization: Always define the subject's exact spatial position and initial posture at the very beginning (e.g., "[Shot 1] Live-action, cinematic... At the start of the shot, [Subject] is positioned at...").
 - Exact Tags: Differentiate between facial likeness and styling using the exact tags provided (e.g., "<Picture 1>"). Do NOT invent new tags or reference off-screen characters.
 - Cinematography & Optical Rendering: Reflect the visual characteristics of the selected lens ({{LENS}}) and framing ({{ASPECT_RATIO}}) in depth-of-field, perspective compression, and environmental sharpness, while strictly adhering to camera motion constraints.
@@ -46,6 +47,7 @@ const QWEN_OPTIMIZED_PROMPT = `You are an expert AI Screenwriter and Prompt Engi
 Your task is to generate ONLY the integrated_multimodal_description narrative paragraph. Do not generate headers, footers, or subject definitions. Use exact asset tags (<Picture N>, <Video N>) provided in the context.
 
 ### Strict Qwen Output Rules:
+- Core Story & Action Ground Truth: Treat the user's creative concept/stub as the immutable ground truth for the action. Expand visual depth and tag integration around the user's story rather than rewriting it.
 - Direct Scene Start: Begin directly with "[Shot 1] Live-action, cinematic..." or the immediate scene action. Absolutely NO conversational greetings, NO preambles (e.g., "Here is the...", "Certainly"), and NO markdown code blocks (\`\`\`).
 - Spatial Initialization: Explicitly establish character spatial coordinates (screen-left, screen-right, foreground, background) and physical posture in the opening sentence.
 - Exact Tag Integration: Integrate character likeness tags naturally (e.g., "Elena (<Picture 1>) sits opposite Marcus (<Picture 2>)"). Do NOT reference untagged characters.
