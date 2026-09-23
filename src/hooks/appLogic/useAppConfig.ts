@@ -96,10 +96,54 @@ export function useAppConfig({ addToast, onUpdateProjectConfig }: UseAppConfigPa
         localStorage.setItem("runpod_auto_connect", String(config.runpod_auto_connect));
       }
     } catch (e) {}
-  }, [config.vision_enabled, config.auto_caption_enabled, config.lm_studio_url, config.local_model, config.runpod_api_key, config.runpod_auto_connect]);
 
-  // Fetch program-level RunPod API key from server on mount
+    // Persist global program-level LLM configuration to server
+    settingsApi.saveLLMSettings({
+      lm_studio_url: config.lm_studio_url,
+      local_model: config.local_model,
+      default_llm_provider: config.default_llm_provider,
+      vision_enabled: config.vision_enabled,
+      auto_caption_enabled: config.auto_caption_enabled,
+      llm_custom_system_prompt: config.llm_custom_system_prompt,
+      llm_temperature: config.llm_temperature,
+      llm_max_tokens: config.llm_max_tokens
+    }).catch(() => {});
+  }, [
+    config.vision_enabled,
+    config.auto_caption_enabled,
+    config.lm_studio_url,
+    config.local_model,
+    config.default_llm_provider,
+    config.llm_custom_system_prompt,
+    config.llm_temperature,
+    config.llm_max_tokens,
+    config.runpod_api_key,
+    config.runpod_auto_connect
+  ]);
+
+  // Fetch program-level settings (LLM & RunPod) from server on mount
   useEffect(() => {
+    settingsApi.getLLMSettings()
+      .then(data => {
+        if (data) {
+          setConfig(prev => ({
+            ...prev,
+            lm_studio_url: data.lm_studio_url || prev.lm_studio_url,
+            local_model: data.local_model || prev.local_model,
+            selected_ollama_model: data.local_model || prev.selected_ollama_model,
+            vision_enabled: data.vision_enabled !== undefined ? data.vision_enabled : prev.vision_enabled,
+            auto_caption_enabled: data.auto_caption_enabled !== undefined ? data.auto_caption_enabled : prev.auto_caption_enabled,
+            llm_custom_system_prompt: data.llm_custom_system_prompt !== undefined ? data.llm_custom_system_prompt : prev.llm_custom_system_prompt,
+            llm_temperature: data.llm_temperature !== undefined ? data.llm_temperature : prev.llm_temperature,
+            llm_max_tokens: data.llm_max_tokens !== undefined ? data.llm_max_tokens : prev.llm_max_tokens
+          }));
+          if (data.default_llm_provider) {
+            setDefaultLlmProviderState(data.default_llm_provider);
+          }
+        }
+      })
+      .catch(() => {});
+
     settingsApi.getRunpodKey()
       .then(data => {
         if (data && data.api_key) {

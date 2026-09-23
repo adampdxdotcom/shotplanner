@@ -7,6 +7,7 @@ export const ROOT_DIR = process.cwd();
 export const ASSETS_DIR = path.join(ROOT_DIR, "assets");
 export const PROJECTS_DIR = path.join(ASSETS_DIR, "project_jsons");
 export const SERVER_CONFIG_DIR = path.join(ROOT_DIR, "data", "config");
+export const LLM_CONFIG_FILE = path.join(SERVER_CONFIG_DIR, "llm_config.json");
 export const GEMINI_CONFIG_FILE = path.join(SERVER_CONFIG_DIR, "gemini_config.json");
 export const CIVITAI_CONFIG_FILE = path.join(SERVER_CONFIG_DIR, "civitai_config.json");
 export const CIVITAI_FAVORITES_FILE = path.join(SERVER_CONFIG_DIR, "civitai_favorites.json");

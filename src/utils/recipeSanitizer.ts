@@ -68,9 +68,16 @@ export function sanitizeProjectForPersistence(project: SceneProjectFile): SceneP
     };
   });
 
-  return {
+  const result = {
     ...project,
     shots: sanitizedShots,
     staging_recipe: sanitizeStagingRecipeForPersistence(project.staging_recipe)
   };
+
+  // Strip machine-specific infrastructure and network connection fields
+  delete (result as any).lm_studio_url;
+  delete (result as any).local_llm_url;
+  delete (result as any).config;
+
+  return result;
 }

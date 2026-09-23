@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { chatWithAssistant } from "../services/assistantService";
 import { getStoredGeminiKey } from "../services/geminiService";
+import { getStoredLLMSettings } from "../services/llmSettingsService";
 
 const router = Router();
 
@@ -28,8 +29,10 @@ router.post("/chat", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Missing required 'messages' array in request body." });
     }
 
-    const effectiveLmStudioUrl = lm_studio_url || "http://localhost:1234/v1";
-    const effectiveProvider = provider || (getStoredGeminiKey() ? "gemini" : "local");
+    const storedLLM = getStoredLLMSettings();
+    const effectiveLmStudioUrl = lm_studio_url || storedLLM.lm_studio_url || "http://localhost:1234/v1";
+    const effectiveModel = model || storedLLM.local_model;
+    const effectiveProvider = provider || storedLLM.default_llm_provider || (getStoredGeminiKey() ? "gemini" : "local");
 
     const result = await chatWithAssistant({
       messages,
@@ -38,7 +41,7 @@ router.post("/chat", async (req: Request, res: Response) => {
       active_section,
       lm_studio_url: effectiveLmStudioUrl,
       provider: effectiveProvider,
-      model,
+      model: effectiveModel,
       temperature,
       max_tokens,
       attached_asset_filename,

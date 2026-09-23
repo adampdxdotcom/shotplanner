@@ -1,6 +1,23 @@
 import { apiClient, RequestOptions } from "../client";
 
 export const settingsApi = {
+  // --- Global LLM Settings ---
+  getLLMSettings(options?: RequestOptions) {
+    return apiClient.get<{
+      lm_studio_url?: string;
+      local_model?: string;
+      default_llm_provider?: "lm_studio" | "gemini";
+      vision_enabled?: boolean;
+      auto_caption_enabled?: boolean;
+      llm_custom_system_prompt?: string;
+      llm_temperature?: number;
+      llm_max_tokens?: number;
+    }>("/api/settings/llm", options);
+  },
+  saveLLMSettings(settings: Record<string, any>, options?: RequestOptions) {
+    return apiClient.post<{ success: boolean; settings: any }>("/api/settings/llm", settings, options);
+  },
+
   // --- Gemini Settings ---
   getGeminiSettings(options?: RequestOptions) {
     return apiClient.get<{ api_key?: string; configured?: boolean }>("/api/settings/gemini", options);

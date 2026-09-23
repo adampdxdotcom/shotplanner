@@ -198,22 +198,9 @@ export function useScenePersistence({
     const delegate = getShotOperationsDelegate?.();
     const currentLlmProvider = delegate?.llmProvider || config.default_llm_provider || defaultLlmProvider;
 
+    // Creative project data only (infrastructure connection settings are program-global)
     const payload: SceneProjectFile = {
       ...sceneProject,
-      lm_studio_url: config.lm_studio_url,
-      vision_enabled: Boolean(config.vision_enabled),
-      auto_caption_enabled: Boolean(config.auto_caption_enabled),
-      config: {
-        ...(sceneProject.config || {}),
-        ...config,
-        lm_studio_url: config.lm_studio_url,
-        vision_enabled: Boolean(config.vision_enabled),
-        auto_caption_enabled: Boolean(config.auto_caption_enabled),
-        gemini_api_key: "",
-        civitai_api_key: "",
-        huggingface_token: "",
-        runpod_api_key: ""
-      },
       llm_provider: currentLlmProvider,
       parameter_node_mappings: parameterNodeMappings,
       generation_params: generationParams,
@@ -221,6 +208,11 @@ export function useScenePersistence({
       subjects: normalized.subjects,
       characters: normalized.characters
     };
+
+    // Remove legacy infrastructure fields from project payload
+    delete (payload as any).lm_studio_url;
+    delete (payload as any).local_llm_url;
+    delete (payload as any).config;
 
     const sanitizedPayload = sanitizeProjectForPersistence(payload);
     
@@ -265,14 +257,8 @@ export function useScenePersistence({
 
     const delegate = getShotOperationsDelegate?.();
 
-    // Restore local LLM IP / URL & provider
-    const restoredLlmUrl = (data as any).lm_studio_url || data.config?.lm_studio_url || (data as any).local_llm_url || (data as any).llm_url || (data as any).llm_endpoint;
-    if (restoredLlmUrl) {
-      setConfig(prev => ({
-        ...prev,
-        lm_studio_url: restoredLlmUrl
-      }));
-    }
+    // Note: Local LLM URLs, model choices, and infrastructure tokens are program-global.
+    // Opening a creative project will NOT overwrite the user's active LLM or hardware environment.
     const explicitLlmProvider = (data as any).llmProvider || data.llm_provider || (data as any).llmChoice || (data as any).providerChoice || data.config?.llm_provider || (data.config as any)?.llmProvider;
     const resolvedLlmProvider: LLMProvider = (explicitLlmProvider === "gemini" || explicitLlmProvider === "lm_studio")
       ? explicitLlmProvider
@@ -300,28 +286,6 @@ export function useScenePersistence({
 
       if (delegate?.setBasicStub) delegate.setBasicStub("");
       if (delegate?.setExpandedPrompt) delegate.setExpandedPrompt("");
-      
-      // Restore config if bundled
-      if (data.config || (data as any).vision_enabled !== undefined) {
-        const isVision = data.config?.vision_enabled !== undefined
-          ? Boolean(data.config.vision_enabled)
-          : ((data as any).vision_enabled !== undefined ? Boolean((data as any).vision_enabled) : undefined);
-        const isAutoCaption = data.config?.auto_caption_enabled !== undefined
-          ? Boolean(data.config.auto_caption_enabled)
-          : ((data as any).auto_caption_enabled !== undefined ? Boolean((data as any).auto_caption_enabled) : undefined);
-
-        setConfig(prev => ({
-          ...prev,
-          ...(data.config || {}),
-          lm_studio_url: restoredLlmUrl || data.config?.lm_studio_url || prev.lm_studio_url,
-          vision_enabled: isVision !== undefined ? isVision : prev.vision_enabled,
-          auto_caption_enabled: isVision !== undefined ? (isVision ? Boolean(isAutoCaption) : false) : prev.auto_caption_enabled,
-          gemini_api_key: "",
-          civitai_api_key: prev.civitai_api_key,
-          huggingface_token: prev.huggingface_token,
-          runpod_api_key: prev.runpod_api_key
-        }));
-      }
 
       const cleanProject = filename.replace(/\.json$/i, "");
       setSceneProject(data);
@@ -456,11 +420,6 @@ export function useScenePersistence({
       shared_assets: [],
       assets: [],
       subjects: [],
-      lm_studio_url: config.lm_studio_url,
-      config: {
-        ...config,
-        default_llm_provider: defaultLlmProvider
-      },
       llm_provider: defaultLlmProvider,
       shots: [{
         id: "shot_" + Date.now(),

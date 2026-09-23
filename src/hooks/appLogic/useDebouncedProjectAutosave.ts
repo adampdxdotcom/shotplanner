@@ -100,20 +100,6 @@ export function useDebouncedProjectAutosave({
       // Strip heavy in-memory data URLs so only asset references and coordinate transforms are serialized
       const rawPayload: SceneProjectFile = {
         ...project,
-        lm_studio_url: latestConfigRef.current.lm_studio_url,
-        vision_enabled: Boolean(latestConfigRef.current.vision_enabled),
-        auto_caption_enabled: Boolean(latestConfigRef.current.auto_caption_enabled),
-        config: {
-          ...(project.config || {}),
-          ...latestConfigRef.current,
-          lm_studio_url: latestConfigRef.current.lm_studio_url,
-          vision_enabled: Boolean(latestConfigRef.current.vision_enabled),
-          auto_caption_enabled: Boolean(latestConfigRef.current.auto_caption_enabled),
-          gemini_api_key: "",
-          civitai_api_key: "",
-          huggingface_token: "",
-          runpod_api_key: ""
-        },
         llm_provider: currentLlmProvider,
         parameter_node_mappings: latestMappingsRef.current,
         generation_params: latestParamsRef.current,
@@ -121,6 +107,11 @@ export function useDebouncedProjectAutosave({
         subjects: normalized.subjects,
         characters: normalized.characters
       };
+
+      // Remove legacy infrastructure fields from project payload
+      delete (rawPayload as any).lm_studio_url;
+      delete (rawPayload as any).local_llm_url;
+      delete (rawPayload as any).config;
 
       const payload = sanitizeProjectForPersistence(rawPayload);
 

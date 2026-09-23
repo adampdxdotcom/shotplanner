@@ -3,8 +3,25 @@ import { getStoredGeminiKey, saveGeminiKey, removeGeminiKey, generateWithGeminiA
 import { getStoredCivitaiKey, saveCivitaiKey, removeCivitaiKey } from "../services/civitaiService";
 import { getStoredHuggingFaceToken, saveHuggingFaceToken, removeHuggingFaceToken } from "../services/huggingfaceService";
 import { getStoredRunpodApiKey, saveRunpodApiKey, removeRunpodApiKey } from "../services/runpodService";
+import { getStoredLLMSettings, saveStoredLLMSettings } from "../services/llmSettingsService";
 
 const router = Router();
+
+/**
+ * Get stored program-level LLM settings
+ */
+router.get("/llm", (req: Request, res: Response) => {
+  const settings = getStoredLLMSettings();
+  res.json(settings);
+});
+
+/**
+ * Save program-level LLM settings
+ */
+router.post("/llm", (req: Request, res: Response) => {
+  const settings = saveStoredLLMSettings(req.body || {});
+  res.json({ success: true, settings });
+});
 
 router.get("/gemini", (req: Request, res: Response) => {
   const key = getStoredGeminiKey();

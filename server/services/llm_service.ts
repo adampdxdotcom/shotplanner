@@ -8,6 +8,7 @@ import {
   hasSceneReferencePhoto
 } from "../utils/formatters";
 import { generateWithGeminiAPI, getStoredGeminiKey } from "./geminiService";
+import { getStoredLLMSettings } from "./llmSettingsService";
 
 export interface LocalLLMRequestOptions {
   url?: string;
@@ -67,9 +68,10 @@ export function stripThinkingTags(text: string): string {
 }
 
 export async function callLocalLLM(options: LocalLLMRequestOptions): Promise<LocalLLMResponse> {
-  const targetUrl = options.url || options.lm_studio_url || options.lmStudioUrl || "http://localhost:1234/v1";
+  const storedLLM = getStoredLLMSettings();
+  const targetUrl = options.url || options.lm_studio_url || options.lmStudioUrl || storedLLM.lm_studio_url || "http://localhost:1234/v1";
   const endpoint = resolveLocalLLMEndpoint(targetUrl);
-  const model = options.model || "local-model";
+  const model = options.model || storedLLM.local_model || "local-model";
   const timeoutMs = options.timeoutMs || 300000;
 
   // Build messages array if not provided directly
