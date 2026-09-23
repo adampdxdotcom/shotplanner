@@ -159,6 +159,7 @@ export const INITIAL_LOCATION_PACK_SLOTS: CharacterPackSlot[] = [
 interface CharacterReferencePackGridProps {
   slots: CharacterPackSlot[];
   subjectName?: string;
+  sceneName?: string;
   config?: AppConfig;
   onUpdateSlot: (slotId: ReferencePackSlotId, updater: Partial<CharacterPackSlot>) => void;
   onClearSlot: (slotId: ReferencePackSlotId) => void;
@@ -169,6 +170,7 @@ interface CharacterReferencePackGridProps {
 export const CharacterReferencePackGrid: React.FC<CharacterReferencePackGridProps> = ({
   slots,
   subjectName = "",
+  sceneName,
   config,
   onUpdateSlot,
   onClearSlot,
@@ -187,6 +189,7 @@ export const CharacterReferencePackGrid: React.FC<CharacterReferencePackGridProp
       const res = await generateCaptionForFile(file, {
         contextType: assetType,
         subjectName: subjectName.trim(),
+        sceneName: sceneName,
         lmStudioUrl: visionState.lmStudioUrl
       });
       if (res.success && res.caption) {

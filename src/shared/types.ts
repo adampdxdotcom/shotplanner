@@ -304,7 +304,8 @@ export interface ImageVisualAnalysis {
   };
   environment_palette?: {
     setting?: string;
-    dominant_colors?: string[];
+    location_type?: string;
+    dominant_colors?: string[] | string;
     mood?: string;
   };
 }

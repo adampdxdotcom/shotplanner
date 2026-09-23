@@ -6,7 +6,8 @@ import {
   ScenePlanningDetails, 
   MediaAsset, 
   AppConfig, 
-  LLMProvider 
+  LLMProvider,
+  PromptVariation
 } from "../../types";
 import { 
   AssistantAction, 
@@ -40,6 +41,56 @@ export interface UseAssistantActionsParams {
   onExpandPrompt?: (shot: ShotItem) => Promise<string>;
   onSelectShot?: (shotId: string) => void;
   injectStateFeedback: (feedbackText: string) => void;
+}
+
+/**
+ * Helper to update a shot's prompt and append a new PromptVariation to prompt_variations.
+ * If prompt_variations is empty, baselines current prompt as "Variation 1 (Original)" first.
+ */
+export function applyPromptVariationToShot(
+  shot: ShotItem,
+  newExpandedPrompt: string,
+  newStub?: string,
+  labelSuffix: string = "Assistant Expansion"
+): ShotItem {
+  const currentVariations = [...(shot.prompt_variations || [])];
+
+  // Baseline original prompt as Variation 1 if no variations exist yet but shot has an existing prompt/stub
+  if (currentVariations.length === 0 && (shot.expanded_prompt || shot.basic_stub)) {
+    const baselineVariation: PromptVariation = {
+      id: "var_1_" + Date.now().toString(36),
+      variation_number: 1,
+      created_at: shot.updated_at || new Date().toISOString(),
+      basic_stub: shot.basic_stub,
+      expanded_prompt: shot.expanded_prompt || "",
+      label: "Variation 1 (Original)"
+    };
+    currentVariations.push(baselineVariation);
+  }
+
+  const nextVarNum = currentVariations.length + 1;
+  const effectiveStub = newStub !== undefined ? newStub : shot.basic_stub;
+
+  const newVariation: PromptVariation = {
+    id: "var_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
+    variation_number: nextVarNum,
+    created_at: new Date().toISOString(),
+    basic_stub: effectiveStub,
+    expanded_prompt: newExpandedPrompt,
+    label: `Variation ${nextVarNum} (${labelSuffix})`
+  };
+
+  const updatedVariations = [...currentVariations, newVariation];
+
+  return {
+    ...shot,
+    basic_stub: effectiveStub,
+    expanded_prompt: newExpandedPrompt,
+    prompt_variations: updatedVariations,
+    active_variation_id: newVariation.id,
+    status: "unstaged",
+    updated_at: new Date().toISOString()
+  };
 }
 
 /**
@@ -151,14 +202,32 @@ export function useAssistantActions({
             }
           });
 
-          shots[idx] = {
+          const hasPromptChange = typeof changes.expanded_prompt === "string" && changes.expanded_prompt.trim().length > 0;
+
+          const mergedGenParams = changes.generation_params
+            ? { ...(current.generation_params || {}), ...changes.generation_params }
+            : current.generation_params;
+
+          let updatedShot: ShotItem = {
             ...current,
             ...changes,
+            generation_params: mergedGenParams,
             characters: mergedCharacters.length > 0 ? mergedCharacters : undefined,
             assigned_slots: updatedSlots,
             status: "unstaged",
             updated_at: new Date().toISOString()
           };
+
+          if (hasPromptChange && changes.expanded_prompt !== current.expanded_prompt) {
+            updatedShot = applyPromptVariationToShot(
+              updatedShot,
+              changes.expanded_prompt,
+              changes.basic_stub !== undefined ? changes.basic_stub : current.basic_stub,
+              "Assistant Update"
+            );
+          }
+
+          shots[idx] = updatedShot;
         }
         return { ...prev, shots };
       });
@@ -256,9 +325,23 @@ export function useAssistantActions({
           expanded_prompt: shotData.expanded_prompt || "",
           characters: shotCharacters.length > 0 ? shotCharacters : undefined,
           assigned_slots: assignedSlots,
+          generation_params: shotData.generation_params ? { ...shotData.generation_params } : undefined,
           status: "unstaged",
           updated_at: new Date().toISOString()
         };
+
+        if (newShot.expanded_prompt || newShot.basic_stub) {
+          const initVar: PromptVariation = {
+            id: "var_1_" + Date.now().toString(36),
+            variation_number: 1,
+            created_at: newShot.updated_at!,
+            basic_stub: newShot.basic_stub,
+            expanded_prompt: newShot.expanded_prompt,
+            label: "Variation 1"
+          };
+          newShot.prompt_variations = [initVar];
+          newShot.active_variation_id = initVar.id;
+        }
 
         return {
           ...prev,
@@ -446,6 +529,9 @@ export function useAssistantActions({
         return;
       }
 
+      // Save snapshot for undo
+      setUndoShotSnapshots((prev) => ({ ...prev, [actionKey]: { ...targetShot } }));
+
       setExpandingProgressMap((prev) => ({
         ...prev,
         [actionKey]: { status: "expanding", message: "Synthesizing prompt..." }
@@ -482,11 +568,12 @@ export function useAssistantActions({
             const shots = [...prev.shots];
             const idx = shots.findIndex((s) => s.shot_number === shotNumber);
             if (idx !== -1) {
-              shots[idx] = {
-                ...shots[idx],
-                expanded_prompt: newPrompt,
-                updated_at: new Date().toISOString()
-              };
+              shots[idx] = applyPromptVariationToShot(
+                shots[idx],
+                newPrompt,
+                action.guidance || shots[idx].basic_stub,
+                "Assistant Expansion"
+              );
             }
             return { ...prev, shots };
           });
@@ -566,7 +653,7 @@ export function useAssistantActions({
   const handleUndoAction = useCallback((action: AssistantAction, actionKey: string) => {
     if (!onUpdateProject) return;
 
-    if (action.type === "update_shot") {
+    if (action.type === "update_shot" || action.type === "expand_shot_prompt") {
       const snapshot = undoShotSnapshots[actionKey];
       if (!snapshot) return;
 
@@ -585,8 +672,9 @@ export function useAssistantActions({
         return next;
       });
 
-      injectStateFeedback(`User reverted (undid) applied changes to Shot #${action.shot_number}`);
-      onShowToast?.(`Reverted changes to Shot #${action.shot_number}.`, "info");
+      const shotNum = (action as any).shot_number;
+      injectStateFeedback(`User reverted (undid) applied changes to Shot #${shotNum}`);
+      onShowToast?.(`Reverted changes to Shot #${shotNum}.`, "info");
 
     } else if (action.type === "update_scene_planning") {
       const snapshot = undoPlanningSnapshots[actionKey];

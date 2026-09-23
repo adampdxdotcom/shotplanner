@@ -214,4 +214,67 @@ describe("assistantChat.test.ts - Production Assistant Per-Scene Memory & Rollin
       expect(loaded[2].content).toBe("Thermal sensors on grid 4.");
     });
   });
+
+  describe("5. Assistant Actions Generation Parameters (Sampling, Megapixels, Total Seconds)", () => {
+    it("parses and normalizes generation_params inside update_shot action blocks", async () => {
+      const { parseAssistantActions } = await import("../types/assistantActions");
+      const messageContent = `I have adjusted the sampling steps and duration for Shot #1.
+\`\`\`action
+{
+  "type": "update_shot",
+  "shot_number": 1,
+  "title": "Adjust sampling quality and duration",
+  "changes": {
+    "shot_type": "Close-Up",
+    "generation_params": {
+      "steps": 40,
+      "megapixels": 1.0,
+      "frames": 5.0
+    }
+  }
+}
+\`\`\``;
+
+      const result = parseAssistantActions(messageContent);
+      expect(result.actions).toHaveLength(1);
+      const action = result.actions[0];
+      expect(action.type).toBe("update_shot");
+      if (action.type === "update_shot") {
+        expect(action.changes.generation_params).toEqual({
+          steps: 40,
+          megapixels: 1.0,
+          frames: 5.0
+        });
+      }
+    });
+
+    it("normalizes flat alias parameter keys (sampling_steps, total_seconds) into generation_params", async () => {
+      const { parseAssistantActions } = await import("../types/assistantActions");
+      const messageContent = `Here is the requested update.
+\`\`\`action
+{
+  "type": "update_shot",
+  "shot_number": 2,
+  "title": "Set 35 steps and 4.2s duration",
+  "changes": {
+    "sampling_steps": 35,
+    "megapixels": "0.75",
+    "total_seconds": "4.2"
+  }
+}
+\`\`\``;
+
+      const result = parseAssistantActions(messageContent);
+      expect(result.actions).toHaveLength(1);
+      const action = result.actions[0];
+      expect(action.type).toBe("update_shot");
+      if (action.type === "update_shot") {
+        expect(action.changes.generation_params).toEqual({
+          steps: 35,
+          megapixels: 0.75,
+          frames: 4.2
+        });
+      }
+    });
+  });
 });

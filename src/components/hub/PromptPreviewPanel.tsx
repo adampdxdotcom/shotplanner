@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Copy, Check, Sparkles, Terminal, FileText } from "lucide-react";
 import { ShotItem, computePrePromptContext, PromptVariation } from "../../types";
 
@@ -20,6 +20,13 @@ export const PromptPreviewPanel: React.FC<PromptPreviewPanelProps> = ({
   const hasExpanded = Boolean(activeShot.expanded_prompt && activeShot.expanded_prompt.trim());
   const variations = activeShot.prompt_variations || [];
   const activeVar = variations.find(v => v.id === activeShot.active_variation_id);
+
+  // Auto-switch view to "expanded" when active variation or expanded prompt changes
+  useEffect(() => {
+    if (activeShot.expanded_prompt && activeShot.expanded_prompt.trim().length > 0) {
+      setPromptViewMode("expanded");
+    }
+  }, [activeShot.active_variation_id, activeShot.expanded_prompt]);
 
   const computedPrePrompt = useMemo(() => {
     return computePrePromptContext({

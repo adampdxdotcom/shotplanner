@@ -3,6 +3,7 @@ import path from "path";
 import { SceneProjectFile, ShotItem, UniverseCharacterProfile, MediaAsset } from "../types";
 import { UniverseService } from "./universeService";
 import { assetService } from "./assetService";
+import { getImageBase64ForVision } from "./thumbnailService";
 import { callLocalLLM } from "./llm_service";
 import { generateWithGeminiAPI, getStoredGeminiKey } from "./geminiService";
 
@@ -87,6 +88,11 @@ function buildProjectDossier(
   }
 
   if (activeShot) {
+    const gen = activeShot.generation_params;
+    const genDetails = gen
+      ? `Sampling: ${gen.steps ?? 30} steps | Resolution: ${gen.megapixels ?? 0.5} MP | Duration: ${gen.frames ?? 3.4}s`
+      : 'Sampling: 30 steps | Resolution: 0.5 MP | Duration: 3.4s (defaults)';
+
     sections.push(
       `### CURRENTLY SELECTED SHOT (#${activeShot.shot_number}: "${activeShot.shot_name || 'Untitled'}")\n` +
       `- Action / Stub: ${activeShot.basic_stub || '(None)'}\n` +
@@ -94,6 +100,7 @@ function buildProjectDossier(
       `- Camera Movement: ${activeShot.camera_movement || 'Locked Off'}\n` +
       `- Lens / Focal Length: ${activeShot.lens_focal_length || '50mm Standard Prime'}\n` +
       `- Camera Angle: ${activeShot.camera_angle || 'Eye Level'}\n` +
+      `- Workflow Generation Settings: ${genDetails}\n` +
       (activeShot.dialogue_line ? `- Dialogue: "${activeShot.dialogue_line}"\n` : '') +
       (activeShot.lighting_setup ? `- Lighting: ${activeShot.lighting_setup}\n` : '') +
       (activeShot.expanded_prompt ? `- Prompt: ${activeShot.expanded_prompt}\n` : '')
@@ -104,7 +111,9 @@ function buildProjectDossier(
   if (shots.length > 0) {
     const shotsSummary = shots.map(s => {
       const isSelected = s.id === activeShot?.id ? " [CURRENT FOCUS]" : "";
-      return `Shot #${s.shot_number} ("${s.shot_name || 'Shot ' + s.shot_number}")${isSelected}: [${s.shot_type || 'Medium'}] [${s.camera_movement || 'Static'}] [${s.lens_focal_length || '50mm'}] - Action: "${s.basic_stub || 'No action specified'}"`;
+      const g = s.generation_params;
+      const gStr = g ? ` [Workflow: ${g.steps ?? 30}st/${g.megapixels ?? 0.5}MP/${g.frames ?? 3.4}s]` : "";
+      return `Shot #${s.shot_number} ("${s.shot_name || 'Shot ' + s.shot_number}")${isSelected}: [${s.shot_type || 'Medium'}] [${s.camera_movement || 'Static'}] [${s.lens_focal_length || '50mm'}]${gStr} - Action: "${s.basic_stub || 'No action specified'}"`;
     }).join("\n");
     sections.push(`### SCENE SHOT LIST (${shots.length} shots total):\n${shotsSummary}`);
   }
@@ -196,7 +205,10 @@ function buildProjectDossier(
       const visualSummary = cachedEntries.map(([fn, v]) => {
         const lightInfo = v.lighting ? `Lighting: ${v.lighting.quality || ''} ${v.lighting.color_temperature || ''}` : '';
         const wardrobeInfo = v.wardrobe ? `Wardrobe: ${v.wardrobe.garments || ''} (${v.wardrobe.colors || ''})` : '';
-        const envInfo = v.environment_palette ? `Palette/Mood: ${v.environment_palette.mood || ''} [${(v.environment_palette.dominant_colors || []).join(", ")}]` : '';
+        const domColors = Array.isArray(v.environment_palette?.dominant_colors)
+          ? v.environment_palette.dominant_colors.join(", ")
+          : v.environment_palette?.dominant_colors || "";
+        const envInfo = v.environment_palette ? `Palette/Mood: ${v.environment_palette.mood || ''} [${domColors}]` : '';
         const details = [v.summary, lightInfo, wardrobeInfo, envInfo].filter(Boolean).join(" | ");
         return `- ${fn}: ${details}`;
       }).join("\n");
@@ -247,7 +259,7 @@ export async function chatWithAssistant(options: AssistantChatOptions): Promise<
     throw new Error("Chat messages are required.");
   }
 
-  // Load image asset file for multimodal vision pipeline if requested
+  // Load image asset file for multimodal vision pipeline if requested (scaled to 384px for token efficiency)
   let imagePayload: { mimeType: string; base64Data: string; filename: string } | null = null;
   const targetFilename = attached_asset_filename || attached_asset?.filename;
 
@@ -255,22 +267,20 @@ export async function chatWithAssistant(options: AssistantChatOptions): Promise<
     const filePath = assetService.getAssetFilePath(targetFilename);
     if (filePath && fs.existsSync(filePath)) {
       try {
-        const fileBuf = fs.readFileSync(filePath);
-        const ext = path.extname(targetFilename).toLowerCase();
-        let mimeType = "image/jpeg";
-        if (ext === ".png") mimeType = "image/png";
-        else if (ext === ".webp") mimeType = "image/webp";
-        else if (ext === ".gif") mimeType = "image/gif";
-        else if (ext === ".bmp") mimeType = "image/bmp";
+        const visionDataUri = await getImageBase64ForVision(filePath, 384);
+        const parts = visionDataUri.split(",");
+        const mimeMatch = visionDataUri.match(/^data:(image\/[a-zA-Z+]+);base64,/);
+        const mimeType = mimeMatch ? mimeMatch[1] : "image/jpeg";
+        const base64Data = parts[1] || "";
 
         imagePayload = {
           mimeType,
-          base64Data: fileBuf.toString("base64"),
+          base64Data,
           filename: targetFilename
         };
-        console.log(`[Assistant Vision Pipeline] Loaded image asset '${targetFilename}' (${fileBuf.length} bytes, ${mimeType})`);
+        console.log(`[Assistant Vision Pipeline] Loaded scaled 384px image asset '${targetFilename}' (${mimeType})`);
       } catch (e: any) {
-        console.warn(`[Assistant Vision Pipeline] Failed to read asset file '${targetFilename}':`, e?.message || e);
+        console.warn(`[Assistant Vision Pipeline] Failed to process asset file '${targetFilename}' for vision:`, e?.message || e);
       }
     } else {
       console.warn(`[Assistant Vision Pipeline] Asset file '${targetFilename}' not found on disk.`);
@@ -295,6 +305,25 @@ The following is live project data reflecting the current state of the film proj
 =========================================
 ${projectDossier}
 =========================================
+
+PROMPT STUBS, EXPANSIONS & PROMPT VARIATIONS:
+- You have full visibility into every shot's current \`basic_stub\` and \`expanded_prompt\` in the Project Dossier.
+- Prompt Variations System: Each shot supports multiple prompt variations (e.g. Variation 1, Variation 2).
+- When a user asks you to:
+  a) "Change the prompt on shot X to Y and expand it",
+  b) "Try an alternate prompt variation for shot X",
+  c) "Revise or Polish the prompt for shot X",
+  or d) "Expand shot X's prompt",
+- You can recommend updating the stub via \`update_shot\` and/or dispatching prompt expansion via \`expand_shot_prompt\`.
+- Always explain to the user that applying prompt updates or expansions will automatically save the result as a new Prompt Variation tab in the shot's Prompt Builder, preserving their previous variations for comparison.
+
+WORKFLOW GENERATION PARAMETERS (Sampling Steps, Megapixels, Total Seconds):
+- Every shot maintains its own independent generation parameters on the Workflow tab:
+  - \`steps\` (Sampling Steps: integer, e.g. 20 to 60, default 30)
+  - \`megapixels\` (Resolution: number, e.g. 0.5, 1.0, 1.5 MP, default 0.5)
+  - \`frames\` (Total Duration in Seconds: number, e.g. 3.4, 5.0, 6.7 seconds, default 3.4)
+- When the user asks to adjust render sampling, quality/steps, resolution/megapixels, or duration/total seconds for a shot (e.g. "Set shot 1 to 40 steps and 5 seconds" or "Increase resolution to 1.0 MP and sampling to 35 on shot 2"), include \`generation_params\` in \`update_shot\` (or \`add_shot\`).
+- Modifying generation parameters is strictly per-shot and will only affect the specified shot.
 
 BEHAVIOR GUIDELINES:
 - Be concise, cinematic, and directly helpful.
@@ -361,7 +390,12 @@ Action formats:
     "camera_movement": "Slow Push In",
     "lighting_setup": "Moody side rim light with deep shadows",
     "characters": ["Elena"],
-    "basic_stub": "Elena gazes through the rain-streaked window as neon reflects across her titanium neural port."
+    "basic_stub": "Elena gazes through the rain-streaked window as neon reflects across her titanium neural port.",
+    "generation_params": {
+      "steps": 35,
+      "megapixels": 1.0,
+      "frames": 4.5
+    }
   }
 }
 \`\`\`
@@ -378,7 +412,12 @@ Action formats:
     "lens_focal_length": "24mm Wide-Angle",
     "camera_movement": "Pan Left",
     "aspect_ratio": "16:9 Widescreen",
-    "basic_stub": "Wide shot across the neon rain-soaked alley as steam rises from subway vents and Elena walks into frame."
+    "basic_stub": "Wide shot across the neon rain-soaked alley as steam rises from subway vents and Elena walks into frame.",
+    "generation_params": {
+      "steps": 30,
+      "megapixels": 0.5,
+      "frames": 3.4
+    }
   }
 }
 \`\`\`

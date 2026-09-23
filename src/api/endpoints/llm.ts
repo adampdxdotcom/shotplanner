@@ -1,4 +1,5 @@
 import { apiClient, RequestOptions } from "../client";
+import { ImageVisualAnalysis } from "../../shared/types";
 
 export interface GeneratePromptPayload {
   basicStub: string;
@@ -38,16 +39,25 @@ export const llmApi = {
   },
 
   /**
-   * Generate a vision caption from image/thumbnail.
+   * Generate a vision caption and deep visual analysis from image/thumbnail.
    */
   generateCaption(payload: {
     thumbnailPath?: string;
     imageBase64?: string;
+    filename?: string;
+    sceneName?: string;
     contextType?: string;
     subjectName?: string;
     lm_studio_url?: string;
   }, options?: RequestOptions) {
-    return apiClient.post<{ success: boolean; caption: string; words_count?: number; error?: string }>(
+    return apiClient.post<{ 
+      success: boolean; 
+      caption: string; 
+      analysis?: ImageVisualAnalysis; 
+      words_count?: number; 
+      saved_to_cache?: boolean;
+      error?: string 
+    }>(
       "/api/llm/caption",
       payload,
       options

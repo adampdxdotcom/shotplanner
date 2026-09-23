@@ -325,6 +325,77 @@ export function normalizeShotChanges(changes: any): Record<string, any> {
     delete normalized.lightingSetup;
   }
 
+  // Normalize Generation Parameters (Sampling Steps, Megapixels, Total Seconds/Frames)
+  let genParams = normalized.generation_params || normalized.generationParams || {};
+  if (typeof genParams !== "object" || genParams === null) {
+    genParams = {};
+  } else {
+    genParams = { ...genParams };
+  }
+
+  if (genParams.sampling_steps !== undefined && genParams.steps === undefined) {
+    genParams.steps = genParams.sampling_steps;
+    delete genParams.sampling_steps;
+  }
+  if (genParams.total_seconds !== undefined && genParams.frames === undefined) {
+    genParams.frames = genParams.total_seconds;
+    delete genParams.total_seconds;
+  }
+  if (genParams.seconds !== undefined && genParams.frames === undefined) {
+    genParams.frames = genParams.seconds;
+    delete genParams.seconds;
+  }
+  if (genParams.duration !== undefined && genParams.frames === undefined) {
+    genParams.frames = genParams.duration;
+    delete genParams.duration;
+  }
+
+  if (normalized.steps !== undefined && genParams.steps === undefined) {
+    genParams.steps = normalized.steps;
+    delete normalized.steps;
+  }
+  if (normalized.sampling_steps !== undefined && genParams.steps === undefined) {
+    genParams.steps = normalized.sampling_steps;
+    delete normalized.sampling_steps;
+  }
+  if (normalized.megapixels !== undefined && genParams.megapixels === undefined) {
+    genParams.megapixels = normalized.megapixels;
+    delete normalized.megapixels;
+  }
+  if (normalized.frames !== undefined && genParams.frames === undefined) {
+    genParams.frames = normalized.frames;
+    delete normalized.frames;
+  }
+  if (normalized.total_seconds !== undefined && genParams.frames === undefined) {
+    genParams.frames = normalized.total_seconds;
+    delete normalized.total_seconds;
+  }
+  if (normalized.totalSeconds !== undefined && genParams.frames === undefined) {
+    genParams.frames = normalized.totalSeconds;
+    delete normalized.totalSeconds;
+  }
+
+  const finalGen: Record<string, number> = {};
+  if (genParams.steps !== undefined && genParams.steps !== null) {
+    const s = parseInt(String(genParams.steps), 10);
+    if (!isNaN(s) && s > 0) finalGen.steps = s;
+  }
+  if (genParams.megapixels !== undefined && genParams.megapixels !== null) {
+    const m = parseFloat(String(genParams.megapixels));
+    if (!isNaN(m) && m > 0) finalGen.megapixels = m;
+  }
+  if (genParams.frames !== undefined && genParams.frames !== null) {
+    const f = parseFloat(String(genParams.frames));
+    if (!isNaN(f) && f > 0) finalGen.frames = f;
+  }
+
+  if (Object.keys(finalGen).length > 0) {
+    normalized.generation_params = finalGen;
+  } else {
+    delete normalized.generation_params;
+  }
+  delete normalized.generationParams;
+
   // Value normalization using canonical presets
   if (normalized.camera_movement) {
     normalized.camera_movement = normalizeCameraMovement(normalized.camera_movement);

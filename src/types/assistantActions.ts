@@ -26,6 +26,11 @@ export interface UpdateShotActionChanges {
   characters?: string[];
   character?: string;
   assigned_slots?: Record<string | number, string>;
+  generation_params?: {
+    steps?: number;
+    megapixels?: number;
+    frames?: number;
+  };
 }
 
 export interface UpdateShotAction {
@@ -55,6 +60,11 @@ export interface AddShotAction {
     ots_anchor_subject?: string;
     ots_focus_subject?: string;
     assigned_slots?: Record<string | number, string>;
+    generation_params?: {
+      steps?: number;
+      megapixels?: number;
+      frames?: number;
+    };
   };
 }
 

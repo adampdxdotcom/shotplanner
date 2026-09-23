@@ -136,8 +136,12 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
         setViCinemaFraming(cached.cinematography?.framing || "");
         setViCinemaLens(cached.cinematography?.lens_feel || "");
         setViCinemaAngle(cached.cinematography?.camera_angle || "");
-        setViEnvLocationType(cached.environment_palette?.location_type || "");
-        setViEnvPalette(cached.environment_palette?.dominant_colors || "");
+        setViEnvLocationType(cached.environment_palette?.location_type || cached.environment_palette?.setting || "");
+        setViEnvPalette(
+          Array.isArray(cached.environment_palette?.dominant_colors)
+            ? cached.environment_palette.dominant_colors.join(", ")
+            : cached.environment_palette?.dominant_colors || ""
+        );
       } else {
         setViSummary("");
         setViSubjectIdentifiedName("");
@@ -183,12 +187,15 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
         res = await generateCaptionForFile(editFile, {
           contextType: effectiveType,
           subjectName: editSubjectName.trim(),
+          sceneName: sceneProject?.scene_name,
+          filename: asset.filename,
           lmStudioUrl: visionState.lmStudioUrl
         });
       } else {
         res = await generateCaptionForAsset(asset, {
           contextType: effectiveType,
           subjectName: editSubjectName.trim(),
+          sceneName: sceneProject?.scene_name,
           assetMediaUrl: getAssetMediaUrl(asset, true),
           lmStudioUrl: visionState.lmStudioUrl
         });
@@ -198,6 +205,34 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
         setEditDescription(res.caption);
         setCaptionToast("AI visual description generated");
         setTimeout(() => setCaptionToast(null), 3000);
+
+        if (res.analysis) {
+          if (res.analysis.summary) setViSummary(res.analysis.summary);
+          if (res.analysis.wardrobe?.garments) setViWardrobeGarments(res.analysis.wardrobe.garments);
+          if (res.analysis.wardrobe?.colors) setViWardrobeColors(res.analysis.wardrobe.colors);
+          if (res.analysis.wardrobe?.era_style) setViWardrobeEra(res.analysis.wardrobe.era_style);
+          if (res.analysis.lighting?.quality) setViLightingQuality(res.analysis.lighting.quality);
+          if (res.analysis.lighting?.key_direction) setViLightingDirection(res.analysis.lighting.key_direction);
+          if (res.analysis.lighting?.color_temperature) setViLightingTemp(res.analysis.lighting.color_temperature);
+          if (res.analysis.cinematography?.framing) setViCinemaFraming(res.analysis.cinematography.framing);
+          if (res.analysis.cinematography?.lens_feel) setViCinemaLens(res.analysis.cinematography.lens_feel);
+          if (res.analysis.cinematography?.camera_angle) setViCinemaAngle(res.analysis.cinematography.camera_angle);
+          if (res.analysis.environment_palette?.location_type) setViEnvLocationType(res.analysis.environment_palette.location_type);
+          if (res.analysis.environment_palette?.dominant_colors) {
+            const dom = res.analysis.environment_palette.dominant_colors;
+            setViEnvPalette(Array.isArray(dom) ? dom.join(", ") : dom);
+          }
+
+          if (onUpdateProject) {
+            onUpdateProject((prev: any) => ({
+              ...prev,
+              visual_analysis_cache: {
+                ...(prev?.visual_analysis_cache || {}),
+                [asset.filename]: res.analysis
+              }
+            }));
+          }
+        }
       } else if (res.error) {
         setCaptionToast(`Vision notice: ${res.error}`);
         setTimeout(() => setCaptionToast(null), 4000);

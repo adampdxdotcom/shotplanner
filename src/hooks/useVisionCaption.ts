@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback } from "react";
-import { AppConfig, MediaAsset } from "../types";
+import { AppConfig, MediaAsset, ImageVisualAnalysis } from "../types";
 import { llmApi } from "../api";
 
 export interface VisionCaptionState {
@@ -140,6 +140,8 @@ export async function imageUrlToVisionBase64(url: string, maxDimension = 384): P
 export interface RequestVisionCaptionParams {
   thumbnailPath?: string;
   imageBase64?: string;
+  filename?: string;
+  sceneName?: string;
   contextType?: "character" | "scene" | "shot" | "asset" | string;
   subjectName?: string;
   lmStudioUrl?: string;
@@ -148,13 +150,17 @@ export interface RequestVisionCaptionParams {
 export async function requestVisionCaption(params: RequestVisionCaptionParams): Promise<{
   success: boolean;
   caption: string;
+  analysis?: ImageVisualAnalysis;
   words_count?: number;
+  saved_to_cache?: boolean;
   error?: string;
 }> {
   try {
     const data = await llmApi.generateCaption({
       thumbnailPath: params.thumbnailPath,
       imageBase64: params.imageBase64,
+      filename: params.filename,
+      sceneName: params.sceneName,
       contextType: params.contextType,
       subjectName: params.subjectName,
       lm_studio_url: params.lmStudioUrl
@@ -170,7 +176,9 @@ export async function requestVisionCaption(params: RequestVisionCaptionParams): 
     return { 
       success: true, 
       caption: data.caption || "", 
-      words_count: data.words_count 
+      analysis: data.analysis,
+      words_count: data.words_count,
+      saved_to_cache: data.saved_to_cache
     };
   } catch (err: any) {
     return { 
@@ -189,13 +197,23 @@ export async function generateCaptionForFile(
   options?: {
     contextType?: string;
     subjectName?: string;
+    filename?: string;
+    sceneName?: string;
     lmStudioUrl?: string;
   }
-): Promise<{ success: boolean; caption: string; error?: string }> {
+): Promise<{ 
+  success: boolean; 
+  caption: string; 
+  analysis?: ImageVisualAnalysis; 
+  saved_to_cache?: boolean; 
+  error?: string 
+}> {
   try {
     const imageBase64 = await fileToVisionBase64(file);
     return await requestVisionCaption({
       imageBase64,
+      filename: options?.filename,
+      sceneName: options?.sceneName,
       contextType: options?.contextType || "asset",
       subjectName: options?.subjectName || "",
       lmStudioUrl: options?.lmStudioUrl
@@ -217,10 +235,17 @@ export async function generateCaptionForAsset(
   options?: {
     contextType?: string;
     subjectName?: string;
+    sceneName?: string;
     lmStudioUrl?: string;
     assetMediaUrl?: string;
   }
-): Promise<{ success: boolean; caption: string; error?: string }> {
+): Promise<{ 
+  success: boolean; 
+  caption: string; 
+  analysis?: ImageVisualAnalysis; 
+  saved_to_cache?: boolean; 
+  error?: string 
+}> {
   try {
     let imageBase64: string | undefined;
     if (options?.assetMediaUrl) {
@@ -233,6 +258,8 @@ export async function generateCaptionForAsset(
 
     return await requestVisionCaption({
       thumbnailPath: asset.filename,
+      filename: asset.filename,
+      sceneName: options?.sceneName,
       imageBase64,
       contextType: options?.contextType || asset.type || "asset",
       subjectName: options?.subjectName || asset.subject_name || "",

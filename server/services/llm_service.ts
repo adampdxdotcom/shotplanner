@@ -50,6 +50,22 @@ export function resolveLocalLLMEndpoint(rawUrl?: string): string {
  * Central orchestrator for sending text or multimodal (image) messages
  * to local OpenAI-compatible LLM servers (LM Studio / Ollama / LocalAI).
  */
+/**
+ * Strips reasoning / thought process tokens (such as <think>...</think>) emitted by reasoning models.
+ */
+export function stripThinkingTags(text: string): string {
+  if (!text) return "";
+  // 1. Strip complete <think>...</think> blocks
+  let clean = text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+  // 2. Strip unclosed <think> blocks (e.g. if generation truncated)
+  if (/<think>/i.test(clean)) {
+    clean = clean.replace(/<think>[\s\S]*$/gi, "").trim();
+  }
+  // 3. Strip [thought]...[/thought] blocks
+  clean = clean.replace(/\[thought\][\s\S]*?\[\/thought\]/gi, "").trim();
+  return clean;
+}
+
 export async function callLocalLLM(options: LocalLLMRequestOptions): Promise<LocalLLMResponse> {
   const targetUrl = options.url || options.lm_studio_url || options.lmStudioUrl || "http://localhost:1234/v1";
   const endpoint = resolveLocalLLMEndpoint(targetUrl);
@@ -119,12 +135,16 @@ export async function callLocalLLM(options: LocalLLMRequestOptions): Promise<Loc
 
     const data = await res.json();
     const choice = data.choices?.[0];
-    let content = (choice?.message?.content || choice?.text || "").trim();
+    let rawContent = (choice?.message?.content || choice?.text || "").trim();
+    let cleanedContent = stripThinkingTags(rawContent);
 
-    // Fallback for reasoning models if final content is empty but reasoning_content exists
-    if (!content && choice?.message?.reasoning_content) {
-      content = choice.message.reasoning_content.trim();
+    // If content only had thinking tags and was stripped to empty, check if reasoning_content exists
+    if (!cleanedContent && choice?.message?.reasoning_content) {
+      cleanedContent = stripThinkingTags(choice.message.reasoning_content.trim());
     }
+
+    // If still empty but rawContent had text (e.g. malformed thoughts), fallback to rawContent
+    let content = cleanedContent || rawContent;
 
     if (!content) {
       throw new Error("Local LLM server returned an empty response.");

@@ -160,6 +160,7 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
       const res = await generateCaptionForFile(fileToDescribe, {
         contextType: assetType,
         subjectName: subjectName.trim(),
+        sceneName: sceneName,
         lmStudioUrl: visionState.lmStudioUrl
       });
       if (res.success && res.caption) {

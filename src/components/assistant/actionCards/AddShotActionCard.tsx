@@ -111,6 +111,30 @@ export const AddShotActionCard: React.FC<AddShotActionCardProps> = ({
           </div>
         )}
 
+        {/* Workflow Generation Parameters Preview */}
+        {shotData.generation_params && Object.keys(shotData.generation_params).length > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-slate-200/50 dark:border-zinc-800">
+            <span className="text-slate-400 dark:text-zinc-500">Workflow Params:</span>
+            <div className="flex flex-wrap gap-1">
+              {shotData.generation_params.steps !== undefined && (
+                <span className="px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 text-[10px] font-sans font-medium">
+                  {shotData.generation_params.steps} steps
+                </span>
+              )}
+              {shotData.generation_params.megapixels !== undefined && (
+                <span className="px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60 text-[10px] font-sans font-medium">
+                  {shotData.generation_params.megapixels} MP
+                </span>
+              )}
+              {shotData.generation_params.frames !== undefined && (
+                <span className="px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 text-[10px] font-sans font-medium">
+                  {shotData.generation_params.frames}s duration
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Bundled Cast Card References Preview */}
         {shotData.characters && shotData.characters.length > 0 && (
           <StagedCastReferencePreview
