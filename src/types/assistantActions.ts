@@ -259,36 +259,46 @@ export function parseAssistantActions(content: string): ParsedAssistantMessage {
   return { cleanContent, actions };
 }
 
-function normalizeActionInPlace(action: AssistantAction) {
-  if (action.type === "update_shot" && action.changes) {
+function normalizeActionInPlace(action: any) {
+  if (action.type === "update_scene_plan") {
+    action.type = "update_scene_planning";
+  }
+  if (action.type === "update_scene_planning") {
+    // If changes were passed at root of action, move to changes object
+    if (!action.changes && (action.overarching_goal || action.visual_theme || action.environment_description || action.lighting_style || action.camera_gear || action.audio_style || action.custom_instructions)) {
+      const { type, title, description, ...changes } = action;
+      action.changes = changes;
+    }
+  } else if (action.type === "update_shot" && action.changes) {
     action.changes = normalizeShotChanges(action.changes) as any;
   } else if (action.type === "add_shot") {
-    const raw = action.shot || (action as any).changes || {};
+    const raw = action.shot || action.changes || {};
     action.shot = normalizeShotChanges(raw) as any;
   }
 }
 
 function isValidAction(obj: any): obj is AssistantAction {
   if (!obj || typeof obj !== "object") return false;
-  if (obj.type === "update_shot" && (typeof obj.shot_number === "number" || typeof obj.shot_number === "string") && obj.changes) {
+  const actionType = obj.type === "update_scene_plan" ? "update_scene_planning" : obj.type;
+  if (actionType === "update_shot" && (typeof obj.shot_number === "number" || typeof obj.shot_number === "string") && obj.changes) {
     return true;
   }
-  if (obj.type === "add_shot" && (obj.shot || obj.changes)) {
+  if (actionType === "add_shot" && (obj.shot || obj.changes)) {
     return true;
   }
-  if (obj.type === "update_scene_planning" && obj.changes && typeof obj.changes === "object") {
+  if (actionType === "update_scene_planning" && (obj.changes || obj.overarching_goal || obj.visual_theme || obj.environment_description || obj.lighting_style || obj.camera_gear || obj.audio_style || obj.custom_instructions)) {
     return true;
   }
-  if (obj.type === "update_character" && (obj.character_name || obj.name) && (obj.changes || typeof obj.notes === "string")) {
+  if (actionType === "update_character" && (obj.character_name || obj.name) && (obj.changes || typeof obj.notes === "string")) {
     return true;
   }
-  if (obj.type === "stage_shot_assets" && (typeof obj.shot_number === "number" || typeof obj.shot_number === "string")) {
+  if (actionType === "stage_shot_assets" && (typeof obj.shot_number === "number" || typeof obj.shot_number === "string")) {
     return true;
   }
-  if (obj.type === "expand_shot_prompt" && (typeof obj.shot_number === "number" || typeof obj.shot_number === "string")) {
+  if (actionType === "expand_shot_prompt" && (typeof obj.shot_number === "number" || typeof obj.shot_number === "string")) {
     return true;
   }
-  if (obj.type === "save_visual_analysis" && typeof obj.filename === "string" && obj.analysis) {
+  if (actionType === "save_visual_analysis" && typeof obj.filename === "string" && obj.analysis) {
     return true;
   }
   return false;
