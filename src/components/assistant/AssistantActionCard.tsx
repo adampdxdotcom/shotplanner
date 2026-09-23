@@ -1,7 +1,6 @@
 import React from "react";
 import { AssistantAction } from "../../types/assistantActions";
 import { DismissedActionBadge } from "./actionCards/DismissedActionBadge";
-import { ValidationGuardrailCard } from "./actionCards/ValidationGuardrailCard";
 import { UpdateShotActionCard } from "./actionCards/UpdateShotActionCard";
 import { AddShotActionCard } from "./actionCards/AddShotActionCard";
 import { UpdateScenePlanningActionCard } from "./actionCards/UpdateScenePlanningActionCard";
@@ -59,15 +58,9 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
     return <DismissedActionBadge action={action} onApply={onApply} />;
   }
 
-  // If safety validation failed (e.g. shot target does not exist), render guardrail card
+  // If safety validation failed (e.g. shot target does not exist yet), suppress warning card
   if (validationError) {
-    return (
-      <ValidationGuardrailCard
-        action={action}
-        validationError={validationError}
-        onDismiss={onDismiss}
-      />
-    );
+    return null;
   }
 
   switch (action.type) {

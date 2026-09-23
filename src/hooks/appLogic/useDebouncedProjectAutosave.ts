@@ -19,6 +19,7 @@ export interface UseDebouncedProjectAutosaveParams {
   config: Partial<AppConfig>;
   parameterNodeMappings: ParameterNodeMappings;
   generationParams: GenerationParameters;
+  selectedWorkflowFile?: string;
   defaultLlmProvider: LLMProvider;
   getShotOperationsDelegate?: () => Partial<ShotOperationsDelegate> | null | undefined;
   isInitialLoad: boolean;
@@ -40,6 +41,7 @@ export function useDebouncedProjectAutosave({
   config,
   parameterNodeMappings,
   generationParams,
+  selectedWorkflowFile,
   defaultLlmProvider,
   getShotOperationsDelegate,
   isInitialLoad,
@@ -100,6 +102,8 @@ export function useDebouncedProjectAutosave({
       // Strip heavy in-memory data URLs so only asset references and coordinate transforms are serialized
       const rawPayload: SceneProjectFile = {
         ...project,
+        selectedWorkflowFile: selectedWorkflowFile || (project as any).selectedWorkflowFile || (project as any).workflow_file,
+        workflow_file: selectedWorkflowFile || (project as any).workflow_file || (project as any).selectedWorkflowFile,
         llm_provider: currentLlmProvider,
         parameter_node_mappings: latestMappingsRef.current,
         generation_params: latestParamsRef.current,

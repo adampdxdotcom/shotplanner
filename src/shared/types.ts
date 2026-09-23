@@ -322,6 +322,7 @@ export interface SceneProjectFile {
   scene_id: string;
   scene_name: string;
   workflow_file: string;
+  selectedWorkflowFile?: string;
   shared_assets: {
     slot_index: number;
     filename: string;

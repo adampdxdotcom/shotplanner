@@ -8,6 +8,7 @@ import {
   WORKFLOWS_DIR, 
   UNIVERSE_MEDIA_DIR, 
   formatSceneFolderName, 
+  getSceneDirectories,
   EMPTY_1X1_PNG_BUFFER 
 } from "../../config/constants";
 import { assetService } from "../assetService";
@@ -64,18 +65,33 @@ function findAssetFile(filename: string): string | null {
 /**
  * Locate workflow template file on disk
  */
-function findWorkflowFile(wfFilename: string): string | null {
+function findWorkflowFile(wfFilename: string, sceneName?: string): string | null {
   if (!wfFilename) return null;
   const cleanWf = path.basename(wfFilename.trim());
   if (!cleanWf) return null;
-  const candidatePaths = [
+
+  const candidatePaths: string[] = [];
+  if (sceneName) {
+    candidatePaths.push(path.join(getSceneDirectories(sceneName).workflows, cleanWf));
+  }
+  candidatePaths.push(
     path.join(WORKFLOWS_DIR, cleanWf),
     path.join(process.cwd(), "assets", "workflows", cleanWf)
-  ];
+  );
+
   for (const p of candidatePaths) {
     if (fs.existsSync(p)) return p;
   }
-  for (const base of [WORKFLOWS_DIR, path.join(process.cwd(), "assets", "workflows")]) {
+
+  const bases = [
+    WORKFLOWS_DIR,
+    path.join(process.cwd(), "assets", "workflows")
+  ];
+  if (sceneName) {
+    bases.unshift(getSceneDirectories(sceneName).workflows);
+  }
+
+  for (const base of bases) {
     if (fs.existsSync(base)) {
       try {
         const subdirs = fs.readdirSync(base, { withFileTypes: true }).filter(d => d.isDirectory());
@@ -148,8 +164,21 @@ export async function exportProjectZip(
     }
   }
 
+  // Also collect all workflow .json files stored directly in the active scene's workflow directory
+  const sceneWfDir = getSceneDirectories(projectData.scene_name || rawName).workflows;
+  if (fs.existsSync(sceneWfDir)) {
+    try {
+      const sceneWfFiles = fs.readdirSync(sceneWfDir).filter(f => f.toLowerCase().endsWith(".json"));
+      for (const f of sceneWfFiles) {
+        referencedWfFiles.add(f);
+      }
+    } catch (e) {
+      console.error("Error reading scene workflow directory for zip export:", e);
+    }
+  }
+
   for (const wfFile of referencedWfFiles) {
-    const foundWfPath = findWorkflowFile(wfFile);
+    const foundWfPath = findWorkflowFile(wfFile, projectData.scene_name || rawName);
     if (foundWfPath && fs.existsSync(foundWfPath)) {
       archive.file(foundWfPath, { name: `workflows/${wfFile}` });
       try {

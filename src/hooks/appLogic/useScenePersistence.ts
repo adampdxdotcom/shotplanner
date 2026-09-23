@@ -145,6 +145,7 @@ export function useScenePersistence({
     config,
     parameterNodeMappings,
     generationParams,
+    selectedWorkflowFile,
     defaultLlmProvider,
     getShotOperationsDelegate,
     isInitialLoad,
@@ -201,6 +202,8 @@ export function useScenePersistence({
     // Creative project data only (infrastructure connection settings are program-global)
     const payload: SceneProjectFile = {
       ...sceneProject,
+      selectedWorkflowFile: selectedWorkflowFile || (sceneProject as any).selectedWorkflowFile || (sceneProject as any).workflow_file,
+      workflow_file: selectedWorkflowFile || (sceneProject as any).workflow_file || (sceneProject as any).selectedWorkflowFile,
       llm_provider: currentLlmProvider,
       parameter_node_mappings: parameterNodeMappings,
       generation_params: generationParams,
