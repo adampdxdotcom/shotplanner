@@ -75,6 +75,39 @@ export default function App() {
   } = useAppLogic();
 
   const [activeConfigTab, setActiveConfigTab] = useState<ConfigTab>("llm");
+  const [isScenePlanOpen, setIsScenePlanOpen] = useState(false);
+
+  const hasScenePlan = Boolean(
+    sceneProject?.scene_planning?.overarching_goal?.trim() ||
+    sceneProject?.scene_planning?.mood_genre?.trim() ||
+    sceneProject?.scene_planning?.location_description?.trim() ||
+    scenePlanning?.overarching_goal?.trim() ||
+    scenePlanning?.mood_genre?.trim() ||
+    scenePlanning?.location_description?.trim()
+  );
+
+  const handleSaveScenePlan = (payload: {
+    sceneName: string;
+    planning: Partial<any>;
+  }) => {
+    setSceneProject((prev) => ({
+      ...prev,
+      scene_name: payload.sceneName || prev.scene_name,
+      scene_planning: {
+        ...(prev.scene_planning || {}),
+        ...payload.planning
+      },
+      updated_at: new Date().toISOString()
+    }));
+    if (payload.planning) {
+      setScenePlanning((prev: any) => ({
+        ...prev,
+        ...payload.planning
+      }));
+    }
+    setIsDirty(true);
+    addToast("Scene Plan updated.", "success");
+  };
 
   // Keep browser tab title synchronized with active scene or project name
   React.useEffect(() => {
@@ -119,6 +152,8 @@ export default function App() {
                 onUpdateSpecificShot={updateShot}
                 onNavigate={scrollToSection}
                 monitorState={monitorState}
+                onOpenScenePlan={() => setIsScenePlanOpen(true)}
+                hasScenePlan={hasScenePlan}
               />
             </div>
           )}
@@ -141,6 +176,8 @@ export default function App() {
               onAssetDeleted={handleAssetDeleted}
               onAssetUpdated={handleAssetUpdated}
               addToast={addToast}
+              onOpenScenePlan={() => setIsScenePlanOpen(true)}
+              hasScenePlan={hasScenePlan}
             />
           )}
 
@@ -159,6 +196,8 @@ export default function App() {
               addToast={addToast}
               autosaveStatus={autosaveStatus}
               lastSavedAt={lastSavedAt}
+              onOpenScenePlan={() => setIsScenePlanOpen(true)}
+              hasScenePlan={hasScenePlan}
             />
           )}
 
@@ -190,6 +229,8 @@ export default function App() {
               onUpdateSpecificShot={updateShot}
               onUpdateProject={setSceneProject}
               config={config}
+              onOpenScenePlan={() => setIsScenePlanOpen(true)}
+              hasScenePlan={hasScenePlan}
             />
           )}
 
@@ -217,6 +258,8 @@ export default function App() {
               onUpdateShot={updateActiveShot}
               onUpdateProject={setSceneProject}
               activeSceneName={sceneProject.scene_name || currentProjectName || "Untitled_Scene"}
+              onOpenScenePlan={() => setIsScenePlanOpen(true)}
+              hasScenePlan={hasScenePlan}
             />
           )}
 
@@ -233,6 +276,8 @@ export default function App() {
               onUpdateSceneProject={setSceneProject}
               onShowToast={addToast}
               onUpdateConfig={setConfig}
+              onOpenScenePlan={() => setIsScenePlanOpen(true)}
+              hasScenePlan={hasScenePlan}
             />
           )}
 
@@ -350,6 +395,10 @@ export default function App() {
           isNewModalOpen={isNewModalOpen} setIsNewModalOpen={setIsNewModalOpen}
           handleCreateNewProject={handleCreateNewProject}
           sceneProject={sceneProject}
+          isScenePlanOpen={isScenePlanOpen}
+          setIsScenePlanOpen={setIsScenePlanOpen}
+          handleSaveScenePlan={handleSaveScenePlan}
+          scenePlanning={scenePlanning}
         />
       </Suspense>
 

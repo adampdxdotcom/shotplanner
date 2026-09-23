@@ -35,6 +35,8 @@ export interface StagingSectionProps {
   initialSubject?: string;
   autosaveStatus?: "saved" | "saving" | "unsaved" | "error";
   lastSavedAt?: Date | null;
+  onOpenScenePlan?: () => void;
+  hasScenePlan?: boolean;
 }
 
 export const StagingSection: React.FC<StagingSectionProps> = ({
@@ -53,7 +55,9 @@ export const StagingSection: React.FC<StagingSectionProps> = ({
   initialTab = "staging" as "headshots" | "staging" | "sheets",
   initialSubject = "",
   autosaveStatus,
-  lastSavedAt
+  lastSavedAt,
+  onOpenScenePlan,
+  hasScenePlan = false
 }) => {
   const {
     activeTab,
@@ -194,6 +198,8 @@ export const StagingSection: React.FC<StagingSectionProps> = ({
         sceneName={activeSceneName || sceneProject?.scene_name || "Scene"}
         onNewShot={onUpdateProject ? handleNewShot : undefined}
         onDuplicateShot={activeShot && onUpdateProject ? handleDuplicateShot : undefined}
+        onOpenScenePlan={onOpenScenePlan}
+        hasScenePlan={hasScenePlan}
       />
 
       {/* SECTION HEADER CARD */}

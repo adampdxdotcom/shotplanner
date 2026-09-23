@@ -25,6 +25,8 @@ interface ExecutionSectionProps {
   onUpdateSceneProject: (updater: (prev: SceneProjectFile) => SceneProjectFile) => void;
   onShowToast?: (text: string, type: "success" | "error" | "info") => void;
   onUpdateConfig?: (newConfig: AppConfig) => void;
+  onOpenScenePlan?: () => void;
+  hasScenePlan?: boolean;
 }
 
 export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
@@ -38,7 +40,9 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
   onUpdateShot,
   onUpdateSceneProject,
   onShowToast,
-  onUpdateConfig
+  onUpdateConfig,
+  onOpenScenePlan,
+  hasScenePlan = false
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<"stage" | "monitor">("stage");
   const [transferState, setTransferState] = useState<"idle" | "progress" | "error" | "success">("idle");
@@ -423,6 +427,8 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
         sceneName={activeSceneName}
         onNewShot={handleAddBlankShot}
         onDuplicateShot={activeShot ? handleDuplicateShot : undefined}
+        onOpenScenePlan={onOpenScenePlan}
+        hasScenePlan={hasScenePlan}
       />
 
       {/* Quick RunPod Sync & Status Bar */}

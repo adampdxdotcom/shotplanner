@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Compass, X, Check, Target } from "lucide-react";
+import { Compass, X, Check, Target, Drama, Clock, MapPin, Sparkles, Film } from "lucide-react";
 import { ScenePlanningDetails } from "../../types";
 
 export interface ScenePlanModalProps {
@@ -7,12 +7,28 @@ export interface ScenePlanModalProps {
   onClose: () => void;
   sceneName?: string;
   scenePlanning?: ScenePlanningDetails;
-  onSave: (overarchingGoal: string) => void;
+  onSave: (payload: {
+    sceneName: string;
+    planning: Partial<ScenePlanningDetails>;
+  }) => void;
 }
 
+const TIME_OF_DAY_PRESETS = [
+  "Day",
+  "Night",
+  "Golden Hour",
+  "Blue Hour",
+  "Dawn / Sunrise",
+  "Dusk / Sunset",
+  "Overcast Day",
+  "High Noon",
+  "Midnight",
+  "Custom"
+];
+
 /**
- * Modal dialog allowing the director to define and refine the overarching goal
- * for the active scene.
+ * Modal dialog allowing the director to define and refine the scene name,
+ * mood/genre, time of day, location, and overarching narrative goal.
  */
 export const ScenePlanModal: React.FC<ScenePlanModalProps> = ({
   isOpen,
@@ -21,29 +37,66 @@ export const ScenePlanModal: React.FC<ScenePlanModalProps> = ({
   scenePlanning,
   onSave
 }) => {
+  const [currentSceneName, setCurrentSceneName] = useState(sceneName);
+  const [moodGenre, setMoodGenre] = useState("");
+  const [timeOfDaySelection, setTimeOfDaySelection] = useState("Day");
+  const [customTimeOfDay, setCustomTimeOfDay] = useState("");
+  const [locationDesc, setLocationDesc] = useState("");
   const [goalText, setGoalText] = useState("");
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const goalRef = useRef<HTMLTextAreaElement>(null);
 
-  // Sync state when modal opens or scenePlanning changes
+  // Sync state when modal opens or props change
   useEffect(() => {
     if (isOpen) {
+      setCurrentSceneName(sceneName || "Untitled Scene");
+      setMoodGenre(scenePlanning?.mood_genre || "");
+      
+      const currentTime = scenePlanning?.time_of_day || "";
+      if (currentTime) {
+        if (TIME_OF_DAY_PRESETS.includes(currentTime)) {
+          setTimeOfDaySelection(currentTime);
+          setCustomTimeOfDay("");
+        } else {
+          setTimeOfDaySelection("Custom");
+          setCustomTimeOfDay(currentTime);
+        }
+      } else {
+        setTimeOfDaySelection("Day");
+        setCustomTimeOfDay("");
+      }
+
+      setLocationDesc(scenePlanning?.location_description || "");
       setGoalText(scenePlanning?.overarching_goal || "");
-      // Focus textarea on modal reveal
+
+      // Focus goal textarea on modal reveal
       const timer = setTimeout(() => {
-        textareaRef.current?.focus();
+        goalRef.current?.focus();
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [isOpen, scenePlanning]);
+  }, [isOpen, sceneName, scenePlanning]);
 
   if (!isOpen) return null;
 
   const handleSave = () => {
-    onSave(goalText.trim());
+    const finalTimeOfDay = timeOfDaySelection === "Custom" 
+      ? customTimeOfDay.trim() 
+      : timeOfDaySelection;
+
+    onSave({
+      sceneName: currentSceneName.trim() || "Untitled Scene",
+      planning: {
+        ...(scenePlanning || {}),
+        mood_genre: moodGenre.trim(),
+        time_of_day: finalTimeOfDay,
+        location_description: locationDesc.trim(),
+        overarching_goal: goalText.trim()
+      }
+    });
     onClose();
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement | HTMLInputElement>) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
       e.preventDefault();
       handleSave();
@@ -73,11 +126,11 @@ export const ScenePlanModal: React.FC<ScenePlanModalProps> = ({
               <Compass className="w-5 h-5" />
             </div>
             <div>
-              <h2 id="scene-plan-title" className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-                Scene Plan
+              <h2 id="scene-plan-title" className="text-base font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                Scene Plan & Directives
               </h2>
               <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                Scene: <span className="font-semibold text-zinc-700 dark:text-zinc-300">{sceneName}</span>
+                Define the high-level goals and atmosphere for the entire scene
               </p>
             </div>
           </div>
@@ -92,14 +145,113 @@ export const ScenePlanModal: React.FC<ScenePlanModalProps> = ({
 
         {/* Modal Body */}
         <div className="p-6 space-y-4 overflow-y-auto">
+          {/* 1. Scene Name Input */}
           <div>
-            <div className="flex items-center justify-between mb-2">
+            <label 
+              htmlFor="scene-name-input"
+              className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5 mb-1.5"
+            >
+              <Film className="w-3.5 h-3.5 text-indigo-500" />
+              Scene Name
+            </label>
+            <input
+              id="scene-name-input"
+              type="text"
+              value={currentSceneName}
+              onChange={(e) => setCurrentSceneName(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="e.g. Marcus Confrontation - Alleyway Exit"
+              className="w-full px-3.5 py-2 text-sm rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50/70 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-hidden focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all font-medium"
+            />
+          </div>
+
+          {/* 2. Mood & Time of Day Row */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            {/* Mood / Genre Box */}
+            <div>
+              <label 
+                htmlFor="scene-mood-input"
+                className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5 mb-1.5"
+              >
+                <Drama className="w-3.5 h-3.5 text-purple-500" />
+                Mood &amp; Genre
+              </label>
+              <input
+                id="scene-mood-input"
+                type="text"
+                value={moodGenre}
+                onChange={(e) => setMoodGenre(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="e.g. Neo-noir cyber-thriller, tense, paranoid"
+                className="w-full px-3.5 py-2 text-xs rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50/70 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-hidden focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all"
+              />
+            </div>
+
+            {/* Time of Day Pull-down + Custom */}
+            <div>
+              <label 
+                htmlFor="scene-time-select"
+                className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5 mb-1.5"
+              >
+                <Clock className="w-3.5 h-3.5 text-amber-500" />
+                Time of Day
+              </label>
+              <div className="flex gap-2">
+                <select
+                  id="scene-time-select"
+                  value={timeOfDaySelection}
+                  onChange={(e) => setTimeOfDaySelection(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50/70 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all cursor-pointer"
+                >
+                  {TIME_OF_DAY_PRESETS.map((preset) => (
+                    <option key={preset} value={preset}>
+                      {preset}
+                    </option>
+                  ))}
+                </select>
+                {timeOfDaySelection === "Custom" && (
+                  <input
+                    type="text"
+                    value={customTimeOfDay}
+                    onChange={(e) => setCustomTimeOfDay(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="e.g. Solar Eclipse"
+                    className="w-1/2 px-3 py-2 text-xs rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50/70 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-hidden focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all"
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* 3. Location Box */}
+          <div>
+            <label 
+              htmlFor="scene-location-input"
+              className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5 mb-1.5"
+            >
+              <MapPin className="w-3.5 h-3.5 text-rose-500" />
+              Location &amp; Setting Description
+            </label>
+            <input
+              id="scene-location-input"
+              type="text"
+              value={locationDesc}
+              onChange={(e) => setLocationDesc(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="e.g. Rain-slicked alleyway in Sector 4, wet pavement, flickering holographic signs"
+              className="w-full px-3.5 py-2 text-xs rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50/70 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-hidden focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all"
+            />
+          </div>
+
+          {/* 4. Overarching Goal & Dramatic Objective */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
               <label 
                 htmlFor="scene-overarching-goal-input"
                 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5"
               >
                 <Target className="w-3.5 h-3.5 text-amber-500" />
-                Overarching Goal & Dramatic Objective
+                Overarching Goal &amp; Dramatic Objective
               </label>
               <span className="text-[11px] text-zinc-400 dark:text-zinc-500 font-mono">
                 {goalText.length} characters
@@ -107,13 +259,13 @@ export const ScenePlanModal: React.FC<ScenePlanModalProps> = ({
             </div>
             <textarea
               id="scene-overarching-goal-input"
-              ref={textareaRef}
+              ref={goalRef}
               value={goalText}
               onChange={(e) => setGoalText(e.target.value)}
               onKeyDown={handleKeyDown}
-              rows={8}
-              placeholder="What is the overarching goal for this scene? Describe the core narrative beat, conflict, or dramatic objective..."
-              className="w-full px-3.5 py-3 text-sm rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50/70 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-hidden focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all font-sans leading-relaxed resize-y"
+              rows={5}
+              placeholder="What is the overarching dramatic goal for this scene? Describe what shifts, escalates, or resolves across these shots..."
+              className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50/70 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-hidden focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all font-sans leading-relaxed resize-y"
             />
           </div>
         </div>
@@ -145,3 +297,4 @@ export const ScenePlanModal: React.FC<ScenePlanModalProps> = ({
     </div>
   );
 };
+

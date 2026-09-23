@@ -514,16 +514,34 @@ export async function expandPrompt(
     ? `\nFRAMING DIRECTIVE:\n${resolvedFramingDirective}\nA Framing Directive is provided; utilize the specific anchor and focus subject likenesses provided in the Global Subject Definitions to execute this framing.\n`
     : "";
 
+  // Scene Planning High-Level Directives (Mood, Time of Day, Location, Goal)
+  const spPlan = scene_planning || planning;
+  const moodSetting = spPlan?.mood_genre?.trim() || "";
+  const timeSetting = spPlan?.time_of_day?.trim() || "";
+  const locationSetting = spPlan?.location_description?.trim() || "";
+  const goalSetting = spPlan?.overarching_goal?.trim() || "";
+
+  const sceneDirectivesList = [
+    moodSetting ? `Mood & Genre: ${moodSetting}` : null,
+    timeSetting ? `Time of Day / Lighting: ${timeSetting}` : null,
+    locationSetting ? `Scene Location / Set: ${locationSetting}` : null,
+    goalSetting ? `Dramatic Scene Goal: ${goalSetting}` : null
+  ].filter(Boolean);
+
+  const scenePlanDirectivesBlock = sceneDirectivesList.length > 0
+    ? `\nSCENE PLANNING & ATMOSPHERIC DIRECTIVES:\n${sceneDirectivesList.join("\n")}\n`
+    : "";
+
   const userPrompt = `CREATIVE CONCEPT / STUB (IMMUTABLE STORY & ACTION GROUND TRUTH):
 "${basic_stub}"
 
 SHOT PLANNING CONTEXT:
 ${resolvedPromptPrefix || "Shot 01"}
-${cameraContextBlock}${opticsContextBlock}${framingContextBlock}
+${cameraContextBlock}${opticsContextBlock}${framingContextBlock}${scenePlanDirectivesBlock}
 AVAILABLE MULTIMODAL REFERENCE ASSETS:
 ${subjectDefinitions || "No reference definitions"}
 
-Generate ONLY the integrated_multimodal_description narrative incorporating the reference tags naturally while strictly preserving the core action from the creative stub and adhering to all camera, optics, and framing constraints.`;
+Generate ONLY the integrated_multimodal_description narrative incorporating the reference tags naturally while strictly preserving the core action from the creative stub and adhering to all atmospheric, camera, optics, and framing constraints.`;
 
   let rawLlmDescription = "";
   let providerUsed = "Local LM Studio";

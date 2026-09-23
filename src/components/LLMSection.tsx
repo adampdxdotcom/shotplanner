@@ -41,6 +41,8 @@ interface LLMSectionProps {
   onUpdateSpecificShot?: (id: string, updater: (prev: ShotItem) => ShotItem) => void;
   onUpdateProject?: React.Dispatch<React.SetStateAction<SceneProjectFile>> | ((updater: (prev: SceneProjectFile) => SceneProjectFile) => void);
   config?: AppConfig;
+  onOpenScenePlan?: () => void;
+  hasScenePlan?: boolean;
 }
 
 /**
@@ -67,7 +69,9 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
   onUpdateShot,
   onUpdateSpecificShot,
   onUpdateProject,
-  config
+  config,
+  onOpenScenePlan,
+  hasScenePlan = false
 }) => {
   // Resolve effective default provider (only default LLM is active & shown)
   const effectiveDefaultProvider: LLMProvider = 
@@ -236,6 +240,8 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
         sceneName={sceneProject.scene_name}
         onNewShot={onUpdateProject ? handleAddBlankShot : undefined}
         onDuplicateShot={onUpdateProject && activeShot ? handleDuplicateShot : undefined}
+        onOpenScenePlan={onOpenScenePlan}
+        hasScenePlan={hasScenePlan}
       />
 
       {/* Prompt Variation History Strip */}

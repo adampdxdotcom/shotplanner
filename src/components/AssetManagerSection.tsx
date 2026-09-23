@@ -32,6 +32,8 @@ interface AssetManagerSectionProps {
   onAssetDeleted: (filename: string) => void;
   onAssetUpdated: (oldFilename: string, newAsset: MediaAsset) => void;
   addToast?: (text: string, type?: "success" | "error" | "info") => void;
+  onOpenScenePlan?: () => void;
+  hasScenePlan?: boolean;
 }
 
 export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
@@ -47,7 +49,9 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
   onRegisterSubject = (_name: string) => {},
   onAssetUploaded,
   onAssetUpdated,
-  addToast
+  addToast,
+  onOpenScenePlan,
+  hasScenePlan = false
 }) => {
   const [activeTab, setActiveTab] = useState<"image" | "audio" | "video" | "takes">(() => getLastAssetTab("image"));
 
@@ -164,6 +168,8 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
         sceneName={activeSceneName}
         onNewShot={handleAddBlankShot}
         onDuplicateShot={activeShot ? handleDuplicateShot : undefined}
+        onOpenScenePlan={onOpenScenePlan}
+        hasScenePlan={hasScenePlan}
       />
 
       {!activeShotId ? (

@@ -76,6 +76,9 @@ export interface UpdateScenePlanningChanges {
   camera_gear?: string;
   audio_style?: string;
   custom_instructions?: string;
+  mood_genre?: string;
+  time_of_day?: string;
+  location_description?: string;
   scene_name?: string;
 }
 
@@ -265,7 +268,19 @@ function normalizeActionInPlace(action: any) {
   }
   if (action.type === "update_scene_planning") {
     // If changes were passed at root of action, move to changes object
-    if (!action.changes && (action.overarching_goal || action.visual_theme || action.environment_description || action.lighting_style || action.camera_gear || action.audio_style || action.custom_instructions)) {
+    if (!action.changes && (
+      action.overarching_goal ||
+      action.visual_theme ||
+      action.environment_description ||
+      action.lighting_style ||
+      action.camera_gear ||
+      action.audio_style ||
+      action.custom_instructions ||
+      action.mood_genre ||
+      action.time_of_day ||
+      action.location_description ||
+      action.scene_name
+    )) {
       const { type, title, description, ...changes } = action;
       action.changes = changes;
     }
@@ -286,7 +301,20 @@ function isValidAction(obj: any): obj is AssistantAction {
   if (actionType === "add_shot" && (obj.shot || obj.changes)) {
     return true;
   }
-  if (actionType === "update_scene_planning" && (obj.changes || obj.overarching_goal || obj.visual_theme || obj.environment_description || obj.lighting_style || obj.camera_gear || obj.audio_style || obj.custom_instructions)) {
+  if (actionType === "update_scene_planning" && (
+    obj.changes ||
+    obj.overarching_goal ||
+    obj.visual_theme ||
+    obj.environment_description ||
+    obj.lighting_style ||
+    obj.camera_gear ||
+    obj.audio_style ||
+    obj.custom_instructions ||
+    obj.mood_genre ||
+    obj.time_of_day ||
+    obj.location_description ||
+    obj.scene_name
+  )) {
     return true;
   }
   if (actionType === "update_character" && (obj.character_name || obj.name) && (obj.changes || typeof obj.notes === "string")) {

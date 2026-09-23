@@ -55,6 +55,8 @@ export interface WorkflowSectionProps {
   sceneProject: SceneProjectFile;
   onUpdateShot: (updater: (prev: ShotItem) => ShotItem) => void;
   onUpdateProject?: React.Dispatch<React.SetStateAction<SceneProjectFile>> | ((updater: (prev: SceneProjectFile) => SceneProjectFile) => void);
+  onOpenScenePlan?: () => void;
+  hasScenePlan?: boolean;
 }
 
 export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
@@ -79,7 +81,9 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
   sceneProject,
   onUpdateShot,
   onUpdateProject,
-  activeSceneName
+  activeSceneName,
+  onOpenScenePlan,
+  hasScenePlan = false
 }) => {
   const [uploading, setUploading] = useState(false);
   const [showRawJson, setShowRawJson] = useState(false);
@@ -225,6 +229,8 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
         sceneName={activeSceneName}
         onNewShot={onUpdateProject ? handleAddBlankShot : undefined}
         onDuplicateShot={onUpdateProject && activeShot ? handleDuplicateShot : undefined}
+        onOpenScenePlan={onOpenScenePlan}
+        hasScenePlan={hasScenePlan}
       />
 
       <div className="bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-700 rounded-xl p-5 shadow-xs space-y-5">

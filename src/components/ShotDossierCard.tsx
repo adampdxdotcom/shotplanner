@@ -14,7 +14,8 @@ import {
   Copy, 
   Check, 
   Sparkles,
-  Quote
+  Quote,
+  Compass
 } from "lucide-react";
 
 export interface ShotDossierCardProps {
@@ -25,6 +26,8 @@ export interface ShotDossierCardProps {
   sceneName?: string;
   onNewShot?: () => void;
   onDuplicateShot?: () => void;
+  onOpenScenePlan?: () => void;
+  hasScenePlan?: boolean;
   extraActions?: React.ReactNode;
   className?: string;
 }
@@ -37,6 +40,8 @@ export const ShotDossierCard: React.FC<ShotDossierCardProps> = ({
   sceneName = "Scene",
   onNewShot,
   onDuplicateShot,
+  onOpenScenePlan,
+  hasScenePlan = false,
   extraActions,
   className = ""
 }) => {
@@ -199,6 +204,20 @@ export const ShotDossierCard: React.FC<ShotDossierCardProps> = ({
             >
               <Plus className="w-3.5 h-3.5" />
               <span>New Shot</span>
+            </button>
+          )}
+          {onOpenScenePlan && (
+            <button
+              type="button"
+              onClick={onOpenScenePlan}
+              className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 dark:bg-amber-600/20 dark:hover:bg-amber-600/30 dark:text-amber-300 dark:border-amber-500/30 rounded-lg text-xs font-semibold transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
+              title="Open Scene Plan & Directives"
+            >
+              <Compass className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+              <span>Scene Plan</span>
+              {hasScenePlan && (
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" title="Scene Plan defined" />
+              )}
             </button>
           )}
           {extraActions}

@@ -58,8 +58,11 @@ function buildProjectDossier(
         sections.push(`OVERARCHING SCENE GOAL & NARRATIVE OBJECTIVE:\n"${sp.overarching_goal}"`);
       }
       const planDetails = [
+        sp.mood_genre ? `Mood & Genre: ${sp.mood_genre}` : null,
+        sp.time_of_day ? `Time of Day: ${sp.time_of_day}` : null,
+        sp.location_description ? `Scene Location: ${sp.location_description}` : null,
         sp.visual_theme ? `Visual Theme: ${sp.visual_theme}` : null,
-        sp.environment_description ? `Environment / Location: ${sp.environment_description}` : null,
+        sp.environment_description ? `Environment Details: ${sp.environment_description}` : null,
         sp.lighting_style ? `Lighting Style: ${sp.lighting_style}` : null,
         sp.camera_gear ? `Camera Gear / Notes: ${sp.camera_gear}` : null,
         sp.audio_style ? `Audio Style: ${sp.audio_style}` : null,
@@ -353,9 +356,12 @@ Action formats:
   "type": "update_scene_planning",
   "title": "Establish Neo-Noir Rain Atmosphere",
   "changes": {
+    "scene_name": "Sector 4 Alley Confrontation",
+    "mood_genre": "Gritty Cyberpunk Thriller with tense, paranoid atmosphere",
+    "time_of_day": "Midnight in heavy rain",
+    "location_description": "Rain-slicked alleyway in Sector 4 with flickering holographic ads, steam vents, wet neon reflections",
     "overarching_goal": "Elena tracks down the rogue courier in the alley, escalating from stealth surveillance to a tense confrontation.",
     "visual_theme": "Cyberpunk Neo-Noir, High Contrast Chiaroscuro",
-    "environment_description": "Rain-slicked alleyway in Sector 4 with flickering holographic ads",
     "lighting_style": "Deep cyan ambient with warm neon amber highlights",
     "camera_gear": "ARRI Alexa Mini LF with Cooke Anamorphic /i Full Frame Plus",
     "audio_style": "Low industrial synth drone and persistent rhythmic rainfall",

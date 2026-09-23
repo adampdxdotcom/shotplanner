@@ -127,7 +127,22 @@ export const ScenePlanningHeader: React.FC<ScenePlanningHeaderProps> = ({
         </div>
 
         {/* Current Shot Badge & Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {planning.mood_genre && (
+            <span className="text-[11px] px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800/40 truncate max-w-[160px]" title={`Mood: ${planning.mood_genre}`}>
+              🎭 {planning.mood_genre}
+            </span>
+          )}
+          {planning.time_of_day && (
+            <span className="text-[11px] px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/40 truncate max-w-[130px]" title={`Time: ${planning.time_of_day}`}>
+              ⏰ {planning.time_of_day}
+            </span>
+          )}
+          {planning.location_description && (
+            <span className="text-[11px] px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800/40 truncate max-w-[180px]" title={`Location: ${planning.location_description}`}>
+              📍 {planning.location_description}
+            </span>
+          )}
           <span className="text-xs font-mono font-semibold px-2.5 py-1 rounded-md bg-zinc-100 text-indigo-700 border border-indigo-200 dark:bg-zinc-900 dark:text-indigo-300 dark:border-indigo-500/30 flex items-center gap-1.5 shadow-xs">
             <Film className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
             Shot {formattedShot}

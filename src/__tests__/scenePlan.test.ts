@@ -32,17 +32,25 @@ describe("scenePlan.test.ts - Scene Plan & Overarching Goal Integration", () => 
     );
   });
 
-  it("supports overarching_goal within the update_scene_planning assistant action", () => {
+  it("supports overarching_goal, mood_genre, time_of_day, and location_description within the update_scene_planning assistant action", () => {
     const action: UpdateScenePlanningAction = {
       type: "update_scene_planning",
-      title: "Refine Dramatic Objective",
+      title: "Refine Dramatic Objective & Atmosphere",
       changes: {
+        scene_name: "Rooftop Infiltration",
+        mood_genre: "Gritty Cyberpunk Suspense",
+        time_of_day: "Dusk / Sunset",
+        location_description: "Industrial helipad overlooking smog-filled skyline",
         overarching_goal: "Build tension steadily as Elena discovers the hacked terminal.",
         lighting_style: "Low key neon green underglow"
       }
     };
 
     expect(action.type).toBe("update_scene_planning");
+    expect(action.changes.scene_name).toBe("Rooftop Infiltration");
+    expect(action.changes.mood_genre).toBe("Gritty Cyberpunk Suspense");
+    expect(action.changes.time_of_day).toBe("Dusk / Sunset");
+    expect(action.changes.location_description).toBe("Industrial helipad overlooking smog-filled skyline");
     expect(action.changes.overarching_goal).toBe(
       "Build tension steadily as Elena discovers the hacked terminal."
     );

@@ -200,6 +200,9 @@ export interface ScenePlanningDetails {
   camera_gear?: string;
   audio_style?: string;
   custom_instructions?: string;
+  mood_genre?: string;
+  time_of_day?: string;
+  location_description?: string;
   [key: string]: any;
 }
 
@@ -213,6 +216,10 @@ export interface ScenePlanningDTO {
   ots_anchor_subject?: string;
   ots_focus_subject?: string;
   ots_side?: "Left" | "Right";
+  overarching_goal?: string;
+  mood_genre?: string;
+  time_of_day?: string;
+  location_description?: string;
 }
 
 export type ScenePlanning = ScenePlanningDTO;

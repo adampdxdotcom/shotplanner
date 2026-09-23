@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from "react";
-import { SceneProjectFile, ShotItem, MediaAsset, AppConfig, CharacterProfile, UniverseCharacterProfile } from "../types";
+import { SceneProjectFile, ShotItem, MediaAsset, AppConfig, CharacterProfile, UniverseCharacterProfile, ScenePlanningDetails } from "../types";
 import { ComfyMonitorState } from "../hooks/useComfyMonitor";
 import { TakeReviewModal } from "./TakeReviewModal";
 import { TakeComparisonModal } from "./TakeComparisonModal";
@@ -30,6 +30,8 @@ interface Props {
   onUpdateSpecificShot?: (id: string, updater: (prev: ShotItem) => ShotItem) => void;
   onNavigate?: (section: string) => void;
   monitorState?: ComfyMonitorState;
+  onOpenScenePlan?: () => void;
+  hasScenePlan?: boolean;
 }
 
 export default function SceneProjectHub({
@@ -46,7 +48,9 @@ export default function SceneProjectHub({
   onAssetUploaded,
   onUpdateSpecificShot,
   onNavigate,
-  monitorState
+  monitorState,
+  onOpenScenePlan,
+  hasScenePlan
 }: Props) {
   const [reviewTakeId, setReviewTakeId] = useState<string | null>(null);
   const [isComparisonOpen, setIsComparisonOpen] = useState(false);
@@ -59,19 +63,20 @@ export default function SceneProjectHub({
   const [universeCharacters, setUniverseCharacters] = useState<Record<string, UniverseCharacterProfile>>({});
   const [universeAssets, setUniverseAssets] = useState<MediaAsset[]>([]);
 
-  const handleSaveScenePlan = (overarchingGoal: string) => {
+  const handleSaveScenePlan = (payload: {
+    sceneName: string;
+    planning: Partial<ScenePlanningDetails>;
+  }) => {
     onUpdateProject((prev) => ({
       ...prev,
+      scene_name: payload.sceneName || prev.scene_name,
       scene_planning: {
         ...(prev.scene_planning || {}),
-        overarching_goal: overarchingGoal
+        ...payload.planning
       },
       updated_at: new Date().toISOString()
     }));
-    onShowToast(
-      overarchingGoal ? "Scene Plan updated." : "Scene Plan cleared.",
-      "success"
-    );
+    onShowToast("Scene Plan updated.", "success");
   };
 
   // Fetch universe roster & media pool whenever import modal is triggered
@@ -339,6 +344,12 @@ export default function SceneProjectHub({
         sceneName={project.scene_name}
         onNewShot={handleAddBlankShot}
         onDuplicateShot={activeShot ? handleDuplicateActiveShot : undefined}
+        onOpenScenePlan={onOpenScenePlan || (() => setIsScenePlanOpen(true))}
+        hasScenePlan={hasScenePlan !== undefined ? hasScenePlan : Boolean(
+          project.scene_planning?.overarching_goal?.trim() ||
+          project.scene_planning?.mood_genre?.trim() ||
+          project.scene_planning?.location_description?.trim()
+        )}
       />
 
       {/* Scene Controls & Action Bar */}
@@ -363,18 +374,6 @@ export default function SceneProjectHub({
         </div>
 
         <div className="flex items-center gap-2 self-end sm:self-auto">
-          <button
-            id="scene-plan-modal-btn"
-            onClick={() => setIsScenePlanOpen(true)}
-            className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700 shadow-xs transition-colors cursor-pointer"
-            title="Open Scene Plan & Narrative Goal"
-          >
-            <Compass className="w-4 h-4 text-amber-500" />
-            <span>Scene Plan</span>
-            {Boolean(project.scene_planning?.overarching_goal?.trim()) && (
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 ml-0.5" title="Scene Plan defined" />
-            )}
-          </button>
           <button
             onClick={() => setIsSketchImportOpen(true)}
             className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs transition-colors cursor-pointer"

@@ -1,5 +1,5 @@
 import React from "react";
-import { BookOpen, Palette, MapPin, Sliders, Camera, Check, Undo2, Sparkles, ArrowRight, X, Compass } from "lucide-react";
+import { BookOpen, Palette, MapPin, Sliders, Camera, Check, Undo2, Sparkles, ArrowRight, X, Compass, Clock, Drama } from "lucide-react";
 import { UpdateScenePlanningAction, AssistantAction } from "../../../types/assistantActions";
 
 interface UpdateScenePlanningActionCardProps {
@@ -62,6 +62,33 @@ export const UpdateScenePlanningActionCard: React.FC<UpdateScenePlanningActionCa
             <strong className="text-slate-800 dark:text-zinc-200 font-medium">{changes.scene_name}</strong>
           </div>
         )}
+        {changes.mood_genre && (
+          <div className="flex items-start gap-1.5">
+            <Drama className="w-3.5 h-3.5 text-purple-500 shrink-0 mt-0.5" />
+            <div>
+              <span className="text-slate-400 dark:text-zinc-500 mr-1 font-medium">Mood & Genre:</span>
+              <span className="text-slate-800 dark:text-zinc-200">{changes.mood_genre}</span>
+            </div>
+          </div>
+        )}
+        {changes.time_of_day && (
+          <div className="flex items-start gap-1.5">
+            <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+            <div>
+              <span className="text-slate-400 dark:text-zinc-500 mr-1 font-medium">Time of Day:</span>
+              <span className="text-slate-800 dark:text-zinc-200">{changes.time_of_day}</span>
+            </div>
+          </div>
+        )}
+        {changes.location_description && (
+          <div className="flex items-start gap-1.5">
+            <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0 mt-0.5" />
+            <div>
+              <span className="text-slate-400 dark:text-zinc-500 mr-1 font-medium">Scene Location:</span>
+              <span className="text-slate-800 dark:text-zinc-200">{changes.location_description}</span>
+            </div>
+          </div>
+        )}
         {changes.overarching_goal && (
           <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-950 dark:text-amber-200">
             <div className="flex items-center gap-1 font-semibold text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-400 mb-0.5">
@@ -84,9 +111,9 @@ export const UpdateScenePlanningActionCard: React.FC<UpdateScenePlanningActionCa
         )}
         {changes.environment_description && (
           <div className="flex items-start gap-1.5">
-            <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0 mt-0.5" />
+            <MapPin className="w-3.5 h-3.5 text-blue-500 shrink-0 mt-0.5" />
             <div>
-              <span className="text-slate-400 dark:text-zinc-500 mr-1 font-medium">Environment:</span>
+              <span className="text-slate-400 dark:text-zinc-500 mr-1 font-medium">Environment Details:</span>
               <span className="text-slate-800 dark:text-zinc-200">{changes.environment_description}</span>
             </div>
           </div>
