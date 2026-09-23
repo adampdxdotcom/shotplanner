@@ -14,7 +14,6 @@ import { copyToClipboard } from "../utils/clipboard";
 import { Sparkles, Bot, AlertCircle, History } from "lucide-react";
 import { useShotPromptContext } from "./prompt/useShotPromptContext";
 import { usePromptExpansion } from "./prompt/usePromptExpansion";
-import { ShotDossierCard } from "./ShotDossierCard";
 import { VariationSelector } from "./workflow/VariationSelector";
 import { TakeSelector } from "./TakeSelector";
 import { BasicStubInput } from "./prompt/BasicStubInput";
@@ -231,19 +230,6 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
 
   return (
     <div id="llm-section" className="w-full space-y-5 flex flex-col min-h-0">
-      {/* Unified Shot Dossier Card */}
-      <ShotDossierCard
-        shots={sceneProject.shots}
-        activeShotId={activeShotId}
-        onSelectShot={onSelectShot}
-        assets={assets}
-        sceneName={sceneProject.scene_name}
-        onNewShot={onUpdateProject ? handleAddBlankShot : undefined}
-        onDuplicateShot={onUpdateProject && activeShot ? handleDuplicateShot : undefined}
-        onOpenScenePlan={onOpenScenePlan}
-        hasScenePlan={hasScenePlan}
-      />
-
       {/* Prompt Variation History Strip */}
       {activeShot && activeShot.prompt_variations && activeShot.prompt_variations.length > 0 && (
         <div className="bg-white dark:bg-zinc-900/80 border border-amber-300 dark:border-amber-500/30 rounded-xl p-3 shadow-xs">

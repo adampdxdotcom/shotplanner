@@ -4,7 +4,6 @@ import { SceneProjectFile, ShotItem, MediaAsset, AppConfig, CharacterProfile, Un
 import { ComfyMonitorState } from "../hooks/useComfyMonitor";
 import { TakeReviewModal } from "./TakeReviewModal";
 import { TakeComparisonModal } from "./TakeComparisonModal";
-import { ShotDossierCard } from "./ShotDossierCard";
 import { ShotCarousel } from "./hub/ShotCarousel";
 import { ShotCharacterRoster } from "./hub/ShotCharacterRoster";
 import { AssetMatrixPanel } from "./hub/AssetMatrixPanel";
@@ -335,23 +334,6 @@ export default function SceneProjectHub({
 
   return (
     <div className="w-full flex flex-col h-full space-y-5">
-      {/* Unified Shot Dossier Card at Top of Scene Hub */}
-      <ShotDossierCard
-        shots={project.shots}
-        activeShotId={activeShotId}
-        onSelectShot={onSelectShot}
-        assets={assets}
-        sceneName={project.scene_name}
-        onNewShot={handleAddBlankShot}
-        onDuplicateShot={activeShot ? handleDuplicateActiveShot : undefined}
-        onOpenScenePlan={onOpenScenePlan || (() => setIsScenePlanOpen(true))}
-        hasScenePlan={hasScenePlan !== undefined ? hasScenePlan : Boolean(
-          project.scene_planning?.overarching_goal?.trim() ||
-          project.scene_planning?.mood_genre?.trim() ||
-          project.scene_planning?.location_description?.trim()
-        )}
-      />
-
       {/* Scene Controls & Action Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-1">
         <div className="flex items-center gap-3">

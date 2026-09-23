@@ -4,7 +4,6 @@ import { AppConfig, SceneProjectFile, ShotItem, TransferResult, MediaAsset, gene
 import { ComfyMonitorState } from "../hooks/useComfyMonitor";
 import { Send, Activity } from "lucide-react";
 
-import { ShotDossierCard } from "./ShotDossierCard";
 import { ExecutionMonitor } from "./execution/ExecutionMonitor";
 import { SendShotPanel } from "./execution/SendShotPanel";
 import { SendScenePanel } from "./execution/SendScenePanel";
@@ -418,19 +417,6 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
 
   return (
     <div id="execution-section" className="w-full space-y-5 flex flex-col min-h-0">
-      {/* Unified Shot Dossier Card */}
-      <ShotDossierCard
-        shots={sceneProject.shots}
-        activeShotId={activeShotId}
-        onSelectShot={onSelectShot}
-        assets={assets}
-        sceneName={activeSceneName}
-        onNewShot={handleAddBlankShot}
-        onDuplicateShot={activeShot ? handleDuplicateShot : undefined}
-        onOpenScenePlan={onOpenScenePlan}
-        hasScenePlan={hasScenePlan}
-      />
-
       {/* Quick RunPod Sync & Status Bar */}
       <RunpodQuickSyncBar
         config={config}

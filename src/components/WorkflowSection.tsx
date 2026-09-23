@@ -4,7 +4,6 @@ import { getAssetMediaUrl } from "../utils/assetUrl";
 import { formatShotNumber, generateSaveVideoPrefix } from "../utils/formatters";
 import { copyToClipboard } from "../utils/clipboard";
 import { generateLiveInjectedWorkflow } from "../utils/workflowInjection";
-import { ShotDossierCard } from "./ShotDossierCard";
 import { WorkflowFileSelector } from "./workflow/WorkflowFileSelector";
 import { MediaLoaderMapper } from "./workflow/MediaLoaderMapper";
 import { LiveWorkflowPreview } from "./workflow/LiveWorkflowPreview";
@@ -220,19 +219,6 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
 
   return (
     <div id="workflow-section" className="w-full space-y-5 flex flex-col min-h-0">
-      {/* Unified Shot Dossier Card */}
-      <ShotDossierCard
-        shots={sceneProject.shots}
-        activeShotId={activeShotId}
-        onSelectShot={onSelectShot}
-        assets={uploadedAssets}
-        sceneName={activeSceneName}
-        onNewShot={onUpdateProject ? handleAddBlankShot : undefined}
-        onDuplicateShot={onUpdateProject && activeShot ? handleDuplicateShot : undefined}
-        onOpenScenePlan={onOpenScenePlan}
-        hasScenePlan={hasScenePlan}
-      />
-
       <div className="bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-700 rounded-xl p-5 shadow-xs space-y-5">
         <WorkflowFileSelector 
           activeShotId={activeShotId}

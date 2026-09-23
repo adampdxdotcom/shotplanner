@@ -6,7 +6,6 @@ import { StagingEnvironmentControls } from "./cast/StagingEnvironmentControls";
 import { StagingActorInspector } from "./cast/StagingActorInspector";
 import { StagingCompositeSavePanel } from "./cast/StagingCompositeSavePanel";
 import { ActorPoseKeyingPanel } from "./cast/ActorPoseKeyingPanel";
-import { ShotDossierCard } from "./ShotDossierCard";
 import {
   StagedActor,
   useStagingStage,
@@ -189,19 +188,6 @@ export const StagingSection: React.FC<StagingSectionProps> = ({
 
   return (
     <div id="staging-section" className="w-full flex flex-col gap-6 min-h-0 flex-1">
-      {/* SHOT DOSSIER CARD */}
-      <ShotDossierCard
-        shots={sceneProject?.shots || []}
-        activeShotId={activeShotId || null}
-        onSelectShot={onSelectShot || (() => {})}
-        assets={assets}
-        sceneName={activeSceneName || sceneProject?.scene_name || "Scene"}
-        onNewShot={onUpdateProject ? handleNewShot : undefined}
-        onDuplicateShot={activeShot && onUpdateProject ? handleDuplicateShot : undefined}
-        onOpenScenePlan={onOpenScenePlan}
-        hasScenePlan={hasScenePlan}
-      />
-
       {/* SECTION HEADER CARD */}
       <StagingStudioHeader
         activeTab={activeTab}

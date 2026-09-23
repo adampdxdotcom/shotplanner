@@ -7,7 +7,6 @@ import { AssetUploadModal } from "./AssetUploadModal";
 import { AssetEditModal } from "./AssetEditModal";
 import { AssetLightbox } from "./AssetLightbox";
 import { getLastAssetTab, setLastAssetTab } from "../utils/workspaceSessionStore";
-import { ShotDossierCard } from "./ShotDossierCard";
 import { 
   EmptyShotState, 
   AssetTabBar, 
@@ -159,19 +158,6 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
 
   return (
     <div id="assets-section" className="w-full space-y-5 flex flex-col min-h-0">
-      {/* Unified Shot Dossier Card */}
-      <ShotDossierCard
-        shots={sceneProject.shots}
-        activeShotId={activeShotId}
-        onSelectShot={onSelectShot}
-        assets={assets}
-        sceneName={activeSceneName}
-        onNewShot={handleAddBlankShot}
-        onDuplicateShot={activeShot ? handleDuplicateShot : undefined}
-        onOpenScenePlan={onOpenScenePlan}
-        hasScenePlan={hasScenePlan}
-      />
-
       {!activeShotId ? (
         <EmptyShotState />
       ) : (

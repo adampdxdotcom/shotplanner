@@ -2,6 +2,8 @@ import React, { useState, Suspense, lazy } from "react";
 import { Navbar } from "./components/Navbar";
 import { ConfigTab } from "./components/ConfigSection";
 import { SectionLoadingFallback } from "./components/common/SectionLoadingFallback";
+import { ShotDossierCard } from "./components/ShotDossierCard";
+import { ShotItem } from "./types";
 import { useAppLogic } from "./hooks/useAppLogic";
 
 // Lazy-loaded top-level sections for optimal initial bundle performance
@@ -109,6 +111,52 @@ export default function App() {
     addToast("Scene Plan updated.", "success");
   };
 
+  const activeShot = sceneProject.shots?.find((s) => s.id === activeShotId) || null;
+
+  const handleAddBlankShot = () => {
+    const newShot: ShotItem = {
+      id: "shot_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
+      shot_number: (sceneProject.shots?.length || 0) + 1,
+      shot_type: "Medium Shot",
+      camera_movement: "Locked Off",
+      lens_focal_length: "50mm Standard Prime",
+      aspect_ratio: "16:9 Widescreen",
+      basic_stub: "",
+      expanded_prompt: "",
+      assigned_slots: {},
+      status: "unstaged",
+      updated_at: new Date().toISOString()
+    };
+    setSceneProject((prev) => ({ ...prev, shots: [...(prev.shots || []), newShot] }));
+    setActiveShotId(newShot.id);
+  };
+
+  const handleDuplicateShot = () => {
+    if (!activeShot) return;
+    const newId = "shot_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
+    setSceneProject((prev) => {
+      const idx = prev.shots.findIndex((s) => s.id === activeShot.id);
+      if (idx === -1) return prev;
+      const duplicatedShot: ShotItem = {
+        ...activeShot,
+        id: newId,
+        shot_number: activeShot.shot_number + 1,
+        shot_name: activeShot.shot_name ? `${activeShot.shot_name} (Copy)` : undefined,
+        status: "unstaged",
+        takes: [],
+        hero_take_id: undefined,
+        assigned_slots: { ...(activeShot.assigned_slots || {}) },
+        characters: activeShot.characters ? [...activeShot.characters] : [],
+        updated_at: new Date().toISOString()
+      };
+      const shots = [...prev.shots];
+      shots.splice(idx + 1, 0, duplicatedShot);
+      shots.forEach((s, i) => (s.shot_number = i + 1));
+      return { ...prev, shots };
+    });
+    setActiveShotId(newId);
+  };
+
   // Keep browser tab title synchronized with active scene or project name
   React.useEffect(() => {
     const displayName = sceneProject.scene_name?.trim() || currentProjectName?.trim() || "Untitled Project";
@@ -133,6 +181,21 @@ export default function App() {
 
       {/* Main Workspace Layout */}
       <main className="w-full max-w-7xl mx-auto px-4 lg:px-8 py-6 space-y-6 flex-1 flex flex-col min-h-0">
+        {/* Universal Shot Dossier Card (Mounted once for all workspace tabs) */}
+        {activeSection !== "gallery" && activeSection !== "cast" && activeSection !== "config" && (
+          <ShotDossierCard
+            shots={sceneProject.shots || []}
+            activeShotId={activeShotId}
+            onSelectShot={setActiveShotId}
+            assets={assets}
+            sceneName={sceneProject.scene_name || currentProjectName || "Scene"}
+            onNewShot={handleAddBlankShot}
+            onDuplicateShot={activeShot ? handleDuplicateShot : undefined}
+            onOpenScenePlan={() => setIsScenePlanOpen(true)}
+            hasScenePlan={hasScenePlan}
+          />
+        )}
+
         <Suspense fallback={<SectionLoadingFallback label={`Loading ${activeSection} module...`} />}>
           {/* Tab Content Rendering */}
           {activeSection === "scene" && (
@@ -152,8 +215,6 @@ export default function App() {
                 onUpdateSpecificShot={updateShot}
                 onNavigate={scrollToSection}
                 monitorState={monitorState}
-                onOpenScenePlan={() => setIsScenePlanOpen(true)}
-                hasScenePlan={hasScenePlan}
               />
             </div>
           )}
@@ -176,8 +237,6 @@ export default function App() {
               onAssetDeleted={handleAssetDeleted}
               onAssetUpdated={handleAssetUpdated}
               addToast={addToast}
-              onOpenScenePlan={() => setIsScenePlanOpen(true)}
-              hasScenePlan={hasScenePlan}
             />
           )}
 
@@ -196,8 +255,6 @@ export default function App() {
               addToast={addToast}
               autosaveStatus={autosaveStatus}
               lastSavedAt={lastSavedAt}
-              onOpenScenePlan={() => setIsScenePlanOpen(true)}
-              hasScenePlan={hasScenePlan}
             />
           )}
 
@@ -229,8 +286,6 @@ export default function App() {
               onUpdateSpecificShot={updateShot}
               onUpdateProject={setSceneProject}
               config={config}
-              onOpenScenePlan={() => setIsScenePlanOpen(true)}
-              hasScenePlan={hasScenePlan}
             />
           )}
 
@@ -258,8 +313,6 @@ export default function App() {
               onUpdateShot={updateActiveShot}
               onUpdateProject={setSceneProject}
               activeSceneName={sceneProject.scene_name || currentProjectName || "Untitled_Scene"}
-              onOpenScenePlan={() => setIsScenePlanOpen(true)}
-              hasScenePlan={hasScenePlan}
             />
           )}
 
@@ -276,8 +329,6 @@ export default function App() {
               onUpdateSceneProject={setSceneProject}
               onShowToast={addToast}
               onUpdateConfig={setConfig}
-              onOpenScenePlan={() => setIsScenePlanOpen(true)}
-              hasScenePlan={hasScenePlan}
             />
           )}
 
