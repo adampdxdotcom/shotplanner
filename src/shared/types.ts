@@ -329,6 +329,8 @@ export interface SceneProjectFile {
   visual_analysis_cache?: Record<string, ImageVisualAnalysis>;
   lm_studio_url?: string;
   local_llm_url?: string;
+  local_model?: string;
+  selected_ollama_model?: string;
   vision_enabled?: boolean;
   auto_caption_enabled?: boolean;
   config?: Partial<AppConfig>;
@@ -527,6 +529,8 @@ export interface AppConfig {
   comfyui_api_url: string;
   remote_api_token: string;
   lm_studio_url: string;
+  local_model?: string;
+  selected_ollama_model?: string;
   runpod_api_key?: string;
   runpod_auto_connect?: boolean;
   gemini_api_key?: string;

@@ -203,6 +203,7 @@ export function useAssistantChat({
     setAbortController(controller);
 
     try {
+      const model = sceneProject?.config?.local_model || sceneProject?.local_model || sceneProject?.config?.selected_ollama_model;
       const response = await sendAssistantChatMessage(
         {
           messages: getRollingChatWindow(newMessages, 16),
@@ -210,6 +211,7 @@ export function useAssistantChat({
           active_shot_id: activeShotId,
           active_section: activeSection,
           provider: effectiveDefault,
+          model,
           lm_studio_url: lmStudioUrl,
           attached_asset_filename: currentStagedAsset?.filename,
           attached_asset: currentStagedAsset

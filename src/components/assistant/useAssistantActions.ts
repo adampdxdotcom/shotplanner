@@ -7,7 +7,8 @@ import {
   MediaAsset, 
   AppConfig, 
   LLMProvider,
-  PromptVariation
+  PromptVariation,
+  GenerationParameters
 } from "../../types";
 import { 
   AssistantAction, 
@@ -204,9 +205,19 @@ export function useAssistantActions({
 
           const hasPromptChange = typeof changes.expanded_prompt === "string" && changes.expanded_prompt.trim().length > 0;
 
-          const mergedGenParams = changes.generation_params
-            ? { ...(current.generation_params || {}), ...changes.generation_params }
-            : current.generation_params;
+          const baseGenParams: GenerationParameters = current.generation_params || {
+            steps: 20,
+            megapixels: 1.0,
+            frames: 81
+          };
+
+          const mergedGenParams: GenerationParameters = changes.generation_params
+            ? {
+                steps: changes.generation_params.steps ?? baseGenParams.steps,
+                megapixels: changes.generation_params.megapixels ?? baseGenParams.megapixels,
+                frames: changes.generation_params.frames ?? baseGenParams.frames
+              }
+            : baseGenParams;
 
           let updatedShot: ShotItem = {
             ...current,

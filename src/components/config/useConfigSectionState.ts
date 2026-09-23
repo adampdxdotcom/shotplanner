@@ -46,9 +46,11 @@ export function useConfigSectionState({
   const [showPublicKeyModal, setShowPublicKeyModal] = useState(false);
   const [hasCopiedPublicKey, setHasCopiedPublicKey] = useState(false);
 
-  // LM Studio connection testing state
+  // Local LLM connection testing state
   const [testingLM, setTestingLM] = useState(false);
   const [lmTestResult, setLmTestResult] = useState<{ success?: boolean; message?: string } | null>(null);
+  const [detectedBackend, setDetectedBackend] = useState<"ollama" | "lm_studio" | "generic" | null>(null);
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
 
   // Gemini connection status state
   const [isGeminiConnected, setIsGeminiConnected] = useState(false);
@@ -86,12 +88,21 @@ export function useConfigSectionState({
         const previousStatus = wasConnectedRef.current.lm_studio;
         if (result.success) {
           setLmTestResult({ success: true, message: result.message });
+          setDetectedBackend(result.backend || null);
+          if (result.models && result.models.length > 0) {
+            setAvailableModels(result.models);
+            if (!config.local_model || !result.models.includes(config.local_model)) {
+              onChange({ ...config, local_model: result.models[0] });
+            }
+          } else {
+            setAvailableModels([]);
+          }
           wasConnectedRef.current.lm_studio = true;
         } else {
           setLmTestResult({ success: false, message: `Connection Failed: ${result.message}` });
           if (previousStatus === true) {
             if (onShowToast) {
-              onShowToast("Connection lost to LM Studio", "error");
+              onShowToast("Connection lost to Local LLM", "error");
             }
           }
           wasConnectedRef.current.lm_studio = false;
@@ -175,15 +186,27 @@ export function useConfigSectionState({
 
     if (result.success) {
       setLmTestResult({ success: true, message: result.message });
+      setDetectedBackend(result.backend || null);
+      if (result.models && result.models.length > 0) {
+        setAvailableModels(result.models);
+        if (!config.local_model || !result.models.includes(config.local_model)) {
+          onChange({ ...config, local_model: result.models[0] });
+        }
+      } else {
+        setAvailableModels([]);
+      }
       wasConnectedRef.current.lm_studio = true;
       if (onShowToast) {
-        onShowToast("✓ LM Studio connected successfully", "success");
+        const backendName = result.backend === "ollama" ? "Ollama" : result.backend === "lm_studio" ? "LM Studio" : "Local LLM";
+        onShowToast(`✓ ${backendName} connected successfully`, "success");
       }
     } else {
       setLmTestResult({ success: false, message: `Connection Failed: ${result.message}` });
+      setDetectedBackend(null);
+      setAvailableModels([]);
       wasConnectedRef.current.lm_studio = false;
       if (onShowToast) {
-        onShowToast(`⚠ LM Studio connection failed: ${result.message}`, "error");
+        onShowToast(`⚠ Connection failed: ${result.message}`, "error");
       }
     }
   };
@@ -197,16 +220,38 @@ export function useConfigSectionState({
 
     if (result.success) {
       setLmTestResult({ success: true, message: result.message });
+      setDetectedBackend(result.backend || null);
+      if (result.models && result.models.length > 0) {
+        setAvailableModels(result.models);
+        if (!config.local_model || !result.models.includes(config.local_model)) {
+          onChange({ ...config, local_model: result.models[0] });
+        }
+      } else {
+        setAvailableModels([]);
+      }
       wasConnectedRef.current.lm_studio = true;
       if (onSetDefaultProvider) {
         onSetDefaultProvider("lm_studio");
       }
     } else {
       setLmTestResult({ success: false, message: `Connection Failed: ${result.message}` });
+      setDetectedBackend(null);
+      setAvailableModels([]);
       wasConnectedRef.current.lm_studio = false;
       if (onShowToast) {
-        onShowToast(`Failed to set default: Could not connect to LM Studio`, "error");
+        onShowToast(`Failed to set default: Could not connect to Local LLM`, "error");
       }
+    }
+  };
+
+  const handleSelectModel = (model: string) => {
+    onChange({
+      ...config,
+      local_model: model,
+      selected_ollama_model: model
+    });
+    if (onShowToast) {
+      onShowToast(`Selected model: ${model}`, "info");
     }
   };
 
@@ -304,6 +349,9 @@ export function useConfigSectionState({
     handleDownloadFile,
     testingLM,
     lmTestResult,
+    detectedBackend,
+    availableModels,
+    handleSelectModel,
     handleInputChange,
     handleProviderSelect,
     handleDeactivateGemini,

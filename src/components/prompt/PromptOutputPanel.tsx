@@ -165,7 +165,7 @@ export const PromptOutputPanel: React.FC<PromptOutputPanelProps> = ({
             <div className="space-y-1 max-w-xs">
               <p className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 flex items-center justify-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 animate-pulse" />
-                <span>Expanding Prompt with {effectiveDefaultProvider === "gemini" ? "Gemini 3.7 Flash" : "LM Studio"}...</span>
+                <span>Expanding Prompt with {effectiveDefaultProvider === "gemini" ? "Gemini 3.7 Flash" : "Local LLM"}...</span>
               </p>
               <p className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-snug">
                 {elapsedSeconds >= 30 

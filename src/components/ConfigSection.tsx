@@ -56,6 +56,9 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({
     handleDownloadFile,
     testingLM,
     lmTestResult,
+    detectedBackend,
+    availableModels,
+    handleSelectModel,
     handleInputChange,
     handleProviderSelect,
     handleDeactivateGemini,
@@ -101,6 +104,9 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({
           handleSetDefaultLMStudio={handleSetDefaultLMStudio}
           testingLM={testingLM}
           lmTestResult={lmTestResult}
+          detectedBackend={detectedBackend}
+          availableModels={availableModels}
+          handleSelectModel={handleSelectModel}
           onSetDefaultProvider={onSetDefaultProvider}
           onDeactivateGemini={handleDeactivateGemini}
           onShowToast={onShowToast}

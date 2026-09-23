@@ -157,6 +157,7 @@ export function usePromptExpansion({
         scene_name: sceneProject?.scene_name || planning?.scene_name,
         characters: sceneProject?.characters,
         gemini_api_key: geminiApiKey,
+        model: config?.local_model || config?.selected_ollama_model,
         custom_system_prompt: config?.llm_custom_system_prompt,
         temperature: config?.llm_temperature,
         max_tokens: config?.llm_max_tokens

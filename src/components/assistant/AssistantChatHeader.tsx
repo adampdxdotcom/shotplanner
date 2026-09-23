@@ -35,7 +35,7 @@ export const AssistantChatHeader: React.FC<AssistantChatHeaderProps> = ({
               AI Production Assistant
             </h3>
             <span className="px-1.5 py-0.5 rounded text-[10px] font-mono uppercase bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950 dark:text-indigo-300 dark:border-indigo-800/60 font-semibold">
-              {effectiveDefault === "gemini" ? "Gemini" : "LM Studio"}
+              {effectiveDefault === "gemini" ? "Gemini" : "Local LLM"}
             </span>
           </div>
           <p className="text-[11px] text-slate-500 dark:text-zinc-400 truncate max-w-[180px] sm:max-w-[240px]">

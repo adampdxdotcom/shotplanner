@@ -18,6 +18,9 @@ interface LLMSetupTabProps {
   handleSetDefaultLMStudio: () => void;
   testingLM: boolean;
   lmTestResult: { success?: boolean; message?: string } | null;
+  detectedBackend?: "ollama" | "lm_studio" | "generic" | null;
+  availableModels?: string[];
+  handleSelectModel?: (model: string) => void;
   onSetDefaultProvider?: (provider: LLMProvider) => void;
   onDeactivateGemini?: () => void;
   onShowToast?: (text: string, type: "success" | "error" | "info") => void;
@@ -37,6 +40,9 @@ export const LLMSetupTab: React.FC<LLMSetupTabProps> = ({
   handleSetDefaultLMStudio,
   testingLM,
   lmTestResult,
+  detectedBackend,
+  availableModels = [],
+  handleSelectModel,
   onSetDefaultProvider,
   onDeactivateGemini,
   onShowToast
@@ -46,6 +52,11 @@ export const LLMSetupTab: React.FC<LLMSetupTabProps> = ({
   const hasUrl = Boolean(config.lm_studio_url && config.lm_studio_url.trim().length > 0);
   const isConnected = !urlEdited && lmTestResult?.success === true;
   const isError = !urlEdited && lmTestResult && !lmTestResult.success;
+
+  const isOllamaDetected =
+    detectedBackend === "ollama" ||
+    (config.lm_studio_url || "").includes("11434") ||
+    availableModels.some((m) => m.includes(":") && !m.includes("@"));
 
   const handleRunTest = () => {
     setUrlEdited(false);
@@ -65,7 +76,7 @@ export const LLMSetupTab: React.FC<LLMSetupTabProps> = ({
             </div>
             <div>
               <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">LLM Connection &amp; Provider Setup</h2>
-              <p className="text-xs text-zinc-600 dark:text-zinc-400">Select active LLM provider, manage local endpoints or API credentials, and set defaults.</p>
+              <p className="text-xs text-zinc-600 dark:text-zinc-400">Select active LLM provider, manage local endpoints (LM Studio, Ollama) or API credentials, and set defaults.</p>
             </div>
           </div>
 
@@ -91,7 +102,7 @@ export const LLMSetupTab: React.FC<LLMSetupTabProps> = ({
                     ? "text-amber-800 dark:text-amber-400" 
                     : "text-zinc-500 dark:text-zinc-400"
               }`} />
-              <span>LM Studio</span>
+              <span>Local LLM</span>
             </button>
 
             <button
@@ -126,7 +137,7 @@ export const LLMSetupTab: React.FC<LLMSetupTabProps> = ({
               <div className="flex items-center justify-between gap-2">
                 <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
                   <Cpu className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />
-                  Local LM Studio API URL
+                  Local LLM Endpoint URL (LM Studio / Ollama)
                 </label>
 
                 {effectiveDefault === "lm_studio" ? (
@@ -139,7 +150,7 @@ export const LLMSetupTab: React.FC<LLMSetupTabProps> = ({
                     type="button"
                     onClick={handleSetDefaultLMStudio}
                     disabled={testingLM}
-                    title="Set LM Studio as default LLM provider"
+                    title="Set Local LLM as default provider"
                     className="px-2.5 py-1 text-xs font-medium bg-white hover:bg-emerald-50 text-zinc-700 hover:text-emerald-800 border border-zinc-300 hover:border-emerald-300 dark:bg-zinc-800 dark:hover:bg-emerald-950/40 dark:text-zinc-300 dark:hover:text-emerald-300 dark:border-zinc-700 dark:hover:border-emerald-600/50 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shrink-0 disabled:opacity-50 shadow-xs"
                   >
                     <RefreshCw className={`w-3 h-3 ${testingLM ? "animate-spin text-emerald-600 dark:text-emerald-400" : "hidden"}`} />
@@ -152,13 +163,13 @@ export const LLMSetupTab: React.FC<LLMSetupTabProps> = ({
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                 <input
                   type="text"
-                  placeholder="http://localhost:1234/v1"
+                  placeholder="http://localhost:1234/v1 or http://localhost:11434/v1"
                   value={config.lm_studio_url || ""}
                   onChange={(e) => {
                     handleInputChange("lm_studio_url", e.target.value);
                     setUrlEdited(true);
                   }}
-                  className="flex-1 bg-white dark:bg-zinc-950 border-2 border-zinc-300 dark:border-zinc-700 focus:border-amber-500 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-600 outline-none transition-colors"
+                  className="flex-1 bg-white dark:bg-zinc-950 border-2 border-zinc-300 dark:border-zinc-700 focus:border-amber-500 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-600 outline-none transition-colors font-mono"
                 />
                 <button
                   type="button"
@@ -177,8 +188,8 @@ export const LLMSetupTab: React.FC<LLMSetupTabProps> = ({
                   }`}
                   title={
                     !hasUrl
-                      ? "Enter a Local LM Studio URL first to enable testing"
-                      : "Test connection to LM Studio endpoint"
+                      ? "Enter a Local LLM URL first to enable testing"
+                      : "Test connection to Local LLM endpoint"
                   }
                 >
                   {testingLM ? (
@@ -192,16 +203,18 @@ export const LLMSetupTab: React.FC<LLMSetupTabProps> = ({
                   )}
                   <span>
                     {testingLM
-                      ? "Testing LLM..."
+                      ? "Testing..."
                       : isConnected
-                      ? "LLM Connected"
+                      ? "Connected"
                       : isError
-                      ? "LLM Error"
-                      : "Test LLM"}
+                      ? "Connection Error"
+                      : "Test Connection"}
                   </span>
                 </button>
               </div>
-              <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Local OpenAI-compatible endpoint hosted by LM Studio for offline LLM expansion and scene planning.</p>
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                Supports LM Studio (port 1234), Ollama (port 11434), or any local OpenAI-compatible endpoint.
+              </p>
             </div>
 
             {lmTestResult && (
@@ -216,6 +229,76 @@ export const LLMSetupTab: React.FC<LLMSetupTabProps> = ({
                   <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
                 )}
                 <span className="font-semibold">{lmTestResult.message}</span>
+              </div>
+            )}
+
+            {/* Ollama Model Selector vs LM Studio Management Notice */}
+            {isConnected && (
+              <div className="pt-1">
+                {isOllamaDetected ? (
+                  <div className="p-3.5 rounded-lg bg-zinc-50 dark:bg-zinc-950/70 border border-zinc-300 dark:border-zinc-800 space-y-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] px-2 py-0.5 rounded font-mono font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/50">
+                          Ollama Detected
+                        </span>
+                        <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">
+                          Select Ollama Model
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleRunTest}
+                        disabled={testingLM}
+                        title="Refresh list of installed Ollama models"
+                        className="text-[11px] font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${testingLM ? "animate-spin" : ""}`} />
+                        <span>Refresh Models</span>
+                      </button>
+                    </div>
+
+                    {availableModels.length > 0 ? (
+                      <div className="space-y-1.5">
+                        <select
+                          value={config.local_model || availableModels[0] || ""}
+                          onChange={(e) => {
+                            if (handleSelectModel) {
+                              handleSelectModel(e.target.value);
+                            } else {
+                              handleInputChange("local_model", e.target.value);
+                            }
+                          }}
+                          className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 focus:border-amber-500 rounded-lg px-3 py-2 text-xs font-mono text-zinc-900 dark:text-zinc-100 outline-none transition-colors cursor-pointer"
+                        >
+                          {availableModels.map((m) => (
+                            <option key={m} value={m}>
+                              {m}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                          Ollama will dynamically load and serve this model on demand when generating prompts or chatting.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800/40 p-2.5 rounded-lg">
+                        No downloaded models found on this Ollama instance. Run <code className="font-mono bg-zinc-200 dark:bg-zinc-800 px-1 py-0.5 rounded">ollama pull &lt;model&gt;</code> in your terminal and click Refresh Models.
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] px-2 py-0.5 rounded font-mono font-semibold bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-700">
+                        LM Studio Backend
+                      </span>
+                      <span className="text-zinc-600 dark:text-zinc-400">
+                        Active model is loaded and managed directly inside your LM Studio desktop app.
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -246,7 +329,7 @@ export const LLMSetupTab: React.FC<LLMSetupTabProps> = ({
                           )}
                         </label>
                         <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5 leading-relaxed">
-                          Enable if your loaded model supports vision (Qwen2-VL, Llama-3.2-Vision). Offers AI captioning and visual descriptions.
+                          Enable if your loaded model supports vision (Qwen2-VL, Llama-3.2-Vision, LLaVA). Offers AI captioning and visual descriptions.
                         </p>
                       </div>
                     </div>
@@ -325,3 +408,4 @@ export const LLMSetupTab: React.FC<LLMSetupTabProps> = ({
     </div>
   );
 };
+

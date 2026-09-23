@@ -57,7 +57,7 @@ export const ConfigTabBar: React.FC<ConfigTabBarProps> = ({
               )}
             </div>
             <span className="text-[10px] font-normal text-zinc-400 block -mt-0.5 truncate">
-              {activeProvider === "gemini" ? "Google Gemini" : "LM Studio Local"}
+              {activeProvider === "gemini" ? "Google Gemini" : "Local LLM"}
             </span>
           </div>
         </button>

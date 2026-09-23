@@ -121,9 +121,9 @@ router.delete("/runpod", (req: Request, res: Response) => {
 });
 
 /**
- * Test LM Studio local API endpoint connection
+ * Test Local LLM (LM Studio / Ollama / OpenAI-compatible) API endpoint connection
  */
-router.post("/test-lm-studio", async (req: Request, res: Response) => {
+router.post(["/test-lm-studio", "/test-local-llm"], async (req: Request, res: Response) => {
   const { url, endpoint, targetUrl: rawTargetUrl } = req.body || {};
   const inputUrl = url || endpoint || rawTargetUrl || "http://localhost:1234/v1";
   const targetUrl = inputUrl.trim().replace(/\/$/, "");
@@ -151,15 +151,36 @@ router.post("/test-lm-studio", async (req: Request, res: Response) => {
     if (lmRes.ok) {
       const data = await lmRes.json().catch(() => ({}));
       const modelsList = Array.isArray(data.data) ? data.data : [];
-      const modelsCount = modelsList.length;
-      const modelNames = modelsList.map((m: any) => m.id || m.name || m);
+      const modelNames = modelsList
+        .map((m: any) => m.id || m.name || (typeof m === "string" ? m : ""))
+        .filter(Boolean);
+      const modelsCount = modelNames.length;
+
+      // Auto-detect backend engine
+      const serverHeader = (lmRes.headers.get("server") || "").toLowerCase();
+      const isOllama =
+        targetUrl.includes("11434") ||
+        serverHeader.includes("ollama") ||
+        modelNames.some((n: string) => n.includes(":") && !n.includes("@"));
+
+      const isLmStudio = targetUrl.includes("1234") || serverHeader.includes("lmstudio");
+      const backendType: "ollama" | "lm_studio" | "generic" = isOllama
+        ? "ollama"
+        : isLmStudio
+        ? "lm_studio"
+        : "generic";
+
+      const backendDisplayName = isOllama ? "Ollama" : isLmStudio ? "LM Studio" : "Local LLM";
 
       return res.json({
         success: true,
-        message: `LM Studio server responsive at ${targetUrl}`,
+        backend: backendType,
+        message: isOllama
+          ? `Ollama connected (${modelsCount} model${modelsCount === 1 ? "" : "s"} available)`
+          : `${backendDisplayName} server responsive at ${targetUrl}`,
         modelsCount,
         models: modelNames,
-        modelNames: modelNames.slice(0, 3).join(", "),
+        modelNames: modelNames.slice(0, 5).join(", "),
         probeUrl
       });
     } else {

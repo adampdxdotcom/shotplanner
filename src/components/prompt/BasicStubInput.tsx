@@ -53,7 +53,7 @@ export const BasicStubInput: React.FC<BasicStubInputProps> = ({
                 ? "bg-purple-600 text-white border border-purple-400/30"
                 : "bg-amber-600 text-white border border-amber-400/30"
             }`}
-            title={`Default Selected LLM: ${effectiveDefaultProvider === "gemini" ? "Gemini 3.7 Flash" : "LM Studio"} (managed in Settings)`}
+            title={`Default Selected LLM: ${effectiveDefaultProvider === "gemini" ? "Gemini 3.7 Flash" : "Local LLM"} (managed in Settings)`}
           >
             {effectiveDefaultProvider === "gemini" ? (
               <>
@@ -63,7 +63,7 @@ export const BasicStubInput: React.FC<BasicStubInputProps> = ({
             ) : (
               <>
                 <Bot className="w-3 h-3" />
-                <span>LM Studio</span>
+                <span>Local LLM</span>
               </>
             )}
           </div>
