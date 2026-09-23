@@ -24,19 +24,20 @@ export function listWorkflows(sceneName?: string) {
           try {
             const content = JSON.parse(fs.readFileSync(fullPath, "utf-8"));
             const parsed = parseWorkflowData(content);
-            const prefix = folderLabel ? `[${folderLabel}] ` : "";
+            const cleanTitle = f.replace(/\.json$/i, "").replace(/[_-]/g, " ");
             workflowMap.set(f.toLowerCase(), {
               filename: f,
               path: publicPathPrefix ? `${publicPathPrefix}/${f}` : `/assets/workflows/${f}`,
               node_count: parsed.totalNodes,
-              title: `${prefix}${f.replace(/\.json$/i, "").replace(/[_-]/g, " ")}`
+              title: cleanTitle
             });
           } catch {
+            const cleanTitle = f.replace(/\.json$/i, "").replace(/[_-]/g, " ");
             workflowMap.set(f.toLowerCase(), {
               filename: f,
               path: publicPathPrefix ? `${publicPathPrefix}/${f}` : `/assets/workflows/${f}`,
               node_count: 0,
-              title: `${folderLabel ? `[${folderLabel}] ` : ""}${f.replace(/\.json$/i, "")}`
+              title: cleanTitle
             });
           }
         }
@@ -53,36 +54,37 @@ export function listWorkflows(sceneName?: string) {
     scanDir(path.join(WORKFLOWS_DIR, sceneFolder), sceneFolder, `/assets/workflows/${sceneFolder}`);
   }
 
-  // 2. Scan all scenes under ASSETS_DIR (<scene>/workflows)
-  if (fs.existsSync(ASSETS_DIR)) {
-    try {
-      const dirs = fs.readdirSync(ASSETS_DIR, { withFileTypes: true });
-      for (const d of dirs) {
-        if (d.isDirectory() && d.name !== "workflows" && d.name !== "uploads") {
-          const sceneWfDir = path.join(ASSETS_DIR, d.name, "workflows");
-          scanDir(sceneWfDir, d.name, `/assets/${d.name}/workflows`);
-        }
-      }
-    } catch {}
-  }
-
-  // 3. Scan subdirectories under WORKFLOWS_DIR
-  if (fs.existsSync(WORKFLOWS_DIR)) {
-    try {
-      const dirs = fs.readdirSync(WORKFLOWS_DIR, { withFileTypes: true });
-      for (const d of dirs) {
-        if (d.isDirectory()) {
-          scanDir(path.join(WORKFLOWS_DIR, d.name), d.name, `/assets/workflows/${d.name}`);
-        }
-      }
-    } catch {}
-  }
-
-  // 4. Scan root WORKFLOWS_DIR and process.cwd() workflows if exists
+  // 2. Scan top-level WORKFLOWS_DIR and process.cwd() workflows for global base templates
   scanDir(WORKFLOWS_DIR, undefined, "/assets/workflows");
   const topLevelWfDir = path.join(process.cwd(), "workflows");
   if (fs.existsSync(topLevelWfDir) && topLevelWfDir !== WORKFLOWS_DIR) {
     scanDir(topLevelWfDir, undefined, "/workflows");
+  }
+
+  // 3. Only scan other project directories if no scene was specified
+  if (!sceneName) {
+    if (fs.existsSync(ASSETS_DIR)) {
+      try {
+        const dirs = fs.readdirSync(ASSETS_DIR, { withFileTypes: true });
+        for (const d of dirs) {
+          if (d.isDirectory() && d.name !== "workflows" && d.name !== "uploads") {
+            const sceneWfDir = path.join(ASSETS_DIR, d.name, "workflows");
+            scanDir(sceneWfDir, d.name, `/assets/${d.name}/workflows`);
+          }
+        }
+      } catch {}
+    }
+
+    if (fs.existsSync(WORKFLOWS_DIR)) {
+      try {
+        const dirs = fs.readdirSync(WORKFLOWS_DIR, { withFileTypes: true });
+        for (const d of dirs) {
+          if (d.isDirectory()) {
+            scanDir(path.join(WORKFLOWS_DIR, d.name), d.name, `/assets/workflows/${d.name}`);
+          }
+        }
+      } catch {}
+    }
   }
 
   const workflowItems = Array.from(workflowMap.values());

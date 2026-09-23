@@ -38,13 +38,11 @@ router.post("/upload", upload.single("file"), (req: Request, res: Response) => {
 
     const target = path.join(targetDir, originalFilename);
     const globalSceneTarget = path.join(globalSceneWfDir, originalFilename);
-    const rootTarget = path.join(WORKFLOWS_DIR, originalFilename);
 
     fs.copyFileSync(req.file.path, target);
     fs.copyFileSync(req.file.path, globalSceneTarget);
-    fs.copyFileSync(req.file.path, rootTarget);
 
-    console.log(`[Workflow Upload] Stored "${originalFilename}" in ${targetDir} and ${WORKFLOWS_DIR}`);
+    console.log(`[Workflow Upload] Stored "${originalFilename}" in ${targetDir}`);
 
     // Immediate local parse so UI responds instantly with parsed metadata
     let parsedInfo: any = null;
