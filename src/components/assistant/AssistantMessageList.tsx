@@ -5,7 +5,7 @@ import { AssistantChatMessage } from "../../services/assistantClient";
 import { AssistantAction, parseAssistantActions, validateActionSafety } from "../../types/assistantActions";
 import { AssistantActionCard } from "./AssistantActionCard";
 import { StagingProgressState, ExpandingProgressState } from "./useAssistantActions";
-import { CharacterProfile, MediaAsset } from "../../types";
+import { CharacterProfile, MediaAsset, ShotItem } from "../../types";
 
 interface AssistantMessageListProps {
   messages: AssistantChatMessage[];
@@ -18,6 +18,7 @@ interface AssistantMessageListProps {
   dismissedActionKeys: Record<string, boolean>;
   stagingProgressMap: Record<string, StagingProgressState>;
   expandingProgressMap: Record<string, ExpandingProgressState>;
+  shots?: ShotItem[];
   characters?: Record<string, CharacterProfile>;
   assets?: MediaAsset[];
   sceneName?: string;
@@ -43,6 +44,7 @@ export const AssistantMessageList: React.FC<AssistantMessageListProps> = ({
   dismissedActionKeys,
   stagingProgressMap,
   expandingProgressMap,
+  shots = [],
   characters,
   assets,
   sceneName,
@@ -157,6 +159,7 @@ export const AssistantMessageList: React.FC<AssistantMessageListProps> = ({
                               isApplied={isApplied}
                               isDismissed={isDismissed}
                               validationError={!safetyCheck.valid ? safetyCheck.reason : null}
+                              shots={shots}
                               characters={characters}
                               assets={assets}
                               sceneName={sceneName}

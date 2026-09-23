@@ -8,13 +8,14 @@ import { UpdateCharacterActionCard } from "./actionCards/UpdateCharacterActionCa
 import { StageShotAssetsActionCard } from "./actionCards/StageShotAssetsActionCard";
 import { ExpandShotPromptActionCard } from "./actionCards/ExpandShotPromptActionCard";
 import { SaveVisualAnalysisActionCard } from "./actionCards/SaveVisualAnalysisActionCard";
-import { CharacterProfile, MediaAsset } from "../../types";
+import { CharacterProfile, MediaAsset, ShotItem } from "../../types";
 
 interface AssistantActionCardProps {
   action: AssistantAction;
   isApplied: boolean;
   isDismissed?: boolean;
   validationError?: string | null;
+  shots?: ShotItem[];
   characters?: Record<string, CharacterProfile>;
   assets?: MediaAsset[];
   sceneName?: string;
@@ -43,6 +44,7 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
   isApplied,
   isDismissed,
   validationError,
+  shots,
   characters,
   assets,
   sceneName,
@@ -69,6 +71,7 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
         <UpdateShotActionCard
           action={action}
           isApplied={isApplied}
+          shots={shots}
           characters={characters}
           assets={assets}
           sceneName={sceneName}
@@ -84,6 +87,7 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
         <AddShotActionCard
           action={action}
           isApplied={isApplied}
+          shots={shots}
           characters={characters}
           assets={assets}
           sceneName={sceneName}

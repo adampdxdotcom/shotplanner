@@ -1,12 +1,14 @@
 import React from "react";
 import { Camera, Check, Undo2, Sparkles, ArrowRight, X } from "lucide-react";
 import { UpdateShotAction, AssistantAction } from "../../../types/assistantActions";
-import { CharacterProfile, MediaAsset } from "../../../types";
+import { CharacterProfile, MediaAsset, ShotItem } from "../../../types";
 import { StagedCastReferencePreview } from "./StagedCastReferencePreview";
+import { ShotThumbnailPreview } from "./ShotThumbnailPreview";
 
 interface UpdateShotActionCardProps {
   action: UpdateShotAction;
   isApplied: boolean;
+  shots?: ShotItem[];
   characters?: Record<string, CharacterProfile>;
   assets?: MediaAsset[];
   sceneName?: string;
@@ -22,6 +24,7 @@ interface UpdateShotActionCardProps {
 export const UpdateShotActionCard: React.FC<UpdateShotActionCardProps> = ({
   action,
   isApplied,
+  shots = [],
   characters: allCharacters = {},
   assets = [],
   sceneName,
@@ -32,6 +35,7 @@ export const UpdateShotActionCard: React.FC<UpdateShotActionCardProps> = ({
 }) => {
   const shotNum = action.shot_number;
   const changes = action.changes || {};
+  const targetShot = shots.find(s => s.shot_number === shotNum);
 
   return (
     <div className={`mt-3 p-3 rounded-xl border transition-all text-xs w-full min-w-0 overflow-hidden ${
@@ -64,6 +68,14 @@ export const UpdateShotActionCard: React.FC<UpdateShotActionCardProps> = ({
           )}
         </div>
       </div>
+
+      {/* Shot Thumbnail Preview */}
+      <ShotThumbnailPreview
+        shot={targetShot}
+        shotNumber={typeof shotNum === "string" ? parseInt(shotNum, 10) || 1 : shotNum}
+        assets={assets}
+        sceneName={sceneName}
+      />
 
       {/* Changes summary */}
       <div className="space-y-1 my-2 font-mono text-[11px] text-slate-700 dark:text-zinc-300">

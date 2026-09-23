@@ -176,6 +176,7 @@ export const AssistantFloatingChat: React.FC<AssistantFloatingChatProps> = ({
             dismissedActionKeys={dismissedActionKeys}
             stagingProgressMap={stagingProgressMap}
             expandingProgressMap={expandingProgressMap}
+            shots={sceneProject.shots}
             characters={sceneProject.characters}
             assets={assets}
             sceneName={sceneProject.scene_name}

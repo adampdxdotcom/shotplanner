@@ -1,6 +1,7 @@
 import React from "react";
 import { CharacterProfile, MediaAsset } from "../../../types";
 import { AlertCircle, Sparkles, UserPlus } from "lucide-react";
+import { getAssetMediaUrl } from "../../../utils/assetUrl";
 
 interface StagedCastReferencePreviewProps {
   characters?: string[];
@@ -39,12 +40,23 @@ export const StagedCastReferencePreview: React.FC<StagedCastReferencePreviewProp
           ? profile.quick_slots.filter(Boolean) 
           : [];
 
-        // If quick_slots are empty, check if library has assets matching character name
+        // Outfit reference fallbacks if quick_slots are empty
+        const outfitRefs = [profile?.scene_outfit_ref, profile?.default_outfit_ref].filter(Boolean) as string[];
+
+        // If quick_slots are empty, check if library has assets matching character name or outfit refs
         const fallbackAssets = quickSlots.length === 0
-          ? assets.filter(a => (a.subject_name || (a as any).character_name || "").toLowerCase() === charName.toLowerCase()).slice(0, 4)
+          ? assets.filter(a => {
+              const charMatch = (a.subject_name || (a as any).character_name || "").toLowerCase() === charName.toLowerCase();
+              const outfitMatch = outfitRefs.includes(a.filename);
+              return charMatch || outfitMatch;
+            }).slice(0, 4)
           : [];
 
-        const photoFilenames = quickSlots.length > 0 ? quickSlots : fallbackAssets.map(a => a.filename);
+        const candidateFilenames = quickSlots.length > 0 
+          ? quickSlots 
+          : (fallbackAssets.length > 0 ? fallbackAssets.map(a => a.filename) : outfitRefs);
+
+        const photoFilenames = candidateFilenames.filter(Boolean).slice(0, 4);
         const hasPhotos = photoFilenames.length > 0;
 
         if (!hasPhotos) {
@@ -99,8 +111,8 @@ export const StagedCastReferencePreview: React.FC<StagedCastReferencePreviewProp
             <div className="flex items-center gap-1.5 overflow-x-auto py-0.5">
               {photoFilenames.map((filename, slotIdx) => {
                 const asset = assets.find(a => a.filename === filename);
-                const scene = asset?.scene_name || sceneName || "";
-                const imgUrl = `/api/assets/raw/${encodeURIComponent(filename)}?scene_name=${encodeURIComponent(scene)}`;
+                const thumbUrl = getAssetMediaUrl(asset || filename, true);
+                const fullUrl = getAssetMediaUrl(asset || filename, false);
 
                 return (
                   <div 
@@ -109,11 +121,16 @@ export const StagedCastReferencePreview: React.FC<StagedCastReferencePreviewProp
                     title={`${charName} - Slot ${slotIdx}: ${filename}`}
                   >
                     <img
-                      src={imgUrl}
+                      src={thumbUrl}
                       alt={filename}
                       className="w-full h-full object-cover"
                       onError={(e) => {
-                        (e.target as HTMLElement).style.display = "none";
+                        const target = e.target as HTMLImageElement;
+                        if (target.src !== fullUrl) {
+                          target.src = fullUrl;
+                        } else {
+                          target.style.display = "none";
+                        }
                       }}
                     />
                     <div className="absolute top-0.5 left-0.5 px-1 rounded bg-black/70 text-[9px] font-mono text-white font-bold leading-tight">

@@ -1,12 +1,14 @@
 import React from "react";
 import { PlusCircle, Check, Undo2, ArrowRight, X } from "lucide-react";
 import { AddShotAction, AssistantAction } from "../../../types/assistantActions";
-import { CharacterProfile, MediaAsset } from "../../../types";
+import { CharacterProfile, MediaAsset, ShotItem } from "../../../types";
 import { StagedCastReferencePreview } from "./StagedCastReferencePreview";
+import { ShotThumbnailPreview } from "./ShotThumbnailPreview";
 
 interface AddShotActionCardProps {
   action: AddShotAction;
   isApplied: boolean;
+  shots?: ShotItem[];
   characters?: Record<string, CharacterProfile>;
   assets?: MediaAsset[];
   sceneName?: string;
@@ -22,6 +24,7 @@ interface AddShotActionCardProps {
 export const AddShotActionCard: React.FC<AddShotActionCardProps> = ({
   action,
   isApplied,
+  shots = [],
   characters: allCharacters = {},
   assets = [],
   sceneName,
@@ -31,6 +34,23 @@ export const AddShotActionCard: React.FC<AddShotActionCardProps> = ({
   onUndo
 }) => {
   const shotData = action.shot || (action as any).changes || {};
+  const proposedShot: ShotItem = typeof shotData === "object" ? {
+    id: shotData.id || "temp_proposed",
+    shot_number: shotData.shot_number || (shots.length + 1),
+    shot_name: shotData.shot_name || `Shot ${(shots.length + 1).toString().padStart(2, "0")}`,
+    assigned_slots: shotData.assigned_slots || {},
+    basic_stub: shotData.basic_stub || "",
+    takes: shotData.takes || [],
+    hero_take_id: shotData.hero_take_id,
+    first_frame: shotData.first_frame
+  } : {
+    id: "temp_proposed",
+    shot_number: shots.length + 1,
+    shot_name: `Shot ${(shots.length + 1).toString().padStart(2, "0")}`,
+    assigned_slots: {},
+    basic_stub: "",
+    takes: []
+  };
 
   return (
     <div className={`mt-3 p-3 rounded-xl border transition-all text-xs w-full min-w-0 overflow-hidden ${
@@ -63,6 +83,14 @@ export const AddShotActionCard: React.FC<AddShotActionCardProps> = ({
           )}
         </div>
       </div>
+
+      {/* Shot Thumbnail Preview */}
+      <ShotThumbnailPreview
+        shot={proposedShot}
+        shotNumber={proposedShot.shot_number}
+        assets={assets}
+        sceneName={sceneName}
+      />
 
       {/* Shot summary */}
       <div className="space-y-1 my-2 font-mono text-[11px] text-slate-700 dark:text-zinc-300">

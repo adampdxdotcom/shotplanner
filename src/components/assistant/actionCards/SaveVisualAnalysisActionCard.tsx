@@ -27,7 +27,7 @@ export const SaveVisualAnalysisActionCard: React.FC<SaveVisualAnalysisActionCard
   
   // Find matching asset object if available
   const matchedAsset = assets.find((a) => a.filename === filename);
-  const thumbUrl = matchedAsset ? getAssetMediaUrl(matchedAsset, true) : null;
+  const thumbUrl = matchedAsset ? getAssetMediaUrl(matchedAsset, true) : (filename ? getAssetMediaUrl(filename, true) : null);
 
   if (isDismissed) {
     return (
