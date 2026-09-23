@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { sanitizeCaptionOutput, generateVisionCaption } from "../../server/services/visionCaptionService";
+import { sanitizeCaptionOutput, generateVisionCaption, detectVisionCapability } from "../../server/services/visionCaptionService";
+import { isVisionModel } from "../hooks/useVisionCaption";
 import { stripThinkingTags } from "../../server/services/llm_service";
 import * as projectModule from "../../server/services/project";
 
@@ -216,6 +217,62 @@ Setting: Vintage cocktail lounge
       expect(result.analysis?.lighting?.quality).toBe("Hard side key light");
       expect(result.analysis?.cinematography?.framing).toBe("Dutch angle medium shot");
       expect(result.analysis?.environment_palette?.setting).toBe("Dark alleyway at night");
+    });
+  });
+
+  describe("detectVisionCapability", () => {
+    it("detects vision-capable models from string arrays", () => {
+      const models = ["mistral-7b-instruct", "qwen2.5-vl-7b-instruct", "llama-3-8b"];
+      const result = detectVisionCapability(models);
+      expect(result.hasVision).toBe(true);
+      expect(result.visionModel).toBe("qwen2.5-vl-7b-instruct");
+      expect(result.detectedCount).toBe(1);
+    });
+
+    it("detects vision models across common naming patterns (llava, pixtral, llama-vision)", () => {
+      expect(detectVisionCapability(["llama-3.2-11b-vision-instruct"]).hasVision).toBe(true);
+      expect(detectVisionCapability(["llava-v1.6-mistral-7b"]).hasVision).toBe(true);
+      expect(detectVisionCapability(["pixtral-12b"]).hasVision).toBe(true);
+      expect(detectVisionCapability(["minicpm-v-2_6"]).hasVision).toBe(true);
+      expect(detectVisionCapability(["moondream2"]).hasVision).toBe(true);
+    });
+
+    it("returns false when only text models are present", () => {
+      const models = ["mistral-7b-instruct", "llama-3.1-8b-instruct", "qwen2.5-7b-instruct", "gemma-2-9b"];
+      const result = detectVisionCapability(models);
+      expect(result.hasVision).toBe(false);
+      expect(result.visionModel).toBeUndefined();
+      expect(result.detectedCount).toBe(0);
+    });
+
+    it("detects vision capability from model objects with architecture/modalities metadata", () => {
+      const models = [
+        { id: "custom-model", modalities: ["text", "image"] },
+        { id: "text-only", modalities: ["text"] }
+      ];
+      const result = detectVisionCapability(models);
+      expect(result.hasVision).toBe(true);
+      expect(result.visionModel).toBe("custom-model");
+    });
+
+    it("detects vision capability from Ollama model objects with clip/mllama family", () => {
+      const models = [
+        { name: "custom-ollama:latest", details: { families: ["llama", "mllama"] } }
+      ];
+      const result = detectVisionCapability(models);
+      expect(result.hasVision).toBe(true);
+      expect(result.visionModel).toBe("custom-ollama:latest");
+    });
+  });
+
+  describe("isVisionModel", () => {
+    it("correctly identifies vision models client-side", () => {
+      expect(isVisionModel("qwen2.5-vl-7b-instruct")).toBe(true);
+      expect(isVisionModel("llama-3.2-11b-vision-instruct")).toBe(true);
+      expect(isVisionModel("llava:latest")).toBe(true);
+      expect(isVisionModel("mistral:7b")).toBe(false);
+      expect(isVisionModel("qwen2.5:7b")).toBe(false);
+      expect(isVisionModel(undefined)).toBe(false);
     });
   });
 });

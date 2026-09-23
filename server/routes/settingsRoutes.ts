@@ -4,6 +4,7 @@ import { getStoredCivitaiKey, saveCivitaiKey, removeCivitaiKey } from "../servic
 import { getStoredHuggingFaceToken, saveHuggingFaceToken, removeHuggingFaceToken } from "../services/huggingfaceService";
 import { getStoredRunpodApiKey, saveRunpodApiKey, removeRunpodApiKey } from "../services/runpodService";
 import { getStoredLLMSettings, saveStoredLLMSettings } from "../services/llmSettingsService";
+import { detectVisionCapability } from "../services/visionCaptionService";
 
 const router = Router();
 
@@ -167,11 +168,14 @@ router.post(["/test-lm-studio", "/test-local-llm"], async (req: Request, res: Re
 
     if (lmRes.ok) {
       const data = await lmRes.json().catch(() => ({}));
-      const modelsList = Array.isArray(data.data) ? data.data : [];
+      const modelsList = Array.isArray(data.data) ? data.data : (Array.isArray(data.models) ? data.models : []);
       const modelNames = modelsList
         .map((m: any) => m.id || m.name || (typeof m === "string" ? m : ""))
         .filter(Boolean);
       const modelsCount = modelNames.length;
+
+      // Auto-detect vision support across available models
+      const { hasVision, visionModel } = detectVisionCapability(modelsList.length > 0 ? modelsList : modelNames);
 
       // Auto-detect backend engine
       const serverHeader = (lmRes.headers.get("server") || "").toLowerCase();
@@ -198,6 +202,8 @@ router.post(["/test-lm-studio", "/test-local-llm"], async (req: Request, res: Re
         modelsCount,
         models: modelNames,
         modelNames: modelNames.slice(0, 5).join(", "),
+        hasVision,
+        visionModel,
         probeUrl
       });
     } else {

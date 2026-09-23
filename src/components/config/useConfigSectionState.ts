@@ -5,6 +5,7 @@ import { probeGeminiConnection } from "./GeminiConfig";
 import { probeLMStudioConnection } from "./lmStudioProbe";
 import { ConfigTab } from "./ConfigTabBar";
 import { settingsApi } from "../../api";
+import { isVisionModel } from "../../hooks/useVisionCaption";
 
 interface UseConfigSectionStateProps {
   config: AppConfig;
@@ -48,7 +49,12 @@ export function useConfigSectionState({
 
   // Local LLM connection testing state
   const [testingLM, setTestingLM] = useState(false);
-  const [lmTestResult, setLmTestResult] = useState<{ success?: boolean; message?: string } | null>(null);
+  const [lmTestResult, setLmTestResult] = useState<{
+    success?: boolean;
+    message?: string;
+    hasVision?: boolean;
+    visionModel?: string;
+  } | null>(null);
   const [detectedBackend, setDetectedBackend] = useState<"ollama" | "lm_studio" | "generic" | null>(null);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
 
@@ -87,7 +93,12 @@ export function useConfigSectionState({
 
         const previousStatus = wasConnectedRef.current.lm_studio;
         if (result.success) {
-          setLmTestResult({ success: true, message: result.message });
+          setLmTestResult({
+            success: true,
+            message: result.message,
+            hasVision: result.hasVision,
+            visionModel: result.visionModel
+          });
           setDetectedBackend(result.backend || null);
           if (result.models && result.models.length > 0) {
             setAvailableModels(result.models);
@@ -97,9 +108,20 @@ export function useConfigSectionState({
           } else {
             setAvailableModels([]);
           }
+
+          // On fresh setup or initial connection, auto-detect vision and configure toggles
+          if (!previousStatus && (localStorage.getItem("vision_enabled") === null || config.vision_enabled === undefined)) {
+            const hasVision = Boolean(result.hasVision);
+            onChange({
+              ...config,
+              vision_enabled: hasVision,
+              auto_caption_enabled: hasVision
+            });
+          }
+
           wasConnectedRef.current.lm_studio = true;
         } else {
-          setLmTestResult({ success: false, message: `Connection Failed: ${result.message}` });
+          setLmTestResult({ success: false, message: `Connection Failed: ${result.message}`, hasVision: false });
           if (previousStatus === true) {
             if (onShowToast) {
               onShowToast("Connection lost to Local LLM", "error");
@@ -185,23 +207,44 @@ export function useConfigSectionState({
     setTestingLM(false);
 
     if (result.success) {
-      setLmTestResult({ success: true, message: result.message });
+      setLmTestResult({
+        success: true,
+        message: result.message,
+        hasVision: result.hasVision,
+        visionModel: result.visionModel
+      });
       setDetectedBackend(result.backend || null);
+
+      const hasVision = Boolean(result.hasVision);
+      const updatedConfig: AppConfig = {
+        ...config,
+        vision_enabled: hasVision,
+        auto_caption_enabled: hasVision
+      };
+
       if (result.models && result.models.length > 0) {
         setAvailableModels(result.models);
         if (!config.local_model || !result.models.includes(config.local_model)) {
-          onChange({ ...config, local_model: result.models[0] });
+          const selected = (hasVision && result.visionModel) ? result.visionModel : result.models[0];
+          updatedConfig.local_model = selected;
+          updatedConfig.selected_ollama_model = selected;
         }
       } else {
         setAvailableModels([]);
       }
+
+      onChange(updatedConfig);
       wasConnectedRef.current.lm_studio = true;
       if (onShowToast) {
         const backendName = result.backend === "ollama" ? "Ollama" : result.backend === "lm_studio" ? "LM Studio" : "Local LLM";
-        onShowToast(`✓ ${backendName} connected successfully`, "success");
+        if (hasVision) {
+          onShowToast(`✓ ${backendName} connected (${result.visionModel || "Vision"} detected — auto-captioning enabled)`, "success");
+        } else {
+          onShowToast(`✓ ${backendName} connected (text model detected — vision kept off)`, "info");
+        }
       }
     } else {
-      setLmTestResult({ success: false, message: `Connection Failed: ${result.message}` });
+      setLmTestResult({ success: false, message: `Connection Failed: ${result.message}`, hasVision: false });
       setDetectedBackend(null);
       setAvailableModels([]);
       wasConnectedRef.current.lm_studio = false;
@@ -219,22 +262,39 @@ export function useConfigSectionState({
     setTestingLM(false);
 
     if (result.success) {
-      setLmTestResult({ success: true, message: result.message });
+      setLmTestResult({
+        success: true,
+        message: result.message,
+        hasVision: result.hasVision,
+        visionModel: result.visionModel
+      });
       setDetectedBackend(result.backend || null);
+
+      const hasVision = Boolean(result.hasVision);
+      const updatedConfig: AppConfig = {
+        ...config,
+        vision_enabled: hasVision,
+        auto_caption_enabled: hasVision
+      };
+
       if (result.models && result.models.length > 0) {
         setAvailableModels(result.models);
         if (!config.local_model || !result.models.includes(config.local_model)) {
-          onChange({ ...config, local_model: result.models[0] });
+          const selected = (hasVision && result.visionModel) ? result.visionModel : result.models[0];
+          updatedConfig.local_model = selected;
+          updatedConfig.selected_ollama_model = selected;
         }
       } else {
         setAvailableModels([]);
       }
+
+      onChange(updatedConfig);
       wasConnectedRef.current.lm_studio = true;
       if (onSetDefaultProvider) {
         onSetDefaultProvider("lm_studio");
       }
     } else {
-      setLmTestResult({ success: false, message: `Connection Failed: ${result.message}` });
+      setLmTestResult({ success: false, message: `Connection Failed: ${result.message}`, hasVision: false });
       setDetectedBackend(null);
       setAvailableModels([]);
       wasConnectedRef.current.lm_studio = false;
@@ -245,13 +305,20 @@ export function useConfigSectionState({
   };
 
   const handleSelectModel = (model: string) => {
+    const hasVision = isVisionModel(model);
     onChange({
       ...config,
       local_model: model,
-      selected_ollama_model: model
+      selected_ollama_model: model,
+      vision_enabled: hasVision,
+      auto_caption_enabled: hasVision
     });
     if (onShowToast) {
-      onShowToast(`Selected model: ${model}`, "info");
+      if (hasVision) {
+        onShowToast(`Selected model: ${model} (Vision & Auto-caption enabled)`, "success");
+      } else {
+        onShowToast(`Selected model: ${model} (Text model — Vision kept off)`, "info");
+      }
     }
   };
 

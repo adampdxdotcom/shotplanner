@@ -17,7 +17,12 @@ interface LLMSetupTabProps {
   handleTestLMStudio: () => void;
   handleSetDefaultLMStudio: () => void;
   testingLM: boolean;
-  lmTestResult: { success?: boolean; message?: string } | null;
+  lmTestResult: {
+    success?: boolean;
+    message?: string;
+    hasVision?: boolean;
+    visionModel?: string;
+  } | null;
   detectedBackend?: "ollama" | "lm_studio" | "generic" | null;
   availableModels?: string[];
   handleSelectModel?: (model: string) => void;
@@ -218,17 +223,45 @@ export const LLMSetupTab: React.FC<LLMSetupTabProps> = ({
             </div>
 
             {lmTestResult && (
-              <div className={`p-3 rounded-lg border text-xs flex items-center gap-2.5 ${
-                lmTestResult.success 
-                  ? "bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-800/40 dark:text-emerald-300" 
-                  : "bg-red-50 border-red-300 text-red-800 dark:bg-red-950/30 dark:border-red-800/40 dark:text-red-300"
-              }`}>
-                {lmTestResult.success ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                ) : (
-                  <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
+              <div className="space-y-2">
+                <div className={`p-3 rounded-lg border text-xs flex items-center justify-between gap-2.5 ${
+                  lmTestResult.success 
+                    ? "bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-800/40 dark:text-emerald-300" 
+                    : "bg-red-50 border-red-300 text-red-800 dark:bg-red-950/30 dark:border-red-800/40 dark:text-red-300"
+                }`}>
+                  <div className="flex items-center gap-2">
+                    {lmTestResult.success ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    ) : (
+                      <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
+                    )}
+                    <span className="font-semibold">{lmTestResult.message}</span>
+                  </div>
+                </div>
+
+                {lmTestResult.success && (
+                  <div className={`p-2.5 rounded-lg border text-xs flex items-center justify-between gap-2 transition-all ${
+                    lmTestResult.hasVision
+                      ? "bg-purple-50/80 border-purple-200 text-purple-900 dark:bg-purple-950/30 dark:border-purple-800/50 dark:text-purple-200"
+                      : "bg-zinc-50 border-zinc-200 text-zinc-700 dark:bg-zinc-950/40 dark:border-zinc-800 dark:text-zinc-400"
+                  }`}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Eye className={`w-3.5 h-3.5 shrink-0 ${lmTestResult.hasVision ? "text-purple-600 dark:text-purple-400" : "text-zinc-400"}`} />
+                      <span className="truncate">
+                        {lmTestResult.hasVision
+                          ? `Vision Support Detected: ${lmTestResult.visionModel || "Multimodal Model"}`
+                          : "Text-Only Model Detected (No vision capabilities)"}
+                      </span>
+                    </div>
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded shrink-0 uppercase tracking-wide ${
+                      lmTestResult.hasVision
+                        ? "bg-purple-100 text-purple-800 dark:bg-purple-900/60 dark:text-purple-200 border border-purple-300 dark:border-purple-700"
+                        : "bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 border border-zinc-300 dark:border-zinc-700"
+                    }`}>
+                      {lmTestResult.hasVision ? "Vision & Auto-Caption ON" : "Vision Kept Off"}
+                    </span>
+                  </div>
                 )}
-                <span className="font-semibold">{lmTestResult.message}</span>
               </div>
             )}
 
@@ -322,9 +355,13 @@ export const LLMSetupTab: React.FC<LLMSetupTabProps> = ({
                           className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5 cursor-pointer select-none"
                         >
                           Vision Enabled
-                          {config.vision_enabled && (
+                          {config.vision_enabled ? (
                             <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-medium bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/50">
-                              Active
+                              {lmTestResult?.hasVision ? "Auto-Enabled" : "Active"}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700">
+                              Off
                             </span>
                           )}
                         </label>

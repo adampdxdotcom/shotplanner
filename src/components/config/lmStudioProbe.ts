@@ -6,6 +6,8 @@ export interface LocalLlmProbeResult {
   backend?: "ollama" | "lm_studio" | "generic";
   models?: string[];
   modelsCount?: number;
+  hasVision?: boolean;
+  visionModel?: string;
 }
 
 export async function probeLMStudioConnection(url?: string): Promise<LocalLlmProbeResult> {
@@ -22,7 +24,9 @@ export async function probeLMStudioConnection(url?: string): Promise<LocalLlmPro
         message: data.message || `Connected: ${backend === "ollama" ? "Ollama" : "LM Studio"} responsive at ${targetUrl}`,
         backend,
         models,
-        modelsCount: data.modelsCount ?? models.length
+        modelsCount: data.modelsCount ?? models.length,
+        hasVision: Boolean(data.hasVision),
+        visionModel: data.visionModel
       };
     } else {
       const errorMsg = data?.error || "Connection refused or endpoint unreachable";

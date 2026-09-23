@@ -44,6 +44,32 @@ export function getVisionCaptionState(config?: Partial<AppConfig>): VisionCaptio
 }
 
 /**
+ * Checks if a model name or identifier is known to support vision input.
+ */
+export function isVisionModel(modelName?: string): boolean {
+  if (!modelName || typeof modelName !== "string") return false;
+  const normalized = modelName.trim().toLowerCase();
+  return (
+    normalized.includes("vision") ||
+    normalized.includes("llava") ||
+    normalized.includes("pixtral") ||
+    normalized.includes("internvl") ||
+    normalized.includes("moondream") ||
+    normalized.includes("cogvlm") ||
+    normalized.includes("bakllava") ||
+    normalized.includes("mllama") ||
+    /minicpm[-_]?v/i.test(normalized) ||
+    /qwen.*[-_]vl/i.test(normalized) ||
+    /deepseek[-_]vl/i.test(normalized) ||
+    /phi[-_]?3.*vision/i.test(normalized) ||
+    /(?:^|[-_./])vl(?:$|[-_.:])/i.test(normalized) ||
+    normalized.includes("gemini") ||
+    normalized.includes("claude") ||
+    normalized.includes("gpt-4o")
+  );
+}
+
+/**
  * Resizes a File or Blob client-side to a max dimension and returns a compact base64 JPEG URI.
  */
 export async function fileToVisionBase64(file: File | Blob, maxDimension = 384): Promise<string> {

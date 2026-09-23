@@ -79,7 +79,16 @@ export const settingsApi = {
     );
   },
   testLmStudio(url: string, options?: RequestOptions) {
-    return apiClient.post<{ success: boolean; modelsCount?: number; error?: string }>(
+    return apiClient.post<{
+      success: boolean;
+      backend?: "ollama" | "lm_studio" | "generic";
+      message?: string;
+      modelsCount?: number;
+      models?: string[];
+      hasVision?: boolean;
+      visionModel?: string;
+      error?: string;
+    }>(
       "/api/settings/test-lm-studio",
       { url },
       options

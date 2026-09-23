@@ -36,6 +36,85 @@ export interface VisionCaptionResult {
   saved_to_cache?: boolean;
 }
 
+export const VISION_MODEL_PATTERNS = [
+  /vision/i,
+  /llava/i,
+  /pixtral/i,
+  /internvl/i,
+  /moondream/i,
+  /cogvlm/i,
+  /minicpm[-_]?v/i,
+  /mllama/i,
+  /bakllava/i,
+  /qwen.*[-_]vl/i,
+  /deepseek[-_]vl/i,
+  /phi[-_]?3.*vision/i,
+  /[-_]vl\b/i,
+  /\bvl[-_]/i,
+  /\bvl\b/i,
+  /gemini/i,
+  /claude/i,
+  /gpt-4o/i,
+];
+
+export interface DetectedVisionCapability {
+  hasVision: boolean;
+  visionModel?: string;
+  detectedCount: number;
+}
+
+/**
+ * Checks a list of models (names or model objects from OpenAI-compatible or Ollama endpoints)
+ * to determine if any loaded or available model has vision/multimodal capabilities.
+ */
+export function detectVisionCapability(modelsList: any[] = []): DetectedVisionCapability {
+  const detectedModels: string[] = [];
+
+  for (const item of modelsList) {
+    if (!item) continue;
+    const name = typeof item === "string" ? item : (item.id || item.name || "");
+    let isVision = false;
+
+    // 1. Check name/id against known vision model families
+    if (name && VISION_MODEL_PATTERNS.some(p => p.test(name))) {
+      isVision = true;
+    }
+
+    // 2. Check metadata fields if model is returned as an object
+    if (!isVision && typeof item === "object") {
+      if (item.type === "vlm" || item.capabilities?.vision === true || item.capabilities?.image_input === true) {
+        isVision = true;
+      }
+      const modalities = [
+        ...(Array.isArray(item.modalities) ? item.modalities : []),
+        ...(Array.isArray(item.architecture?.modalities) ? item.architecture?.modalities : [])
+      ];
+      if (modalities.some((m: any) => typeof m === "string" && (m.toLowerCase().includes("image") || m.toLowerCase().includes("vision")))) {
+        isVision = true;
+      }
+      const families = [
+        ...(Array.isArray(item.families) ? item.families : []),
+        ...(Array.isArray(item.details?.families) ? item.details?.families : []),
+        item.family,
+        item.details?.family
+      ].filter(Boolean);
+      if (families.some((f: any) => typeof f === "string" && (f.toLowerCase().includes("clip") || f.toLowerCase().includes("vision") || f.toLowerCase().includes("mllama")))) {
+        isVision = true;
+      }
+    }
+
+    if (isVision && name) {
+      detectedModels.push(name);
+    }
+  }
+
+  return {
+    hasVision: detectedModels.length > 0,
+    visionModel: detectedModels[0],
+    detectedCount: detectedModels.length
+  };
+}
+
 /**
  * Cleans and post-processes raw caption text from the vision model,
  * enforcing length bounds, removing conversational noise, and ensuring
