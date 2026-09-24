@@ -26,6 +26,26 @@ export interface DiagnosticsResponse {
   tags: string[];
 }
 
+export interface TempStorageStats {
+  chunksCount: number;
+  chunksSizeBytes: number;
+  tmpUploadsCount: number;
+  tmpUploadsSizeBytes: number;
+  totalTempFilesCount: number;
+  totalTempSizeBytes: number;
+  totalTempSizeMB: string;
+}
+
+export interface CleanupResult {
+  success: boolean;
+  cleanedCount: number;
+  cleanedBytes: number;
+  cleanedMB: string;
+  prunedSessions: number;
+  storage: TempStorageStats;
+  message: string;
+}
+
 export interface SystemHealthInfo {
   success: boolean;
   nodeVersion: string;
@@ -38,6 +58,7 @@ export interface SystemHealthInfo {
     heapTotalMB: string;
     externalMB: string;
   };
+  storage?: TempStorageStats;
   logging: {
     currentLevel: LogLevel;
     stats: BufferStats;
@@ -73,6 +94,14 @@ export const diagnosticsApi = {
 
   getSystemHealth(options?: RequestOptions) {
     return apiClient.get<SystemHealthInfo>("/api/diagnostics/system", options);
+  },
+
+  getStorageStats(options?: RequestOptions) {
+    return apiClient.get<{ success: boolean; storage: TempStorageStats }>("/api/diagnostics/storage", options);
+  },
+
+  purgeTempFiles(maxAgeMs: number = 0, options?: RequestOptions) {
+    return apiClient.post<CleanupResult>("/api/diagnostics/cleanup", { maxAgeMs }, options);
   },
 
   getExportUrl(params?: { format?: "txt" | "json"; level?: LogLevel; tag?: string; search?: string }) {

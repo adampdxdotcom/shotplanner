@@ -19,6 +19,8 @@ const STORAGE_KEYS = {
   ACTIVE_STAGING_SUBJECT: "shotplanner_active_staging_subject",
   ACTIVE_STAGING_TAB: "shotplanner_active_staging_tab",
   ACTIVE_ASSET_TAB: "shotplanner_active_asset_tab",
+  ACTIVE_CONFIG_TAB: "shotplanner_active_config_tab",
+  ACTIVE_CAST_TAB: "shotplanner_active_cast_tab",
 } as const;
 
 export const VALID_SECTIONS = [
@@ -187,3 +189,42 @@ export function setLastAssetTab(tab: "image" | "audio" | "video" | "takes"): voi
     safeStorage.setItem(STORAGE_KEYS.ACTIVE_ASSET_TAB, tab);
   }
 }
+
+export type WorkspaceConfigTab = "llm" | "remote" | "models" | "general" | "diagnostics";
+
+// 7. Active Config Tab
+export function getLastConfigTab(fallback: WorkspaceConfigTab = "llm"): WorkspaceConfigTab {
+  const val = safeStorage.getItem(STORAGE_KEYS.ACTIVE_CONFIG_TAB);
+  if (val === "llm" || val === "remote" || val === "models" || val === "general" || val === "diagnostics") {
+    return val;
+  }
+  return fallback;
+}
+
+export function setLastConfigTab(tab: WorkspaceConfigTab): void {
+  if (tab === "llm" || tab === "remote" || tab === "models" || tab === "general" || valIsValidConfigTab(tab)) {
+    safeStorage.setItem(STORAGE_KEYS.ACTIVE_CONFIG_TAB, tab);
+  }
+}
+
+function valIsValidConfigTab(tab: string): tab is WorkspaceConfigTab {
+  return tab === "llm" || tab === "remote" || tab === "models" || tab === "general" || tab === "diagnostics";
+}
+
+export type WorkspaceCastTab = "scene" | "universe";
+
+// 8. Active Cast Roster Tab
+export function getLastCastTab(fallback: WorkspaceCastTab = "scene"): WorkspaceCastTab {
+  const val = safeStorage.getItem(STORAGE_KEYS.ACTIVE_CAST_TAB);
+  if (val === "scene" || val === "universe") {
+    return val;
+  }
+  return fallback;
+}
+
+export function setLastCastTab(tab: WorkspaceCastTab): void {
+  if (tab === "scene" || tab === "universe") {
+    safeStorage.setItem(STORAGE_KEYS.ACTIVE_CAST_TAB, tab);
+  }
+}
+

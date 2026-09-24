@@ -6,6 +6,7 @@ import { probeLMStudioConnection } from "./lmStudioProbe";
 import { ConfigTab } from "./ConfigTabBar";
 import { settingsApi } from "../../api";
 import { isVisionModel } from "../../hooks/useVisionCaption";
+import { getLastConfigTab, setLastConfigTab } from "../../utils/workspaceSessionStore";
 
 interface UseConfigSectionStateProps {
   config: AppConfig;
@@ -26,16 +27,24 @@ export function useConfigSectionState({
   onChangeProvider,
   onSetDefaultProvider,
   onShowToast,
-  initialTab = "llm"
+  initialTab
 }: UseConfigSectionStateProps) {
-  // Active Configuration Tab
-  const [activeTab, setActiveTab] = useState<ConfigTab>(initialTab);
+  // Active Configuration Tab (persisted across refreshes)
+  const [activeTab, setActiveTab] = useState<ConfigTab>(() => {
+    return initialTab || (getLastConfigTab("llm") as ConfigTab);
+  });
 
   useEffect(() => {
     if (initialTab) {
       setActiveTab(initialTab);
     }
   }, [initialTab]);
+
+  useEffect(() => {
+    if (activeTab) {
+      setLastConfigTab(activeTab);
+    }
+  }, [activeTab]);
 
   // Remote SSH Testing state
   const [testingSSH, setTestingSSH] = useState(false);

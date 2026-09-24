@@ -10,6 +10,7 @@ import {
 import { getAssetMediaUrl } from '../../utils/assetUrl';
 import { normalizeProjectCastAndAssets } from '../../utils/subjectUtils';
 import { sanitizeProjectForPersistence } from '../../utils/recipeSanitizer';
+import { sweepGhostReferences } from '../../utils/referentialIntegrity';
 import { useDebouncedProjectAutosave } from './useDebouncedProjectAutosave';
 import { 
   getLastProjectName, 
@@ -217,7 +218,8 @@ export function useScenePersistence({
     delete (payload as any).local_llm_url;
     delete (payload as any).config;
 
-    const sanitizedPayload = sanitizeProjectForPersistence(payload);
+    const { cleanedProject } = sweepGhostReferences(payload);
+    const sanitizedPayload = sanitizeProjectForPersistence(cleanedProject);
     
     const resData = await projectsApi.save(filename, sanitizedPayload);
     const actualFilename = resData.filename || filename;
@@ -251,11 +253,18 @@ export function useScenePersistence({
     }
 
     const normalizedData = normalizeProjectCastAndAssets(rawData);
-    const data = {
+    const fullProject: SceneProjectFile = {
       ...rawData,
       subjects: normalizedData.subjects,
       characters: normalizedData.characters,
       assets: normalizedData.assets
+    };
+    const { cleanedProject: sweptData } = sweepGhostReferences(fullProject);
+    const data = {
+      ...sweptData,
+      subjects: sweptData.subjects,
+      characters: sweptData.characters,
+      assets: sweptData.assets
     };
 
     const delegate = getShotOperationsDelegate?.();

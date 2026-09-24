@@ -52,6 +52,7 @@ export const DiagnosticsTab: React.FC<DiagnosticsTabProps> = ({ onShowToast }) =
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isClearing, setIsClearing] = useState<boolean>(false);
   const [isChangingLevel, setIsChangingLevel] = useState<boolean>(false);
+  const [isPurgingChunks, setIsPurgingChunks] = useState<boolean>(false);
   const [hasCopiedLogs, setHasCopiedLogs] = useState<boolean>(false);
   const [copiedMetaId, setCopiedMetaId] = useState<number | null>(null);
 
@@ -152,6 +153,26 @@ export const DiagnosticsTab: React.FC<DiagnosticsTabProps> = ({ onShowToast }) =
       }
     } finally {
       setIsClearing(false);
+    }
+  };
+
+  // Purge temporary chunk uploads
+  const handlePurgeTempChunks = async () => {
+    setIsPurgingChunks(true);
+    try {
+      const res = await diagnosticsApi.purgeTempFiles(0);
+      if (res && res.success) {
+        if (onShowToast) {
+          onShowToast(res.message || `Reclaimed ${res.cleanedMB} MB temporary storage.`, "success");
+        }
+        await fetchDiagnostics(true);
+      }
+    } catch (err: any) {
+      if (onShowToast) {
+        onShowToast(`Failed to purge temporary files: ${err.message}`, "error");
+      }
+    } finally {
+      setIsPurgingChunks(false);
     }
   };
 
@@ -302,7 +323,7 @@ export const DiagnosticsTab: React.FC<DiagnosticsTabProps> = ({ onShowToast }) =
       </div>
 
       {/* Telemetry Stats Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {/* Node & Platform */}
         <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-3.5 flex items-center gap-3">
           <div className="p-2 rounded-lg bg-zinc-800/80 text-zinc-400">
@@ -327,6 +348,34 @@ export const DiagnosticsTab: React.FC<DiagnosticsTabProps> = ({ onShowToast }) =
               {health?.memory ? `${health.memory.rssMB} MB / ${health.memory.heapUsedMB} MB` : "Telemetry loading..."}
             </div>
           </div>
+        </div>
+
+        {/* Temporary Storage & Chunks */}
+        <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-3.5 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2 rounded-lg bg-zinc-800/80 text-zinc-400 shrink-0">
+              <Trash2 className="w-4 h-4 text-cyan-400" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[10px] uppercase tracking-wider font-semibold text-zinc-400 truncate">Temp Chunks</div>
+              <div className="text-xs font-bold text-zinc-100 truncate">
+                {health?.storage ? `${health.storage.totalTempSizeMB} MB (${health.storage.totalTempFilesCount})` : "0.00 MB"}
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handlePurgeTempChunks}
+            disabled={isPurgingChunks}
+            className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-cyan-300 hover:text-cyan-200 text-[11px] font-semibold rounded-lg border border-zinc-700 transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+            title="Force purge all temporary upload chunk files and orphaned session fragments"
+          >
+            {isPurgingChunks ? (
+              <RefreshCw className="w-3 h-3 animate-spin" />
+            ) : (
+              "Purge"
+            )}
+          </button>
         </div>
 
         {/* Uptime */}

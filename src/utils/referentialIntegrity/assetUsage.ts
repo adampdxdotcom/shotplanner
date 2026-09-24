@@ -52,7 +52,7 @@ export function getAssetUsageSummary(
         });
       }
       (shot.staging_recipe.actors || []).forEach(actor => {
-        if (actor.referenceAssetFilename === target) {
+        if (actor.referenceAssetFilename === target || actor.cutoutAssetFilename === target || actor.maskAssetFilename === target) {
           summary.stagingUsages.push({
             shotId: shot.id,
             shotNumber: shot.shot_number,
@@ -97,7 +97,7 @@ export function getAssetUsageSummary(
       summary.stagingUsages.push({ type: "composite" });
     }
     (project.staging_recipe.actors || []).forEach(actor => {
-      if (actor.referenceAssetFilename === target) {
+      if (actor.referenceAssetFilename === target || actor.cutoutAssetFilename === target || actor.maskAssetFilename === target) {
         summary.stagingUsages.push({ type: "actor" });
       }
     });

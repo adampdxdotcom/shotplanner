@@ -17,6 +17,7 @@ import { AssetRecord } from "../types";
 import { sanitizeSlug } from "../utils/formatters";
 import { generateThumbnailFile } from "./thumbnailService";
 import { writeJsonAtomicSync } from "../utils/atomicFs";
+import { safeUnlinkSync, purgeUploadSessionChunks } from "../utils/fileCleanup";
 import { createScopedLogger } from "../utils/logger";
 
 const log = createScopedLogger("AssetService");
@@ -127,13 +128,47 @@ export function parseAssetFilename(filename: string): {
   };
 }
 
+interface ChunkUploadSession {
+  chunks: string[];
+  total: number;
+  createdAt: number;
+  lastActivity: number;
+}
+
 class AssetService {
-  private uploadChunks = new Map<string, string[]>();
+  private uploadChunks = new Map<string, ChunkUploadSession>();
 
   constructor() {}
   public loadAssetDatabase(): void {}
   public saveAssetDatabase(): void {}
   public getRawDatabase(): AssetRecord[] { return []; }
+
+  /**
+   * Prunes abandoned upload sessions inactive for longer than maxAgeMs (default: 1 hour).
+   */
+  public pruneExpiredUploadSessions(maxAgeMs: number = 60 * 60 * 1000): number {
+    const now = Date.now();
+    let pruned = 0;
+    for (const [uploadId, session] of this.uploadChunks.entries()) {
+      if (now - session.lastActivity > maxAgeMs) {
+        purgeUploadSessionChunks(uploadId);
+        this.uploadChunks.delete(uploadId);
+        pruned++;
+      }
+    }
+    if (pruned > 0) {
+      log.info(`Pruned ${pruned} abandoned in-memory upload chunk session(s).`);
+    }
+    return pruned;
+  }
+
+  /**
+   * Aborts an active chunked upload session and removes all written chunk files.
+   */
+  public abortChunkUpload(uploadId: string): boolean {
+    purgeUploadSessionChunks(uploadId);
+    return this.uploadChunks.delete(uploadId);
+  }
   
   public getAssetFilePath(filename: string): string | null {
     const dirsToScan = [
@@ -596,10 +631,22 @@ class AssetService {
       } = payload;
       const chunkIdx = parseInt(String(chunk_index));
       const total = parseInt(String(total_chunks));
+      
+      // Opportunistically prune abandoned upload sessions
+      this.pruneExpiredUploadSessions();
+
       if (!this.uploadChunks.has(upload_id)) {
-        this.uploadChunks.set(upload_id, new Array(total).fill(""));
+        this.uploadChunks.set(upload_id, {
+          chunks: new Array(total).fill(""),
+          total,
+          createdAt: Date.now(),
+          lastActivity: Date.now()
+        });
       }
-      const chunkArray = this.uploadChunks.get(upload_id)!;
+      
+      const session = this.uploadChunks.get(upload_id)!;
+      session.lastActivity = Date.now();
+
       const chunksTempDir = path.join(TMP_DIR, "chunks");
       if (!fs.existsSync(chunksTempDir)) {
         fs.mkdirSync(chunksTempDir, { recursive: true });
@@ -609,8 +656,9 @@ class AssetService {
       try {
         fs.unlinkSync(chunkFile.path);
       } catch (e) {}
-      chunkArray[chunkIdx] = chunkPath;
-      const isFinalChunk = chunkArray.every((cp) => cp !== "");
+      
+      session.chunks[chunkIdx] = chunkPath;
+      const isFinalChunk = session.chunks.every((cp) => cp !== "");
       if (!isFinalChunk) {
         return resolve({ complete: false });
       }
@@ -639,6 +687,17 @@ class AssetService {
       const finalPath = path.join(targetDir, targetFilename);
       const writeStream = fs.createWriteStream(finalPath);
       
+      const cleanupOnError = (err: any) => {
+        log.error(`Chunk assembly error for upload ${upload_id}: ${err?.message || err}`);
+        try { writeStream.destroy(); } catch (e) {}
+        safeUnlinkSync(finalPath);
+        purgeUploadSessionChunks(upload_id);
+        this.uploadChunks.delete(upload_id);
+        reject(err instanceof Error ? err : new Error(String(err)));
+      };
+
+      writeStream.on("error", cleanupOnError);
+
       const appendNext = (i: number) => {
         if (i >= total) {
           writeStream.end();
@@ -652,7 +711,9 @@ class AssetService {
             try { fs.unlinkSync(cp); } catch (e) {}
             appendNext(i + 1);
           });
-          rs.on("error", reject);
+          rs.on("error", (err) => {
+            cleanupOnError(err);
+          });
         } else {
           appendNext(i + 1);
         }
@@ -661,11 +722,11 @@ class AssetService {
       appendNext(0);
       
       writeStream.on("finish", async () => {
-        if (this.uploadChunks) {
-            this.uploadChunks.delete(upload_id);
-        }
+        this.uploadChunks.delete(upload_id);
+        purgeUploadSessionChunks(upload_id);
+
         if (!fs.existsSync(finalPath)) {
-          return reject(new Error("Failed to write assembled chunked file. File missing."));
+          return cleanupOnError(new Error("Failed to write assembled chunked file. File missing."));
         }
         const stats = fs.statSync(finalPath);
         const parsedSlotIndex =

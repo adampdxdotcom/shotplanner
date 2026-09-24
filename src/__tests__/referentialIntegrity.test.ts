@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   cascadeAssetDeletion,
   cascadeAssetRename,
+  cascadeCharacterDeletion,
   cascadeCharacterRename,
   sweepGhostReferences,
   getAssetUsageSummary
@@ -14,7 +15,9 @@ describe("referentialIntegrity", () => {
       { id: "a1", filename: "neo_headshot.png", original_name: "neo_headshot.png", media_type: "image", type: "Headshot", subject_name: "Neo", description: "", size_bytes: 1000, created_at: Date.now() },
       { id: "a2", filename: "neo_body.png", original_name: "neo_body.png", media_type: "image", type: "Body Reference", subject_name: "Neo", description: "", size_bytes: 1000, created_at: Date.now() },
       { id: "a3", filename: "trinity_ref.png", original_name: "trinity_ref.png", media_type: "image", type: "Headshot", subject_name: "Trinity", description: "", size_bytes: 1000, created_at: Date.now() },
-      { id: "a4", filename: "background.png", original_name: "background.png", media_type: "image", type: "Location", subject_name: "Rooftop", description: "", size_bytes: 1000, created_at: Date.now() }
+      { id: "a4", filename: "background.png", original_name: "background.png", media_type: "image", type: "Location", subject_name: "Rooftop", description: "", size_bytes: 1000, created_at: Date.now() },
+      { id: "a5", filename: "neo_cutout.png", original_name: "neo_cutout.png", media_type: "image", type: "Cutout", subject_name: "Neo", description: "", size_bytes: 1000, created_at: Date.now() },
+      { id: "a6", filename: "neo_mask.png", original_name: "neo_mask.png", media_type: "image", type: "Mask", subject_name: "Neo", description: "", size_bytes: 1000, created_at: Date.now() }
     ];
 
     const shot1: ShotItem = {
@@ -35,7 +38,18 @@ describe("referentialIntegrity", () => {
       staging_recipe: {
         backgroundAssetFilename: "background.png",
         actors: [
-          { id: "a1", characterName: "Neo", referenceAssetFilename: "neo_headshot.png", xPercent: 50, yPercent: 50, scale: 1, isFlipped: false, zIndex: 1 }
+          {
+            id: "a1",
+            characterName: "Neo",
+            referenceAssetFilename: "neo_headshot.png",
+            cutoutAssetFilename: "neo_cutout.png",
+            maskAssetFilename: "neo_mask.png",
+            xPercent: 50,
+            yPercent: 50,
+            scale: 1,
+            isFlipped: false,
+            zIndex: 1
+          }
         ]
       },
       status: "staged",
@@ -66,7 +80,24 @@ describe("referentialIntegrity", () => {
         }
       },
       assets,
-      shots: [shot1]
+      shots: [shot1],
+      staging_recipe: {
+        backgroundAssetFilename: "background.png",
+        actors: [
+          {
+            id: "proj_a1",
+            characterName: "Neo",
+            referenceAssetFilename: "neo_headshot.png",
+            cutoutAssetFilename: "neo_cutout.png",
+            maskAssetFilename: "neo_mask.png",
+            xPercent: 50,
+            yPercent: 50,
+            scale: 1,
+            isFlipped: false,
+            zIndex: 1
+          }
+        ]
+      }
     };
   };
 
@@ -79,6 +110,13 @@ describe("referentialIntegrity", () => {
       expect(summary.isUsed).toBe(true);
       expect(summary.shotSlots.some(s => s.shotId === "shot_1" && s.slotIndex === 0)).toBe(true);
       expect(summary.characterQuickSlots.some(c => c.characterName === "Neo" && c.slotIndex === 1)).toBe(true);
+    });
+
+    it("detects cutout and mask asset usages in staging recipes", () => {
+      const project = createMockProject();
+      const cutoutSummary = getAssetUsageSummary(project, "neo_cutout.png");
+      expect(cutoutSummary.isUsed).toBe(true);
+      expect(cutoutSummary.stagingUsages.length).toBeGreaterThan(0);
     });
   });
 
@@ -98,10 +136,21 @@ describe("referentialIntegrity", () => {
       // Other slots remain untouched
       expect(updatedProject.shots[0].assigned_slots[1]).toBe("trinity_ref.png");
 
-      // Cleared from staging actor cutouts
+      // Cleared from staging actor reference
       expect(updatedProject.shots[0].staging_recipe?.actors?.[0]?.referenceAssetFilename).toBeUndefined();
 
       expect(clearedShotSlotsCount).toBeGreaterThan(0);
+    });
+
+    it("clears cutoutAssetFilename and maskAssetFilename from actors when deleted", () => {
+      const project = createMockProject();
+      const { updatedProject: projectWithoutCutout } = cascadeAssetDeletion(project, "neo_cutout.png");
+      expect(projectWithoutCutout.shots[0].staging_recipe?.actors?.[0]?.cutoutAssetFilename).toBeUndefined();
+      expect(projectWithoutCutout.staging_recipe?.actors?.[0]?.cutoutAssetFilename).toBeUndefined();
+
+      const { updatedProject: projectWithoutMask } = cascadeAssetDeletion(project, "neo_mask.png");
+      expect(projectWithoutMask.shots[0].staging_recipe?.actors?.[0]?.maskAssetFilename).toBeUndefined();
+      expect(projectWithoutMask.staging_recipe?.actors?.[0]?.maskAssetFilename).toBeUndefined();
     });
   });
 
@@ -128,6 +177,17 @@ describe("referentialIntegrity", () => {
       expect(updatedProject.shots[0].staging_recipe?.actors?.[0]?.referenceAssetFilename).toBe("neo_face_v2.png");
 
       expect(updatedShotSlotsCount).toBeGreaterThan(0);
+    });
+
+    it("updates cutoutAssetFilename and maskAssetFilename across staging recipes", () => {
+      const project = createMockProject();
+      const { updatedProject } = cascadeAssetRename(
+        project,
+        "neo_cutout.png",
+        "neo_cutout_v2.png"
+      );
+      expect(updatedProject.shots[0].staging_recipe?.actors?.[0]?.cutoutAssetFilename).toBe("neo_cutout_v2.png");
+      expect(updatedProject.staging_recipe?.actors?.[0]?.cutoutAssetFilename).toBe("neo_cutout_v2.png");
     });
   });
 
@@ -167,6 +227,40 @@ describe("referentialIntegrity", () => {
     });
   });
 
+  describe("cascadeCharacterDeletion", () => {
+    it("removes character, unlinks assigned slots, removes staging actors and OTS references", () => {
+      const project = createMockProject();
+      const { updatedProject, clearedShotsCount, clearedStagingActorsCount } = cascadeCharacterDeletion(
+        project,
+        "Neo"
+      );
+
+      // Character removed from registry and subjects
+      expect(updatedProject.characters?.["Neo"]).toBeUndefined();
+      expect(updatedProject.subjects).not.toContain("Neo");
+
+      // Character removed from shot character list
+      expect(updatedProject.shots[0].characters).not.toContain("Neo");
+      expect(updatedProject.shots[0].characters).toContain("Trinity");
+
+      // Character removed from OTS framing
+      expect(updatedProject.shots[0].ots_anchor_subject).toBe("");
+
+      // De-assigned slot 0 which contained neo_headshot.png
+      expect(updatedProject.shots[0].assigned_slots[0]).toBeUndefined();
+      // Slot 1 (Trinity) and Slot 8 (Background) remain assigned
+      expect(updatedProject.shots[0].assigned_slots[1]).toBe("trinity_ref.png");
+      expect(updatedProject.shots[0].assigned_slots[8]).toBe("background.png");
+
+      // Staging actors belonging to Neo purged
+      expect(updatedProject.shots[0].staging_recipe?.actors?.length).toBe(0);
+      expect(updatedProject.staging_recipe?.actors?.length).toBe(0);
+
+      expect(clearedShotsCount).toBe(1);
+      expect(clearedStagingActorsCount).toBe(2);
+    });
+  });
+
   describe("sweepGhostReferences", () => {
     it("purges references to filenames that no longer exist in the assets registry", () => {
       const project = createMockProject();
@@ -181,6 +275,17 @@ describe("referentialIntegrity", () => {
       expect(totalCleanedSlots).toBeGreaterThan(0);
       expect(cleanedProject.shots[0].assigned_slots[2]).toBeUndefined();
       expect(cleanedProject.characters?.["Trinity"].quick_slots?.[0]).toBe("");
+    });
+
+    it("sweeps ghost cutout and mask references in staging actors", () => {
+      const project = createMockProject();
+      // Set actor cutout to a non-existent ghost filename
+      if (project.shots[0].staging_recipe?.actors?.[0]) {
+        project.shots[0].staging_recipe.actors[0].cutoutAssetFilename = "ghost_cutout.png";
+      }
+
+      const { cleanedProject } = sweepGhostReferences(project);
+      expect(cleanedProject.shots[0].staging_recipe?.actors?.[0]?.cutoutAssetFilename).toBeUndefined();
     });
   });
 });

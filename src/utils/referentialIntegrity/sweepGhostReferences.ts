@@ -48,13 +48,34 @@ export function sweepGhostReferences(project: SceneProjectFile): SweepGhostRefer
         comp = undefined;
         stagingMod = true;
       }
-      if (actors && actors.some(a => a.referenceAssetFilename && !existingFilenames.has(a.referenceAssetFilename))) {
+      const hasGhostActor = actors && actors.some(a => 
+        (a.referenceAssetFilename && !existingFilenames.has(a.referenceAssetFilename)) ||
+        (a.cutoutAssetFilename && !existingFilenames.has(a.cutoutAssetFilename)) ||
+        (a.maskAssetFilename && !existingFilenames.has(a.maskAssetFilename))
+      );
+
+      if (hasGhostActor && actors) {
         actors = actors.map(a => {
-          if (a.referenceAssetFilename && !existingFilenames.has(a.referenceAssetFilename)) {
-            ghostFilenames.add(a.referenceAssetFilename);
-            return { ...a, referenceAssetFilename: undefined };
+          let actorMod = false;
+          let ref = a.referenceAssetFilename;
+          let cut = a.cutoutAssetFilename;
+          let msk = a.maskAssetFilename;
+          if (ref && !existingFilenames.has(ref)) {
+            ghostFilenames.add(ref);
+            ref = undefined;
+            actorMod = true;
           }
-          return a;
+          if (cut && !existingFilenames.has(cut)) {
+            ghostFilenames.add(cut);
+            cut = undefined;
+            actorMod = true;
+          }
+          if (msk && !existingFilenames.has(msk)) {
+            ghostFilenames.add(msk);
+            msk = undefined;
+            actorMod = true;
+          }
+          return actorMod ? { ...a, referenceAssetFilename: ref, cutoutAssetFilename: cut, maskAssetFilename: msk } : a;
         });
         stagingMod = true;
       }
@@ -118,7 +139,61 @@ export function sweepGhostReferences(project: SceneProjectFile): SweepGhostRefer
     }
   });
 
-  // 3. Sweep Shared Assets
+  // 3. Sweep Project Staging Recipe
+  let nextProjectStaging = project.staging_recipe;
+  if (nextProjectStaging) {
+    let stagingMod = false;
+    let bg = nextProjectStaging.backgroundAssetFilename;
+    let comp = nextProjectStaging.compositeAssetFilename;
+    let actors = nextProjectStaging.actors;
+
+    if (bg && !existingFilenames.has(bg) && !bg.startsWith("http") && !bg.startsWith("data:")) {
+      ghostFilenames.add(bg);
+      bg = undefined;
+      stagingMod = true;
+    }
+    if (comp && !existingFilenames.has(comp)) {
+      ghostFilenames.add(comp);
+      comp = undefined;
+      stagingMod = true;
+    }
+    const hasGhostActor = actors && actors.some(a => 
+      (a.referenceAssetFilename && !existingFilenames.has(a.referenceAssetFilename)) ||
+      (a.cutoutAssetFilename && !existingFilenames.has(a.cutoutAssetFilename)) ||
+      (a.maskAssetFilename && !existingFilenames.has(a.maskAssetFilename))
+    );
+    if (hasGhostActor && actors) {
+      actors = actors.map(a => {
+        let actorMod = false;
+        let ref = a.referenceAssetFilename;
+        let cut = a.cutoutAssetFilename;
+        let msk = a.maskAssetFilename;
+        if (ref && !existingFilenames.has(ref)) {
+          ghostFilenames.add(ref);
+          ref = undefined;
+          actorMod = true;
+        }
+        if (cut && !existingFilenames.has(cut)) {
+          ghostFilenames.add(cut);
+          cut = undefined;
+          actorMod = true;
+        }
+        if (msk && !existingFilenames.has(msk)) {
+          ghostFilenames.add(msk);
+          msk = undefined;
+          actorMod = true;
+        }
+        return actorMod ? { ...a, referenceAssetFilename: ref, cutoutAssetFilename: cut, maskAssetFilename: msk } : a;
+      });
+      stagingMod = true;
+    }
+
+    if (stagingMod) {
+      nextProjectStaging = { ...nextProjectStaging, backgroundAssetFilename: bg, compositeAssetFilename: comp, actors };
+    }
+  }
+
+  // 4. Sweep Shared Assets
   const nextSharedAssets = (project.shared_assets || []).filter(sa => {
     if (sa.filename && !existingFilenames.has(sa.filename)) {
       ghostFilenames.add(sa.filename);
@@ -132,6 +207,7 @@ export function sweepGhostReferences(project: SceneProjectFile): SweepGhostRefer
       ...project,
       shots: nextShots,
       characters: nextCharacters,
+      staging_recipe: nextProjectStaging,
       shared_assets: nextSharedAssets
     },
     ghostFilenamesSwept: Array.from(ghostFilenames),

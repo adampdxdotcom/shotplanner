@@ -229,28 +229,29 @@ export const ShotDossierCard: React.FC<ShotDossierCardProps> = ({
         
         {/* PREVIEW THUMBNAIL (16:9 RATIO BOX) */}
         <div className="w-full md:w-48 aspect-video rounded-lg overflow-hidden shrink-0 relative bg-zinc-100 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 group shadow-inner flex items-center justify-center">
-          {previewUrl ? (
+          <div className="flex flex-col items-center justify-center text-center p-2 text-zinc-500 dark:text-zinc-400">
+            <Camera className="w-6 h-6 mb-1 opacity-50 text-indigo-500 dark:text-indigo-400" />
+            <span className="text-[11px] font-medium">No Location Asset</span>
+          </div>
+          {previewUrl && (
             isVideo ? (
               <video
                 src={`${previewUrl}#t=0.001`}
                 preload="metadata"
                 muted
                 playsInline
-                className="w-full h-full object-cover"
+                onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
+                className="absolute inset-0 w-full h-full object-cover"
               />
             ) : (
               <img
                 src={previewUrl}
                 alt={displayTitle}
-                className="w-full h-full object-cover"
+                onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
+                className="absolute inset-0 w-full h-full object-cover"
                 referrerPolicy="no-referrer"
               />
             )
-          ) : (
-            <div className="flex flex-col items-center justify-center text-center p-2 text-zinc-500 dark:text-zinc-400">
-              <Camera className="w-6 h-6 mb-1 opacity-50 text-indigo-500 dark:text-indigo-400" />
-              <span className="text-[11px] font-medium">No Location Asset</span>
-            </div>
           )}
 
           {/* THUMBNAIL BADGES */}

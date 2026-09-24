@@ -68,4 +68,14 @@ export const assetsApi = {
   sync(assets: AssetRecord[], options?: RequestOptions) {
     return apiClient.post<{ success: boolean; count?: number }>("/api/assets/sync", { assets }, options);
   },
+
+  /**
+   * Cancel and abort an in-flight chunked upload session, purging disk fragments.
+   */
+  abortChunkUpload(uploadId: string, options?: RequestOptions) {
+    return apiClient.delete<{ success: boolean; message: string }>(
+      `/api/assets/upload_chunk/${uploadId}`,
+      options
+    );
+  },
 };

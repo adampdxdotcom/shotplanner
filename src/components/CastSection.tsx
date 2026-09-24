@@ -15,6 +15,7 @@ import { RegisterCharacterModal } from "./cast/RegisterCharacterModal";
 import { DeleteCharacterModal } from "./cast/DeleteCharacterModal";
 import { useUniverseSync } from "./cast/useUniverseSync";
 import { assetsApi } from "../api";
+import { getLastCastTab, setLastCastTab } from "../utils/workspaceSessionStore";
 
 interface CastSectionProps {
   assets: MediaAsset[];
@@ -49,7 +50,13 @@ export const CastSection: React.FC<CastSectionProps> = ({
   onUpdateProject,
   addToast
 }) => {
-  const [activeRosterTab, setActiveRosterTab] = useState<"scene" | "universe">("scene");
+  const [activeRosterTab, setActiveRosterTab] = useState<"scene" | "universe">(() => getLastCastTab("scene"));
+
+  React.useEffect(() => {
+    if (activeRosterTab) {
+      setLastCastTab(activeRosterTab);
+    }
+  }, [activeRosterTab]);
 
   // Universe state & synchronization logic
   const {

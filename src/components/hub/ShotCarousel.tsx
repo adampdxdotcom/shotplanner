@@ -106,27 +106,28 @@ export const ShotCarousel: React.FC<ShotCarouselProps> = ({
                   : "border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500"
               }`}
             >
-              {thumbnailUrl ? (
+              <div className="absolute inset-0 bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
+                <span className="text-zinc-400 dark:text-zinc-500 text-sm font-medium">No Location</span>
+              </div>
+              {thumbnailUrl && (
                 isVideoThumb ? (
                   <video
                     src={`${thumbnailUrl}#t=0.001`}
                     preload="metadata"
                     muted
                     playsInline
+                    onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
                     className="absolute inset-0 w-full h-full object-cover opacity-60 pointer-events-none"
                   />
                 ) : (
                   <img
                     src={thumbnailUrl}
+                    onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
                     className="absolute inset-0 w-full h-full object-cover opacity-60 pointer-events-none"
                     alt=""
                     referrerPolicy="no-referrer"
                   />
                 )
-              ) : (
-                <div className="absolute inset-0 bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
-                  <span className="text-zinc-400 dark:text-zinc-500 text-sm font-medium">No Location</span>
-                </div>
               )}
               
               <div className="absolute top-2 left-2 flex flex-col items-start gap-1 z-10 max-w-[calc(100%-4rem)]">

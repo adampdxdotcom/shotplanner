@@ -7,6 +7,8 @@ import {
   formatLogEntryAsText,
   createScopedLogger
 } from "../utils/logger";
+import { getTempStorageStats, cleanupStaleChunks } from "../utils/fileCleanup";
+import { assetService } from "../services/assetService";
 
 const log = createScopedLogger("DiagnosticRoute");
 const router = Router();
@@ -167,6 +169,7 @@ router.get("/system", (_req: Request, res: Response) => {
     const hours = Math.floor(uptimeSec / 3600);
     const mins = Math.floor((uptimeSec % 3600) / 60);
     const secs = uptimeSec % 60;
+    const storage = getTempStorageStats();
 
     res.json({
       success: true,
@@ -180,6 +183,7 @@ router.get("/system", (_req: Request, res: Response) => {
         heapTotalMB: (mem.heapTotal / 1048576).toFixed(1),
         externalMB: (mem.external / 1048576).toFixed(1)
       },
+      storage,
       logging: {
         currentLevel: logger.getLevel(),
         stats: logger.getBufferStats(),
@@ -189,6 +193,47 @@ router.get("/system", (_req: Request, res: Response) => {
     });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message || "Failed to retrieve system info" });
+  }
+});
+
+/**
+ * GET /api/diagnostics/storage
+ * Direct endpoint for storage and temporary chunk statistics
+ */
+router.get("/storage", (_req: Request, res: Response) => {
+  try {
+    const stats = getTempStorageStats();
+    res.json({ success: true, storage: stats });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message || "Failed to retrieve storage stats" });
+  }
+});
+
+/**
+ * POST /api/diagnostics/cleanup
+ * Manually trigger purging of orphaned temporary chunks and expired upload sessions
+ */
+router.post("/cleanup", (req: Request, res: Response) => {
+  try {
+    const maxAgeMs = req.body.maxAgeMs !== undefined ? Number(req.body.maxAgeMs) : 0;
+    const { cleanedCount, cleanedBytes } = cleanupStaleChunks(maxAgeMs);
+    const prunedSessions = assetService.pruneExpiredUploadSessions(maxAgeMs);
+
+    const mb = (cleanedBytes / (1024 * 1024)).toFixed(2);
+    log.info(`Manual cleanup executed: purged ${cleanedCount} temporary file(s) (${mb} MB), evicted ${prunedSessions} session(s).`);
+
+    res.json({
+      success: true,
+      cleanedCount,
+      cleanedBytes,
+      cleanedMB: mb,
+      prunedSessions,
+      storage: getTempStorageStats(),
+      message: `Reclaimed ${mb} MB across ${cleanedCount} temporary file(s).`
+    });
+  } catch (err: any) {
+    log.error(`Manual temporary file cleanup error: ${err?.message || err}`);
+    res.status(500).json({ success: false, error: err.message || "Failed to execute cleanup" });
   }
 });
 

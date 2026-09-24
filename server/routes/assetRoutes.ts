@@ -164,4 +164,33 @@ router.post("/upload_chunk", upload.single("file"), async (req: Request, res: Re
   }
 });
 
+// Explicit chunk upload cancellation / abort endpoint
+router.delete("/upload_chunk/:upload_id", (req: Request, res: Response) => {
+  try {
+    const { upload_id } = req.params;
+    if (!upload_id) return res.status(400).json({ error: "Missing upload_id" });
+
+    assetService.abortChunkUpload(upload_id);
+    log.info(`Aborted chunk upload session and purged temporary fragments for: ${upload_id}`);
+    res.json({ success: true, message: `Upload session ${upload_id} aborted and chunks purged` });
+  } catch (err: any) {
+    log.error(`Error aborting chunk upload session: ${err?.message || err}`);
+    res.status(500).json({ error: err.message || "Failed to abort chunk upload" });
+  }
+});
+
+router.post("/upload_chunk/cancel", (req: Request, res: Response) => {
+  try {
+    const { upload_id } = req.body;
+    if (!upload_id) return res.status(400).json({ error: "Missing upload_id" });
+
+    assetService.abortChunkUpload(upload_id);
+    log.info(`Cancelled chunk upload session and purged temporary fragments for: ${upload_id}`);
+    res.json({ success: true, message: `Upload session ${upload_id} cancelled and chunks purged` });
+  } catch (err: any) {
+    log.error(`Error cancelling chunk upload session: ${err?.message || err}`);
+    res.status(500).json({ error: err.message || "Failed to cancel chunk upload" });
+  }
+});
+
 export default router;

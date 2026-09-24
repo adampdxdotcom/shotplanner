@@ -149,11 +149,23 @@ export async function processAssetTransfer(options: AssetTransferOptions) {
     const { resolvedFilename, rawWorkflow } = resolveWorkflowTemplate(workflow_filename, activeSceneName);
     baseTemplateUsed = resolvedFilename;
 
+    // Sanitize node mappings against missing/ghost files
+    const sanitizedNodeMappings = { ...node_mappings };
+    const missingFilenames = new Set(missingSummary.map(m => m.filename));
+    if (missingFilenames.size > 0 && bypass_missing !== false) {
+      for (const [nodeId, fn] of Object.entries(sanitizedNodeMappings)) {
+        if (fn && typeof fn === "string" && missingFilenames.has(fn.trim())) {
+          log.warn(`Ghost/missing asset "${fn}" in node mapping for node ${nodeId} substituted with ${safe_placeholder || "empty.png"}`);
+          sanitizedNodeMappings[nodeId] = safe_placeholder || "empty.png";
+        }
+      }
+    }
+
     updatedWorkflowJson = injectAndPrepareWorkflowData(
       rawWorkflow,
       prompt_node_id,
       expanded_prompt || "",
-      node_mappings,
+      sanitizedNodeMappings,
       bypass_missing,
       safe_placeholder,
       {

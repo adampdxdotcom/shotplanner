@@ -61,6 +61,7 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
   const [isDraggingOver, setIsDraggingOver] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const activeXhrRef = useRef<XMLHttpRequest | null>(null);
   const visionState = useVisionCaption(config);
 
   const modifierConfig = useMemo(() => getModifierConfig(assetType), [assetType]);
@@ -85,6 +86,10 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
         setSubjectName(defaultSubject);
       }
     } else {
+      if (activeXhrRef.current) {
+        try { activeXhrRef.current.abort(); } catch (e) {}
+        activeXhrRef.current = null;
+      }
       if (stagedPreviewUrl) {
         revokeManagedBlobUrl(stagedPreviewUrl);
       }
@@ -236,6 +241,7 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
 
     try {
       const xhr = new XMLHttpRequest();
+      activeXhrRef.current = xhr;
       xhr.upload.addEventListener("progress", (event) => {
         if (event.lengthComputable) {
           const percentComplete = Math.round((event.loaded / event.total) * 100);
@@ -262,6 +268,7 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
           }
         });
         xhr.addEventListener("error", () => reject(new Error("Network error during upload")));
+        xhr.addEventListener("abort", () => reject(new Error("Upload aborted by user")));
         xhr.open("POST", "/api/assets/upload");
         xhr.send(formData);
       });
@@ -278,6 +285,8 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
     } catch (err: any) {
       setUploading(false);
       setUploadError(err.message);
+    } finally {
+      activeXhrRef.current = null;
     }
   };
 

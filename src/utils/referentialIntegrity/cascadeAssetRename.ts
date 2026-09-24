@@ -83,13 +83,28 @@ export function cascadeAssetRename(
         stagingModified = true;
         updatedStagingRefsCount++;
       }
-      if (actors && actors.some(a => a.referenceAssetFilename === oldTarget)) {
+      if (actors && actors.some(a => a.referenceAssetFilename === oldTarget || a.cutoutAssetFilename === oldTarget || a.maskAssetFilename === oldTarget)) {
         actors = actors.map(a => {
-          if (a.referenceAssetFilename === oldTarget) {
+          let actorModified = false;
+          let ref = a.referenceAssetFilename;
+          let cut = a.cutoutAssetFilename;
+          let msk = a.maskAssetFilename;
+          if (ref === oldTarget) {
+            ref = newTarget;
+            actorModified = true;
             updatedStagingRefsCount++;
-            return { ...a, referenceAssetFilename: newTarget };
           }
-          return a;
+          if (cut === oldTarget) {
+            cut = newTarget;
+            actorModified = true;
+            updatedStagingRefsCount++;
+          }
+          if (msk === oldTarget) {
+            msk = newTarget;
+            actorModified = true;
+            updatedStagingRefsCount++;
+          }
+          return actorModified ? { ...a, referenceAssetFilename: ref, cutoutAssetFilename: cut, maskAssetFilename: msk } : a;
         });
         stagingModified = true;
       }
@@ -187,8 +202,29 @@ export function cascadeAssetRename(
       comp = newTarget;
       stagingModified = true;
     }
-    if (actors && actors.some(a => a.referenceAssetFilename === oldTarget)) {
-      actors = actors.map(a => a.referenceAssetFilename === oldTarget ? { ...a, referenceAssetFilename: newTarget } : a);
+    if (actors && actors.some(a => a.referenceAssetFilename === oldTarget || a.cutoutAssetFilename === oldTarget || a.maskAssetFilename === oldTarget)) {
+      actors = actors.map(a => {
+        let actorModified = false;
+        let ref = a.referenceAssetFilename;
+        let cut = a.cutoutAssetFilename;
+        let msk = a.maskAssetFilename;
+        if (ref === oldTarget) {
+          ref = newTarget;
+          actorModified = true;
+          updatedStagingRefsCount++;
+        }
+        if (cut === oldTarget) {
+          cut = newTarget;
+          actorModified = true;
+          updatedStagingRefsCount++;
+        }
+        if (msk === oldTarget) {
+          msk = newTarget;
+          actorModified = true;
+          updatedStagingRefsCount++;
+        }
+        return actorModified ? { ...a, referenceAssetFilename: ref, cutoutAssetFilename: cut, maskAssetFilename: msk } : a;
+      });
       stagingModified = true;
     }
 

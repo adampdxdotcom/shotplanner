@@ -7,6 +7,7 @@ import { AssetUploadModal } from "./AssetUploadModal";
 import { AssetEditModal } from "./AssetEditModal";
 import { AssetLightbox } from "./AssetLightbox";
 import { getLastAssetTab, setLastAssetTab } from "../utils/workspaceSessionStore";
+import { assetsApi } from "../api";
 import { 
   EmptyShotState, 
   AssetTabBar, 
@@ -47,6 +48,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
   characters = {},
   onRegisterSubject = (_name: string) => {},
   onAssetUploaded,
+  onAssetDeleted,
   onAssetUpdated,
   addToast,
   onOpenScenePlan,
@@ -154,6 +156,23 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
       return { ...prev, shots: [...prev.shots, duplicatedShot] };
     });
     onSelectShot(newId);
+  };
+
+  const handleDeleteAsset = async (assetToDelete: MediaAsset) => {
+    try {
+      await assetsApi.delete(encodeURIComponent(assetToDelete.filename));
+      onAssetDeleted(assetToDelete.filename);
+      if (lightboxAsset?.filename === assetToDelete.filename) {
+        setLightboxAsset(null);
+      }
+      if (editingAsset?.filename === assetToDelete.filename) {
+        setEditingAsset(null);
+      }
+      addToast?.(`Deleted asset "${assetToDelete.original_name || assetToDelete.filename}"`, "success");
+    } catch (err: any) {
+      console.error("Failed to delete asset:", err);
+      addToast?.(`Failed to delete asset: ${err.message || "Unknown error"}`, "error");
+    }
   };
 
   return (
@@ -317,6 +336,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
       <AssetLightbox 
         asset={lightboxAsset}
         onClose={() => setLightboxAsset(null)}
+        onDelete={handleDeleteAsset}
       />
 
       {/* Take Review & Comparison Modals */}

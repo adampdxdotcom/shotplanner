@@ -5,6 +5,7 @@ import { SectionLoadingFallback } from "./components/common/SectionLoadingFallba
 import { ShotDossierCard } from "./components/ShotDossierCard";
 import { ShotItem } from "./types";
 import { useAppLogic } from "./hooks/useAppLogic";
+import { getLastConfigTab, setLastConfigTab } from "./utils/workspaceSessionStore";
 
 // Lazy-loaded top-level sections for optimal initial bundle performance
 const SceneProjectHub = lazy(() => import("./components/SceneProjectHub"));
@@ -76,8 +77,15 @@ export default function App() {
     lastSavedAt
   } = useAppLogic();
 
-  const [activeConfigTab, setActiveConfigTab] = useState<ConfigTab>("llm");
+  const [activeConfigTab, setActiveConfigTab] = useState<ConfigTab>(() => getLastConfigTab("llm"));
   const [isScenePlanOpen, setIsScenePlanOpen] = useState(false);
+
+  // Synchronize active config tab
+  React.useEffect(() => {
+    if (activeConfigTab) {
+      setLastConfigTab(activeConfigTab);
+    }
+  }, [activeConfigTab]);
 
   const hasScenePlan = Boolean(
     sceneProject?.scene_planning?.overarching_goal?.trim() ||

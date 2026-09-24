@@ -2,7 +2,7 @@ import React, { useEffect, useCallback } from 'react';
 import { SceneProjectFile, ScenePlanning, CharacterProfile } from '../../types';
 import { generateUUID } from '../../utils/formatters';
 import { toCanonicalSubjectName, findCanonicalSubject, normalizeProjectCastAndAssets } from '../../utils/subjectUtils';
-import { cascadeCharacterRename, sweepGhostReferences } from '../../utils/referentialIntegrity';
+import { cascadeCharacterRename, cascadeCharacterDeletion, sweepGhostReferences } from '../../utils/referentialIntegrity';
 
 interface UseCastManagementParams {
   sceneProject: SceneProjectFile;
@@ -158,100 +158,8 @@ export function useCastManagement({
     const targetLower = trimmed.toLowerCase();
 
     setSceneProject(prevProject => {
-      // 1. Identify all asset filenames associated with the deleted character
-      const characterFilenames = new Set<string>();
-
-      // Check quick slots & outfit ref from character profile
-      const charEntries = Object.entries(prevProject.characters || {}) as [string, CharacterProfile][];
-      const charProfile = charEntries.find(([name]) => name.toLowerCase() === targetLower)?.[1];
-      if (charProfile) {
-        (charProfile.quick_slots || []).forEach(fn => { if (fn) characterFilenames.add(fn); });
-        if (charProfile.scene_outfit_ref && /\.(png|jpe?g|webp|gif|bmp|mp4|mov)$/i.test(charProfile.scene_outfit_ref)) {
-          characterFilenames.add(charProfile.scene_outfit_ref);
-        }
-      }
-
-      // Check assets matching character tag
-      (prevProject.assets || []).forEach(a => {
-        if ((a.subject_name || "").trim().toLowerCase() === targetLower) {
-          if (a.filename) characterFilenames.add(a.filename);
-        }
-      });
-
-      // 2. Remove character record from characters registry
-      const nextCharacters: Record<string, CharacterProfile> = {};
-      charEntries.forEach(([key, val]) => {
-        if (key.toLowerCase() !== targetLower && val.name.toLowerCase() !== targetLower) {
-          nextCharacters[key] = val;
-        }
-      });
-
-      // 3. Remove character name from global subjects registry
-      const nextSubjects = (prevProject.subjects || []).filter(
-        s => s.toLowerCase() !== targetLower
-      );
-
-      // 4. Update scene assets list:
-      // - Remove universe assets from this scene's asset list since the character is removed from the scene.
-      // - For local scene assets matching this character, remove them from the scene's asset list so they don't linger as "unlabeled".
-      const nextAssets = (prevProject.assets || []).filter(a => {
-        const isMatch = (a.subject_name || "").trim().toLowerCase() === targetLower;
-        return !isMatch;
-      });
-
-      // 5. Surgical shot-level de-assignment across every shot in the project
-      const nextShots = (prevProject.shots || []).map(shot => {
-        // De-assign slot keys containing filenames belonging to the deleted character
-        const nextAssignedSlots: Record<number, string> = {};
-        for (const [slotKey, fn] of Object.entries(shot.assigned_slots || {})) {
-          if (fn && !characterFilenames.has(fn as string)) {
-            nextAssignedSlots[Number(slotKey)] = fn as string;
-          }
-        }
-
-        // Clean characters array in shot
-        const nextChars = (shot.characters || []).filter(
-          c => (c || "").trim().toLowerCase() !== targetLower
-        );
-
-        // Clean OTS anchor/focus subjects if they match the deleted character
-        let otsAnchor = shot.ots_anchor_subject;
-        let otsFocus = shot.ots_focus_subject;
-        if (otsAnchor && otsAnchor.trim().toLowerCase() === targetLower) {
-          otsAnchor = "";
-        }
-        if (otsFocus && otsFocus.trim().toLowerCase() === targetLower) {
-          otsFocus = "";
-        }
-
-        // Clean staging recipe actors
-        let nextStaging = shot.staging_recipe;
-        if (nextStaging && Array.isArray(nextStaging.actors)) {
-          const nextActors = nextStaging.actors.filter(
-            a => (a.characterName || "").trim().toLowerCase() !== targetLower
-          );
-          if (nextActors.length !== nextStaging.actors.length) {
-            nextStaging = { ...nextStaging, actors: nextActors };
-          }
-        }
-
-        return {
-          ...shot,
-          assigned_slots: nextAssignedSlots,
-          characters: nextChars,
-          ots_anchor_subject: otsAnchor,
-          ots_focus_subject: otsFocus,
-          staging_recipe: nextStaging
-        };
-      });
-
-      return {
-        ...prevProject,
-        characters: nextCharacters,
-        subjects: nextSubjects,
-        assets: nextAssets,
-        shots: nextShots
-      };
+      const { updatedProject } = cascadeCharacterDeletion(prevProject, trimmed, { removeTaggedAssets: false });
+      return updatedProject;
     });
 
     // Clean OTS in scene planning if configured for this character

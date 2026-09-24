@@ -116,11 +116,23 @@ export async function processSceneTransfer(options: SceneTransferOptions) {
         aspect_ratio: shot.aspect_ratio
       });
 
+      // Sanitize node mappings against missing/ghost files
+      const sanitizedShotNodeMappings = { ...(shot.node_mappings || {}) };
+      const missingFilenames = new Set(missingSummary.map(m => m.filename));
+      if (missingFilenames.size > 0 && bypass_missing !== false) {
+        for (const [nodeId, fn] of Object.entries(sanitizedShotNodeMappings)) {
+          if (fn && typeof fn === "string" && missingFilenames.has(fn.trim())) {
+            log.warn(`Ghost/missing asset "${fn}" in shot ${activeShotNumber} substituted with ${safe_placeholder || "empty.png"}`);
+            sanitizedShotNodeMappings[nodeId] = safe_placeholder || "empty.png";
+          }
+        }
+      }
+
       const updatedWorkflowJson = injectAndPrepareWorkflowData(
         rawWorkflow,
         shot.prompt_node_id,
         shot.expanded_prompt || "",
-        shot.node_mappings || {},
+        sanitizedShotNodeMappings,
         bypass_missing,
         safe_placeholder,
         {

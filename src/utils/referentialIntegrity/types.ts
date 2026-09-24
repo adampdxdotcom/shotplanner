@@ -34,6 +34,14 @@ export interface CascadeCharacterRenameResult {
   updatedAssetsCount: number;
 }
 
+export interface CascadeCharacterDeleteResult {
+  updatedProject: SceneProjectFile;
+  clearedShotsCount: number;
+  clearedAssetsCount: number;
+  clearedStagingActorsCount: number;
+  clearedShotSlotsCount: number;
+}
+
 export interface SweepGhostReferencesResult {
   cleanedProject: SceneProjectFile;
   ghostFilenamesSwept: string[];
