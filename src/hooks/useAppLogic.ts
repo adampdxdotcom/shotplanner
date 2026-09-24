@@ -110,7 +110,7 @@ export function useAppLogic() {
     setBypassMissing,
     fetchWorkflows,
     addToast,
-    getShotOperationsDelegate: () => shotOpsRef.current
+    getShotOperationsDelegate: useCallback(() => shotOpsRef.current, [])
   });
 
   // 5. Cast & Character Management

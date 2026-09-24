@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   SceneProjectFile, 
   ScenePlanning, 
@@ -105,6 +105,7 @@ export function useScenePersistence({
   const [isLoadModalOpen, setIsLoadModalOpen] = useState(false);
   const [currentProjectName, setCurrentProjectName] = useState<string>("");
   const [availableScenes, setAvailableScenes] = useState<string[]>([]);
+  const isLoadingProjectRef = useRef(false);
 
   useEffect(() => {
     projectsApi.list()
@@ -122,8 +123,8 @@ export function useScenePersistence({
   }, []);
 
   useEffect(() => {
-    if (isInitialLoad || !hasLoadedProject) {
-      setIsInitialLoad(false);
+    if (isLoadingProjectRef.current || isInitialLoad || !hasLoadedProject) {
+      if (isInitialLoad) setIsInitialLoad(false);
       return;
     }
     setIsDirty(true);
@@ -164,11 +165,13 @@ export function useScenePersistence({
       if (assetList.length > 0) {
         setSceneProject(prev => {
           const currentAssets = prev.assets || [];
+          let hasDiff = currentAssets.length !== assetList.length;
           const newAssets = assetList.map((a: any, idx: number) => {
             const existing = currentAssets.find(ca => ca.filename === a.filename);
             if (existing) {
               return existing;
             }
+            hasDiff = true;
             return {
               ...a,
               slot_index: a.slot_index !== undefined ? a.slot_index : idx,
@@ -176,6 +179,9 @@ export function useScenePersistence({
               preview_url: getAssetMediaUrl(a.filename)
             };
           });
+          if (!hasDiff) {
+            return prev;
+          }
           return { ...prev, assets: newAssets };
         });
       }
@@ -232,11 +238,13 @@ export function useScenePersistence({
   }, [sceneProject, config, parameterNodeMappings, generationParams, defaultLlmProvider, getShotOperationsDelegate, addToast]);
 
   const handleLoadProject = useCallback(async (filename: string, options?: { isInitialRestore?: boolean }) => {
+    isLoadingProjectRef.current = true;
     // If a demo project file is ever referenced, abort safely without error
     if (filename.toLowerCase().includes("demo")) {
       clearDemoProjectSession();
       setHasLoadedProject(true);
       setIsDirty(false);
+      isLoadingProjectRef.current = false;
       return;
     }
 
@@ -249,8 +257,10 @@ export function useScenePersistence({
         clearLastProjectName();
         setHasLoadedProject(true);
         setIsDirty(false);
+        isLoadingProjectRef.current = false;
         return;
       }
+      isLoadingProjectRef.current = false;
       throw new Error(err.message || "Failed to load project.");
     }
 
@@ -346,7 +356,10 @@ export function useScenePersistence({
       setHasLoadedProject(true);
       await fetchAssets(data.scene_name || filename.replace(/\.json$/i, ""));
       
-      setTimeout(() => setIsDirty(false), 100);
+      setTimeout(() => {
+        isLoadingProjectRef.current = false;
+        setIsDirty(false);
+      }, 150);
       if (!options?.isInitialRestore) {
         const assetCount = Array.isArray(data.assets) ? data.assets.length : 0;
         addToast(`Project "${filename}" loaded successfully (${assetCount} image assets restored).`, "success");
@@ -420,7 +433,10 @@ export function useScenePersistence({
     
     await fetchWorkflows();
     
-    setTimeout(() => setIsDirty(false), 100);
+    setTimeout(() => {
+      isLoadingProjectRef.current = false;
+      setIsDirty(false);
+    }, 150);
     const assetCount = Array.isArray(data.assets) ? data.assets.length : 0;
     addToast(`Project "${filename}" loaded successfully (${assetCount} image assets restored).`, "success");
   }, [setConfig, defaultLlmProvider, setNodeMappings, setParameterNodeMappings, setGenerationParams, setSelectedWorkflowFile, setSelectedPromptNodeId, setBypassMissing, fetchAssets, fetchWorkflows, addToast, getShotOperationsDelegate]);
@@ -470,14 +486,23 @@ export function useScenePersistence({
     addToast(`New scene "${sceneName}" created in-memory. Save when ready!`, "info");
   }, [selectedWorkflowFile, config, defaultLlmProvider, setNodeMappings, setParameterNodeMappings, addToast, getShotOperationsDelegate]);
 
+  const initialRestoreExecutedRef = useRef(false);
+  const handleLoadProjectRef = useRef(handleLoadProject);
+  handleLoadProjectRef.current = handleLoadProject;
+  const fetchWorkflowsRef = useRef(fetchWorkflows);
+  fetchWorkflowsRef.current = fetchWorkflows;
+
   useEffect(() => {
-    fetchWorkflows();
+    if (initialRestoreExecutedRef.current) return;
+    initialRestoreExecutedRef.current = true;
+
+    fetchWorkflowsRef.current();
     // Clear any stale demo project references from storage
     clearDemoProjectSession();
 
     const lastProject = getLastProjectName();
     if (lastProject && lastProject !== "untitled_scene" && !lastProject.includes("demo")) {
-      handleLoadProject(lastProject, { isInitialRestore: true }).catch((err) => {
+      handleLoadProjectRef.current(lastProject, { isInitialRestore: true }).catch((err) => {
         console.warn(`[Workspace] Could not auto-restore project "${lastProject}":`, err);
         clearLastProjectName();
         setHasLoadedProject(true);
@@ -488,7 +513,7 @@ export function useScenePersistence({
       setHasLoadedProject(true);
       setIsDirty(false);
     }
-  }, [fetchWorkflows, handleLoadProject]);
+  }, []);
 
   useEffect(() => {
     if (currentProjectName && currentProjectName !== "untitled_scene") {
@@ -496,8 +521,13 @@ export function useScenePersistence({
     }
   }, [currentProjectName]);
 
+  const lastFetchedSceneRef = useRef<string | null>(null);
   useEffect(() => {
-    fetchAssets(sceneProject.scene_name || currentProjectName);
+    const targetScene = sceneProject.scene_name || currentProjectName;
+    if (targetScene && targetScene !== lastFetchedSceneRef.current) {
+      lastFetchedSceneRef.current = targetScene;
+      fetchAssets(targetScene);
+    }
   }, [sceneProject.scene_name, currentProjectName, fetchAssets]);
 
   return {
