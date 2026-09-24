@@ -1,16 +1,23 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { AppConfig, MediaAsset, SceneProjectFile, ImageVisualAnalysis } from "../types";
-import { Edit3, X, AlertCircle, UploadCloud, Undo2, Trash2, CheckCircle, Sparkles, Loader2, Eye, Shirt, Sun, Camera, Palette, Save } from "lucide-react";
+import { Edit3, X, AlertCircle, Sparkles, Loader2 } from "lucide-react";
 import { SubjectCombobox } from "./SubjectCombobox";
 import { getAssetMediaUrl } from "../utils/assetUrl";
 import { 
-  ASSET_REFERENCE_MODIFIERS, 
   getModifierConfig,
   updateDescriptionWithModifier, 
   detectActiveModifier 
 } from "../utils/assetModifiers";
 import { useVisionCaption, generateCaptionForFile, generateCaptionForAsset } from "../hooks/useVisionCaption";
 import { assetsApi } from "../api";
+import {
+  PRESET_TYPES,
+  AssetPreviewHeaderCard,
+  AssetReferenceTypeSelector,
+  AssetFileReplacementSection,
+  VisualIntelligenceBreakdownEditor,
+  VisualIntelligenceBreakdownValues
+} from "./assetManager/edit";
 
 interface AssetEditModalProps {
   asset: MediaAsset | null;
@@ -24,14 +31,24 @@ interface AssetEditModalProps {
   onAssetUpdated: (oldFilename: string, newAsset: MediaAsset) => void;
 }
 
-const PRESET_TYPES = [
-  { value: "Headshot", label: "Headshot (Face)" },
-  { value: "Body Reference", label: "Body / Outfit" },
-  { value: "Scene / Location", label: "Scene / Location" },
-  { value: "Object / Prop", label: "Object / Prop" },
-  { value: "Style / Mood", label: "Style / Mood" },
-  { value: "Other", label: "Other" }
-];
+const DEFAULT_VI_VALUES: VisualIntelligenceBreakdownValues = {
+  summary: "",
+  subjectIdentifiedName: "",
+  subjectAge: "",
+  subjectExpression: "",
+  subjectHair: "",
+  wardrobeGarments: "",
+  wardrobeColors: "",
+  wardrobeEra: "",
+  lightingQuality: "",
+  lightingDirection: "",
+  lightingTemp: "",
+  cinemaFraming: "",
+  cinemaLens: "",
+  cinemaAngle: "",
+  envLocationType: "",
+  envPalette: ""
+};
 
 export const AssetEditModal: React.FC<AssetEditModalProps> = ({
   asset,
@@ -51,31 +68,22 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
   const [editDescription, setEditDescription] = useState<string>("");
   const [editFile, setEditFile] = useState<File | null>(null);
   const [isReplacingFile, setIsReplacingFile] = useState<boolean>(false);
-  const [editDragActive, setEditDragActive] = useState<boolean>(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [isCaptioning, setIsCaptioning] = useState(false);
   const [captionToast, setCaptionToast] = useState<string | null>(null);
 
   // Editable Visual Intelligence Breakdown Fields
-  const [viSummary, setViSummary] = useState<string>("");
-  const [viSubjectIdentifiedName, setViSubjectIdentifiedName] = useState<string>("");
-  const [viSubjectAge, setViSubjectAge] = useState<string>("");
-  const [viSubjectExpression, setViSubjectExpression] = useState<string>("");
-  const [viSubjectHair, setViSubjectHair] = useState<string>("");
-  const [viWardrobeGarments, setViWardrobeGarments] = useState<string>("");
-  const [viWardrobeColors, setViWardrobeColors] = useState<string>("");
-  const [viWardrobeEra, setViWardrobeEra] = useState<string>("");
-  const [viLightingQuality, setViLightingQuality] = useState<string>("");
-  const [viLightingDirection, setViLightingDirection] = useState<string>("");
-  const [viLightingTemp, setViLightingTemp] = useState<string>("");
-  const [viCinemaFraming, setViCinemaFraming] = useState<string>("");
-  const [viCinemaLens, setViCinemaLens] = useState<string>("");
-  const [viCinemaAngle, setViCinemaAngle] = useState<string>("");
-  const [viEnvLocationType, setViEnvLocationType] = useState<string>("");
-  const [viEnvPalette, setViEnvPalette] = useState<string>("");
+  const [viValues, setViValues] = useState<VisualIntelligenceBreakdownValues>(DEFAULT_VI_VALUES);
 
   const visionState = useVisionCaption(config);
+
+  const handleViChange = <K extends keyof VisualIntelligenceBreakdownValues>(
+    field: K,
+    val: VisualIntelligenceBreakdownValues[K]
+  ) => {
+    setViValues(prev => ({ ...prev, [field]: val }));
+  };
 
   useEffect(() => {
     if (asset) {
@@ -122,43 +130,28 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
       // Populate Visual Intelligence fields from project cache
       const cached = sceneProject?.visual_analysis_cache?.[asset.filename];
       if (cached) {
-        setViSummary(cached.summary || "");
-        setViSubjectIdentifiedName(cached.subject?.identified_name || "");
-        setViSubjectAge(cached.subject?.apparent_age || "");
-        setViSubjectExpression(cached.subject?.expression || "");
-        setViSubjectHair(cached.subject?.hair || "");
-        setViWardrobeGarments(cached.wardrobe?.garments || "");
-        setViWardrobeColors(cached.wardrobe?.colors || "");
-        setViWardrobeEra(cached.wardrobe?.era_style || "");
-        setViLightingQuality(cached.lighting?.quality || "");
-        setViLightingDirection(cached.lighting?.key_direction || "");
-        setViLightingTemp(cached.lighting?.color_temperature || "");
-        setViCinemaFraming(cached.cinematography?.framing || "");
-        setViCinemaLens(cached.cinematography?.lens_feel || "");
-        setViCinemaAngle(cached.cinematography?.camera_angle || "");
-        setViEnvLocationType(cached.environment_palette?.location_type || cached.environment_palette?.setting || "");
-        setViEnvPalette(
-          Array.isArray(cached.environment_palette?.dominant_colors)
+        setViValues({
+          summary: cached.summary || "",
+          subjectIdentifiedName: cached.subject?.identified_name || "",
+          subjectAge: cached.subject?.apparent_age || "",
+          subjectExpression: cached.subject?.expression || "",
+          subjectHair: cached.subject?.hair || "",
+          wardrobeGarments: cached.wardrobe?.garments || "",
+          wardrobeColors: cached.wardrobe?.colors || "",
+          wardrobeEra: cached.wardrobe?.era_style || "",
+          lightingQuality: cached.lighting?.quality || "",
+          lightingDirection: cached.lighting?.key_direction || "",
+          lightingTemp: cached.lighting?.color_temperature || "",
+          cinemaFraming: cached.cinematography?.framing || "",
+          cinemaLens: cached.cinematography?.lens_feel || "",
+          cinemaAngle: cached.cinematography?.camera_angle || "",
+          envLocationType: cached.environment_palette?.location_type || cached.environment_palette?.setting || "",
+          envPalette: Array.isArray(cached.environment_palette?.dominant_colors)
             ? cached.environment_palette.dominant_colors.join(", ")
             : cached.environment_palette?.dominant_colors || ""
-        );
+        });
       } else {
-        setViSummary("");
-        setViSubjectIdentifiedName("");
-        setViSubjectAge("");
-        setViSubjectExpression("");
-        setViSubjectHair("");
-        setViWardrobeGarments("");
-        setViWardrobeColors("");
-        setViWardrobeEra("");
-        setViLightingQuality("");
-        setViLightingDirection("");
-        setViLightingTemp("");
-        setViCinemaFraming("");
-        setViCinemaLens("");
-        setViCinemaAngle("");
-        setViEnvLocationType("");
-        setViEnvPalette("");
+        setViValues(DEFAULT_VI_VALUES);
       }
     }
   }, [asset, sceneProject]);
@@ -207,21 +200,22 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
         setTimeout(() => setCaptionToast(null), 3000);
 
         if (res.analysis) {
-          if (res.analysis.summary) setViSummary(res.analysis.summary);
-          if (res.analysis.wardrobe?.garments) setViWardrobeGarments(res.analysis.wardrobe.garments);
-          if (res.analysis.wardrobe?.colors) setViWardrobeColors(res.analysis.wardrobe.colors);
-          if (res.analysis.wardrobe?.era_style) setViWardrobeEra(res.analysis.wardrobe.era_style);
-          if (res.analysis.lighting?.quality) setViLightingQuality(res.analysis.lighting.quality);
-          if (res.analysis.lighting?.key_direction) setViLightingDirection(res.analysis.lighting.key_direction);
-          if (res.analysis.lighting?.color_temperature) setViLightingTemp(res.analysis.lighting.color_temperature);
-          if (res.analysis.cinematography?.framing) setViCinemaFraming(res.analysis.cinematography.framing);
-          if (res.analysis.cinematography?.lens_feel) setViCinemaLens(res.analysis.cinematography.lens_feel);
-          if (res.analysis.cinematography?.camera_angle) setViCinemaAngle(res.analysis.cinematography.camera_angle);
-          if (res.analysis.environment_palette?.location_type) setViEnvLocationType(res.analysis.environment_palette.location_type);
-          if (res.analysis.environment_palette?.dominant_colors) {
-            const dom = res.analysis.environment_palette.dominant_colors;
-            setViEnvPalette(Array.isArray(dom) ? dom.join(", ") : dom);
-          }
+          const dom = res.analysis.environment_palette?.dominant_colors;
+          setViValues(prev => ({
+            ...prev,
+            summary: res.analysis?.summary || prev.summary,
+            wardrobeGarments: res.analysis?.wardrobe?.garments || prev.wardrobeGarments,
+            wardrobeColors: res.analysis?.wardrobe?.colors || prev.wardrobeColors,
+            wardrobeEra: res.analysis?.wardrobe?.era_style || prev.wardrobeEra,
+            lightingQuality: res.analysis?.lighting?.quality || prev.lightingQuality,
+            lightingDirection: res.analysis?.lighting?.key_direction || prev.lightingDirection,
+            lightingTemp: res.analysis?.lighting?.color_temperature || prev.lightingTemp,
+            cinemaFraming: res.analysis?.cinematography?.framing || prev.cinemaFraming,
+            cinemaLens: res.analysis?.cinematography?.lens_feel || prev.cinemaLens,
+            cinemaAngle: res.analysis?.cinematography?.camera_angle || prev.cinemaAngle,
+            envLocationType: res.analysis?.environment_palette?.location_type || prev.envLocationType,
+            envPalette: dom ? (Array.isArray(dom) ? dom.join(", ") : dom) : prev.envPalette
+          }));
 
           if (onUpdateProject) {
             onUpdateProject((prev: any) => ({
@@ -316,31 +310,31 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
         const updatedAnalysis: ImageVisualAnalysis = {
           filename: asset.filename,
           scanned_at: new Date().toISOString(),
-          summary: viSummary.trim(),
+          summary: viValues.summary.trim(),
           subject: {
-            identified_name: viSubjectIdentifiedName.trim() || undefined,
-            apparent_age: viSubjectAge.trim() || undefined,
-            expression: viSubjectExpression.trim() || undefined,
-            hair: viSubjectHair.trim() || undefined
+            identified_name: viValues.subjectIdentifiedName.trim() || undefined,
+            apparent_age: viValues.subjectAge.trim() || undefined,
+            expression: viValues.subjectExpression.trim() || undefined,
+            hair: viValues.subjectHair.trim() || undefined
           },
           wardrobe: {
-            garments: viWardrobeGarments.trim() || undefined,
-            colors: viWardrobeColors.trim() || undefined,
-            era_style: viWardrobeEra.trim() || undefined
+            garments: viValues.wardrobeGarments.trim() || undefined,
+            colors: viValues.wardrobeColors.trim() || undefined,
+            era_style: viValues.wardrobeEra.trim() || undefined
           },
           lighting: {
-            quality: viLightingQuality.trim() || undefined,
-            key_direction: viLightingDirection.trim() || undefined,
-            color_temperature: viLightingTemp.trim() || undefined
+            quality: viValues.lightingQuality.trim() || undefined,
+            key_direction: viValues.lightingDirection.trim() || undefined,
+            color_temperature: viValues.lightingTemp.trim() || undefined
           },
           cinematography: {
-            framing: viCinemaFraming.trim() || undefined,
-            lens_feel: viCinemaLens.trim() || undefined,
-            camera_angle: viCinemaAngle.trim() || undefined
+            framing: viValues.cinemaFraming.trim() || undefined,
+            lens_feel: viValues.cinemaLens.trim() || undefined,
+            camera_angle: viValues.cinemaAngle.trim() || undefined
           },
           environment_palette: {
-            location_type: viEnvLocationType.trim() || undefined,
-            dominant_colors: viEnvPalette.trim() || undefined
+            location_type: viValues.envLocationType.trim() || undefined,
+            dominant_colors: viValues.envPalette.trim() || undefined
           }
         };
 
@@ -363,9 +357,6 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
   };
 
   if (!asset) return null;
-
-  const sanitize = (s: string) => s.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-  const previewMetadata = `${sanitize(effectiveType)}_${sanitize(editSubjectName || "subject")}_${asset.filename.split('.').pop() || "png"}`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 dark:bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-150">
@@ -393,81 +384,25 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
           )}
 
           {/* Asset Preview Header Card */}
-          <div className="bg-zinc-50 dark:bg-zinc-950/70 border border-zinc-200 dark:border-zinc-800/80 rounded-xl p-3 flex items-center gap-3.5 shadow-2xs">
-            <div className="w-14 h-14 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden shrink-0 relative flex items-center justify-center">
-              {asset.media_type === "image" || !asset.media_type || !/\.(mp4|mov|webm|mp3|wav)$/i.test(asset.filename) ? (
-                <img 
-                  src={getAssetMediaUrl(asset.filename, true)} 
-                  alt={asset.filename} 
-                  className="w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-xs font-mono font-bold text-amber-600 dark:text-amber-400">
-                  {asset.filename.split('.').pop()?.toUpperCase()}
-                </div>
-              )}
-            </div>
-
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-mono font-semibold text-zinc-900 dark:text-zinc-200 truncate">{asset.filename}</p>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-[10px] bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20 px-1.5 py-0.5 rounded font-medium">
-                  {effectiveType}
-                </span>
-                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-medium truncate">
-                  {editSubjectName || "Unassigned"}
-                </span>
-              </div>
-            </div>
-          </div>
+          <AssetPreviewHeaderCard
+            asset={asset}
+            effectiveType={effectiveType}
+            subjectName={editSubjectName}
+          />
 
           {/* Type of Reference & Modifier Selectors */}
-          <div>
-            <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-400 mb-1">Type of Reference</label>
-            <div className="flex gap-2 flex-wrap sm:flex-nowrap">
-              <select 
-                value={assetType}
-                onChange={(e) => {
-                  const nextType = e.target.value;
-                  setAssetType(nextType);
-                  setSelectedModifier("");
-                }}
-                className="bg-white dark:bg-zinc-950 border-2 border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-white focus:border-amber-500 transition-colors outline-none flex-1 min-w-[140px] shadow-2xs"
-              >
-                {PRESET_TYPES.map(preset => (
-                  <option key={preset.value} value={preset.value}>
-                    {preset.label}
-                  </option>
-                ))}
-              </select>
-
-              {modifierConfig && (
-                <select
-                  value={selectedModifier}
-                  onChange={(e) => handleModifierChange(e.target.value)}
-                  className="bg-white dark:bg-zinc-950 border-2 border-amber-500/40 dark:border-amber-600/40 rounded-lg px-3 py-2 text-sm text-amber-800 dark:text-amber-300 focus:border-amber-500 transition-colors outline-none shrink-0 shadow-2xs"
-                >
-                  <option value="">Modifier (Optional)...</option>
-                  {modifierConfig.modifiers.map(preset => (
-                    <option key={preset.id} value={preset.modifier}>
-                      {preset.label}
-                    </option>
-                  ))}
-                </select>
-              )}
-
-              {assetType === "Other" && (
-                <input
-                  type="text"
-                  value={customType}
-                  onChange={(e) => setCustomType(e.target.value)}
-                  placeholder="Custom type..."
-                  className="flex-1 bg-white dark:bg-zinc-950 border-2 border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-white focus:border-amber-500 transition-colors outline-none shadow-2xs"
-                />
-              )}
-            </div>
-          </div>
+          <AssetReferenceTypeSelector
+            assetType={assetType}
+            customType={customType}
+            selectedModifier={selectedModifier}
+            modifierConfig={modifierConfig}
+            onTypeChange={(nextType) => {
+              setAssetType(nextType);
+              setSelectedModifier("");
+            }}
+            onCustomTypeChange={setCustomType}
+            onModifierChange={handleModifierChange}
+          />
 
           {/* Subject / Entity Name */}
           <div>
@@ -527,328 +462,20 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
           </div>
 
           {/* Visual Intelligence Breakdown (Editable) */}
-          <div className="bg-zinc-50 dark:bg-zinc-950/80 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3.5 space-y-3 shadow-2xs">
-            <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800/80 pb-2">
-              <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1.5 uppercase tracking-wider">
-                <Eye className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                Visual Intelligence Breakdown
-              </span>
-              <span className="text-[10px] text-zinc-500 font-mono">Editable Cache</span>
-            </div>
-
-            {/* Overall Summary */}
-            <div>
-              <label className="block text-[11px] font-medium text-zinc-700 dark:text-zinc-400 mb-1">Visual Summary</label>
-              <textarea
-                value={viSummary}
-                onChange={(e) => setViSummary(e.target.value)}
-                rows={2}
-                placeholder="Overall description of subject, lighting, framing..."
-                className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700/80 rounded-lg px-2.5 py-1.5 text-xs text-zinc-900 dark:text-zinc-200 focus:border-amber-500 outline-none resize-none placeholder-zinc-400 dark:placeholder-zinc-600 shadow-2xs"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-              {/* Subject Details */}
-              <div className="p-2.5 rounded-lg bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 flex flex-col gap-1.5 shadow-2xs">
-                <span className="font-semibold text-indigo-600 dark:text-indigo-400 text-[11px] flex items-center gap-1">
-                  Subject / Actor Details
-                </span>
-                <div>
-                  <label className="block text-[10px] text-zinc-500 dark:text-zinc-400">Identified Name</label>
-                  <input
-                    type="text"
-                    value={viSubjectIdentifiedName}
-                    onChange={(e) => setViSubjectIdentifiedName(e.target.value)}
-                    placeholder="e.g., John / Hero"
-                    className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-900 dark:text-zinc-200 focus:border-indigo-500 outline-none"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <div>
-                    <label className="block text-[10px] text-zinc-500 dark:text-zinc-400">Apparent Age</label>
-                    <input
-                      type="text"
-                      value={viSubjectAge}
-                      onChange={(e) => setViSubjectAge(e.target.value)}
-                      placeholder="e.g., Late 20s"
-                      className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-900 dark:text-zinc-200 focus:border-indigo-500 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-zinc-500 dark:text-zinc-400">Expression</label>
-                    <input
-                      type="text"
-                      value={viSubjectExpression}
-                      onChange={(e) => setViSubjectExpression(e.target.value)}
-                      placeholder="e.g., Stern, focused"
-                      className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-900 dark:text-zinc-200 focus:border-indigo-500 outline-none"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-[10px] text-zinc-500 dark:text-zinc-400">Hair & Features</label>
-                  <input
-                    type="text"
-                    value={viSubjectHair}
-                    onChange={(e) => setViSubjectHair(e.target.value)}
-                    placeholder="e.g., Short dark hair"
-                    className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-900 dark:text-zinc-200 focus:border-indigo-500 outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Wardrobe & Style */}
-              <div className="p-2.5 rounded-lg bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 flex flex-col gap-1.5 shadow-2xs">
-                <span className="font-semibold text-amber-600 dark:text-amber-400 text-[11px] flex items-center gap-1">
-                  <Shirt className="w-3 h-3" />
-                  Wardrobe & Style
-                </span>
-                <div>
-                  <label className="block text-[10px] text-zinc-500 dark:text-zinc-400">Garments</label>
-                  <input
-                    type="text"
-                    value={viWardrobeGarments}
-                    onChange={(e) => setViWardrobeGarments(e.target.value)}
-                    placeholder="e.g., Leather jacket, t-shirt"
-                    className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-900 dark:text-zinc-200 focus:border-amber-500 outline-none"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <div>
-                    <label className="block text-[10px] text-zinc-500 dark:text-zinc-400">Colors</label>
-                    <input
-                      type="text"
-                      value={viWardrobeColors}
-                      onChange={(e) => setViWardrobeColors(e.target.value)}
-                      placeholder="e.g., Black, crimson"
-                      className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-900 dark:text-zinc-200 focus:border-amber-500 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-zinc-500 dark:text-zinc-400">Era / Style</label>
-                    <input
-                      type="text"
-                      value={viWardrobeEra}
-                      onChange={(e) => setViWardrobeEra(e.target.value)}
-                      placeholder="e.g., Cyberpunk, 90s"
-                      className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-900 dark:text-zinc-200 focus:border-amber-500 outline-none"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Lighting Setup */}
-              <div className="p-2.5 rounded-lg bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 flex flex-col gap-1.5 shadow-2xs">
-                <span className="font-semibold text-yellow-600 dark:text-yellow-400 text-[11px] flex items-center gap-1">
-                  <Sun className="w-3 h-3" />
-                  Lighting Setup
-                </span>
-                <div>
-                  <label className="block text-[10px] text-zinc-500 dark:text-zinc-400">Quality</label>
-                  <input
-                    type="text"
-                    value={viLightingQuality}
-                    onChange={(e) => setViLightingQuality(e.target.value)}
-                    placeholder="e.g., Hard contrast, soft diffuse"
-                    className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-900 dark:text-zinc-200 focus:border-yellow-500 outline-none"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <div>
-                    <label className="block text-[10px] text-zinc-500 dark:text-zinc-400">Key Direction</label>
-                    <input
-                      type="text"
-                      value={viLightingDirection}
-                      onChange={(e) => setViLightingDirection(e.target.value)}
-                      placeholder="e.g., Side-lit 45 deg"
-                      className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-900 dark:text-zinc-200 focus:border-yellow-500 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-zinc-500 dark:text-zinc-400">Color Temp</label>
-                    <input
-                      type="text"
-                      value={viLightingTemp}
-                      onChange={(e) => setViLightingTemp(e.target.value)}
-                      placeholder="e.g., Cool blue, warm tungsten"
-                      className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-900 dark:text-zinc-200 focus:border-yellow-500 outline-none"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Cinematography */}
-              <div className="p-2.5 rounded-lg bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 flex flex-col gap-1.5 shadow-2xs">
-                <span className="font-semibold text-blue-600 dark:text-blue-400 text-[11px] flex items-center gap-1">
-                  <Camera className="w-3 h-3" />
-                  Cinematography
-                </span>
-                <div>
-                  <label className="block text-[10px] text-zinc-500 dark:text-zinc-400">Framing / Shot Type</label>
-                  <input
-                    type="text"
-                    value={viCinemaFraming}
-                    onChange={(e) => setViCinemaFraming(e.target.value)}
-                    placeholder="e.g., Close-Up, Medium Shot"
-                    className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-900 dark:text-zinc-200 focus:border-blue-500 outline-none"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <div>
-                    <label className="block text-[10px] text-zinc-500 dark:text-zinc-400">Lens Feel</label>
-                    <input
-                      type="text"
-                      value={viCinemaLens}
-                      onChange={(e) => setViCinemaLens(e.target.value)}
-                      placeholder="e.g., 50mm, anamorphic"
-                      className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-900 dark:text-zinc-200 focus:border-blue-500 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-zinc-500 dark:text-zinc-400">Camera Angle</label>
-                    <input
-                      type="text"
-                      value={viCinemaAngle}
-                      onChange={(e) => setViCinemaAngle(e.target.value)}
-                      placeholder="e.g., Eye-level, low angle"
-                      className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-900 dark:text-zinc-200 focus:border-blue-500 outline-none"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Environment & Palette */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1 border-t border-zinc-200 dark:border-zinc-800/60">
-              <div>
-                <label className="block text-[10px] font-medium text-zinc-600 dark:text-zinc-400 mb-0.5">Location Type</label>
-                <input
-                  type="text"
-                  value={viEnvLocationType}
-                  onChange={(e) => setViEnvLocationType(e.target.value)}
-                  placeholder="e.g., Cyberpunk alleyway, studio interior"
-                  className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-900 dark:text-zinc-200 focus:border-emerald-500 outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-medium text-zinc-600 dark:text-zinc-400 mb-0.5">Dominant Palette</label>
-                <input
-                  type="text"
-                  value={viEnvPalette}
-                  onChange={(e) => setViEnvPalette(e.target.value)}
-                  placeholder="e.g., Neon cyan, dark purple"
-                  className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-900 dark:text-zinc-200 focus:border-emerald-500 outline-none"
-                />
-              </div>
-            </div>
-          </div>
+          <VisualIntelligenceBreakdownEditor
+            values={viValues}
+            onChangeField={handleViChange}
+          />
 
           {/* Media File Replacement Option */}
-          <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/50">
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-400">Media File</label>
-              {!isReplacingFile && (
-                <button
-                  type="button"
-                  onClick={() => setIsReplacingFile(true)}
-                  className="text-[10px] bg-zinc-200 hover:bg-zinc-300 text-zinc-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-300 px-2 py-1 rounded transition-colors cursor-pointer"
-                >
-                  Replace File
-                </button>
-              )}
-            </div>
-
-            {!isReplacingFile ? (
-              <div className="flex items-center gap-3 p-3 bg-zinc-50 dark:bg-zinc-950/50 border border-zinc-200 dark:border-zinc-800 rounded-lg">
-                <div className="w-8 h-8 bg-zinc-200 dark:bg-zinc-800 rounded flex items-center justify-center shrink-0">
-                  <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-500" />
-                </div>
-                <div className="overflow-hidden flex-1">
-                  <p className="text-xs text-zinc-800 dark:text-zinc-300 truncate font-mono">{asset.filename}</p>
-                  <p className="text-[10px] text-zinc-500">Original file preserved</p>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {editFile ? (
-                  <div className="border border-amber-300 dark:border-amber-600/30 bg-amber-50/60 dark:bg-amber-950/20 rounded-lg overflow-hidden">
-                    <div className="p-3 flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 overflow-hidden">
-                        <div className="w-8 h-8 bg-amber-100 dark:bg-amber-900/40 rounded flex items-center justify-center shrink-0">
-                          <UploadCloud className="w-4 h-4 text-amber-600 dark:text-amber-500" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-medium text-amber-900 dark:text-amber-200 truncate">{editFile.name}</p>
-                          <p className="text-[10px] text-amber-700 dark:text-amber-500/70">{(editFile.size / 1024).toFixed(1)} KB</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="p-2.5 bg-zinc-100 dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-                      <button
-                        type="button"
-                        onClick={handleRevertToOriginal}
-                        className="px-2.5 py-1 text-xs text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 flex items-center gap-1.5 transition-colors cursor-pointer"
-                      >
-                        <Undo2 className="w-3.5 h-3.5" />
-                        <span>Keep original file</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleEditFileSelected(null)}
-                        className="px-2.5 py-1 bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-950/40 dark:hover:bg-red-900/60 dark:text-red-300 border border-red-200 dark:border-red-800/50 rounded-md text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>Remove</span>
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div
-                    onDragEnter={(e) => { e.preventDefault(); setEditDragActive(true); }}
-                    onDragOver={(e) => { e.preventDefault(); setEditDragActive(true); }}
-                    onDragLeave={(e) => { e.preventDefault(); setEditDragActive(false); }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      setEditDragActive(false);
-                      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                        handleEditFileSelected(e.dataTransfer.files[0]);
-                      }
-                    }}
-                    className={`relative w-full flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-xl transition-all ${
-                      editDragActive
-                        ? "border-amber-500 bg-amber-50/80 dark:bg-amber-500/10"
-                        : "border-zinc-300 hover:border-amber-500 dark:border-zinc-700 dark:hover:border-amber-500/80 bg-zinc-50/70 hover:bg-zinc-100/70 dark:bg-zinc-950/60 dark:hover:bg-zinc-900/60 cursor-pointer"
-                    }`}
-                  >
-                    <label className="w-full flex flex-col items-center justify-center cursor-pointer">
-                      <UploadCloud className="w-8 h-8 mb-2 text-amber-500 dark:text-amber-400 animate-pulse" />
-                      <p className="text-xs font-semibold text-zinc-900 dark:text-zinc-200 text-center">
-                        Select Replacement {asset.media_type ? asset.media_type.toUpperCase() : "MEDIA"} File
-                      </p>
-                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400 text-center mt-1">
-                        Click to browse files or drag and drop here
-                      </p>
-                      <input
-                        type="file"
-                        accept={asset.media_type === "image" ? "image/*" : asset.media_type === "audio" ? "audio/*" : "video/*"}
-                        onChange={(e) => handleEditFileSelected(e.target.files?.[0] || null)}
-                        className="hidden"
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      onClick={handleRevertToOriginal}
-                      className="mt-3 text-[11px] text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 underline flex items-center gap-1 cursor-pointer"
-                    >
-                      <Undo2 className="w-3 h-3" />
-                      Cancel replacement & keep original
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          <AssetFileReplacementSection
+            asset={asset}
+            isReplacingFile={isReplacingFile}
+            editFile={editFile}
+            onStartReplace={() => setIsReplacingFile(true)}
+            onRevertToOriginal={handleRevertToOriginal}
+            onFileSelected={handleEditFileSelected}
+          />
 
           {editError && (
             <div className="p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg flex items-start gap-2">
