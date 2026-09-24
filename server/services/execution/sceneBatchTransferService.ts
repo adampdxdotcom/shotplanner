@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { getSceneDirectories } from "../../config/constants";
 import { TransferFileSummary } from "../../types";
+import { writeAtomicSync } from "../../utils/atomicFs";
 import {
   generatePromptPrefix,
   generateSaveVideoPrefix,
@@ -143,7 +144,7 @@ export async function processSceneTransfer(options: SceneTransferOptions) {
       }
       const stagedPath = path.join(sceneWfDir, finalFilename);
       const wfContentStr = JSON.stringify(updatedWorkflowJson, null, 2);
-      fs.writeFileSync(stagedPath, wfContentStr);
+      writeAtomicSync(stagedPath, wfContentStr);
 
       sftpItems.push({
         filename: finalFilename,

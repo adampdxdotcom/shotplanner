@@ -1,7 +1,49 @@
 import fs from "fs";
 import path from "path";
 import { ASSETS_DIR, PROJECTS_DIR, ensureSceneDirectories, formatSceneFolderName } from "../../config/constants";
-import { writeJsonAtomicSync } from "../../utils/atomicFs";
+import { writeJsonAtomicSync, readJsonWithBackupRecoverySync } from "../../utils/atomicFs";
+import { projectWriteMutex } from "../../utils/mutex";
+import { createScopedLogger } from "../../utils/logger";
+
+const log = createScopedLogger("ProjectCrud");
+
+export interface SaveProjectOptions {
+  allowEmpty?: boolean;
+  createBackup?: boolean;
+}
+
+/**
+ * Validates incoming project payload structure and guards against catastrophic data truncation.
+ */
+export function validateProjectPayload(
+  incomingData: any,
+  existingData?: any,
+  options?: SaveProjectOptions
+): { valid: boolean; error?: string } {
+  if (!incomingData || typeof incomingData !== "object" || Array.isArray(incomingData)) {
+    return { valid: false, error: "Project payload must be a non-empty object." };
+  }
+
+  // If shots array is present, ensure it is an array
+  if ("shots" in incomingData && !Array.isArray(incomingData.shots)) {
+    return { valid: false, error: "Project payload 'shots' field must be an array." };
+  }
+
+  // Catastrophic Truncation Guard:
+  // If existing file on disk has 3 or more shots, and incoming payload has 0 shots,
+  // reject unless explicit allowEmpty flag is set.
+  const existingShotCount = Array.isArray(existingData?.shots) ? existingData.shots.length : 0;
+  const incomingShotCount = Array.isArray(incomingData?.shots) ? incomingData.shots.length : 0;
+
+  if (existingShotCount >= 3 && incomingShotCount === 0 && !options?.allowEmpty) {
+    return {
+      valid: false,
+      error: `Catastrophic truncation prevented: Existing project has ${existingShotCount} shots, but incoming payload has 0 shots. Pass allow_empty: true to force save.`
+    };
+  }
+
+  return { valid: true };
+}
 
 export const IGNORED_JSON_FILENAMES = new Set([
   "assets_db.json",
@@ -159,7 +201,18 @@ export function getProjectData(projectName: string): any | null {
   const filePath = findProjectFile(projectName);
   if (!filePath || !fs.existsSync(filePath)) return null;
 
-  const projectData = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+  const projectData = readJsonWithBackupRecoverySync<any>(filePath, {
+    onRecovered: (backupPath, targetPath) => {
+      log.warn(`[SelfHealing] Recovered corrupted project from backup snapshot: ${backupPath} -> ${targetPath}`);
+    },
+    onError: (err) => {
+      log.error(`Primary project file ${filePath} corrupted: ${err.message}`);
+    }
+  });
+
+  if (!projectData) {
+    return null;
+  }
   
   // Ensure scene folders exist on load
   const cleanName = sanitizeProjectName(projectName);
@@ -169,21 +222,136 @@ export function getProjectData(projectName: string): any | null {
   return projectData;
 }
 
-export function saveProjectData(projectName: string, projectData: any): string {
+/**
+ * Server-Side Defense-in-Depth Payload Sanitizer
+ * Strips excessive in-memory base64 data URLs (masks, cutouts, canvas backdrops)
+ * and volatile network configs before committing JSON files to disk.
+ */
+export function sanitizeProjectPayloadForStorage(projectData: any): any {
+  if (!projectData || typeof projectData !== "object") return projectData;
+
+  const sanitizeActor = (actor: any) => {
+    if (!actor || typeof actor !== "object") return actor;
+    const isCutoutDataUrl = typeof actor.cutoutDataUrl === "string" && actor.cutoutDataUrl.startsWith("data:");
+    const isMaskDataUrl = typeof actor.maskDataUrl === "string" && actor.maskDataUrl.startsWith("data:");
+    const isOrigDataUrl = typeof actor.originalCutoutDataUrl === "string" && actor.originalCutoutDataUrl.startsWith("data:");
+
+    const cleaned = { ...actor };
+    if (isCutoutDataUrl && (actor.cutoutAssetFilename || actor.cutoutDataUrl.length > 2000)) {
+      delete cleaned.cutoutDataUrl;
+    }
+    if (isMaskDataUrl) {
+      delete cleaned.maskDataUrl;
+    }
+    if (isOrigDataUrl) {
+      delete cleaned.originalCutoutDataUrl;
+    }
+    return cleaned;
+  };
+
+  const sanitizeRecipe = (recipe: any) => {
+    if (!recipe || typeof recipe !== "object") return recipe;
+    const isBgDataUrl = typeof recipe.backgroundUrl === "string" && recipe.backgroundUrl.startsWith("data:");
+    const cleaned = { ...recipe };
+    if (isBgDataUrl && (recipe.backgroundAssetFilename || recipe.backgroundUrl.length > 2000)) {
+      delete cleaned.backgroundUrl;
+    }
+    if (Array.isArray(cleaned.actors)) {
+      cleaned.actors = cleaned.actors.map(sanitizeActor);
+    }
+    return cleaned;
+  };
+
+  const result = { ...projectData };
+
+  // Sanitize top-level staging recipe
+  if (result.staging_recipe) {
+    result.staging_recipe = sanitizeRecipe(result.staging_recipe);
+  }
+
+  // Sanitize shots staging recipes
+  if (Array.isArray(result.shots)) {
+    result.shots = result.shots.map((shot: any) => {
+      if (shot && typeof shot === "object" && shot.staging_recipe) {
+        return {
+          ...shot,
+          staging_recipe: sanitizeRecipe(shot.staging_recipe)
+        };
+      }
+      return shot;
+    });
+  }
+
+  // Strip transient connection settings
+  delete (result as any).lm_studio_url;
+  delete (result as any).local_llm_url;
+  delete (result as any).config;
+
+  return result;
+}
+
+export async function saveProjectDataAsync(
+  projectName: string,
+  projectData: any,
+  options?: SaveProjectOptions
+): Promise<string> {
   const cleanName = sanitizeProjectName(projectName);
   const sceneDirName = formatSceneFolderName(cleanName);
-  
-  if (projectData && typeof projectData === "object") {
-    projectData.scene_name = sceneDirName;
-    if (projectData.scene_planning && typeof projectData.scene_planning === "object") {
-      projectData.scene_planning.scene_name = sceneDirName;
+
+  return await projectWriteMutex.runExclusive(sceneDirName, async () => {
+    const existingData = getProjectData(sceneDirName);
+    const validation = validateProjectPayload(projectData, existingData, options);
+    if (!validation.valid) {
+      throw new Error(validation.error);
+    }
+
+    const sanitizedData = sanitizeProjectPayloadForStorage(projectData);
+
+    if (sanitizedData && typeof sanitizedData === "object") {
+      sanitizedData.scene_name = sceneDirName;
+      if (sanitizedData.scene_planning && typeof sanitizedData.scene_planning === "object") {
+        sanitizedData.scene_planning.scene_name = sceneDirName;
+      }
+    }
+
+    const dirs = ensureSceneDirectories(sceneDirName);
+    const targetPath = path.join(dirs.base, `${sceneDirName}.json`);
+
+    // Save with automatic .bak backup rotation
+    writeJsonAtomicSync(targetPath, sanitizedData, 2, { createBackup: options?.createBackup !== false });
+
+    return `${sceneDirName}.json`;
+  });
+}
+
+export function saveProjectData(
+  projectName: string,
+  projectData: any,
+  options?: SaveProjectOptions
+): string {
+  const cleanName = sanitizeProjectName(projectName);
+  const sceneDirName = formatSceneFolderName(cleanName);
+
+  const existingData = getProjectData(sceneDirName);
+  const validation = validateProjectPayload(projectData, existingData, options);
+  if (!validation.valid) {
+    throw new Error(validation.error);
+  }
+
+  const sanitizedData = sanitizeProjectPayloadForStorage(projectData);
+
+  if (sanitizedData && typeof sanitizedData === "object") {
+    sanitizedData.scene_name = sceneDirName;
+    if (sanitizedData.scene_planning && typeof sanitizedData.scene_planning === "object") {
+      sanitizedData.scene_planning.scene_name = sceneDirName;
     }
   }
 
   const dirs = ensureSceneDirectories(sceneDirName);
   const targetPath = path.join(dirs.base, `${sceneDirName}.json`);
-  
-  writeJsonAtomicSync(targetPath, projectData);
+
+  // Save with automatic .bak backup rotation
+  writeJsonAtomicSync(targetPath, sanitizedData, 2, { createBackup: options?.createBackup !== false });
 
   return `${sceneDirName}.json`;
 }

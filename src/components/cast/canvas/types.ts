@@ -7,6 +7,8 @@ export interface StagedActorCanvasItem {
   originalCutoutDataUrl?: string;
   maskDataUrl?: string;
   referenceAssetFilename?: string;
+  cutoutAssetFilename?: string;
+  maskAssetFilename?: string;
   xPercent: number; // unconstrained (supports negative space & off-canvas framing)
   yPercent: number; // unconstrained (anchor at feet)
   scale: number; // 0.20 to 3.50+

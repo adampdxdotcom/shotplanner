@@ -5,6 +5,7 @@ import { StagedActorCanvasItem } from "../cast/StagingInteractiveCanvas";
 import { useCompositeExporter } from "../../hooks/useCompositeExporter";
 import { getAssetMediaUrl } from "../../utils/assetUrl";
 import { sanitizeStagingRecipeForPersistence } from "../../utils/recipeSanitizer";
+import { uploadCutoutAsset, uploadMaskAsset, uploadBackgroundAsset } from "../../utils/cutoutAssetUploader";
 import { createManagedBlobUrl, revokeManagedBlobUrl, purgeManagedBlobUrls } from "../../utils/blobRegistry";
 import { 
   getLastStagingTab, 
@@ -167,10 +168,18 @@ export function useStagingStage({
           facing: a.facing || "facing_camera",
           posture: a.posture || "Standing Heroic",
           referenceAssetFilename: a.referenceAssetFilename,
-          // Rehydrate cutout: if base64 was stripped, fallback to reference asset url!
-          cutoutDataUrl: a.cutoutDataUrl || (a.referenceAssetFilename ? getAssetMediaUrl(a.referenceAssetFilename) : undefined),
+          cutoutAssetFilename: a.cutoutAssetFilename,
+          maskAssetFilename: a.maskAssetFilename,
+          // Rehydrate cutout:
+          // 1. If physical cutout asset filename exists -> load from /api/uploads/{filename}
+          // 2. Else if cutoutDataUrl is already an asset URL or valid string -> use it
+          // 3. Else fallback to reference asset url
+          cutoutDataUrl: (a.cutoutAssetFilename ? getAssetMediaUrl(a.cutoutAssetFilename) : undefined)
+            || (a.cutoutDataUrl && !a.cutoutDataUrl.startsWith("data:") ? a.cutoutDataUrl : undefined)
+            || a.cutoutDataUrl
+            || (a.referenceAssetFilename ? getAssetMediaUrl(a.referenceAssetFilename) : undefined),
           originalCutoutDataUrl: a.originalCutoutDataUrl,
-          maskDataUrl: a.maskDataUrl
+          maskDataUrl: (a.maskAssetFilename ? getAssetMediaUrl(a.maskAssetFilename) : undefined) || a.maskDataUrl
         }));
         setStagedActors(loaded);
         setSelectedActorId(loaded[0]?.id || null);
@@ -219,6 +228,8 @@ export function useStagingStage({
           id: a.id,
           characterName: a.characterName,
           referenceAssetFilename: a.referenceAssetFilename,
+          cutoutAssetFilename: a.cutoutAssetFilename,
+          maskAssetFilename: a.maskAssetFilename,
           xPercent: Number(a.xPercent.toFixed(2)),
           yPercent: Number(a.yPercent.toFixed(2)),
           scale: Number(a.scale.toFixed(3)),
@@ -397,8 +408,10 @@ export function useStagingStage({
     const defaultY = targetPlane === "background" ? 42 : targetPlane === "midground" ? 65 : 88;
     const defaultScale = targetPlane === "background" ? 0.7 : targetPlane === "midground" ? 0.95 : 1.15;
 
+    let targetId: string;
+
     if (existingIndex >= 0) {
-      const existingId = stagedActors[existingIndex].id;
+      targetId = stagedActors[existingIndex].id;
       setStagedActors(prev => {
         const next = [...prev];
         next[existingIndex] = {
@@ -412,11 +425,12 @@ export function useStagingStage({
         };
         return next;
       });
-      setSelectedActorId(existingId);
+      setSelectedActorId(targetId);
     } else {
       const offset = (stagedActors.length * 20 + 30) % 70 + 15;
+      targetId = `actor-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       const newActor: StagedActor = {
-        id: `actor-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        id: targetId,
         characterName: actorData.characterName,
         plane: targetPlane,
         horizontalPercent: offset,
@@ -433,6 +447,27 @@ export function useStagingStage({
       setStagedActors(prev => [...prev, newActor]);
       setSelectedActorId(newActor.id);
     }
+
+    // Assetize in-memory base64 into a physical asset on disk
+    if (actorData.cutoutDataUrl && actorData.cutoutDataUrl.startsWith("data:")) {
+      uploadCutoutAsset({
+        dataUrl: actorData.cutoutDataUrl,
+        characterName: actorData.characterName,
+        sceneName: activeSceneName || sceneProject?.scene_name,
+        onUploaded: (savedFilename, url) => {
+          setStagedActors(prev => prev.map(a => {
+            if (a.id === targetId) {
+              return {
+                ...a,
+                cutoutAssetFilename: savedFilename,
+                cutoutDataUrl: url
+              };
+            }
+            return a;
+          }));
+        }
+      });
+    }
   };
 
   const handleUpdateActor = (id: string, updates: Partial<StagedActor>) => {
@@ -447,6 +482,52 @@ export function useStagingStage({
         xPercent: nextX
       };
     }));
+
+    // If cutoutDataUrl was updated with a new base64 buffer (e.g. from canvas brush masking), assetize it in background
+    if (updates.cutoutDataUrl && updates.cutoutDataUrl.startsWith("data:")) {
+      const currentActor = stagedActors.find(a => a.id === id);
+      const charName = currentActor?.characterName || "actor";
+      uploadCutoutAsset({
+        dataUrl: updates.cutoutDataUrl,
+        characterName: charName,
+        sceneName: activeSceneName || sceneProject?.scene_name,
+        onUploaded: (savedFilename, url) => {
+          setStagedActors(prev => prev.map(a => {
+            if (a.id === id) {
+              return {
+                ...a,
+                cutoutAssetFilename: savedFilename,
+                cutoutDataUrl: url
+              };
+            }
+            return a;
+          }));
+        }
+      });
+    }
+
+    // If maskDataUrl was updated with a new base64 buffer, assetize it as a physical mask asset
+    if (updates.maskDataUrl && updates.maskDataUrl.startsWith("data:")) {
+      const currentActor = stagedActors.find(a => a.id === id);
+      const charName = currentActor?.characterName || "actor";
+      uploadMaskAsset({
+        dataUrl: updates.maskDataUrl,
+        characterName: charName,
+        sceneName: activeSceneName || sceneProject?.scene_name,
+        onUploaded: (savedFilename) => {
+          setStagedActors(prev => prev.map(a => {
+            if (a.id === id) {
+              return {
+                ...a,
+                maskAssetFilename: savedFilename,
+                maskDataUrl: undefined
+              };
+            }
+            return a;
+          }));
+        }
+      });
+    }
   };
 
   const handleRemoveActor = (id: string) => {

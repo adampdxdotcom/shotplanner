@@ -10,7 +10,8 @@ import {
   getProjectData, 
   importProjectZip, 
   listProjects, 
-  saveProjectData, 
+  saveProjectData,
+  saveProjectDataAsync,
   deleteProject 
 } from "../services/projectService";
 import { universeService } from "../services/universeService";
@@ -26,14 +27,19 @@ router.get("/", (req: Request, res: Response) => {
 });
 
 // Save a project
-router.post("/", (req: Request, res: Response) => {
+router.post("/", async (req: Request, res: Response) => {
   try {
     const rawName = req.body.name || req.body.filename;
     if (!rawName) return res.status(400).json({ error: "Project name is required" });
-    const savedName = saveProjectData(rawName, req.body.data);
+    const allowEmpty = req.body.allow_empty === true || req.body.allowEmpty === true;
+    const savedName = await saveProjectDataAsync(rawName, req.body.data, { allowEmpty });
     res.json({ success: true, filename: savedName });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    const isValidationErr = err.message && (
+      err.message.includes("Catastrophic truncation") || 
+      err.message.includes("Project payload")
+    );
+    res.status(isValidationErr ? 400 : 500).json({ error: err.message });
   }
 });
 

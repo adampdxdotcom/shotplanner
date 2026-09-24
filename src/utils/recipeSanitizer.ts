@@ -15,6 +15,8 @@ export function sanitizeActorRecipeForPersistence(actor: StagedActorRecipeItem):
     id: actor.id,
     characterName: actor.characterName,
     referenceAssetFilename: actor.referenceAssetFilename,
+    cutoutAssetFilename: actor.cutoutAssetFilename,
+    maskAssetFilename: actor.maskAssetFilename,
     xPercent: Number(actor.xPercent.toFixed(2)),
     yPercent: Number(actor.yPercent.toFixed(2)),
     scale: Number(actor.scale.toFixed(3)),

@@ -116,6 +116,8 @@ export interface StagedActorRecipeItem {
   originalCutoutDataUrl?: string;
   maskDataUrl?: string;
   referenceAssetFilename?: string;
+  cutoutAssetFilename?: string;
+  maskAssetFilename?: string;
   xPercent: number;
   yPercent: number;
   scale: number;

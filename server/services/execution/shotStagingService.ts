@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { getSceneDirectories } from "../../config/constants";
 import { ScenePlanningDTO, TransferFileSummary } from "../../types";
+import { writeAtomicSync } from "../../utils/atomicFs";
 import {
   generatePromptPrefix,
   generateSaveVideoPrefix,
@@ -187,7 +188,7 @@ export async function processAssetTransfer(options: AssetTransferOptions) {
     }
     const stagedPath = path.join(sceneWfDir, finalFilename);
     const wfContentStr = JSON.stringify(updatedWorkflowJson, null, 2);
-    fs.writeFileSync(stagedPath, wfContentStr);
+    writeAtomicSync(stagedPath, wfContentStr);
     stagedWorkflowFilename = finalFilename;
 
     // Add workflow JSON to remote transfer queue

@@ -1,7 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "fs";
 import path from "path";
-import { writeAtomicSync, writeAtomic, writeJsonAtomicSync, writeJsonAtomic } from "../../server/utils/atomicFs";
+import {
+  writeAtomicSync,
+  writeAtomic,
+  writeJsonAtomicSync,
+  writeJsonAtomic,
+  readJsonWithBackupRecoverySync
+} from "../../server/utils/atomicFs";
 import { TMP_DIR } from "../../server/config/constants";
 
 describe("atomicFs - Atomic File Writing Utility", () => {
@@ -68,5 +74,53 @@ describe("atomicFs - Atomic File Writing Utility", () => {
     expect(fs.existsSync(deepFile)).toBe(true);
     const content = JSON.parse(fs.readFileSync(deepFile, "utf-8"));
     expect(content.nested).toBe(true);
+  });
+
+  it("automatically creates a .bak backup file when createBackup option is enabled", () => {
+    const backupTarget = path.join(testDir, "scene.json");
+    const initialData = { scene: "Cyberpunk Alley", shots: [1, 2] };
+    const updatedData = { scene: "Cyberpunk Alley", shots: [1, 2, 3] };
+
+    // Initial write (no backup yet because target didn't exist)
+    writeJsonAtomicSync(backupTarget, initialData, 2, { createBackup: true });
+    expect(fs.existsSync(backupTarget)).toBe(true);
+
+    // Second write (should preserve initialData as scene.json.bak)
+    writeJsonAtomicSync(backupTarget, updatedData, 2, { createBackup: true });
+    expect(fs.existsSync(backupTarget)).toBe(true);
+    expect(fs.existsSync(`${backupTarget}.bak`)).toBe(true);
+
+    const activeContent = JSON.parse(fs.readFileSync(backupTarget, "utf-8"));
+    const backupContent = JSON.parse(fs.readFileSync(`${backupTarget}.bak`, "utf-8"));
+
+    expect(activeContent.shots.length).toBe(3);
+    expect(backupContent.shots.length).toBe(2);
+  });
+
+  it("self-heals and recovers corrupted primary files using .bak snapshot", () => {
+    const targetFile = path.join(testDir, "corrupted_scene.json");
+    const validData = { scene: "Helipad", shots: [1, 2, 3] };
+
+    // Create a valid backup
+    writeJsonAtomicSync(`${targetFile}.bak`, validData);
+
+    // Corrupt the primary file (e.g. 0-byte or malformed syntax)
+    fs.writeFileSync(targetFile, "{ truncated json data ... missing closing brace");
+
+    let recoveryNotified = false;
+    const result = readJsonWithBackupRecoverySync(targetFile, {
+      onRecovered: (bak, target) => {
+        recoveryNotified = true;
+        expect(bak).toBe(`${targetFile}.bak`);
+        expect(target).toBe(targetFile);
+      }
+    });
+
+    expect(result).toEqual(validData);
+    expect(recoveryNotified).toBe(true);
+
+    // Verify the primary file was restored on disk
+    const restoredOnDisk = JSON.parse(fs.readFileSync(targetFile, "utf-8"));
+    expect(restoredOnDisk).toEqual(validData);
   });
 });

@@ -70,10 +70,32 @@ export function useDebouncedProjectAutosave({
   latestNameRef.current = currentProjectName;
 
   const isSavingRef = useRef(false);
+  const hasPendingChangesRef = useRef(false);
+  const dirtyRevisionRef = useRef(0);
 
-  // Core save execution function
+  // Increment revision whenever input dependencies change
+  useEffect(() => {
+    if (!isInitialLoad && hasLoadedProject) {
+      dirtyRevisionRef.current += 1;
+    }
+  }, [
+    sceneProject,
+    config,
+    parameterNodeMappings,
+    generationParams,
+    selectedWorkflowFile,
+    currentProjectName,
+    isInitialLoad,
+    hasLoadedProject
+  ]);
+
+  // Core save execution function with concurrency queueing and revision safety
   const executeAutosave = useCallback(async (): Promise<boolean> => {
-    if (isSavingRef.current) return false;
+    // If a network save is already in-flight, mark pending so a follow-up executes immediately upon completion
+    if (isSavingRef.current) {
+      hasPendingChangesRef.current = true;
+      return false;
+    }
 
     const project = latestProjectRef.current;
     const name = latestNameRef.current || project.scene_name || "untitled_scene";
@@ -88,7 +110,11 @@ export function useDebouncedProjectAutosave({
     }
 
     isSavingRef.current = true;
+    hasPendingChangesRef.current = false;
     setAutosaveStatus("saving");
+
+    // Snapshot the revision being dispatched
+    const dispatchedRevision = dirtyRevisionRef.current;
 
     try {
       const normalized = normalizeProjectCastAndAssets({
@@ -121,8 +147,15 @@ export function useDebouncedProjectAutosave({
 
       await projectsApi.save(filename, payload);
 
-      setIsDirty(false);
-      setAutosaveStatus("saved");
+      // Only mark clean if no new edits occurred while the HTTP request was in flight
+      if (dirtyRevisionRef.current === dispatchedRevision) {
+        setIsDirty(false);
+        setAutosaveStatus("saved");
+      } else {
+        // New edits occurred mid-flight: keep dirty and mark pending
+        hasPendingChangesRef.current = true;
+      }
+
       setLastSavedAt(new Date());
       return true;
     } catch (err) {
@@ -131,8 +164,15 @@ export function useDebouncedProjectAutosave({
       return false;
     } finally {
       isSavingRef.current = false;
+      // If changes arrived while saving was in-flight, trigger follow-up save immediately
+      if (hasPendingChangesRef.current) {
+        hasPendingChangesRef.current = false;
+        setTimeout(() => {
+          executeAutosave();
+        }, 100);
+      }
     }
-  }, [defaultLlmProvider, getShotOperationsDelegate, setIsDirty]);
+  }, [defaultLlmProvider, getShotOperationsDelegate, selectedWorkflowFile, setIsDirty]);
 
   // Handle debounced trigger when project is dirty
   useEffect(() => {

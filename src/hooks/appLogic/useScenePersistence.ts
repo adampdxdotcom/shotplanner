@@ -127,17 +127,6 @@ export function useScenePersistence({
     setIsDirty(true);
   }, [sceneProject, config, selectedWorkflowFile, selectedPromptNodeId, nodeMappings, bypassMissing, generationParams, parameterNodeMappings]);
 
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (isDirty) {
-        e.preventDefault();
-        e.returnValue = "";
-      }
-    };
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [isDirty]);
-
   // Debounced auto-save sceneProject to backend storage with stripped data URLs
   const { autosaveStatus, lastSavedAt, forceAutosave } = useDebouncedProjectAutosave({
     sceneProject,
@@ -154,6 +143,17 @@ export function useScenePersistence({
     setIsDirty,
     debounceMs: 1200
   });
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirty || autosaveStatus === "saving") {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isDirty, autosaveStatus]);
 
   const fetchAssets = useCallback(async (sceneName?: string) => {
     try {
