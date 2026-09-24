@@ -15,6 +15,7 @@ import { useDebouncedProjectAutosave } from './useDebouncedProjectAutosave';
 import { 
   getLastProjectName, 
   setLastProjectName, 
+  clearLastProjectName,
   getLastActiveSection, 
   getLastActiveShotId,
   clearDemoProjectSession
@@ -245,6 +246,7 @@ export function useScenePersistence({
     } catch (err: any) {
       if (options?.isInitialRestore) {
         clearDemoProjectSession();
+        clearLastProjectName();
         setHasLoadedProject(true);
         setIsDirty(false);
         return;
@@ -345,8 +347,10 @@ export function useScenePersistence({
       await fetchAssets(data.scene_name || filename.replace(/\.json$/i, ""));
       
       setTimeout(() => setIsDirty(false), 100);
-      const assetCount = Array.isArray(data.assets) ? data.assets.length : 0;
-      addToast(`Project "${filename}" loaded successfully (${assetCount} image assets restored).`, "success");
+      if (!options?.isInitialRestore) {
+        const assetCount = Array.isArray(data.assets) ? data.assets.length : 0;
+        addToast(`Project "${filename}" loaded successfully (${assetCount} image assets restored).`, "success");
+      }
       return;
     }
 
@@ -470,10 +474,21 @@ export function useScenePersistence({
     fetchWorkflows();
     // Clear any stale demo project references from storage
     clearDemoProjectSession();
-    // Load directly to a clean blank project on launch
-    setHasLoadedProject(true);
-    setIsDirty(false);
-  }, [fetchWorkflows]);
+
+    const lastProject = getLastProjectName();
+    if (lastProject && lastProject !== "untitled_scene" && !lastProject.includes("demo")) {
+      handleLoadProject(lastProject, { isInitialRestore: true }).catch((err) => {
+        console.warn(`[Workspace] Could not auto-restore project "${lastProject}":`, err);
+        clearLastProjectName();
+        setHasLoadedProject(true);
+        setIsDirty(false);
+      });
+    } else {
+      // Load directly to a clean blank project on launch
+      setHasLoadedProject(true);
+      setIsDirty(false);
+    }
+  }, [fetchWorkflows, handleLoadProject]);
 
   useEffect(() => {
     if (currentProjectName && currentProjectName !== "untitled_scene") {
