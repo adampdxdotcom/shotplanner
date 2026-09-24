@@ -776,6 +776,17 @@ html.dark .markdown-body code {
   font-size: 0.8em;
 }
 
+/* 10. System Diagnostics & Log Console in Light Mode */
+html.light #diagnostics-tab pre {
+  color: #1e293b;
+  color-scheme: light;
+}
+
+html.light #diagnostics-tab code {
+  color: #0f172a;
+  color-scheme: light;
+}
+
 
 
 

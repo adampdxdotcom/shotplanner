@@ -245,30 +245,30 @@ export const DiagnosticsTab: React.FC<DiagnosticsTabProps> = ({ onShowToast }) =
     switch (level) {
       case "error":
         return (
-          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/40">
-            <AlertCircle className="w-3 h-3 text-rose-400" />
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-50 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/40">
+            <AlertCircle className="w-3 h-3 text-rose-600 dark:text-rose-400" />
             ERROR
           </span>
         );
       case "warn":
         return (
-          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/40">
-            <AlertTriangle className="w-3 h-3 text-amber-400" />
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/40">
+            <AlertTriangle className="w-3 h-3 text-amber-600 dark:text-amber-400" />
             WARN
           </span>
         );
       case "debug":
         return (
-          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/40">
-            <Bug className="w-3 h-3 text-purple-400" />
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-50 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-500/40">
+            <Bug className="w-3 h-3 text-purple-600 dark:text-purple-400" />
             DEBUG
           </span>
         );
       case "info":
       default:
         return (
-          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-sky-500/20 text-sky-300 border border-sky-500/40">
-            <Info className="w-3 h-3 text-sky-400" />
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-sky-50 dark:bg-sky-500/20 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-500/40">
+            <Info className="w-3 h-3 text-sky-600 dark:text-sky-400" />
             INFO
           </span>
         );
@@ -278,17 +278,17 @@ export const DiagnosticsTab: React.FC<DiagnosticsTabProps> = ({ onShowToast }) =
   return (
     <div id="diagnostics-tab" className="space-y-6">
       {/* Header Banner Card */}
-      <div className="bg-zinc-900/90 border border-zinc-800 rounded-xl p-5 shadow-sm">
+      <div className="bg-white dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-emerald-950/80 border border-emerald-700/50 flex items-center justify-center text-emerald-400 shadow-inner">
+            <div className="w-10 h-10 rounded-lg bg-emerald-50 dark:bg-emerald-950/80 border border-emerald-200 dark:border-emerald-700/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-2xs">
               <Terminal className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-zinc-100 flex items-center gap-2">
+              <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                 System Diagnostics &amp; Real-time Logs
               </h2>
-              <p className="text-xs text-zinc-400 mt-0.5">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
                 Structured in-memory ring buffer with credential sanitization, memory telemetry, and instant export.
               </p>
             </div>
@@ -300,12 +300,12 @@ export const DiagnosticsTab: React.FC<DiagnosticsTabProps> = ({ onShowToast }) =
               onClick={() => setIsAutoRefresh(prev => !prev)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border ${
                 isAutoRefresh
-                  ? "bg-emerald-600/20 text-emerald-300 border-emerald-500/50"
-                  : "bg-zinc-800 text-zinc-300 hover:bg-zinc-750 border-zinc-700"
+                  ? "bg-emerald-50 dark:bg-emerald-600/20 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-500/50"
+                  : "bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-750 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700"
               }`}
               title="Toggle automatic refresh every 3 seconds"
             >
-              <Activity className={`w-3.5 h-3.5 ${isAutoRefresh ? "animate-pulse text-emerald-400" : "text-zinc-400"}`} />
+              <Activity className={`w-3.5 h-3.5 ${isAutoRefresh ? "animate-pulse text-emerald-600 dark:text-emerald-400" : "text-zinc-400 dark:text-zinc-500"}`} />
               Auto-Stream {isAutoRefresh ? "ON" : "OFF"}
             </button>
 
@@ -313,9 +313,9 @@ export const DiagnosticsTab: React.FC<DiagnosticsTabProps> = ({ onShowToast }) =
               type="button"
               onClick={() => fetchDiagnostics()}
               disabled={isLoading}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-zinc-800 hover:bg-zinc-750 text-zinc-200 border border-zinc-700 flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-750 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin text-emerald-400" : ""}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin text-emerald-600 dark:text-emerald-400" : "text-zinc-500 dark:text-zinc-400"}`} />
               Refresh
             </button>
           </div>
@@ -325,40 +325,40 @@ export const DiagnosticsTab: React.FC<DiagnosticsTabProps> = ({ onShowToast }) =
       {/* Telemetry Stats Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {/* Node & Platform */}
-        <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-3.5 flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-zinc-800/80 text-zinc-400">
-            <Cpu className="w-4 h-4 text-indigo-400" />
+        <div className="bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3.5 flex items-center gap-3 shadow-xs">
+          <div className="p-2 rounded-lg bg-indigo-50 dark:bg-zinc-800/80 text-indigo-600 dark:text-indigo-400">
+            <Cpu className="w-4 h-4" />
           </div>
           <div className="min-w-0">
-            <div className="text-[10px] uppercase tracking-wider font-semibold text-zinc-400 truncate">Runtime</div>
-            <div className="text-xs font-bold text-zinc-100 truncate">
+            <div className="text-[10px] uppercase tracking-wider font-semibold text-zinc-500 dark:text-zinc-400 truncate">Runtime</div>
+            <div className="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">
               {health ? `${health.nodeVersion} (${health.platform})` : "Node.js"}
             </div>
           </div>
         </div>
 
         {/* Memory RSS / Heap */}
-        <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-3.5 flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-zinc-800/80 text-zinc-400">
-            <HardDrive className="w-4 h-4 text-emerald-400" />
+        <div className="bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3.5 flex items-center gap-3 shadow-xs">
+          <div className="p-2 rounded-lg bg-emerald-50 dark:bg-zinc-800/80 text-emerald-600 dark:text-emerald-400">
+            <HardDrive className="w-4 h-4" />
           </div>
           <div className="min-w-0">
-            <div className="text-[10px] uppercase tracking-wider font-semibold text-zinc-400 truncate">Memory (RSS / Heap)</div>
-            <div className="text-xs font-bold text-zinc-100 truncate">
+            <div className="text-[10px] uppercase tracking-wider font-semibold text-zinc-500 dark:text-zinc-400 truncate">Memory (RSS / Heap)</div>
+            <div className="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">
               {health?.memory ? `${health.memory.rssMB} MB / ${health.memory.heapUsedMB} MB` : "Telemetry loading..."}
             </div>
           </div>
         </div>
 
         {/* Temporary Storage & Chunks */}
-        <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-3.5 flex items-center justify-between gap-2">
+        <div className="bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3.5 flex items-center justify-between gap-2 shadow-xs">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="p-2 rounded-lg bg-zinc-800/80 text-zinc-400 shrink-0">
-              <Trash2 className="w-4 h-4 text-cyan-400" />
+            <div className="p-2 rounded-lg bg-cyan-50 dark:bg-zinc-800/80 text-cyan-600 dark:text-cyan-400 shrink-0">
+              <Trash2 className="w-4 h-4" />
             </div>
             <div className="min-w-0">
-              <div className="text-[10px] uppercase tracking-wider font-semibold text-zinc-400 truncate">Temp Chunks</div>
-              <div className="text-xs font-bold text-zinc-100 truncate">
+              <div className="text-[10px] uppercase tracking-wider font-semibold text-zinc-500 dark:text-zinc-400 truncate">Temp Chunks</div>
+              <div className="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">
                 {health?.storage ? `${health.storage.totalTempSizeMB} MB (${health.storage.totalTempFilesCount})` : "0.00 MB"}
               </div>
             </div>
@@ -367,7 +367,7 @@ export const DiagnosticsTab: React.FC<DiagnosticsTabProps> = ({ onShowToast }) =
             type="button"
             onClick={handlePurgeTempChunks}
             disabled={isPurgingChunks}
-            className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-cyan-300 hover:text-cyan-200 text-[11px] font-semibold rounded-lg border border-zinc-700 transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+            className="px-2 py-1 bg-cyan-50 hover:bg-cyan-100 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-cyan-700 hover:text-cyan-800 dark:text-cyan-300 dark:hover:text-cyan-200 text-[11px] font-semibold rounded-lg border border-cyan-200 dark:border-zinc-700 transition-colors cursor-pointer shrink-0 disabled:opacity-50"
             title="Force purge all temporary upload chunk files and orphaned session fragments"
           >
             {isPurgingChunks ? (
@@ -379,26 +379,26 @@ export const DiagnosticsTab: React.FC<DiagnosticsTabProps> = ({ onShowToast }) =
         </div>
 
         {/* Uptime */}
-        <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-3.5 flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-zinc-800/80 text-zinc-400">
-            <Clock className="w-4 h-4 text-amber-400" />
+        <div className="bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3.5 flex items-center gap-3 shadow-xs">
+          <div className="p-2 rounded-lg bg-amber-50 dark:bg-zinc-800/80 text-amber-600 dark:text-amber-400">
+            <Clock className="w-4 h-4" />
           </div>
           <div className="min-w-0">
-            <div className="text-[10px] uppercase tracking-wider font-semibold text-zinc-400 truncate">Uptime</div>
-            <div className="text-xs font-bold text-zinc-100 truncate">
+            <div className="text-[10px] uppercase tracking-wider font-semibold text-zinc-500 dark:text-zinc-400 truncate">Uptime</div>
+            <div className="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">
               {health?.uptimeFormatted || "0s"}
             </div>
           </div>
         </div>
 
         {/* Server Log Level Controller */}
-        <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-3.5 flex items-center justify-between gap-2">
+        <div className="bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3.5 flex items-center justify-between gap-2 shadow-xs">
           <div className="min-w-0">
-            <div className="text-[10px] uppercase tracking-wider font-semibold text-zinc-400 flex items-center gap-1">
-              <Sliders className="w-3 h-3 text-purple-400" />
+            <div className="text-[10px] uppercase tracking-wider font-semibold text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
+              <Sliders className="w-3 h-3 text-purple-600 dark:text-purple-400" />
               Server Level
             </div>
-            <div className="text-xs font-bold text-zinc-100 uppercase">
+            <div className="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase">
               {activeServerLevel}
             </div>
           </div>
@@ -406,7 +406,7 @@ export const DiagnosticsTab: React.FC<DiagnosticsTabProps> = ({ onShowToast }) =
             value={activeServerLevel}
             disabled={isChangingLevel}
             onChange={(e) => handleLogLevelChange(e.target.value as LogLevel)}
-            className="bg-zinc-800 text-zinc-200 text-xs font-medium rounded-lg px-2 py-1 border border-zinc-700 focus:outline-hidden focus:border-indigo-500 cursor-pointer disabled:opacity-50"
+            className="bg-zinc-50 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 text-xs font-medium rounded-lg px-2 py-1 border border-zinc-300 dark:border-zinc-700 focus:outline-hidden focus:border-indigo-500 cursor-pointer disabled:opacity-50"
           >
             <option value="debug">DEBUG</option>
             <option value="info">INFO</option>
@@ -418,22 +418,22 @@ export const DiagnosticsTab: React.FC<DiagnosticsTabProps> = ({ onShowToast }) =
       </div>
 
       {/* Filter and Export Action Bar */}
-      <div className="bg-zinc-900/90 border border-zinc-800 rounded-xl p-4 shadow-sm space-y-3.5">
+      <div className="bg-white dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 shadow-xs space-y-3.5">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           {/* Search Input */}
           <div className="relative flex-1 min-w-[200px]">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-500" />
             <input
               type="text"
               placeholder="Search message, tag, or metadata payload..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-zinc-800/90 text-zinc-200 pl-9 pr-3 py-1.5 text-xs rounded-lg border border-zinc-700/80 placeholder-zinc-500 focus:outline-hidden focus:border-indigo-500"
+              className="w-full bg-zinc-50 dark:bg-zinc-800/90 text-zinc-900 dark:text-zinc-200 pl-9 pr-3 py-1.5 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700/80 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-hidden focus:border-indigo-500"
             />
           </div>
 
           {/* Level Filter Tabs */}
-          <div className="flex items-center gap-1 bg-zinc-950/80 p-1 rounded-lg border border-zinc-800 overflow-x-auto shrink-0">
+          <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-950/80 p-1 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-x-auto shrink-0">
             {["all", "error", "warn", "info", "debug"].map((lvl) => {
               const isSelected = selectedLevelFilter === lvl;
               const count =
@@ -448,13 +448,15 @@ export const DiagnosticsTab: React.FC<DiagnosticsTabProps> = ({ onShowToast }) =
                   onClick={() => setSelectedLevelFilter(lvl)}
                   className={`px-2.5 py-1 rounded text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer flex items-center gap-1.5 ${
                     isSelected
-                      ? "bg-zinc-800 text-white shadow-xs"
-                      : "text-zinc-400 hover:text-zinc-200"
+                      ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs border border-zinc-200/80 dark:border-transparent"
+                      : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-200/50 dark:hover:bg-zinc-900/50"
                   }`}
                 >
                   <span>{lvl}</span>
                   <span className={`text-[10px] px-1 rounded-full ${
-                    isSelected ? "bg-zinc-700 text-zinc-200" : "bg-zinc-900 text-zinc-500"
+                    isSelected
+                      ? "bg-zinc-100 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200"
+                      : "bg-zinc-200/60 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-500"
                   }`}>
                     {count}
                   </span>
@@ -468,7 +470,7 @@ export const DiagnosticsTab: React.FC<DiagnosticsTabProps> = ({ onShowToast }) =
             <select
               value={selectedTagFilter}
               onChange={(e) => setSelectedTagFilter(e.target.value)}
-              className="bg-zinc-800 text-zinc-200 text-xs font-medium rounded-lg px-2.5 py-1.5 border border-zinc-700/80 focus:outline-hidden focus:border-indigo-500 cursor-pointer"
+              className="bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-200 text-xs font-medium rounded-lg px-2.5 py-1.5 border border-zinc-300 dark:border-zinc-700/80 focus:outline-hidden focus:border-indigo-500 cursor-pointer"
             >
               <option value="all">All Modules ({availableTags.length})</option>
               {availableTags.map((tag) => (
@@ -482,18 +484,18 @@ export const DiagnosticsTab: React.FC<DiagnosticsTabProps> = ({ onShowToast }) =
             <button
               type="button"
               onClick={() => setSortOrder(prev => prev === "desc" ? "asc" : "desc")}
-              className="p-1.5 bg-zinc-800 hover:bg-zinc-750 text-zinc-300 rounded-lg border border-zinc-700 transition-colors cursor-pointer"
+              className="p-1.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-750 text-zinc-700 dark:text-zinc-300 rounded-lg border border-zinc-300 dark:border-zinc-700 transition-colors cursor-pointer"
               title={`Sort order: ${sortOrder === "desc" ? "Newest First" : "Oldest First"}`}
             >
-              <ArrowUpDown className="w-4 h-4 text-zinc-400" />
+              <ArrowUpDown className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
             </button>
           </div>
         </div>
 
         {/* Secondary Action Toolbar: Copy, Export, Clear */}
-        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-zinc-800/80">
-          <div className="text-xs text-zinc-400 font-medium">
-            Showing <strong className="text-zinc-200">{displayLogs.length}</strong> log entries
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-zinc-200 dark:border-zinc-800/80">
+          <div className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">
+            Showing <strong className="text-zinc-800 dark:text-zinc-200">{displayLogs.length}</strong> log entries
             {stats && ` (Buffer: ${stats.totalEntries}/${stats.maxBufferSize})`}
           </div>
 
@@ -502,9 +504,9 @@ export const DiagnosticsTab: React.FC<DiagnosticsTabProps> = ({ onShowToast }) =
               type="button"
               onClick={handleCopyVisibleLogs}
               disabled={displayLogs.length === 0}
-              className="px-2.5 py-1.5 bg-zinc-800 hover:bg-zinc-750 text-zinc-200 text-xs font-semibold rounded-lg border border-zinc-700 flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-40"
+              className="px-2.5 py-1.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-750 text-zinc-700 dark:text-zinc-200 text-xs font-semibold rounded-lg border border-zinc-300 dark:border-zinc-700 flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-40"
             >
-              {hasCopiedLogs ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-zinc-400" />}
+              {hasCopiedLogs ? <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />}
               {hasCopiedLogs ? "Copied" : "Copy All"}
             </button>
 
@@ -512,10 +514,10 @@ export const DiagnosticsTab: React.FC<DiagnosticsTabProps> = ({ onShowToast }) =
               type="button"
               onClick={() => handleDownloadFile("txt")}
               disabled={displayLogs.length === 0}
-              className="px-2.5 py-1.5 bg-zinc-800 hover:bg-zinc-750 text-zinc-200 text-xs font-semibold rounded-lg border border-zinc-700 flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-40"
+              className="px-2.5 py-1.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-750 text-zinc-700 dark:text-zinc-200 text-xs font-semibold rounded-lg border border-zinc-300 dark:border-zinc-700 flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-40"
               title="Download formatted .LOG bundle with system metadata"
             >
-              <Download className="w-3.5 h-3.5 text-indigo-400" />
+              <Download className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
               Export .LOG
             </button>
 
@@ -523,10 +525,10 @@ export const DiagnosticsTab: React.FC<DiagnosticsTabProps> = ({ onShowToast }) =
               type="button"
               onClick={() => handleDownloadFile("json")}
               disabled={displayLogs.length === 0}
-              className="px-2.5 py-1.5 bg-zinc-800 hover:bg-zinc-750 text-zinc-200 text-xs font-semibold rounded-lg border border-zinc-700 flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-40"
+              className="px-2.5 py-1.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-750 text-zinc-700 dark:text-zinc-200 text-xs font-semibold rounded-lg border border-zinc-300 dark:border-zinc-700 flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-40"
               title="Download raw JSON diagnostics payload"
             >
-              <Download className="w-3.5 h-3.5 text-emerald-400" />
+              <Download className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
               Export .JSON
             </button>
 
@@ -534,9 +536,9 @@ export const DiagnosticsTab: React.FC<DiagnosticsTabProps> = ({ onShowToast }) =
               type="button"
               onClick={handleClearLogs}
               disabled={isClearing || (stats?.totalEntries === 0 && logs.length === 0)}
-              className="px-2.5 py-1.5 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 text-xs font-semibold rounded-lg border border-rose-800/60 flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-40"
+              className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 text-xs font-semibold rounded-lg border border-rose-200 dark:border-rose-800/60 flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-40"
             >
-              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+              <Trash2 className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
               Clear
             </button>
           </div>
@@ -544,29 +546,29 @@ export const DiagnosticsTab: React.FC<DiagnosticsTabProps> = ({ onShowToast }) =
       </div>
 
       {/* Terminal Log Console */}
-      <div className="bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden shadow-md font-mono text-xs">
+      <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-md font-mono text-xs">
         {/* Terminal Title Bar */}
-        <div className="bg-zinc-900/90 border-b border-zinc-800 px-4 py-2.5 flex items-center justify-between select-none">
+        <div className="bg-zinc-100/90 dark:bg-zinc-900/90 border-b border-zinc-200 dark:border-zinc-800 px-4 py-2.5 flex items-center justify-between select-none">
           <div className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-full bg-rose-500/80 inline-block" />
             <span className="w-3 h-3 rounded-full bg-amber-500/80 inline-block" />
             <span className="w-3 h-3 rounded-full bg-emerald-500/80 inline-block" />
-            <span className="text-zinc-400 font-sans text-xs font-semibold ml-2">
+            <span className="text-zinc-700 dark:text-zinc-400 font-sans text-xs font-semibold ml-2">
               Console Log Stream
             </span>
           </div>
-          <div className="text-[11px] text-zinc-400 font-sans">
+          <div className="text-[11px] text-zinc-500 dark:text-zinc-400 font-sans">
             Auto-sanitizing API tokens, passwords &amp; base64 payloads
           </div>
         </div>
 
         {/* Logs List Container */}
-        <div className="max-h-[600px] overflow-y-auto divide-y divide-zinc-850/80 p-1">
+        <div className="max-h-[600px] overflow-y-auto divide-y divide-zinc-200 dark:divide-zinc-850/80 bg-zinc-50/40 dark:bg-zinc-950 p-1">
           {displayLogs.length === 0 ? (
-            <div className="p-8 text-center text-zinc-400 font-sans">
-              <Terminal className="w-8 h-8 text-zinc-600 mx-auto mb-2 opacity-50" />
-              <p className="text-xs">No diagnostic logs recorded matching current criteria.</p>
-              <p className="text-[11px] text-zinc-400 mt-1">
+            <div className="p-8 text-center text-zinc-500 dark:text-zinc-400 font-sans">
+              <Terminal className="w-8 h-8 text-zinc-400 dark:text-zinc-600 mx-auto mb-2 opacity-50" />
+              <p className="text-xs font-medium text-zinc-700 dark:text-zinc-300">No diagnostic logs recorded matching current criteria.</p>
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
                 Server operations, SSH transfers, and generation activities will appear here automatically.
               </p>
             </div>
@@ -578,11 +580,11 @@ export const DiagnosticsTab: React.FC<DiagnosticsTabProps> = ({ onShowToast }) =
               return (
                 <div
                   key={entry.id}
-                  className={`p-2.5 hover:bg-zinc-900/60 transition-colors ${
+                  className={`p-2.5 hover:bg-zinc-100 dark:hover:bg-zinc-900/60 transition-colors ${
                     entry.level === "error"
-                      ? "bg-rose-950/15"
+                      ? "bg-rose-50/70 dark:bg-rose-950/15"
                       : entry.level === "warn"
-                      ? "bg-amber-950/10"
+                      ? "bg-amber-50/70 dark:bg-amber-950/10"
                       : ""
                   }`}
                 >
@@ -592,7 +594,7 @@ export const DiagnosticsTab: React.FC<DiagnosticsTabProps> = ({ onShowToast }) =
                       <button
                         type="button"
                         onClick={() => toggleExpand(entry.id)}
-                        className="p-0.5 text-zinc-500 hover:text-zinc-300 mt-0.5 cursor-pointer"
+                        className="p-0.5 text-zinc-400 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-300 mt-0.5 cursor-pointer"
                         title="Toggle metadata inspection"
                       >
                         {isExpanded ? (
@@ -606,7 +608,7 @@ export const DiagnosticsTab: React.FC<DiagnosticsTabProps> = ({ onShowToast }) =
                     )}
 
                     {/* Timestamp */}
-                    <span className="text-zinc-400 text-[11px] whitespace-nowrap shrink-0 mt-0.5 select-none">
+                    <span className="text-zinc-500 dark:text-zinc-400 text-[11px] whitespace-nowrap shrink-0 mt-0.5 select-none">
                       {entry.timestamp}
                     </span>
 
@@ -614,30 +616,30 @@ export const DiagnosticsTab: React.FC<DiagnosticsTabProps> = ({ onShowToast }) =
                     <div className="shrink-0 mt-0.5">{getLevelBadge(entry.level)}</div>
 
                     {/* Module Tag */}
-                    <span className="text-indigo-400 font-semibold whitespace-nowrap shrink-0 mt-0.5 select-none">
+                    <span className="text-indigo-600 dark:text-indigo-400 font-semibold whitespace-nowrap shrink-0 mt-0.5 select-none">
                       [{entry.tag}]
                     </span>
 
                     {/* Main Log Message */}
-                    <div className="flex-1 text-zinc-200 break-words leading-relaxed">
+                    <div className="flex-1 text-zinc-800 dark:text-zinc-200 break-words leading-relaxed font-mono">
                       {entry.message}
                     </div>
                   </div>
 
                   {/* Collapsible Metadata Block */}
                   {hasMeta && isExpanded && (
-                    <div className="mt-2 ml-10 p-3 bg-zinc-900 rounded-lg border border-zinc-800 text-[11px] relative group">
-                      <div className="flex items-center justify-between mb-1.5 text-zinc-400 font-sans text-[10px] uppercase tracking-wider font-semibold">
+                    <div className="mt-2 ml-10 p-3 bg-zinc-100/90 dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 text-[11px] relative group">
+                      <div className="flex items-center justify-between mb-1.5 text-zinc-500 dark:text-zinc-400 font-sans text-[10px] uppercase tracking-wider font-semibold">
                         <span>Payload Metadata</span>
                         <button
                           type="button"
                           onClick={() => handleCopyMeta(entry.id, entry.meta)}
-                          className="flex items-center gap-1 text-zinc-400 hover:text-zinc-200 px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-750 transition-colors cursor-pointer"
+                          className="flex items-center gap-1 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 px-1.5 py-0.5 rounded bg-white hover:bg-zinc-200/80 dark:bg-zinc-800 dark:hover:bg-zinc-750 border border-zinc-200 dark:border-transparent transition-colors cursor-pointer"
                         >
                           {copiedMetaId === entry.id ? (
                             <>
-                              <Check className="w-3 h-3 text-emerald-400" />
-                              <span className="text-emerald-400">Copied</span>
+                              <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                              <span className="text-emerald-600 dark:text-emerald-400">Copied</span>
                             </>
                           ) : (
                             <>
@@ -647,7 +649,7 @@ export const DiagnosticsTab: React.FC<DiagnosticsTabProps> = ({ onShowToast }) =
                           )}
                         </button>
                       </div>
-                      <pre className="overflow-x-auto text-zinc-300 whitespace-pre-wrap leading-tight">
+                      <pre className="overflow-x-auto text-zinc-800 dark:text-zinc-300 whitespace-pre-wrap leading-tight font-mono">
                         {typeof entry.meta === "string"
                           ? entry.meta
                           : JSON.stringify(entry.meta, null, 2)}

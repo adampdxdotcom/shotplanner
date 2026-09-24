@@ -42,7 +42,7 @@ export const ConfigTabBar: React.FC<ConfigTabBarProps> = ({
         >
           <div className={`p-1 rounded-md shrink-0 ${
             activeTab === "llm" 
-              ? "bg-purple-500/20 text-purple-300" 
+              ? "bg-purple-500/20 text-purple-600 dark:text-purple-300" 
               : "bg-zinc-800/60 text-zinc-400"
           }`}>
             <Bot className="w-4 h-4" />
@@ -56,7 +56,7 @@ export const ConfigTabBar: React.FC<ConfigTabBarProps> = ({
                 <span className={`w-2 h-2 rounded-full shrink-0 ${isLmStudioConnected ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]" : "bg-amber-400"}`} />
               )}
             </div>
-            <span className="text-[10px] font-normal text-zinc-400 block -mt-0.5 truncate">
+            <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400 block -mt-0.5 truncate">
               {activeProvider === "gemini" ? "Google Gemini" : "Local LLM"}
             </span>
           </div>
@@ -75,7 +75,7 @@ export const ConfigTabBar: React.FC<ConfigTabBarProps> = ({
         >
           <div className={`p-1 rounded-md shrink-0 ${
             activeTab === "remote" 
-              ? "bg-indigo-500/20 text-indigo-300" 
+              ? "bg-indigo-500/20 text-indigo-600 dark:text-indigo-300" 
               : "bg-zinc-800/60 text-zinc-400"
           }`}>
             <Server className="w-4 h-4" />
@@ -87,7 +87,7 @@ export const ConfigTabBar: React.FC<ConfigTabBarProps> = ({
                 <span className="w-2 h-2 rounded-full shrink-0 bg-indigo-400" />
               ) : null}
             </div>
-            <span className="text-[10px] font-normal text-zinc-400 block -mt-0.5 truncate">
+            <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400 block -mt-0.5 truncate">
               GPU SSH &amp; ComfyUI
             </span>
           </div>
@@ -106,7 +106,7 @@ export const ConfigTabBar: React.FC<ConfigTabBarProps> = ({
         >
           <div className={`p-1 rounded-md shrink-0 ${
             activeTab === "models" 
-              ? "bg-blue-500/20 text-blue-300" 
+              ? "bg-blue-500/20 text-blue-600 dark:text-blue-300" 
               : "bg-zinc-800/60 text-zinc-400"
           }`}>
             <DownloadCloud className="w-4 h-4" />
@@ -115,7 +115,7 @@ export const ConfigTabBar: React.FC<ConfigTabBarProps> = ({
             <div className="flex items-center gap-1.5">
               <span className="truncate">Models</span>
             </div>
-            <span className="text-[10px] font-normal text-zinc-400 block -mt-0.5 truncate">
+            <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400 block -mt-0.5 truncate">
               Civitai &amp; Hugging Face
             </span>
           </div>
@@ -134,7 +134,7 @@ export const ConfigTabBar: React.FC<ConfigTabBarProps> = ({
         >
           <div className={`p-1 rounded-md shrink-0 ${
             activeTab === "general" 
-              ? "bg-amber-500/20 text-amber-300" 
+              ? "bg-amber-500/20 text-amber-600 dark:text-amber-300" 
               : "bg-zinc-800/60 text-zinc-400"
           }`}>
             <Sliders className="w-4 h-4" />
@@ -143,7 +143,7 @@ export const ConfigTabBar: React.FC<ConfigTabBarProps> = ({
             <div className="flex items-center gap-1.5">
               <span className="truncate">General</span>
             </div>
-            <span className="text-[10px] font-normal text-zinc-400 block -mt-0.5 truncate">
+            <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400 block -mt-0.5 truncate">
               Appearance &amp; Theme
             </span>
           </div>
@@ -162,7 +162,7 @@ export const ConfigTabBar: React.FC<ConfigTabBarProps> = ({
         >
           <div className={`p-1 rounded-md shrink-0 ${
             activeTab === "diagnostics" 
-              ? "bg-emerald-500/20 text-emerald-300" 
+              ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-300" 
               : "bg-zinc-800/60 text-zinc-400"
           }`}>
             <Terminal className="w-4 h-4" />
@@ -171,7 +171,7 @@ export const ConfigTabBar: React.FC<ConfigTabBarProps> = ({
             <div className="flex items-center gap-1.5">
               <span className="truncate">Diagnostics</span>
             </div>
-            <span className="text-[10px] font-normal text-zinc-400 block -mt-0.5 truncate">
+            <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400 block -mt-0.5 truncate">
               Logs &amp; System Health
             </span>
           </div>

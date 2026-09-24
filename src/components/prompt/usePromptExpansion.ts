@@ -65,53 +65,86 @@ export function usePromptExpansion({
   onUpdateSpecificShot,
   onShowToast
 }: UsePromptExpansionParams): UsePromptExpansionReturn {
-  const [generating, setGenerating] = useState(false);
+  // Stable refs for callbacks and active context to prevent stale closure leaks across shot switches
+  const activeShotIdRef = useRef(activeShotId);
+  activeShotIdRef.current = activeShotId;
+
+  const onUpdateSpecificShotRef = useRef(onUpdateSpecificShot);
+  onUpdateSpecificShotRef.current = onUpdateSpecificShot;
+
+  const onUpdateShotRef = useRef(onUpdateShot);
+  onUpdateShotRef.current = onUpdateShot;
+
+  const onChangeExpandedPromptRef = useRef(onChangeExpandedPrompt);
+  onChangeExpandedPromptRef.current = onChangeExpandedPrompt;
+
+  // Track in-flight generations and abort controllers per shot ID
+  const [generatingShotIds, setGeneratingShotIds] = useState<Record<string, boolean>>({});
+  const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
+  const startTimesRef = useRef<Map<string, number>>(new Map());
+
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const abortControllerRef = useRef<AbortController | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [presentedFallbackNotice, setPresentedFallbackNotice] = useState<string | null>(null);
   const [providerUsed, setProviderUsed] = useState<string | null>(null);
   const [lastDebugInfo, setLastDebugInfo] = useState<PromptDebugInfo | null>(null);
   const [showDebugModal, setShowDebugModal] = useState(false);
 
-  // Live timer tracking elapsed generation duration
+  // Generation status for currently active shot view
+  const generating = Boolean(activeShotId && generatingShotIds[activeShotId]);
+
+  // Live timer tracking elapsed generation duration for the currently viewed shot
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | null = null;
-    if (generating) {
-      setElapsedSeconds(0);
+    const isCurrentShotGenerating = Boolean(activeShotId && generatingShotIds[activeShotId]);
+
+    if (isCurrentShotGenerating && activeShotId) {
+      const startTime = startTimesRef.current.get(activeShotId) || Date.now();
+      setElapsedSeconds(Math.max(0, Math.floor((Date.now() - startTime) / 1000)));
+
       interval = setInterval(() => {
-        setElapsedSeconds((prev) => prev + 1);
+        const s = startTimesRef.current.get(activeShotId) || Date.now();
+        setElapsedSeconds(Math.max(0, Math.floor((Date.now() - s) / 1000)));
       }, 1000);
     } else {
       setElapsedSeconds(0);
     }
+
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [generating]);
+  }, [activeShotId, generatingShotIds]);
 
-  const handleCancelGeneration = () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
+  const handleCancelGeneration = (shotIdToCancel?: string) => {
+    const targetId = shotIdToCancel || activeShotIdRef.current;
+    if (targetId && abortControllersRef.current.has(targetId)) {
+      abortControllersRef.current.get(targetId)?.abort();
+      abortControllersRef.current.delete(targetId);
+      startTimesRef.current.delete(targetId);
+
+      setGeneratingShotIds((prev) => {
+        const next = { ...prev };
+        delete next[targetId];
+        return next;
+      });
+
+      onShowToast?.("LLM prompt expansion cancelled.", "info");
     }
-    setGenerating(false);
-    onShowToast?.("LLM prompt expansion cancelled.", "info");
   };
 
   const handleGeneratePrompt = async () => {
-    if (generating) {
-      handleCancelGeneration();
-      return;
-    }
-
-    if (!activeShotId) {
+    const currentShotId = activeShotIdRef.current;
+    if (!currentShotId) {
       setError("Please select a shot to rework or generate its prompt.");
       onShowToast?.("Please select a shot first.", "error");
       return;
     }
 
-    const currentShotId = activeShotId;
+    if (generatingShotIds[currentShotId]) {
+      handleCancelGeneration(currentShotId);
+      return;
+    }
+
     const targetShot = sceneProject.shots.find((s) => s.id === currentShotId) || activeShot;
     const stubToUse = (targetShot?.basic_stub ?? currentBasicStub).trim();
 
@@ -129,9 +162,10 @@ export function usePromptExpansion({
 
     const priorPrompt = targetShot?.expanded_prompt?.trim() || "";
     const controller = new AbortController();
-    abortControllerRef.current = controller;
+    abortControllersRef.current.set(currentShotId, controller);
+    startTimesRef.current.set(currentShotId, Date.now());
 
-    setGenerating(true);
+    setGeneratingShotIds((prev) => ({ ...prev, [currentShotId]: true }));
     setError(null);
     setPresentedFallbackNotice(null);
     setProviderUsed(null);
@@ -165,7 +199,9 @@ export function usePromptExpansion({
 
       const data: any = await llmApi.generatePrompt(payload, { signal: controller.signal });
       if (data && data.expanded_prompt) {
-        setPresentedFallbackNotice(null);
+        if (activeShotIdRef.current === currentShotId) {
+          setPresentedFallbackNotice(null);
+        }
 
         let createdVariationNumber = 1;
         const updatedShotUpdater = (prev: ShotItem): ShotItem => {
@@ -193,14 +229,16 @@ export function usePromptExpansion({
           };
         };
 
-        if (onUpdateSpecificShot) {
-          onUpdateSpecificShot(currentShotId, updatedShotUpdater);
-        } else {
-          onUpdateShot(updatedShotUpdater);
+        // Explicitly bind update to the originating shot ID to prevent cross-shot overwrite leaks
+        if (onUpdateSpecificShotRef.current) {
+          onUpdateSpecificShotRef.current(currentShotId, updatedShotUpdater);
+        } else if (onUpdateShotRef.current) {
+          onUpdateShotRef.current(updatedShotUpdater);
         }
 
-        if (activeShotId === currentShotId) {
-          onChangeExpandedPrompt(data.expanded_prompt);
+        // Only update active editor text state if user is STILL viewing this exact shot
+        if (activeShotIdRef.current === currentShotId) {
+          onChangeExpandedPromptRef.current(data.expanded_prompt);
         }
 
         if (data.provider) setProviderUsed(data.provider);
@@ -209,19 +247,21 @@ export function usePromptExpansion({
       } else {
         const providerLabel = providerChoice === "gemini" ? "Google Gemini" : "LM Studio";
         const errorMsg = data.error || `Failed to generate prompt with ${providerLabel}`;
-        setError(errorMsg);
-        onShowToast?.(`LLM generation failed: ${errorMsg}`, "error");
+        if (activeShotIdRef.current === currentShotId) {
+          setError(errorMsg);
+        }
+        onShowToast?.(`Shot ${targetShot?.shot_number || 1}: LLM generation failed: ${errorMsg}`, "error");
 
         if (priorPrompt) {
-          if (onUpdateSpecificShot) {
-            onUpdateSpecificShot(currentShotId, (prev) => ({ ...prev, expanded_prompt: priorPrompt }));
+          if (onUpdateSpecificShotRef.current) {
+            onUpdateSpecificShotRef.current(currentShotId, (prev) => ({ ...prev, expanded_prompt: priorPrompt }));
           }
-          if (activeShotId === currentShotId) {
-            onChangeExpandedPrompt(priorPrompt);
+          if (activeShotIdRef.current === currentShotId) {
+            onChangeExpandedPromptRef.current(priorPrompt);
+            setPresentedFallbackNotice(`Default LLM service failed (${providerLabel}). Presenting last prompt for this shot.`);
+            onShowToast?.("Presenting last prompt for this shot.", "info");
           }
-          setPresentedFallbackNotice(`Default LLM service failed (${providerLabel}). Presenting last prompt for this shot.`);
-          onShowToast?.("Presenting last prompt for this shot.", "info");
-        } else {
+        } else if (activeShotIdRef.current === currentShotId) {
           setPresentedFallbackNotice(`Default LLM service failed (${providerLabel}). No previous prompt available for this shot.`);
         }
       }
@@ -231,24 +271,31 @@ export function usePromptExpansion({
       }
       const providerLabel = providerChoice === "gemini" ? "Google Gemini" : "LM Studio";
       const errorMsg = err.message || `Failed to connect to ${providerLabel}`;
-      setError(errorMsg);
-      onShowToast?.(`LLM generation failed: ${errorMsg}`, "error");
+      if (activeShotIdRef.current === currentShotId) {
+        setError(errorMsg);
+      }
+      onShowToast?.(`Shot ${targetShot?.shot_number || 1}: LLM generation failed: ${errorMsg}`, "error");
 
       if (priorPrompt) {
-        if (onUpdateSpecificShot) {
-          onUpdateSpecificShot(currentShotId, (prev) => ({ ...prev, expanded_prompt: priorPrompt }));
+        if (onUpdateSpecificShotRef.current) {
+          onUpdateSpecificShotRef.current(currentShotId, (prev) => ({ ...prev, expanded_prompt: priorPrompt }));
         }
-        if (activeShotId === currentShotId) {
-          onChangeExpandedPrompt(priorPrompt);
+        if (activeShotIdRef.current === currentShotId) {
+          onChangeExpandedPromptRef.current(priorPrompt);
+          setPresentedFallbackNotice(`Default LLM service failed (${providerLabel}). Presenting last prompt for this shot.`);
+          onShowToast?.("Presenting last prompt for this shot.", "info");
         }
-        setPresentedFallbackNotice(`Default LLM service failed (${providerLabel}). Presenting last prompt for this shot.`);
-        onShowToast?.("Presenting last prompt for this shot.", "info");
-      } else {
+      } else if (activeShotIdRef.current === currentShotId) {
         setPresentedFallbackNotice(`Default LLM service failed (${providerLabel}). No previous prompt available for this shot.`);
       }
     } finally {
-      abortControllerRef.current = null;
-      setGenerating(false);
+      abortControllersRef.current.delete(currentShotId);
+      startTimesRef.current.delete(currentShotId);
+      setGeneratingShotIds((prev) => {
+        const next = { ...prev };
+        delete next[currentShotId];
+        return next;
+      });
     }
   };
 
