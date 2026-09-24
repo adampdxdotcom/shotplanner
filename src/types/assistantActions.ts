@@ -211,6 +211,29 @@ export function validateActionSafety(
 }
 
 /**
+ * Validates a sequence of assistant actions sequentially (Phased Action Protocol).
+ * Tracks cumulative shot additions so coordinated multi-action steps (e.g. adding a shot
+ * and then updating or expanding it) evaluate properly while blocking ungrounded hallucinations.
+ */
+export function validateActionSequenceSafety(
+  actions: AssistantAction[],
+  initialShotNumbers: number[]
+): Array<{ valid: boolean; reason?: string }> {
+  const currentNumbers = new Set(initialShotNumbers);
+  let nextShotNum = (initialShotNumbers.length > 0 ? Math.max(...initialShotNumbers) : 0) + 1;
+
+  return actions.map((act) => {
+    if (act.type === "add_shot") {
+      const assignedNum = nextShotNum++;
+      currentNumbers.add(assignedNum);
+      return { valid: true };
+    }
+
+    return validateActionSafety(act, Array.from(currentNumbers));
+  });
+}
+
+/**
  * Extracts ```action or ```json blocks from message content that contain valid assistant actions.
  * Automatically normalizes camera, lens, framing, and movement changes into canonical presets.
  */

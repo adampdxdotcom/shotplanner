@@ -2,7 +2,7 @@ import React, { useEffect } from "react";
 import { Bot, Clapperboard, Loader2, CheckCheck, X, Clock } from "lucide-react";
 import Markdown from "react-markdown";
 import { AssistantChatMessage } from "../../services/assistantClient";
-import { AssistantAction, parseAssistantActions, validateActionSafety } from "../../types/assistantActions";
+import { AssistantAction, parseAssistantActions, validateActionSafety, validateActionSequenceSafety } from "../../types/assistantActions";
 import { AssistantActionCard } from "./AssistantActionCard";
 import { StagingProgressState, ExpandingProgressState } from "./useAssistantActions";
 import { CharacterProfile, MediaAsset, ShotItem } from "../../types";
@@ -108,7 +108,8 @@ export const AssistantMessageList: React.FC<AssistantMessageListProps> = ({
                 <div className="whitespace-pre-wrap">{msg.content}</div>
               ) : (() => {
                 const { cleanContent, actions } = parseAssistantActions(msg.content);
-                const validActions = actions.filter((act) => validateActionSafety(act, existingShotNumbers).valid);
+                const sequenceSafety = validateActionSequenceSafety(actions, existingShotNumbers);
+                const validActions = actions.filter((_, actIdx) => sequenceSafety[actIdx]?.valid);
                 const unappliedCount = validActions.filter((act, actIdx) => {
                   const actionKey = `${idx}_${act.type}_${act.type === "update_shot" ? act.shot_number : act.type === "update_character" ? act.character_name : actIdx}`;
                   return !appliedActionKeys[actionKey] && !dismissedActionKeys[actionKey];
@@ -150,7 +151,7 @@ export const AssistantMessageList: React.FC<AssistantMessageListProps> = ({
                           const actionKey = `${idx}_${act.type}_${act.type === "update_shot" ? act.shot_number : act.type === "update_character" ? act.character_name : actIdx}`;
                           const isApplied = !!appliedActionKeys[actionKey];
                           const isDismissed = !!dismissedActionKeys[actionKey];
-                          const safetyCheck = validateActionSafety(act, existingShotNumbers);
+                          const safetyCheck = sequenceSafety[actIdx] || validateActionSafety(act, existingShotNumbers);
 
                           return (
                             <AssistantActionCard

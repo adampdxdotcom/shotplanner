@@ -12,7 +12,8 @@ import {
 } from "../../types";
 import { 
   AssistantAction, 
-  validateActionSafety 
+  validateActionSafety,
+  validateActionSequenceSafety
 } from "../../types/assistantActions";
 import { toCanonicalSubjectName, findCanonicalSubject } from "../../utils/subjectUtils";
 import { generateUUID } from "../../utils/formatters";
@@ -740,8 +741,9 @@ export function useAssistantActions({
 
   const handleApplyAllActions = (actions: AssistantAction[], msgIdx: number) => {
     const existingShotNums = (sceneProject.shots || []).map((s) => s.shot_number);
+    const sequenceSafety = validateActionSequenceSafety(actions, existingShotNums);
     actions.forEach((act, actIdx) => {
-      const safety = validateActionSafety(act, existingShotNums);
+      const safety = sequenceSafety[actIdx] || validateActionSafety(act, existingShotNums);
       const actionKey = `${msgIdx}_${act.type}_${act.type === "update_shot" ? act.shot_number : act.type === "update_character" ? act.character_name : actIdx}`;
       if (safety.valid && !appliedActionKeys[actionKey] && !dismissedActionKeys[actionKey]) {
         handleApplyAction(act, actionKey);
