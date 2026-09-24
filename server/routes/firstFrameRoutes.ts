@@ -5,7 +5,9 @@ import {
   commitFirstFrameCandidate 
 } from "../services/firstFrameService";
 import { processAssetTransfer } from "../services/executionService";
+import { createScopedLogger } from "../utils/logger";
 
+const log = createScopedLogger("FirstFrameRoute");
 const router = Router();
 
 /**
@@ -17,7 +19,7 @@ router.post("/sanitize-prompt", async (req: Request, res: Response) => {
     const result = await sanitizeSafetyPrompt(prompt || "");
     res.json(result);
   } catch (err: any) {
-    console.error("[FirstFrameRoute /sanitize-prompt ERROR]:", err);
+    log.error("Failed to sanitize prompt", { error: err?.message || err });
     res.status(500).json({ error: err.message || "Failed to sanitize prompt." });
   }
 });
@@ -42,6 +44,8 @@ router.post("/generate", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Director staging prompt is required for First Frame generation." });
     }
 
+    log.info(`Generating first frame candidates for shot ${shotNumber || 1} in scene ${sceneName || "scene01"}`);
+
     const result = await generateMultimodalFirstFrame({
       prompt,
       actorImage,
@@ -55,7 +59,7 @@ router.post("/generate", async (req: Request, res: Response) => {
 
     res.json(result);
   } catch (err: any) {
-    console.error("[FirstFrameRoute /generate ERROR]:", err);
+    log.error("Failed to generate first frame candidates", { error: err?.message || err });
     res.status(500).json({ 
       error: err.message || "Failed to generate first frame candidates.",
       blockedByFilter: err.message?.toLowerCase().includes("safety") || err.message?.toLowerCase().includes("blocked")
@@ -95,7 +99,7 @@ router.post("/accept", async (req: Request, res: Response) => {
       }
     });
   } catch (err: any) {
-    console.error("[FirstFrameRoute /accept ERROR]:", err);
+    log.error("Failed to accept and save first frame candidate", { error: err?.message || err });
     res.status(500).json({ error: err.message || "Failed to accept and save first frame candidate." });
   }
 });
@@ -134,7 +138,7 @@ router.post("/send-to-comfy", async (req: Request, res: Response) => {
       result: transferResult
     });
   } catch (err: any) {
-    console.error("[FirstFrameRoute /send-to-comfy ERROR]:", err);
+    log.error("Failed to stage to local ComfyUI", { error: err?.message || err });
     res.status(500).json({ error: err.message || "Failed to stage to local ComfyUI." });
   }
 });

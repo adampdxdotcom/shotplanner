@@ -1,8 +1,8 @@
 import React from "react";
-import { Bot, Server, DownloadCloud, Sliders } from "lucide-react";
+import { Bot, Server, DownloadCloud, Sliders, Terminal } from "lucide-react";
 import { LLMProvider } from "../../types";
 
-export type ConfigTab = "llm" | "remote" | "models" | "general";
+export type ConfigTab = "llm" | "remote" | "models" | "general" | "diagnostics";
 
 interface ConfigTabBarProps {
   activeTab: ConfigTab;
@@ -28,7 +28,7 @@ export const ConfigTabBar: React.FC<ConfigTabBarProps> = ({
       id="config-tab-bar"
       className="w-full bg-zinc-900/90 border-2 border-zinc-700/80 rounded-xl p-1.5 shadow-sm backdrop-blur-xs"
     >
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 w-full">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 w-full">
         {/* Tab 1: LLM Setup */}
         <button
           id="config-tab-llm"
@@ -145,6 +145,34 @@ export const ConfigTabBar: React.FC<ConfigTabBarProps> = ({
             </div>
             <span className="text-[10px] font-normal text-zinc-400 block -mt-0.5 truncate">
               Appearance &amp; Theme
+            </span>
+          </div>
+        </button>
+
+        {/* Tab 5: System Diagnostics & Logs */}
+        <button
+          id="config-tab-diagnostics"
+          type="button"
+          onClick={() => setActiveTab("diagnostics")}
+          className={`w-full flex items-center gap-2.5 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all cursor-pointer justify-start ${
+            activeTab === "diagnostics"
+              ? "bg-zinc-800 text-white border border-zinc-600 shadow-xs"
+              : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850 border border-transparent"
+          }`}
+        >
+          <div className={`p-1 rounded-md shrink-0 ${
+            activeTab === "diagnostics" 
+              ? "bg-emerald-500/20 text-emerald-300" 
+              : "bg-zinc-800/60 text-zinc-400"
+          }`}>
+            <Terminal className="w-4 h-4" />
+          </div>
+          <div className="text-left min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              <span className="truncate">Diagnostics</span>
+            </div>
+            <span className="text-[10px] font-normal text-zinc-400 block -mt-0.5 truncate">
+              Logs &amp; System Health
             </span>
           </div>
         </button>

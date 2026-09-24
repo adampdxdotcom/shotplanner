@@ -1,5 +1,8 @@
 import WebSocket from "ws";
 import { Response } from "express";
+import { createScopedLogger } from "../utils/logger";
+
+const log = createScopedLogger("ComfySocketService");
 
 export interface ComfyJobState {
   promptId: string;
@@ -65,7 +68,7 @@ export function connectComfyWebSocket(apiUrl: string): WebSocket | null {
     wsPool.set(normalizedUrl, ws);
 
     ws.on("open", () => {
-      console.log(`[ComfySocketService] WS connection successfully established with ${normalizedUrl}`);
+      log.info(`WS connection successfully established with ${normalizedUrl}`);
       lastWarnTime.delete(normalizedUrl);
       broadcastToClients(normalizedUrl, { type: "connected", url: normalizedUrl });
     });
@@ -88,11 +91,11 @@ export function connectComfyWebSocket(apiUrl: string): WebSocket | null {
       // Throttle repetitive ECONNREFUSED notices to once every 30 seconds as an informative warning
       if (isConnRefused) {
         if (now - lastWarn > 30000) {
-          console.warn(`[ComfySocketService] ComfyUI instance at ${normalizedUrl} is currently offline (ECONNREFUSED). Waiting for connection.`);
+          log.warn(`ComfyUI instance at ${normalizedUrl} is currently offline (ECONNREFUSED). Waiting for connection.`);
           lastWarnTime.set(normalizedUrl, now);
         }
       } else {
-        console.warn(`[ComfySocketService] WS Notice on ${normalizedUrl}:`, err?.message || err);
+        log.warn(`WS Notice on ${normalizedUrl}`, { error: err?.message || err });
       }
 
       broadcastToClients(normalizedUrl, { type: "error", message: err?.message || String(err) });
@@ -111,7 +114,7 @@ export function connectComfyWebSocket(apiUrl: string): WebSocket | null {
 
     return ws;
   } catch (err: any) {
-    console.warn(`[ComfySocketService] Could not initiate WS for ${normalizedUrl}:`, err.message);
+    log.warn(`Could not initiate WS for ${normalizedUrl}`, { error: err.message });
     return null;
   }
 }
@@ -239,7 +242,7 @@ export function unregisterSSEClient(apiUrl: string, res: Response) {
         if (!remainingClients || remainingClients.size === 0) {
           const ws = wsPool.get(normalizedUrl);
           if (ws) {
-            console.log(`[ComfySocketService] No active clients, closing WebSocket to ${normalizedUrl}`);
+            log.info(`No active clients, closing WebSocket to ${normalizedUrl}`);
             ws.close();
             wsPool.delete(normalizedUrl);
           }

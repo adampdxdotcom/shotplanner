@@ -7,6 +7,9 @@ import { ensureSceneDirectories, ASSETS_DIR } from "../config/constants";
 import { assetService } from "./assetService";
 import { generateThumbnailFile } from "./thumbnailService";
 import { AssetRecord } from "../types";
+import { createScopedLogger } from "../utils/logger";
+
+const log = createScopedLogger("FirstFrame");
 
 /**
  * Pre-flight safety re-prompting translator.
@@ -70,8 +73,8 @@ Original Prompt:
           replacementsApplied: ["AI Theatrical Stunt & Lighting Translation"]
         };
       }
-    } catch (err) {
-      console.warn("[Sanitize Prompt] Gemini AI translation fallback to dictionary rules:", err);
+    } catch (err: any) {
+      log.warn("Gemini AI translation fallback to dictionary rules", { error: err?.message || err });
     }
   }
 
@@ -250,7 +253,7 @@ COMPOSITION & STAGING DIRECTIVES:
         }
       } catch (err: any) {
         lastError = err;
-        console.warn(`[First Frame Gen] Model ${model} attempt ${idx + 1} failed:`, err?.message || err);
+        log.warn(`Model ${model} attempt ${idx + 1} failed`, { error: err?.message || err });
       }
     }
 
@@ -318,8 +321,8 @@ export async function commitFirstFrameCandidate({
   let thumbPath: string | undefined = undefined;
   try {
     thumbPath = await generateThumbnailFile(targetPath, undefined, 384);
-  } catch (e) {
-    console.warn("[First Frame Save] Thumbnail generation error:", e);
+  } catch (e: any) {
+    log.warn("Thumbnail generation error during first frame save", { error: e?.message || e });
   }
 
   const stats = fs.statSync(targetPath);
@@ -344,6 +347,10 @@ export async function commitFirstFrameCandidate({
 
   // Upsert asset to database
   assetService.upsertAsset(asset);
+  log.info(`Committed first frame asset for shot ${shotNumber} in scene ${cleanScene}`, {
+    filename,
+    sizeBytes: stats.size
+  });
 
   return {
     asset,

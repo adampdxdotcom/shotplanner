@@ -3,6 +3,9 @@ import path from "path";
 import { Client, ConnectConfig } from "ssh2";
 import { CIVITAI_CONFIG_FILE, CIVITAI_FAVORITES_FILE } from "../config/constants";
 import { writeJsonAtomicSync } from "../utils/atomicFs";
+import { createScopedLogger } from "../utils/logger";
+
+const log = createScopedLogger("CivitaiService");
 
 export interface CivitaiModelVersionOption {
   id: number;
@@ -145,7 +148,7 @@ export function getStoredCivitaiFavorites(): CivitaiFavorite[] {
         return data.favorites;
       }
     } catch (e) {
-      console.error("[Civitai] Error reading favorites file:", e);
+      log.error("Error reading favorites file", { error: e });
     }
   }
   return [];

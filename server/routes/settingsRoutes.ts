@@ -5,6 +5,9 @@ import { getStoredHuggingFaceToken, saveHuggingFaceToken, removeHuggingFaceToken
 import { getStoredRunpodApiKey, saveRunpodApiKey, removeRunpodApiKey } from "../services/runpodService";
 import { getStoredLLMSettings, saveStoredLLMSettings } from "../services/llmSettingsService";
 import { detectVisionCapability } from "../services/visionCaptionService";
+import { createScopedLogger } from "../utils/logger";
+
+const log = createScopedLogger("SettingsRoute");
 
 const router = Router();
 
@@ -155,6 +158,8 @@ router.post(["/test-lm-studio", "/test-local-llm"], async (req: Request, res: Re
     }
   }
 
+  log.info(`Testing Local LLM probe at: ${probeUrl}`);
+
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);
@@ -192,6 +197,8 @@ router.post(["/test-lm-studio", "/test-local-llm"], async (req: Request, res: Re
         : "generic";
 
       const backendDisplayName = isOllama ? "Ollama" : isLmStudio ? "LM Studio" : "Local LLM";
+
+      log.info(`Local LLM probe succeeded: ${backendDisplayName} (${modelsCount} models, vision: ${hasVision})`);
 
       return res.json({
         success: true,
@@ -279,7 +286,7 @@ router.post("/test-comfyui", async (req: Request, res: Response) => {
   const targetUrl = rawUrl.trim().replace(/\/$/, "");
   const authToken = (remote_api_token || token || "").trim();
 
-  console.log(`[ComfyUI Test] Testing reachability for URL: ${targetUrl}`);
+  log.info(`Testing reachability for URL: ${targetUrl}`);
 
   let probeUrl = `${targetUrl}/system_stats`;
 
@@ -325,7 +332,7 @@ router.post("/test-comfyui", async (req: Request, res: Response) => {
       }
 
       const systemInfo = systemInfoParts.length > 0 ? systemInfoParts.join(" | ") : `${targetUrl} (Active)`;
-      console.log(`[ComfyUI Test] Success (HTTP 200) - Connected to: ${systemInfo}`);
+      log.info(`Success (HTTP 200) - Connected to: ${systemInfo}`);
 
       return res.json({
         success: true,
@@ -337,7 +344,7 @@ router.post("/test-comfyui", async (req: Request, res: Response) => {
     } else {
       const statusText = lmRes ? `HTTP ${lmRes.status} ${lmRes.statusText}` : "No response";
       const errorMessage = `Server responded with ${statusText}`;
-      console.log(`[ComfyUI Test] Failed to connect to ${targetUrl}: ${errorMessage}`);
+      log.warn(`Failed to connect to ${targetUrl}: ${errorMessage}`);
       return res.status(400).json({
         success: false,
         error: errorMessage
@@ -349,7 +356,7 @@ router.post("/test-comfyui", async (req: Request, res: Response) => {
       ? "Connection timed out (5s limit reached)" 
       : (err.message || "Connection refused or endpoint unreachable");
 
-    console.log(`[ComfyUI Test] Failed to connect to ${targetUrl}: ${errorMessage}`);
+    log.warn(`Failed to connect to ${targetUrl}: ${errorMessage}`);
     return res.status(400).json({
       success: false,
       error: errorMessage

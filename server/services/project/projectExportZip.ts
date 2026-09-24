@@ -16,6 +16,9 @@ import { universeService } from "../universeService";
 import { formatShotNumber, sanitizeFilenamePart, generateSaveVideoPrefix } from "../../utils/formatters";
 import { parseWorkflowData, injectAndPrepareWorkflowData } from "../workflowService";
 import { findProjectFile } from "./projectCrud";
+import { createScopedLogger } from "../../utils/logger";
+
+const log = createScopedLogger("ProjectExportZip");
 
 /**
  * Locate asset file across scene folders, uploads, and universe media
@@ -32,7 +35,7 @@ function findAssetFile(filename: string): string | null {
       return resolvedPath;
     }
   } catch (e) {
-    console.warn(`Error using assetService path resolver for ${cleanFn}:`, e);
+    log.warn(`Error using assetService path resolver for ${cleanFn}:`, { error: e });
   }
 
   // 2. Fallback: Search standard candidate folders
@@ -130,7 +133,7 @@ export async function exportProjectZip(
   const archive = new ZipArchive({ zlib: { level: 9 } });
 
   archive.on("error", (err: any) => {
-    console.error("Archive error:", err);
+    log.error("Archive error", { error: err });
     if (!res.headersSent) {
       res.status(500).json({ error: err.message || "Failed to create archive" });
     }
@@ -173,7 +176,7 @@ export async function exportProjectZip(
         referencedWfFiles.add(f);
       }
     } catch (e) {
-      console.error("Error reading scene workflow directory for zip export:", e);
+      log.error("Error reading scene workflow directory for zip export", { error: e });
     }
   }
 
@@ -185,7 +188,7 @@ export async function exportProjectZip(
         const wfContent = JSON.parse(fs.readFileSync(foundWfPath, "utf-8"));
         cachedTemplates.set(wfFile, wfContent);
       } catch (e) {
-        console.error(`Failed to parse workflow ${wfFile}:`, e);
+        log.error(`Failed to parse workflow ${wfFile}`, { error: e });
       }
     }
   }
@@ -296,7 +299,7 @@ export async function exportProjectZip(
       archive.append(JSON.stringify(referencedUniverseChars, null, 2), { name: "universe/characters.json" });
     }
   } catch (e) {
-    console.error("Error packaging universe metadata in ZIP export:", e);
+    log.error("Error packaging universe metadata in ZIP export", { error: e });
   }
 
   // 5. Dynamically synthesize and include fully injected ready-to-run workflow JSON for EVERY shot in staged_workflows/

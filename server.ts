@@ -20,6 +20,7 @@ import assistantRoutes from "./server/routes/assistantRoutes";
 import comfyRoutes from "./server/routes/comfyRoutes";
 import runpodRoutes from "./server/routes/runpodRoutes";
 import firstFrameRoutes from "./server/routes/firstFrameRoutes";
+import diagnosticRoutes from "./server/routes/diagnosticRoutes";
 
 // Re-export utility functions for external consumers
 export {
@@ -69,6 +70,8 @@ app.use("/api/assistant", assistantRoutes);
 app.use("/api/comfy", comfyRoutes);
 app.use("/api/runpod", runpodRoutes);
 app.use("/api/first-frame", firstFrameRoutes);
+app.use("/api/diagnostics", diagnosticRoutes);
+app.use("/api/system", diagnosticRoutes);
 
 // Compatibility aliases for remote sync and staging
 app.post("/api/assets/sync_remote", handleAssetTransfer);

@@ -5,6 +5,9 @@ import { getImageBase64ForVision } from "./thumbnailService";
 import { callLocalLLM, stripThinkingTags } from "./llm_service";
 import { getProjectData, saveProjectData } from "./project";
 import { ImageVisualAnalysis } from "../types";
+import { createScopedLogger } from "../utils/logger";
+
+const log = createScopedLogger("VisionCaption");
 
 export interface VisionCaptionOptions {
   thumbnailPath?: string;
@@ -474,12 +477,18 @@ Return ONLY valid JSON. Do NOT output markdown explanations or conversational te
         projectData.visual_analysis_cache[resolvedFilename] = analysis;
         saveProjectData(targetSceneName, projectData);
         savedToCache = true;
-        console.log(`[Vision Caption Service] Silently auto-saved visual analysis for '${resolvedFilename}' in scene '${targetSceneName}'`);
+        log.debug(`Silently auto-saved visual analysis for '${resolvedFilename}' in scene '${targetSceneName}'`);
       }
     } catch (cacheErr: any) {
-      console.warn(`[Vision Caption Service] Could not auto-save visual analysis cache:`, cacheErr?.message || cacheErr);
+      log.warn("Could not auto-save visual analysis cache", { error: cacheErr?.message || cacheErr });
     }
   }
+
+  log.info(`Vision caption generated (${wordsCount} words)`, {
+    model: localRes.model || model,
+    subjectSubstituted,
+    savedToCache
+  });
 
   return {
     success: true,

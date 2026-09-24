@@ -6,7 +6,9 @@ import { listWorkflows, parseWorkflowData } from "../services/workflowService";
 import { processAssetTransfer, processSceneTransfer } from "../services/executionService";
 import { listRemoteWorkflows, fetchRemoteWorkflowJson, syncRemoteWorkflowToLocal, getRemoteComfyObjectInfo } from "../services/remoteComfyService";
 import { safeUnlinkSync } from "../utils/fileCleanup";
+import { createScopedLogger } from "../utils/logger";
 
+const log = createScopedLogger("WorkflowRoute");
 const router = Router();
 
 router.get("/", (req: Request, res: Response) => {
@@ -42,7 +44,7 @@ router.post("/upload", upload.single("file"), (req: Request, res: Response) => {
     fs.copyFileSync(req.file.path, target);
     fs.copyFileSync(req.file.path, globalSceneTarget);
 
-    console.log(`[Workflow Upload] Stored "${originalFilename}" in ${targetDir}`);
+    log.info(`Stored "${originalFilename}" in ${targetDir}`);
 
     // Immediate local parse so UI responds instantly with parsed metadata
     let parsedInfo: any = null;
@@ -76,7 +78,7 @@ router.post("/upload", upload.single("file"), (req: Request, res: Response) => {
           const remoteDest = `${remoteComfyRoot}/user/default/workflows/${originalFilename}`;
           await executeOneShotSSHWrite(uploadBody, remoteDest, JSON.stringify(rawWorkflow, null, 2));
         } catch (bgErr: any) {
-          console.warn(`[Background SSH Sync Notice] ${bgErr.message}`);
+          log.warn("Background SSH Sync Notice", { error: bgErr.message || bgErr });
         }
       });
     }
@@ -174,11 +176,11 @@ router.post("/parse", (req: Request, res: Response) => {
 // Stage single workflow/asset configuration to remote ComfyUI
 router.post("/stage", async (req: Request, res: Response) => {
   try {
-    console.log(`[Workflow Route] POST /api/workflow/stage for scene "${req.body.scene_name || 'default'}"`);
+    log.info(`POST /api/workflow/stage for scene "${req.body.scene_name || 'default'}"`);
     const result = await processAssetTransfer(req.body);
     res.json(result);
   } catch (err: any) {
-    console.error("[Workflow Route /stage ERROR]:", err);
+    log.error("Failed to stage assets", { error: err?.message || err });
     const status = err.message && err.message.includes("is required") ? 400 : 500;
     res.status(status).json({ error: err.message || "Failed to stage assets." });
   }
@@ -187,7 +189,7 @@ router.post("/stage", async (req: Request, res: Response) => {
 // Stage specific shot to remote ComfyUI
 router.post("/stage-shot", async (req: Request, res: Response) => {
   try {
-    console.log(`[Workflow Route] POST /api/workflow/stage-shot for scene "${req.body.scene_name || 'default'}"`);
+    log.info(`POST /api/workflow/stage-shot for scene "${req.body.scene_name || 'default'}"`);
     const shot = Array.isArray(req.body.shots) && req.body.shots.length > 0 ? req.body.shots[0] : null;
     const transferOptions = {
       ...req.body,
@@ -204,7 +206,7 @@ router.post("/stage-shot", async (req: Request, res: Response) => {
     const result = await processAssetTransfer(transferOptions);
     res.json(result);
   } catch (err: any) {
-    console.error("[Workflow Route /stage-shot ERROR]:", err);
+    log.error("Failed to stage shot", { error: err?.message || err });
     const status = err.message && err.message.includes("is required") ? 400 : 500;
     res.status(status).json({ error: err.message || "Failed to stage shot." });
   }
@@ -213,11 +215,11 @@ router.post("/stage-shot", async (req: Request, res: Response) => {
 // Stage full scene across all shots to remote ComfyUI
 router.post("/stage-scene", async (req: Request, res: Response) => {
   try {
-    console.log(`[Workflow Route] POST /api/workflow/stage-scene for scene "${req.body.scene_name || 'default'}" (${req.body.shots?.length || 0} shots)`);
+    log.info(`POST /api/workflow/stage-scene for scene "${req.body.scene_name || 'default'}" (${req.body.shots?.length || 0} shots)`);
     const result = await processSceneTransfer(req.body);
     res.json(result);
   } catch (err: any) {
-    console.error("[Workflow Route /stage-scene ERROR]:", err);
+    log.error("Failed to stage scene", { error: err?.message || err });
     const status = err.message && err.message.includes("is required") ? 400 : 500;
     res.status(status).json({ error: err.message || "Failed to stage scene." });
   }
@@ -226,11 +228,11 @@ router.post("/stage-scene", async (req: Request, res: Response) => {
 // Discover workflows available on remote ComfyUI installation (Passive Monitoring)
 router.post("/remote-list", async (req: Request, res: Response) => {
   try {
-    console.log(`[Workflow Route] POST /api/workflow/remote-list from host "${req.body.remote_host || req.body.host || 'none'}"`);
+    log.info(`POST /api/workflow/remote-list from host "${req.body.remote_host || req.body.host || 'none'}"`);
     const result = await listRemoteWorkflows(req.body);
     res.json(result);
   } catch (err: any) {
-    console.error("[Workflow Route /remote-list ERROR]:", err);
+    log.error("Failed to query remote ComfyUI workflows", { error: err?.message || err });
     res.status(500).json({
       success: false,
       workflows: [],
@@ -268,7 +270,7 @@ router.post("/remote-get", async (req: Request, res: Response) => {
       }
     });
   } catch (err: any) {
-    console.error("[Workflow Route /remote-get ERROR]:", err);
+    log.error("Failed to fetch remote workflow", { error: err?.message || err });
     res.status(500).json({ success: false, error: err.message || "Failed to fetch remote workflow." });
   }
 });
@@ -286,7 +288,7 @@ router.post("/sync-remote", async (req: Request, res: Response) => {
     }
     res.json(result);
   } catch (err: any) {
-    console.error("[Workflow Route /sync-remote ERROR]:", err);
+    log.error("Failed to sync remote workflow", { error: err?.message || err });
     res.status(500).json({ success: false, error: err.message || "Failed to sync remote workflow." });
   }
 });
@@ -297,7 +299,7 @@ router.post("/remote-object-info", async (req: Request, res: Response) => {
     const result = await getRemoteComfyObjectInfo(req.body);
     res.json(result);
   } catch (err: any) {
-    console.error("[Workflow Route /remote-object-info ERROR]:", err);
+    log.error("Failed to query ComfyUI object info", { error: err?.message || err });
     res.status(500).json({ success: false, error: err.message || "Failed to query ComfyUI object info." });
   }
 });
@@ -360,7 +362,7 @@ router.post("/preview-shot-injection", async (req: Request, res: Response) => {
       }
     });
   } catch (err: any) {
-    console.error("[Workflow Route /preview-shot-injection ERROR]:", err);
+    log.error("Failed to preview shot injection", { error: err?.message || err });
     res.status(500).json({ success: false, error: err.message || "Failed to preview shot injection." });
   }
 });

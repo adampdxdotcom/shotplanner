@@ -177,6 +177,10 @@ export default function App() {
         toasts={toasts}
         onDismissToast={dismissToast}
         monitorState={monitorState}
+        onOpenDiagnostics={() => {
+          setActiveConfigTab("diagnostics");
+          scrollToSection("config");
+        }}
       />
 
       {/* Main Workspace Layout */}

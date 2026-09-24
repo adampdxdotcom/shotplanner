@@ -7,7 +7,9 @@ import {
   saveCivitaiFavorite,
   deleteCivitaiFavorite
 } from "../services/civitaiService";
+import { createScopedLogger } from "../utils/logger";
 
+const log = createScopedLogger("CivitaiRoute");
 const router = Router();
 
 /**
@@ -23,7 +25,7 @@ router.get("/favorites", (req: Request, res: Response) => {
       count: favorites.length
     });
   } catch (err: any) {
-    console.error("[Civitai Favorites List Error]:", err);
+    log.error("Civitai Favorites List Error", { error: err?.message || err });
     return res.status(500).json({
       success: false,
       error: err.message || "Failed to retrieve favorites."
@@ -45,7 +47,7 @@ router.post("/favorites", (req: Request, res: Response) => {
       message: `Successfully favorited '${favorite.name}'`
     });
   } catch (err: any) {
-    console.error("[Civitai Favorites Save Error]:", err);
+    log.error("Civitai Favorites Save Error", { error: err?.message || err });
     return res.status(400).json({
       success: false,
       error: err.message || "Failed to save favorite."
@@ -68,7 +70,7 @@ router.delete("/favorites/:version_id", (req: Request, res: Response) => {
       message: removed ? `Removed favorite ${versionId}` : `Favorite ${versionId} not found`
     });
   } catch (err: any) {
-    console.error("[Civitai Favorites Delete Error]:", err);
+    log.error("Civitai Favorites Delete Error", { error: err?.message || err });
     return res.status(500).json({
       success: false,
       error: err.message || "Failed to delete favorite."
@@ -108,7 +110,7 @@ router.get("/model-info", async (req: Request, res: Response) => {
       ...metadata
     });
   } catch (err: any) {
-    console.error("[Civitai Model Info Error]:", err);
+    log.error("Civitai Model Info Error", { error: err?.message || err });
     return res.status(400).json({
       success: false,
       error: err.message || "Failed to inspect model on Civitai."
@@ -168,7 +170,7 @@ router.post("/download-remote", async (req: Request, res: Response) => {
     }
     return res.json(result);
   } catch (err: any) {
-    console.error("[Civitai Remote Download Error]:", err);
+    log.error("Civitai Remote Download Error", { error: err?.message || err });
     return res.status(500).json({
       success: false,
       error: err.message || "An unexpected error occurred during remote download."

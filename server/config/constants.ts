@@ -2,6 +2,9 @@ import path from "path";
 import fs from "fs";
 import multer from "multer";
 import { writeJsonAtomicSync } from "../utils/atomicFs";
+import { createScopedLogger } from "../utils/logger";
+
+const log = createScopedLogger("Config");
 
 export const ROOT_DIR = process.cwd();
 export const ASSETS_DIR = path.join(ROOT_DIR, "assets");
@@ -123,7 +126,7 @@ export function initDirectories(): void {
         }
         fs.unlinkSync(legacyPath);
       } catch (err) {
-        console.warn(`[Config] Migration note for ${fileName}:`, err);
+        log.warn(`Migration note for ${fileName}`, { error: err });
       }
     }
   });

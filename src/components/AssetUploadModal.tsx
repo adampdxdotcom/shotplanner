@@ -301,46 +301,58 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
   const previewFilename = `${sanitize(assetType)}_${sanitize(subjectName || "subject")}_<timestamp>.${activeTab === "image" ? "png" : activeTab === "audio" ? "mp3" : "mp4"}`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-zinc-900 border-2 border-zinc-700 rounded-xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between p-4 border-b border-zinc-800 bg-zinc-950/50">
-          <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
-            <UploadCloud className="w-4 h-4 text-amber-400" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 dark:bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+      <div className="bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-700 rounded-xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-150">
+        <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/80 dark:bg-zinc-950/50">
+          <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+            <UploadCloud className="w-4 h-4 text-amber-500 dark:text-amber-400" />
             {customTitle || (uploadModalSlot ? `Assign ${uploadModalSlot.type.toUpperCase()} to Slot ${uploadModalSlot.index + 1}` : `Select or Upload Reference Asset`)}
           </h3>
-          <button onClick={onClose} className="text-zinc-400 hover:text-white transition-colors" disabled={uploading}>
+          <button 
+            onClick={onClose} 
+            className="text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-white p-1 rounded-md hover:bg-zinc-200/60 dark:hover:bg-zinc-800 transition-colors cursor-pointer" 
+            disabled={uploading}
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
         
-        <div className="flex border-b border-zinc-800 bg-zinc-950/30">
+        <div className="flex border-b border-zinc-200 dark:border-zinc-800 bg-zinc-100/70 dark:bg-zinc-950/30">
           <button
             onClick={() => setUploadModalTab("upload")}
-            className={`flex-1 py-3 text-xs font-semibold uppercase tracking-wider transition-colors ${uploadModalTab === "upload" ? "text-amber-400 border-b-2 border-amber-400 bg-zinc-900/50" : "text-zinc-500 hover:text-zinc-300"}`}
+            className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer ${
+              uploadModalTab === "upload" 
+                ? "text-amber-600 dark:text-amber-400 border-b-2 border-amber-500 dark:border-amber-400 bg-white dark:bg-zinc-900/50 shadow-2xs" 
+                : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-900/20"
+            }`}
           >
             Upload New Asset
           </button>
           <button
             onClick={() => setUploadModalTab("library")}
-            className={`flex-1 py-3 text-xs font-semibold uppercase tracking-wider transition-colors ${uploadModalTab === "library" ? "text-amber-400 border-b-2 border-amber-400 bg-zinc-900/50" : "text-zinc-500 hover:text-zinc-300"}`}
+            className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer ${
+              uploadModalTab === "library" 
+                ? "text-amber-600 dark:text-amber-400 border-b-2 border-amber-500 dark:border-amber-400 bg-white dark:bg-zinc-900/50 shadow-2xs" 
+                : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-900/20"
+            }`}
           >
             Select from Library
           </button>
         </div>
         
-        <div className="p-4 overflow-y-auto max-h-[72vh] min-h-[400px] flex flex-col custom-scrollbar">
+        <div className="p-4 overflow-y-auto max-h-[72vh] min-h-[400px] flex flex-col custom-scrollbar text-zinc-800 dark:text-zinc-200">
           {uploadModalTab === "upload" ? (
             <div className="space-y-4 flex-1 flex flex-col">
               {uploadError && (
-                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-                  <p className="text-xs text-red-400">{uploadError}</p>
+                <div className="p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-500 dark:text-red-400 shrink-0 mt-0.5" />
+                  <p className="text-xs text-red-700 dark:text-red-400">{uploadError}</p>
                 </div>
               )}
 
               {captionToast && (
-                <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-center gap-2 text-xs text-amber-300">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <div className="p-2.5 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-lg flex items-center gap-2 text-xs text-amber-800 dark:text-amber-300 font-medium">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
                   <span>{captionToast}</span>
                 </div>
               )}
@@ -348,7 +360,7 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
               {activeTab === "image" && (
                 <>
                   <div>
-                    <label className="block text-xs font-medium text-zinc-400 mb-1">Type of Reference</label>
+                    <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-400 mb-1">Type of Reference</label>
                     <div className="flex gap-2 flex-wrap sm:flex-nowrap">
                       <select 
                         value={assetType}
@@ -357,7 +369,7 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
                           setAssetType(nextType);
                           setSelectedModifier("");
                         }}
-                        className="bg-zinc-950 border-2 border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 transition-colors outline-none flex-1 min-w-[140px]"
+                        className="bg-white dark:bg-zinc-950 border-2 border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-white focus:border-amber-500 transition-colors outline-none flex-1 min-w-[140px] shadow-2xs"
                       >
                         <option value="Headshot">Headshot (Face)</option>
                         <option value="Body Reference">Body / Outfit</option>
@@ -371,7 +383,7 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
                         <select
                           value={selectedModifier}
                           onChange={(e) => handleModifierChange(e.target.value)}
-                          className="bg-zinc-950 border-2 border-amber-600/40 rounded-lg px-3 py-2 text-sm text-amber-300 focus:border-amber-500 transition-colors outline-none shrink-0"
+                          className="bg-white dark:bg-zinc-950 border-2 border-amber-500/40 dark:border-amber-600/40 rounded-lg px-3 py-2 text-sm text-amber-800 dark:text-amber-300 focus:border-amber-500 transition-colors outline-none shrink-0 shadow-2xs"
                         >
                           <option value="">Modifier (Optional)...</option>
                           {modifierConfig.modifiers.map(preset => (
@@ -388,13 +400,13 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
                           value={assetType}
                           onChange={(e) => setAssetType(e.target.value)}
                           placeholder="Custom type..."
-                          className="flex-1 bg-zinc-950 border-2 border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 transition-colors outline-none"
+                          className="flex-1 bg-white dark:bg-zinc-950 border-2 border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-white focus:border-amber-500 transition-colors outline-none shadow-2xs"
                         />
                       )}
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-zinc-400 mb-1">Subject / Entity Name</label>
+                    <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-400 mb-1">Subject / Entity Name</label>
                     <SubjectCombobox
                       value={subjectName}
                       onChange={setSubjectName}
@@ -411,13 +423,13 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
                   </div>
                   <div>
                     <div className="flex items-center justify-between mb-1">
-                      <label className="block text-xs font-medium text-zinc-400">Visual Description (for prompting)</label>
+                      <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-400">Visual Description (for prompting)</label>
                       {visionState.canCaption && (
                         <button
                           type="button"
                           onClick={() => stagedFile && handleRequestVisionCaption(stagedFile)}
                           disabled={!stagedFile || isCaptioning}
-                          className="text-[11px] text-amber-400 hover:text-amber-300 disabled:opacity-40 flex items-center gap-1 cursor-pointer transition-colors"
+                          className="text-[11px] text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300 disabled:opacity-40 flex items-center gap-1 cursor-pointer transition-colors font-medium"
                           title="Generate AI visual caption with loaded vision model"
                         >
                           {isCaptioning ? (
@@ -443,13 +455,13 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
                         assetType === "Object / Prop" ? "Glowing blue crystalline sword..." :
                         "A man with short brown hair wearing a red jacket..."
                       }
-                      className="w-full bg-zinc-950 border-2 border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:border-amber-500 transition-colors outline-none resize-none placeholder-zinc-600"
+                      className="w-full bg-white dark:bg-zinc-950 border-2 border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-zinc-200 focus:border-amber-500 transition-colors outline-none resize-none placeholder-zinc-400 dark:placeholder-zinc-600 shadow-2xs"
                     />
                   </div>
                   
-                  <div className="bg-amber-950/20 border border-amber-900/30 rounded-lg p-2.5 flex flex-col gap-1">
-                    <span className="text-[10px] font-semibold text-amber-500/80 uppercase tracking-wider">Preview Filename</span>
-                    <span className="text-xs text-amber-200/90 font-mono break-all">{previewFilename}</span>
+                  <div className="bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 rounded-lg p-2.5 flex flex-col gap-1">
+                    <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-500/80 uppercase tracking-wider">Preview Filename</span>
+                    <span className="text-xs text-amber-900 dark:text-amber-200/90 font-mono break-all font-medium">{previewFilename}</span>
                   </div>
                 </>
               )}
@@ -469,28 +481,28 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
-                  className={`rounded-xl border-2 ${isDraggingOver ? "border-amber-400 bg-amber-950/20" : "border-zinc-700 bg-zinc-950"} p-3 flex flex-col sm:flex-row items-center gap-3 transition-colors`}
+                  className={`rounded-xl border-2 ${isDraggingOver ? "border-amber-500 bg-amber-50/60 dark:bg-amber-950/20" : "border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-950"} p-3 flex flex-col sm:flex-row items-center gap-3 transition-colors shadow-2xs`}
                 >
-                  <div className="w-20 h-20 rounded-lg overflow-hidden border border-zinc-800 bg-black shrink-0 relative flex items-center justify-center">
+                  <div className="w-20 h-20 rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-black shrink-0 relative flex items-center justify-center">
                     {activeTab === "image" ? (
                       <img src={stagedPreviewUrl} alt="Staged" className="w-full h-full object-cover" />
                     ) : activeTab === "video" ? (
                       <video src={stagedPreviewUrl} className="w-full h-full object-cover" />
                     ) : (
-                      <Music className="w-8 h-8 text-emerald-400" />
+                      <Music className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
                     )}
                   </div>
 
                   <div className="flex-1 min-w-0 text-left w-full">
-                    <div className="text-xs font-semibold text-zinc-200 truncate">{stagedFile.name}</div>
-                    <div className="text-[10px] text-zinc-500 mt-0.5">{(stagedFile.size / 1024).toFixed(1)} KB ready for staging</div>
+                    <div className="text-xs font-semibold text-zinc-900 dark:text-zinc-200 truncate">{stagedFile.name}</div>
+                    <div className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">{(stagedFile.size / 1024).toFixed(1)} KB ready for staging</div>
                     
                     <div className="flex items-center gap-2 mt-2">
                       <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
                         disabled={uploading}
-                        className="px-2.5 py-1 text-[11px] font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded transition-colors"
+                        className="px-2.5 py-1 text-[11px] font-medium bg-zinc-200 hover:bg-zinc-300 text-zinc-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-200 rounded transition-colors cursor-pointer"
                       >
                         Change File
                       </button>
@@ -502,7 +514,7 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
                           setStagedPreviewUrl(null);
                         }}
                         disabled={uploading}
-                        className="px-2.5 py-1 text-[11px] font-medium bg-red-950/50 hover:bg-red-900 text-red-300 rounded transition-colors"
+                        className="px-2.5 py-1 text-[11px] font-medium bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-950/50 dark:hover:bg-red-900 dark:text-red-300 rounded transition-colors cursor-pointer"
                       >
                         Clear
                       </button>
@@ -515,13 +527,13 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
-                  className={`flex-1 min-h-[120px] mt-1 border-2 border-dashed ${isDraggingOver ? "border-amber-400 bg-amber-950/30 scale-[1.01]" : "border-zinc-700 hover:border-amber-500 bg-zinc-950/60"} rounded-xl relative transition-all group overflow-hidden flex flex-col items-center justify-center p-5 cursor-pointer`}
+                  className={`flex-1 min-h-[120px] mt-1 border-2 border-dashed ${isDraggingOver ? "border-amber-500 bg-amber-50/80 dark:bg-amber-950/30 scale-[1.01]" : "border-zinc-300 hover:border-amber-500 dark:border-zinc-700 dark:hover:border-amber-500 bg-zinc-50/70 hover:bg-zinc-100/70 dark:bg-zinc-950/60 dark:hover:bg-zinc-900/60"} rounded-xl relative transition-all group overflow-hidden flex flex-col items-center justify-center p-5 cursor-pointer`}
                 >
-                  <UploadCloud className={`w-8 h-8 mb-2 ${isDraggingOver ? "text-amber-300 animate-bounce" : "text-amber-500 group-hover:text-amber-400"} transition-colors`} />
-                  <p className="text-xs font-semibold text-zinc-200 text-center">
+                  <UploadCloud className={`w-8 h-8 mb-2 ${isDraggingOver ? "text-amber-500 animate-bounce" : "text-amber-500 group-hover:text-amber-600 dark:group-hover:text-amber-400"} transition-colors`} />
+                  <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 text-center">
                     {isDraggingOver ? `Drop ${activeTab.toUpperCase()} File Here` : `Select or Drop ${activeTab.toUpperCase()} File`}
                   </p>
-                  <p className="text-[11px] text-zinc-500 text-center mt-0.5">
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400 text-center mt-0.5">
                     Click to browse or drag file here
                   </p>
                 </div>
@@ -530,22 +542,22 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
               {/* Upload Progress & Action Button */}
               {uploading && (
                 <div className="space-y-1.5 pt-2">
-                  <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
+                  <div className="w-full h-2 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
                     <div 
                       className="h-full bg-amber-500 rounded-full transition-all duration-300"
                       style={{ width: `${uploadProgress}%` }}
                     />
                   </div>
-                  <div className="text-[11px] text-amber-300 text-center">{uploadProgress}% Uploading & Staging...</div>
+                  <div className="text-[11px] text-amber-700 dark:text-amber-300 text-center font-medium">{uploadProgress}% Uploading & Staging...</div>
                 </div>
               )}
 
-              <div className="pt-3 border-t border-zinc-800 flex justify-end gap-2.5 mt-auto">
+              <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800 flex justify-end gap-2.5 mt-auto">
                 <button
                   type="button"
                   onClick={onClose}
                   disabled={uploading}
-                  className="px-4 py-2 text-xs font-medium text-zinc-400 hover:text-white transition-colors"
+                  className="px-4 py-2 text-xs font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -563,10 +575,10 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
           ) : (
             <div className="flex-1 flex flex-col min-h-0">
               {libraryAssets.length === 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-zinc-950/50 rounded-xl border border-zinc-800/50 h-full">
-                  <HardDrive className="w-8 h-8 text-zinc-600 mb-3" />
-                  <p className="text-sm text-zinc-400">No assets found in library. Switch to the Upload tab to add new references.</p>
-                  <button onClick={() => setUploadModalTab("upload")} className="mt-4 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-md text-xs font-medium transition-colors">
+                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-zinc-50 dark:bg-zinc-950/50 rounded-xl border border-zinc-200 dark:border-zinc-800/50 h-full">
+                  <HardDrive className="w-8 h-8 text-zinc-400 dark:text-zinc-600 mb-3" />
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400">No assets found in library. Switch to the Upload tab to add new references.</p>
+                  <button onClick={() => setUploadModalTab("upload")} className="mt-4 px-4 py-2 bg-zinc-200 hover:bg-zinc-300 text-zinc-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-white rounded-md text-xs font-medium transition-colors cursor-pointer">
                     Switch to Upload Tab
                   </button>
                 </div>
@@ -574,13 +586,13 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
                 <>
                   <div className="space-y-4 mb-4 shrink-0">
                     <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 dark:text-zinc-500" />
                       <input
                         type="text"
                         placeholder="Search by subject, description, or filename..."
                         value={librarySearch}
                         onChange={e => setLibrarySearch(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2 bg-zinc-950 border-2 border-zinc-800 focus:border-amber-500 rounded-lg text-sm text-white placeholder-zinc-600 outline-none transition-colors"
+                        className="w-full pl-9 pr-4 py-2 bg-white dark:bg-zinc-950 border-2 border-zinc-300 dark:border-zinc-800 focus:border-amber-500 rounded-lg text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 outline-none transition-colors shadow-2xs"
                       />
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -588,7 +600,11 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
                         <button
                           key={filter}
                           onClick={() => setLibraryFilter(filter)}
-                          className={`px-3 py-1 rounded-full text-xs font-medium transition-colors border ${libraryFilter === filter ? "bg-zinc-800 text-white border-zinc-600" : "bg-zinc-950 text-zinc-500 border-zinc-800 hover:border-zinc-700"}`}
+                          className={`px-3 py-1 rounded-full text-xs font-medium transition-colors border cursor-pointer ${
+                            libraryFilter === filter 
+                              ? "bg-zinc-900 text-white border-zinc-900 dark:bg-zinc-800 dark:text-white dark:border-zinc-600" 
+                              : "bg-white text-zinc-700 border-zinc-200 hover:border-zinc-300 dark:bg-zinc-950 dark:text-zinc-400 dark:border-zinc-800 dark:hover:border-zinc-700"
+                          }`}
                         >
                           {filter}
                         </button>
@@ -598,13 +614,13 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
                   
                   <div className="flex-1 overflow-y-auto space-y-6 pr-2 custom-scrollbar">
                     {Object.keys(groupedLibraryAssets).length === 0 ? (
-                      <div className="text-center py-8 text-zinc-500 text-sm">No assets match your search/filter.</div>
+                      <div className="text-center py-8 text-zinc-500 dark:text-zinc-400 text-sm">No assets match your search/filter.</div>
                     ) : (
                       Object.entries(groupedLibraryAssets as Record<string, MediaAsset[]>).map(([subject, groupAssets]) => (
                         <div key={subject} className="space-y-3">
-                          <div className="flex items-center gap-2 border-b border-zinc-800 pb-2 sticky top-0 bg-zinc-900/90 backdrop-blur z-10">
-                            <h4 className="text-sm font-semibold text-zinc-200">{subject}</h4>
-                            <span className="px-2 py-0.5 bg-zinc-800 rounded-full text-[10px] text-zinc-400 font-medium">
+                          <div className="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-2 sticky top-0 bg-white/95 dark:bg-zinc-900/90 backdrop-blur z-10">
+                            <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-200">{subject}</h4>
+                            <span className="px-2 py-0.5 bg-zinc-100 text-zinc-600 border border-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-transparent rounded-full text-[10px] font-medium">
                               {groupAssets.length} {groupAssets.length === 1 ? "Asset" : "Assets"}
                             </span>
                           </div>
@@ -613,15 +629,19 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
                               <div
                                 key={asset.id || asset.filename}
                                 onClick={() => setSelectedLibraryAsset(asset)}
-                                className={`relative aspect-square rounded-lg border-2 cursor-pointer overflow-hidden transition-all group ${selectedLibraryAsset?.filename === asset.filename ? "border-amber-500 ring-2 ring-amber-500/20" : "border-zinc-800 hover:border-zinc-600"}`}
+                                className={`relative aspect-square rounded-lg border-2 cursor-pointer overflow-hidden transition-all group ${
+                                  selectedLibraryAsset?.filename === asset.filename 
+                                    ? "border-amber-500 ring-2 ring-amber-500/20" 
+                                    : "border-zinc-200 hover:border-zinc-400 dark:border-zinc-800 dark:hover:border-zinc-600"
+                                }`}
                               >
                                 {(uploadModalSlot?.type || activeTab) === "image" ? (
                                   <img src={getAssetMediaUrl(asset, true)} className="absolute inset-0 w-full h-full object-cover" alt="" />
                                 ) : (uploadModalSlot?.type || activeTab) === "video" ? (
                                   <video src={getAssetMediaUrl(asset, true)} className="absolute inset-0 w-full h-full object-cover" />
                                 ) : (
-                                  <div className="absolute inset-0 bg-zinc-800 flex items-center justify-center">
-                                    <Music className="w-8 h-8 text-zinc-500" />
+                                  <div className="absolute inset-0 bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
+                                    <Music className="w-8 h-8 text-zinc-400 dark:text-zinc-500" />
                                   </div>
                                 )}
                                 <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-2 pt-6">
@@ -641,8 +661,8 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
                     )}
                   </div>
                   
-                  <div className="pt-4 border-t border-zinc-800 flex justify-end gap-3 mt-4 shrink-0">
-                    <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-zinc-400 hover:text-white transition-colors">
+                  <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800 flex justify-end gap-3 mt-4 shrink-0">
+                    <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors cursor-pointer">
                       Cancel
                     </button>
                     <button

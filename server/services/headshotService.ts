@@ -6,6 +6,9 @@ import sharp from 'sharp';
 import { ensureSceneDirectories } from '../config/constants';
 import { assetService } from './assetService';
 import { AssetRecord } from '../types';
+import { createScopedLogger } from '../utils/logger';
+
+const log = createScopedLogger("HeadshotService");
 
 export const HEADSHOT_TEMPLATES: Record<string, string> = {
   "Facing": "Front-facing studio portrait with direct eye contact. Preserve facial likeness, hair texture, and identity from the reference image. Request maximum resolution/quality. Placed on a pure solid white studio backdrop, isolated on clean white background, studio lighting.",
@@ -71,12 +74,12 @@ export async function generateVariations(
         }
       } catch (err: any) {
         lastError = err;
-        console.warn(`[Headshot Generation] Model ${model} failed for preset ${key}:`, err?.message || err);
+        log.warn(`Model ${model} failed for preset ${key}`, { error: err?.message || err });
       }
     }
 
     const errDetail = lastError?.message || "No image data returned by Google API";
-    console.error(`[Headshot Generation] Google API Error: ${errDetail}`);
+    log.error(`Google API Error: ${errDetail}`);
     throw new Error(`Google API Error: ${errDetail}`);
   });
 
@@ -122,7 +125,7 @@ export async function saveSelectedVariations(
       // generate thumbnail
       await sharp(buffer).resize(256).toFile(thumbPath);
     } catch (err) {
-      console.error(`Failed to generate thumbnail for ${filename}`, err);
+      log.error(`Failed to generate thumbnail for ${filename}`, { error: err });
       // Fallback: write the full image to the thumbnail path if sharp fails
       fs.writeFileSync(thumbPath, buffer);
     }

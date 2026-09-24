@@ -5,6 +5,9 @@ import { ZipArchive } from "archiver";
 import { ASSETS_DIR, UPLOADS_DIR, formatSceneFolderName } from "../../config/constants";
 import { formatShotNumber, sanitizeFilenamePart } from "../../utils/formatters";
 import { findProjectFile } from "./projectCrud";
+import { createScopedLogger } from "../../utils/logger";
+
+const log = createScopedLogger("ProjectTakes");
 
 export interface ProjectTakesSummary {
   projectName: string;
@@ -155,7 +158,7 @@ export async function exportTakesZip(projectName: string, res: Response): Promis
   const archive = new ZipArchive({ zlib: { level: 1 } });
 
   archive.on("error", (err: any) => {
-    console.error("Takes archive error:", err);
+    log.error("Takes archive error", { error: err });
     if (!res.headersSent) {
       res.status(500).json({ error: err.message || "Failed to create takes archive" });
     }

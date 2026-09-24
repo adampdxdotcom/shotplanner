@@ -2,6 +2,9 @@ import fs from "fs";
 import path from "path";
 import { Client, ConnectConfig, SFTPWrapper } from "ssh2";
 import { EMPTY_1X1_PNG_BUFFER } from "../config/constants";
+import { createScopedLogger } from "../utils/logger";
+
+const log = createScopedLogger("SSHService");
 
 export interface SSHCredentials {
   host?: string;
@@ -137,7 +140,7 @@ export function resolveSSHConfig(creds: SSHCredentials): ResolvedSSHConfig {
       try {
         rawKey = fs.readFileSync(keyPathVal, "utf-8");
       } catch (e: any) {
-        console.warn(`[SSH Config] Failed to read private key from path ${keyPathVal}:`, e.message);
+        log.warn(`Failed to read private key from path ${keyPathVal}`, { error: e.message });
       }
     }
   }
@@ -309,19 +312,19 @@ export async function testSSHConnection(creds: SSHCredentials): Promise<{
     return { success: false, message: "Remote GPU host IP or hostname is required." };
   }
 
-  console.log(`[SSH Test] Testing connection to ${resolved.username}@${resolved.host}:${resolved.port} (Auth: ${resolved.authMethod})...`);
+  log.info(`Testing connection to ${resolved.username}@${resolved.host}:${resolved.port} (Auth: ${resolved.authMethod})...`);
 
   let client: Client | null = null;
   try {
     client = await connectSSH(resolved.connectConfig);
-    console.log(`[SSH Test] SSH handshake successful!`);
+    log.info("SSH handshake successful!");
 
     // Run system diagnosis & ensure input directory exists
     const prepCmd = `uname -s -r -m && mkdir -p "${resolved.remoteInputDir}"`;
     const { stdout, stderr, code } = await execSSHCommand(client, prepCmd);
 
     const sysInfo = stdout.trim() || "Linux Remote Server";
-    console.log(`[SSH Test] Remote System Info: ${sysInfo}`);
+    log.info(`Remote System Info: ${sysInfo}`);
 
     // Ensure 1x1 transparent bypass pixel empty.png exists in ComfyUI input dir
     let emptyPngStaged = false;
@@ -334,9 +337,9 @@ export async function testSSHConnection(creds: SSHCredentials): Promise<{
         remotePath: remoteEmptyPath
       });
       emptyPngStaged = true;
-      console.log(`[SSH Test] Verified & staged 1x1 transparent bypass pixel -> ${remoteEmptyPath}`);
+      log.info(`Verified & staged 1x1 transparent bypass pixel -> ${remoteEmptyPath}`);
     } catch (sftpErr: any) {
-      console.warn(`[SSH Test] Warning: SFTP empty.png check encountered notice: ${sftpErr.message}`);
+      log.warn(`Warning: SFTP empty.png check encountered notice: ${sftpErr.message}`);
     }
 
     const authLabel = resolved.authMethod !== "None" ? `${resolved.authMethod} authentication` : "credentials";
@@ -351,7 +354,7 @@ export async function testSSHConnection(creds: SSHCredentials): Promise<{
       auth_method: resolved.authMethod
     };
   } catch (err: any) {
-    console.error(`[SSH Test ERROR] Connection failed to ${resolved.username}@${resolved.host}:${resolved.port}:`, err.message);
+    log.error(`Connection failed to ${resolved.username}@${resolved.host}:${resolved.port}: ${err.message}`);
     let guidance = "";
     if (err.message && err.message.includes("All configured authentication methods failed")) {
       guidance = ` Authentication rejected. Please verify your SSH Private Key or Password in Settings -> Remote Server.`;
@@ -386,8 +389,8 @@ export async function executeSFTPBatchTransfer(
     throw new Error("Remote Host IP / Address is required for SSH asset transfer.");
   }
 
-  console.log(`[SSH SFTP] Connecting to ${resolved.username}@${resolved.host}:${resolved.port} (Auth: ${resolved.authMethod})...`);
-  console.log(`[SSH SFTP] Preparing to transfer ${items.length} file(s) into ComfyUI root: ${resolved.remoteComfyUIRoot}`);
+  log.info(`Connecting to ${resolved.username}@${resolved.host}:${resolved.port} (Auth: ${resolved.authMethod})...`);
+  log.info(`Preparing to transfer ${items.length} file(s) into ComfyUI root: ${resolved.remoteComfyUIRoot}`);
 
   const summary: SFTPTransferSummary = {
     success: true,
@@ -404,7 +407,7 @@ export async function executeSFTPBatchTransfer(
   let client: Client | null = null;
   try {
     client = await connectSSH(resolved.connectConfig);
-    console.log(`[SSH SFTP] Connected to ${resolved.username}@${resolved.host}:${resolved.port}`);
+    log.info(`Connected to ${resolved.username}@${resolved.host}:${resolved.port}`);
 
     // Pre-create all unique remote directories using remote mkdir -p
     const remoteDirs = new Set<string>();
@@ -415,17 +418,17 @@ export async function executeSFTPBatchTransfer(
     });
 
     const mkdirCmd = Array.from(remoteDirs).map((d) => `mkdir -p "${d}"`).join(" && ");
-    console.log(`[SSH SFTP] Ensuring ${remoteDirs.size} remote directories exist...`);
+    log.info(`Ensuring ${remoteDirs.size} remote directories exist...`);
     await execSSHCommand(client, mkdirCmd);
 
     // Open SFTP session
     const sftp = await openSFTP(client);
-    console.log(`[SSH SFTP] SFTP session established. Starting transfers...`);
+    log.info("SFTP session established. Starting transfers...");
 
     for (const item of items) {
       const itemStart = Date.now();
       try {
-        console.log(`[SSH SFTP] [->] Transferring: ${item.filename} -> ${item.remotePath}`);
+        log.info(`Transferring: ${item.filename} -> ${item.remotePath}`);
         const bytes = await uploadSFTPItem(sftp, item);
         const elapsed = Date.now() - itemStart;
 
@@ -440,7 +443,7 @@ export async function executeSFTPBatchTransfer(
           remote_path: item.remotePath,
           message: `Transferred via SFTP (${(bytes / 1024).toFixed(1)} KB in ${elapsed}ms)`
         });
-        console.log(`[SSH SFTP] [OK] Completed: ${item.filename} (${bytes} bytes in ${elapsed}ms)`);
+        log.info(`Completed: ${item.filename} (${bytes} bytes in ${elapsed}ms)`);
       } catch (uploadErr: any) {
         summary.failedCount++;
         summary.failedFiles.push(item.filename);
@@ -452,15 +455,15 @@ export async function executeSFTPBatchTransfer(
           remote_path: item.remotePath,
           message: `SFTP upload failed: ${uploadErr.message}`
         });
-        console.error(`[SSH SFTP ERROR] Failed to transfer ${item.filename}:`, uploadErr.message);
+        log.error(`Failed to transfer ${item.filename}`, { error: uploadErr.message });
       }
     }
 
     summary.durationMs = Date.now() - startTime;
     summary.success = summary.failedCount === 0;
 
-    console.log(
-      `[SSH SFTP Staging Complete] ${summary.transferredCount}/${items.length} transferred (${(summary.totalBytes / 1024).toFixed(1)} KB) in ${(summary.durationMs / 1000).toFixed(2)}s. Errors: ${summary.failedCount}`
+    log.info(
+      `SFTP Staging Complete: ${summary.transferredCount}/${items.length} transferred (${(summary.totalBytes / 1024).toFixed(1)} KB) in ${(summary.durationMs / 1000).toFixed(2)}s. Errors: ${summary.failedCount}`
     );
 
     return summary;
@@ -468,7 +471,7 @@ export async function executeSFTPBatchTransfer(
     summary.success = false;
     summary.error = connErr.message;
     summary.durationMs = Date.now() - startTime;
-    console.error(`[SSH SFTP FATAL] Connection or staging failed: ${connErr.message}`);
+    log.error(`Connection or staging failed: ${connErr.message}`);
     throw connErr;
   } finally {
     if (client) {
@@ -512,7 +515,7 @@ export async function executeOneShotSSHWrite(
           else reject(new Error(`Piped SSH cat write exited with code ${code}`));
         });
         stream.stderr.on("data", (d: Buffer) => {
-          console.warn("[One-Shot SSH Write stderr]:", d.toString());
+          log.warn("One-Shot SSH Write stderr", { stderr: d.toString() });
         });
         stream.write(contentBuffer);
         stream.end();
@@ -520,7 +523,7 @@ export async function executeOneShotSSHWrite(
     });
 
     const elapsed = Date.now() - startTime;
-    console.log(`[One-Shot SSH Write] Streamed ${contentBuffer.length} bytes to ${remotePath} in ${elapsed}ms`);
+    log.info(`Streamed ${contentBuffer.length} bytes to ${remotePath} in ${elapsed}ms`);
     return { success: true, durationMs: elapsed };
   } catch (err: any) {
     return { success: false, durationMs: Date.now() - startTime, error: err.message };

@@ -2,6 +2,9 @@ import fs from "fs";
 import path from "path";
 import { WORKFLOWS_DIR, ASSETS_DIR, formatSceneFolderName, getSceneDirectories } from "../../config/constants";
 import { parseWorkflowData } from "./workflowParser";
+import { createScopedLogger } from "../../utils/logger";
+
+const log = createScopedLogger("WorkflowResolver");
 
 export interface ResolvedWorkflowTemplate {
   resolvedPath: string;
@@ -43,7 +46,7 @@ export function listWorkflows(sceneName?: string) {
         }
       }
     } catch (e) {
-      console.warn(`[Workflow Scan Error] Failed reading ${dirPath}:`, e);
+      log.warn(`Failed reading ${dirPath}:`, { error: e });
     }
   };
 
@@ -146,7 +149,7 @@ export function resolveWorkflowTemplate(
           rawWorkflow: raw
         };
       } catch (e: any) {
-        console.warn(`[Workflow Resolver] Candidate ${candidate} exists but failed to parse: ${e.message}`);
+        log.warn(`Candidate ${candidate} exists but failed to parse: ${e.message}`);
       }
     }
   }

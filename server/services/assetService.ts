@@ -17,6 +17,9 @@ import { AssetRecord } from "../types";
 import { sanitizeSlug } from "../utils/formatters";
 import { generateThumbnailFile } from "./thumbnailService";
 import { writeJsonAtomicSync } from "../utils/atomicFs";
+import { createScopedLogger } from "../utils/logger";
+
+const log = createScopedLogger("AssetService");
 
 const COMPOUND_REFERENCE_TYPES = [
   "scene_location_reference",
@@ -365,7 +368,7 @@ class AssetService {
 
       writeJsonAtomicSync(ASSET_DB_FILE, dbRecords);
     } catch (e) {
-      console.error("[AssetService] Error updating ASSET_DB_FILE:", e);
+      log.error("Error updating ASSET_DB_FILE", { error: e });
     }
 
     // 2. Synchronize project JSON files in assets/
@@ -426,7 +429,7 @@ class AssetService {
         }
       }
     } catch (e) {
-      console.error("[AssetService] Error syncing project files:", e);
+      log.error("Error syncing project files", { error: e });
     }
 
     return {

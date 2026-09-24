@@ -18,6 +18,9 @@ import {
   normalizeRemoteComfyRoot,
   resolveLocalAssetsForTransfer
 } from "./sftpTransferHelper";
+import { createScopedLogger } from "../../utils/logger";
+
+const log = createScopedLogger("SceneBatchTransfer");
 
 export interface SceneTransferOptions extends SSHCredentials {
   remote_host?: string;
@@ -62,7 +65,7 @@ export async function processSceneTransfer(options: SceneTransferOptions) {
 
   const targetHost = remote_host || options.host || options.runpod_ip;
   const activeSceneName = sanitizeFilenamePart(scene_name ?? "Untitled_Scene");
-  console.log(`[SSH Scene Staging] Starting batch staging for scene: "${activeSceneName}" (${shots.length} shots) to host: ${targetHost || 'None'}`);
+  log.info(`Starting batch staging for scene: "${activeSceneName}" (${shots.length} shots) to host: ${targetHost || 'None'}`);
 
   const { root: cleanRemoteRoot, inputDir: cleanRemoteDir } = normalizeRemoteComfyRoot(remote_comfyui_root);
 
@@ -148,9 +151,9 @@ export async function processSceneTransfer(options: SceneTransferOptions) {
         remotePath: remoteWorkflowPath,
         sizeBytes: Buffer.byteLength(wfContentStr)
       });
-      console.log(`[SSH Scene Staging] Prepared shot ${activeShotNumber} workflow JSON -> ${remoteWorkflowPath}`);
+      log.info(`Prepared shot ${activeShotNumber} workflow JSON -> ${remoteWorkflowPath}`);
     } catch (e: any) {
-      console.error(`[SSH Scene Staging ERROR] Failed to prepare staged workflow JSON for shot ${shot.shot_number}:`, e.message);
+      log.error(`Failed to prepare staged workflow JSON for shot ${shot.shot_number}`, { error: e.message });
       throw new Error(`Failed to stage shot ${shot.shot_number}: ${e.message}`);
     }
   }
@@ -162,7 +165,7 @@ export async function processSceneTransfer(options: SceneTransferOptions) {
   const skippedFiles: string[] = [];
 
   if (targetHost && sftpItems.length > 0) {
-    console.log(`[SSH Scene Staging] Commencing SFTP batch upload of ${sftpItems.length} items (${filesToTransfer.length} assets, ${shots.length} workflows) to ${targetHost}...`);
+    log.info(`Commencing SFTP batch upload of ${sftpItems.length} items (${filesToTransfer.length} assets, ${shots.length} workflows) to ${targetHost}...`);
     const sftpSummary = await executeSFTPBatchTransfer(options, sftpItems);
 
     transferredCount = sftpSummary.transferredCount;
@@ -182,11 +185,11 @@ export async function processSceneTransfer(options: SceneTransferOptions) {
 
     if (!sftpSummary.success || sftpSummary.failedCount > 0) {
       const errDetail = sftpSummary.error || `Failed files: ${sftpSummary.failedFiles.join(", ")}`;
-      console.error(`[SSH Scene Staging Failed] ${errDetail}`);
+      log.error(`Scene staging failed on ${targetHost}`, { error: errDetail });
       throw new Error(`Scene staging failed on ${targetHost}: ${errDetail}`);
     }
   } else if (!targetHost) {
-    console.log(`[SSH Scene Staging] No remote host provided. Staged ${sftpItems.length} items locally only.`);
+    log.info(`No remote host provided. Staged ${sftpItems.length} items locally only.`);
     sftpItems.forEach(item => {
       transferredCount++;
       uploadedFiles.push(item.filename);
@@ -202,7 +205,7 @@ export async function processSceneTransfer(options: SceneTransferOptions) {
   }
 
   const statusMessage = `Successfully verified and staged ${shots.length} workflow(s) and ${uploadedFiles.length} file(s) into Remote ComfyUI. Workflows in: ${cleanRemoteRoot}/user/default/workflows/`;
-  console.log(`[SSH Scene Staging Complete] ${statusMessage}`);
+  log.info(statusMessage);
 
   return {
     success: true,

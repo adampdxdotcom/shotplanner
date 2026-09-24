@@ -9,6 +9,9 @@ import {
 import { UniverseCharacterProfile } from "../types";
 import { assetService } from "./assetService";
 import { writeJsonAtomicSync } from "../utils/atomicFs";
+import { createScopedLogger } from "../utils/logger";
+
+const log = createScopedLogger("UniverseService");
 
 // Ensure universe directory and database file exist
 initDirectories();
@@ -28,7 +31,7 @@ export class UniverseService {
       const parsed = JSON.parse(raw);
       return typeof parsed === "object" && parsed !== null ? parsed : {};
     } catch (err) {
-      console.error("[UniverseService] Error reading characters:", err);
+      log.error("Error reading characters", { error: err });
       return {};
     }
   }
@@ -51,7 +54,7 @@ export class UniverseService {
       writeJsonAtomicSync(UNIVERSE_CHARACTERS_FILE, characters);
       return true;
     } catch (err) {
-      console.error("[UniverseService] Error saving characters:", err);
+      log.error("Error saving characters", { error: err });
       return false;
     }
   }
@@ -160,7 +163,7 @@ export class UniverseService {
 
       return { success: true, universePath: destPath, filename };
     } catch (err: any) {
-      console.error("[UniverseService] Error promoting asset:", err);
+      log.error("Error promoting asset", { error: err?.message || err });
       return { success: false, filename, error: err.message };
     }
   }

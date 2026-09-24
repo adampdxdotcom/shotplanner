@@ -368,29 +368,33 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
   const previewMetadata = `${sanitize(effectiveType)}_${sanitize(editSubjectName || "subject")}_${asset.filename.split('.').pop() || "png"}`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-zinc-900 border-2 border-zinc-700 rounded-xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between p-4 border-b border-zinc-800 bg-zinc-950/50">
-          <h3 className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
-            <Edit3 className="w-4 h-4 text-amber-400" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 dark:bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+      <div className="bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-700 rounded-xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-150">
+        <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/80 dark:bg-zinc-950/50">
+          <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+            <Edit3 className="w-4 h-4 text-amber-500 dark:text-amber-400" />
             Edit Asset Metadata
           </h3>
-          <button onClick={onClose} className="text-zinc-400 hover:text-white transition-colors" disabled={isEditing}>
+          <button 
+            onClick={onClose} 
+            className="text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-white p-1 rounded-md hover:bg-zinc-200/60 dark:hover:bg-zinc-800 transition-colors cursor-pointer" 
+            disabled={isEditing}
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="p-4 space-y-4 overflow-y-auto max-h-[70vh] custom-scrollbar">
+        <div className="p-4 space-y-4 overflow-y-auto max-h-[70vh] custom-scrollbar text-zinc-800 dark:text-zinc-200">
           {captionToast && (
-            <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-center gap-2 text-xs text-amber-300">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <div className="p-2.5 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-lg flex items-center gap-2 text-xs text-amber-800 dark:text-amber-300 font-medium">
+              <Sparkles className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
               <span>{captionToast}</span>
             </div>
           )}
 
           {/* Asset Preview Header Card */}
-          <div className="bg-zinc-950/70 border border-zinc-800/80 rounded-xl p-3 flex items-center gap-3.5">
-            <div className="w-14 h-14 bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden shrink-0 relative flex items-center justify-center">
+          <div className="bg-zinc-50 dark:bg-zinc-950/70 border border-zinc-200 dark:border-zinc-800/80 rounded-xl p-3 flex items-center gap-3.5 shadow-2xs">
+            <div className="w-14 h-14 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden shrink-0 relative flex items-center justify-center">
               {asset.media_type === "image" || !asset.media_type || !/\.(mp4|mov|webm|mp3|wav)$/i.test(asset.filename) ? (
                 <img 
                   src={getAssetMediaUrl(asset.filename, true)} 
@@ -399,19 +403,19 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
                   referrerPolicy="no-referrer"
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-xs font-mono font-bold text-amber-400">
+                <div className="w-full h-full flex items-center justify-center text-xs font-mono font-bold text-amber-600 dark:text-amber-400">
                   {asset.filename.split('.').pop()?.toUpperCase()}
                 </div>
               )}
             </div>
 
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-mono font-medium text-zinc-200 truncate">{asset.filename}</p>
+              <p className="text-xs font-mono font-semibold text-zinc-900 dark:text-zinc-200 truncate">{asset.filename}</p>
               <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded font-medium">
+                <span className="text-[10px] bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20 px-1.5 py-0.5 rounded font-medium">
                   {effectiveType}
                 </span>
-                <span className="text-[10px] text-zinc-400 font-medium truncate">
+                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-medium truncate">
                   {editSubjectName || "Unassigned"}
                 </span>
               </div>
@@ -420,7 +424,7 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
 
           {/* Type of Reference & Modifier Selectors */}
           <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1">Type of Reference</label>
+            <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-400 mb-1">Type of Reference</label>
             <div className="flex gap-2 flex-wrap sm:flex-nowrap">
               <select 
                 value={assetType}
@@ -429,7 +433,7 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
                   setAssetType(nextType);
                   setSelectedModifier("");
                 }}
-                className="bg-zinc-950 border-2 border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 transition-colors outline-none flex-1 min-w-[140px]"
+                className="bg-white dark:bg-zinc-950 border-2 border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-white focus:border-amber-500 transition-colors outline-none flex-1 min-w-[140px] shadow-2xs"
               >
                 {PRESET_TYPES.map(preset => (
                   <option key={preset.value} value={preset.value}>
@@ -442,7 +446,7 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
                 <select
                   value={selectedModifier}
                   onChange={(e) => handleModifierChange(e.target.value)}
-                  className="bg-zinc-950 border-2 border-amber-600/40 rounded-lg px-3 py-2 text-sm text-amber-300 focus:border-amber-500 transition-colors outline-none shrink-0"
+                  className="bg-white dark:bg-zinc-950 border-2 border-amber-500/40 dark:border-amber-600/40 rounded-lg px-3 py-2 text-sm text-amber-800 dark:text-amber-300 focus:border-amber-500 transition-colors outline-none shrink-0 shadow-2xs"
                 >
                   <option value="">Modifier (Optional)...</option>
                   {modifierConfig.modifiers.map(preset => (
@@ -459,7 +463,7 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
                   value={customType}
                   onChange={(e) => setCustomType(e.target.value)}
                   placeholder="Custom type..."
-                  className="flex-1 bg-zinc-950 border-2 border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 transition-colors outline-none"
+                  className="flex-1 bg-white dark:bg-zinc-950 border-2 border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-white focus:border-amber-500 transition-colors outline-none shadow-2xs"
                 />
               )}
             </div>
@@ -467,7 +471,7 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
 
           {/* Subject / Entity Name */}
           <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1">Subject / Entity Name</label>
+            <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-400 mb-1">Subject / Entity Name</label>
             <SubjectCombobox
               value={editSubjectName}
               onChange={setEditSubjectName}
@@ -486,13 +490,13 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
           {/* Visual Description */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="block text-xs font-medium text-zinc-400">Visual Description (for prompting)</label>
+              <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-400">Visual Description (for prompting)</label>
               {visionState.canCaption && (
                 <button
                   type="button"
                   onClick={handleRequestVisionCaption}
                   disabled={isCaptioning}
-                  className="text-[11px] text-amber-400 hover:text-amber-300 disabled:opacity-40 flex items-center gap-1 cursor-pointer transition-colors"
+                  className="text-[11px] text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300 disabled:opacity-40 flex items-center gap-1 cursor-pointer transition-colors font-medium"
                   title="Generate AI visual caption with loaded vision model"
                 >
                   {isCaptioning ? (
@@ -518,15 +522,15 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
                 effectiveType === "Object / Prop" ? "Glowing blue crystalline sword..." :
                 "A man with short brown hair wearing a red jacket..."
               }
-              className="w-full bg-zinc-950 border-2 border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:border-amber-500 transition-colors outline-none resize-none placeholder-zinc-600"
+              className="w-full bg-white dark:bg-zinc-950 border-2 border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-zinc-200 focus:border-amber-500 transition-colors outline-none resize-none placeholder-zinc-400 dark:placeholder-zinc-600 shadow-2xs"
             />
           </div>
 
           {/* Visual Intelligence Breakdown (Editable) */}
-          <div className="bg-zinc-950/80 border border-zinc-800 rounded-xl p-3.5 space-y-3">
-            <div className="flex items-center justify-between border-b border-zinc-800/80 pb-2">
-              <span className="text-xs font-semibold text-amber-400 flex items-center gap-1.5 uppercase tracking-wider">
-                <Eye className="w-3.5 h-3.5 text-amber-400" />
+          <div className="bg-zinc-50 dark:bg-zinc-950/80 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3.5 space-y-3 shadow-2xs">
+            <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800/80 pb-2">
+              <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1.5 uppercase tracking-wider">
+                <Eye className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
                 Visual Intelligence Breakdown
               </span>
               <span className="text-[10px] text-zinc-500 font-mono">Editable Cache</span>
@@ -534,181 +538,181 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
 
             {/* Overall Summary */}
             <div>
-              <label className="block text-[11px] font-medium text-zinc-400 mb-1">Visual Summary</label>
+              <label className="block text-[11px] font-medium text-zinc-700 dark:text-zinc-400 mb-1">Visual Summary</label>
               <textarea
                 value={viSummary}
                 onChange={(e) => setViSummary(e.target.value)}
                 rows={2}
                 placeholder="Overall description of subject, lighting, framing..."
-                className="w-full bg-zinc-900 border border-zinc-700/80 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 focus:border-amber-500 outline-none resize-none placeholder-zinc-600"
+                className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700/80 rounded-lg px-2.5 py-1.5 text-xs text-zinc-900 dark:text-zinc-200 focus:border-amber-500 outline-none resize-none placeholder-zinc-400 dark:placeholder-zinc-600 shadow-2xs"
               />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
               {/* Subject Details */}
-              <div className="p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800 flex flex-col gap-1.5">
-                <span className="font-semibold text-indigo-400 text-[11px] flex items-center gap-1">
+              <div className="p-2.5 rounded-lg bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 flex flex-col gap-1.5 shadow-2xs">
+                <span className="font-semibold text-indigo-600 dark:text-indigo-400 text-[11px] flex items-center gap-1">
                   Subject / Actor Details
                 </span>
                 <div>
-                  <label className="block text-[10px] text-zinc-400">Identified Name</label>
+                  <label className="block text-[10px] text-zinc-500 dark:text-zinc-400">Identified Name</label>
                   <input
                     type="text"
                     value={viSubjectIdentifiedName}
                     onChange={(e) => setViSubjectIdentifiedName(e.target.value)}
                     placeholder="e.g., John / Hero"
-                    className="w-full bg-zinc-950 border border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-200 focus:border-indigo-500 outline-none"
+                    className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-900 dark:text-zinc-200 focus:border-indigo-500 outline-none"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-1.5">
                   <div>
-                    <label className="block text-[10px] text-zinc-400">Apparent Age</label>
+                    <label className="block text-[10px] text-zinc-500 dark:text-zinc-400">Apparent Age</label>
                     <input
                       type="text"
                       value={viSubjectAge}
                       onChange={(e) => setViSubjectAge(e.target.value)}
                       placeholder="e.g., Late 20s"
-                      className="w-full bg-zinc-950 border border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-200 focus:border-indigo-500 outline-none"
+                      className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-900 dark:text-zinc-200 focus:border-indigo-500 outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] text-zinc-400">Expression</label>
+                    <label className="block text-[10px] text-zinc-500 dark:text-zinc-400">Expression</label>
                     <input
                       type="text"
                       value={viSubjectExpression}
                       onChange={(e) => setViSubjectExpression(e.target.value)}
                       placeholder="e.g., Stern, focused"
-                      className="w-full bg-zinc-950 border border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-200 focus:border-indigo-500 outline-none"
+                      className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-900 dark:text-zinc-200 focus:border-indigo-500 outline-none"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] text-zinc-400">Hair & Features</label>
+                  <label className="block text-[10px] text-zinc-500 dark:text-zinc-400">Hair & Features</label>
                   <input
                     type="text"
                     value={viSubjectHair}
                     onChange={(e) => setViSubjectHair(e.target.value)}
                     placeholder="e.g., Short dark hair"
-                    className="w-full bg-zinc-950 border border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-200 focus:border-indigo-500 outline-none"
+                    className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-900 dark:text-zinc-200 focus:border-indigo-500 outline-none"
                   />
                 </div>
               </div>
 
               {/* Wardrobe & Style */}
-              <div className="p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800 flex flex-col gap-1.5">
-                <span className="font-semibold text-amber-400 text-[11px] flex items-center gap-1">
+              <div className="p-2.5 rounded-lg bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 flex flex-col gap-1.5 shadow-2xs">
+                <span className="font-semibold text-amber-600 dark:text-amber-400 text-[11px] flex items-center gap-1">
                   <Shirt className="w-3 h-3" />
                   Wardrobe & Style
                 </span>
                 <div>
-                  <label className="block text-[10px] text-zinc-400">Garments</label>
+                  <label className="block text-[10px] text-zinc-500 dark:text-zinc-400">Garments</label>
                   <input
                     type="text"
                     value={viWardrobeGarments}
                     onChange={(e) => setViWardrobeGarments(e.target.value)}
                     placeholder="e.g., Leather jacket, t-shirt"
-                    className="w-full bg-zinc-950 border border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-200 focus:border-amber-500 outline-none"
+                    className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-900 dark:text-zinc-200 focus:border-amber-500 outline-none"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-1.5">
                   <div>
-                    <label className="block text-[10px] text-zinc-400">Colors</label>
+                    <label className="block text-[10px] text-zinc-500 dark:text-zinc-400">Colors</label>
                     <input
                       type="text"
                       value={viWardrobeColors}
                       onChange={(e) => setViWardrobeColors(e.target.value)}
                       placeholder="e.g., Black, crimson"
-                      className="w-full bg-zinc-950 border border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-200 focus:border-amber-500 outline-none"
+                      className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-900 dark:text-zinc-200 focus:border-amber-500 outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] text-zinc-400">Era / Style</label>
+                    <label className="block text-[10px] text-zinc-500 dark:text-zinc-400">Era / Style</label>
                     <input
                       type="text"
                       value={viWardrobeEra}
                       onChange={(e) => setViWardrobeEra(e.target.value)}
                       placeholder="e.g., Cyberpunk, 90s"
-                      className="w-full bg-zinc-950 border border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-200 focus:border-amber-500 outline-none"
+                      className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-900 dark:text-zinc-200 focus:border-amber-500 outline-none"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Lighting Setup */}
-              <div className="p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800 flex flex-col gap-1.5">
-                <span className="font-semibold text-yellow-400 text-[11px] flex items-center gap-1">
+              <div className="p-2.5 rounded-lg bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 flex flex-col gap-1.5 shadow-2xs">
+                <span className="font-semibold text-yellow-600 dark:text-yellow-400 text-[11px] flex items-center gap-1">
                   <Sun className="w-3 h-3" />
                   Lighting Setup
                 </span>
                 <div>
-                  <label className="block text-[10px] text-zinc-400">Quality</label>
+                  <label className="block text-[10px] text-zinc-500 dark:text-zinc-400">Quality</label>
                   <input
                     type="text"
                     value={viLightingQuality}
                     onChange={(e) => setViLightingQuality(e.target.value)}
                     placeholder="e.g., Hard contrast, soft diffuse"
-                    className="w-full bg-zinc-950 border border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-200 focus:border-yellow-500 outline-none"
+                    className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-900 dark:text-zinc-200 focus:border-yellow-500 outline-none"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-1.5">
                   <div>
-                    <label className="block text-[10px] text-zinc-400">Key Direction</label>
+                    <label className="block text-[10px] text-zinc-500 dark:text-zinc-400">Key Direction</label>
                     <input
                       type="text"
                       value={viLightingDirection}
                       onChange={(e) => setViLightingDirection(e.target.value)}
                       placeholder="e.g., Side-lit 45 deg"
-                      className="w-full bg-zinc-950 border border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-200 focus:border-yellow-500 outline-none"
+                      className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-900 dark:text-zinc-200 focus:border-yellow-500 outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] text-zinc-400">Color Temp</label>
+                    <label className="block text-[10px] text-zinc-500 dark:text-zinc-400">Color Temp</label>
                     <input
                       type="text"
                       value={viLightingTemp}
                       onChange={(e) => setViLightingTemp(e.target.value)}
                       placeholder="e.g., Cool blue, warm tungsten"
-                      className="w-full bg-zinc-950 border border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-200 focus:border-yellow-500 outline-none"
+                      className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-900 dark:text-zinc-200 focus:border-yellow-500 outline-none"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Cinematography */}
-              <div className="p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800 flex flex-col gap-1.5">
-                <span className="font-semibold text-blue-400 text-[11px] flex items-center gap-1">
+              <div className="p-2.5 rounded-lg bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 flex flex-col gap-1.5 shadow-2xs">
+                <span className="font-semibold text-blue-600 dark:text-blue-400 text-[11px] flex items-center gap-1">
                   <Camera className="w-3 h-3" />
                   Cinematography
                 </span>
                 <div>
-                  <label className="block text-[10px] text-zinc-400">Framing / Shot Type</label>
+                  <label className="block text-[10px] text-zinc-500 dark:text-zinc-400">Framing / Shot Type</label>
                   <input
                     type="text"
                     value={viCinemaFraming}
                     onChange={(e) => setViCinemaFraming(e.target.value)}
                     placeholder="e.g., Close-Up, Medium Shot"
-                    className="w-full bg-zinc-950 border border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-200 focus:border-blue-500 outline-none"
+                    className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-900 dark:text-zinc-200 focus:border-blue-500 outline-none"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-1.5">
                   <div>
-                    <label className="block text-[10px] text-zinc-400">Lens Feel</label>
+                    <label className="block text-[10px] text-zinc-500 dark:text-zinc-400">Lens Feel</label>
                     <input
                       type="text"
                       value={viCinemaLens}
                       onChange={(e) => setViCinemaLens(e.target.value)}
                       placeholder="e.g., 50mm, anamorphic"
-                      className="w-full bg-zinc-950 border border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-200 focus:border-blue-500 outline-none"
+                      className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-900 dark:text-zinc-200 focus:border-blue-500 outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] text-zinc-400">Camera Angle</label>
+                    <label className="block text-[10px] text-zinc-500 dark:text-zinc-400">Camera Angle</label>
                     <input
                       type="text"
                       value={viCinemaAngle}
                       onChange={(e) => setViCinemaAngle(e.target.value)}
                       placeholder="e.g., Eye-level, low angle"
-                      className="w-full bg-zinc-950 border border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-200 focus:border-blue-500 outline-none"
+                      className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-900 dark:text-zinc-200 focus:border-blue-500 outline-none"
                     />
                   </div>
                 </div>
@@ -716,39 +720,39 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
             </div>
 
             {/* Environment & Palette */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1 border-t border-zinc-800/60">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1 border-t border-zinc-200 dark:border-zinc-800/60">
               <div>
-                <label className="block text-[10px] font-medium text-zinc-400 mb-0.5">Location Type</label>
+                <label className="block text-[10px] font-medium text-zinc-600 dark:text-zinc-400 mb-0.5">Location Type</label>
                 <input
                   type="text"
                   value={viEnvLocationType}
                   onChange={(e) => setViEnvLocationType(e.target.value)}
                   placeholder="e.g., Cyberpunk alleyway, studio interior"
-                  className="w-full bg-zinc-900 border border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-200 focus:border-emerald-500 outline-none"
+                  className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-900 dark:text-zinc-200 focus:border-emerald-500 outline-none"
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-medium text-zinc-400 mb-0.5">Dominant Palette</label>
+                <label className="block text-[10px] font-medium text-zinc-600 dark:text-zinc-400 mb-0.5">Dominant Palette</label>
                 <input
                   type="text"
                   value={viEnvPalette}
                   onChange={(e) => setViEnvPalette(e.target.value)}
                   placeholder="e.g., Neon cyan, dark purple"
-                  className="w-full bg-zinc-900 border border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-200 focus:border-emerald-500 outline-none"
+                  className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700/60 rounded px-2 py-1 text-[11px] text-zinc-900 dark:text-zinc-200 focus:border-emerald-500 outline-none"
                 />
               </div>
             </div>
           </div>
 
           {/* Media File Replacement Option */}
-          <div className="pt-2 border-t border-zinc-800/50">
+          <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/50">
             <div className="flex items-center justify-between mb-2">
-              <label className="block text-xs font-medium text-zinc-400">Media File</label>
+              <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-400">Media File</label>
               {!isReplacingFile && (
                 <button
                   type="button"
                   onClick={() => setIsReplacingFile(true)}
-                  className="text-[10px] bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-2 py-1 rounded transition-colors"
+                  className="text-[10px] bg-zinc-200 hover:bg-zinc-300 text-zinc-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-300 px-2 py-1 rounded transition-colors cursor-pointer"
                 >
                   Replace File
                 </button>
@@ -756,35 +760,35 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
             </div>
 
             {!isReplacingFile ? (
-              <div className="flex items-center gap-3 p-3 bg-zinc-950/50 border border-zinc-800 rounded-lg opacity-70">
-                <div className="w-8 h-8 bg-zinc-800 rounded flex items-center justify-center shrink-0">
-                  <CheckCircle className="w-4 h-4 text-emerald-500" />
+              <div className="flex items-center gap-3 p-3 bg-zinc-50 dark:bg-zinc-950/50 border border-zinc-200 dark:border-zinc-800 rounded-lg">
+                <div className="w-8 h-8 bg-zinc-200 dark:bg-zinc-800 rounded flex items-center justify-center shrink-0">
+                  <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-500" />
                 </div>
                 <div className="overflow-hidden flex-1">
-                  <p className="text-xs text-zinc-300 truncate font-mono">{asset.filename}</p>
+                  <p className="text-xs text-zinc-800 dark:text-zinc-300 truncate font-mono">{asset.filename}</p>
                   <p className="text-[10px] text-zinc-500">Original file preserved</p>
                 </div>
               </div>
             ) : (
               <div className="space-y-2">
                 {editFile ? (
-                  <div className="border border-amber-600/30 bg-amber-950/20 rounded-lg overflow-hidden">
+                  <div className="border border-amber-300 dark:border-amber-600/30 bg-amber-50/60 dark:bg-amber-950/20 rounded-lg overflow-hidden">
                     <div className="p-3 flex items-center justify-between gap-3">
                       <div className="flex items-center gap-3 overflow-hidden">
-                        <div className="w-8 h-8 bg-amber-900/40 rounded flex items-center justify-center shrink-0">
-                          <UploadCloud className="w-4 h-4 text-amber-500" />
+                        <div className="w-8 h-8 bg-amber-100 dark:bg-amber-900/40 rounded flex items-center justify-center shrink-0">
+                          <UploadCloud className="w-4 h-4 text-amber-600 dark:text-amber-500" />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-xs font-medium text-amber-200 truncate">{editFile.name}</p>
-                          <p className="text-[10px] text-amber-500/70">{(editFile.size / 1024).toFixed(1)} KB</p>
+                          <p className="text-xs font-medium text-amber-900 dark:text-amber-200 truncate">{editFile.name}</p>
+                          <p className="text-[10px] text-amber-700 dark:text-amber-500/70">{(editFile.size / 1024).toFixed(1)} KB</p>
                         </div>
                       </div>
                     </div>
-                    <div className="p-2.5 bg-zinc-900 border-t border-zinc-800 flex items-center justify-between">
+                    <div className="p-2.5 bg-zinc-100 dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
                       <button
                         type="button"
                         onClick={handleRevertToOriginal}
-                        className="px-2.5 py-1 text-xs text-zinc-400 hover:text-zinc-200 flex items-center gap-1.5 transition-colors"
+                        className="px-2.5 py-1 text-xs text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 flex items-center gap-1.5 transition-colors cursor-pointer"
                       >
                         <Undo2 className="w-3.5 h-3.5" />
                         <span>Keep original file</span>
@@ -792,7 +796,7 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
                       <button
                         type="button"
                         onClick={() => handleEditFileSelected(null)}
-                        className="px-2.5 py-1 bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-800/50 rounded-md text-xs flex items-center gap-1.5 transition-colors"
+                        className="px-2.5 py-1 bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-950/40 dark:hover:bg-red-900/60 dark:text-red-300 border border-red-200 dark:border-red-800/50 rounded-md text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                         <span>Remove</span>
@@ -813,16 +817,16 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
                     }}
                     className={`relative w-full flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-xl transition-all ${
                       editDragActive
-                        ? "border-amber-400 bg-amber-500/10"
-                        : "border-zinc-700 hover:border-amber-500/80 bg-zinc-950/60 hover:bg-zinc-900/60 cursor-pointer"
+                        ? "border-amber-500 bg-amber-50/80 dark:bg-amber-500/10"
+                        : "border-zinc-300 hover:border-amber-500 dark:border-zinc-700 dark:hover:border-amber-500/80 bg-zinc-50/70 hover:bg-zinc-100/70 dark:bg-zinc-950/60 dark:hover:bg-zinc-900/60 cursor-pointer"
                     }`}
                   >
                     <label className="w-full flex flex-col items-center justify-center cursor-pointer">
-                      <UploadCloud className="w-8 h-8 mb-2 text-amber-400 animate-pulse" />
-                      <p className="text-xs font-semibold text-zinc-200 text-center">
+                      <UploadCloud className="w-8 h-8 mb-2 text-amber-500 dark:text-amber-400 animate-pulse" />
+                      <p className="text-xs font-semibold text-zinc-900 dark:text-zinc-200 text-center">
                         Select Replacement {asset.media_type ? asset.media_type.toUpperCase() : "MEDIA"} File
                       </p>
-                      <p className="text-[11px] text-zinc-400 text-center mt-1">
+                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400 text-center mt-1">
                         Click to browse files or drag and drop here
                       </p>
                       <input
@@ -835,7 +839,7 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
                     <button
                       type="button"
                       onClick={handleRevertToOriginal}
-                      className="mt-3 text-[11px] text-zinc-400 hover:text-zinc-200 underline flex items-center gap-1"
+                      className="mt-3 text-[11px] text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 underline flex items-center gap-1 cursor-pointer"
                     >
                       <Undo2 className="w-3 h-3" />
                       Cancel replacement & keep original
@@ -847,21 +851,25 @@ export const AssetEditModal: React.FC<AssetEditModalProps> = ({
           </div>
 
           {editError && (
-            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-              <p className="text-xs text-red-400">{editError}</p>
+            <div className="p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-red-500 dark:text-red-400 shrink-0 mt-0.5" />
+              <p className="text-xs text-red-700 dark:text-red-400">{editError}</p>
             </div>
           )}
         </div>
 
-        <div className="p-4 border-t border-zinc-800 bg-zinc-950/30 flex justify-end gap-3">
-          <button onClick={onClose} className="px-4 py-2 text-xs font-medium text-zinc-400 hover:text-white transition-colors" disabled={isEditing}>
+        <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/80 dark:bg-zinc-950/30 flex justify-end gap-3">
+          <button 
+            onClick={onClose} 
+            className="px-4 py-2 text-xs font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors cursor-pointer" 
+            disabled={isEditing}
+          >
             Cancel
           </button>
           <button 
             onClick={submitEdit} 
             disabled={isEditing}
-            className="px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-xs font-semibold rounded-lg transition-colors flex items-center gap-2"
+            className="px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-xs font-semibold rounded-lg transition-colors flex items-center gap-2 cursor-pointer shadow-md"
           >
             {isEditing ? "Saving..." : "Save Changes"}
           </button>

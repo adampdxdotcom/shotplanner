@@ -14,7 +14,9 @@ import {
   deleteProject 
 } from "../services/projectService";
 import { universeService } from "../services/universeService";
+import { createScopedLogger } from "../utils/logger";
 
+const log = createScopedLogger("ProjectRoute");
 const router = Router();
 
 // List all projects
@@ -60,7 +62,7 @@ router.get("/:filename/export", async (req: Request, res: Response) => {
       includeTakes: includeRenders 
     });
   } catch (err: any) {
-    console.error("Export error:", err);
+    log.error("Export error", { error: err?.message || err });
     if (!res.headersSent) {
       res.status(500).json({ error: err.message || "Export error" });
     }
@@ -72,7 +74,7 @@ router.get("/:filename/export-takes", async (req: Request, res: Response) => {
   try {
     await exportTakesZip(req.params.filename, res);
   } catch (err: any) {
-    console.error("Export takes error:", err);
+    log.error("Export takes error", { error: err?.message || err });
     if (!res.headersSent) {
       res.status(500).json({ error: err.message || "Export takes error" });
     }
@@ -111,7 +113,7 @@ router.post("/inspect-zip", upload.single("file"), async (req: Request, res: Res
     if (req.file?.path) {
       safeUnlinkSync(req.file.path);
     }
-    console.error("Inspect ZIP error:", err);
+    log.error("Inspect ZIP error", { error: err?.message || err });
     res.status(500).json({ error: err.message || "Failed to inspect ZIP archive" });
   }
 });
@@ -144,7 +146,7 @@ router.post("/import", upload.single("file"), async (req: Request, res: Response
       res.status(400).json({ error: "No project JSON found in zip" });
     }
   } catch (err: any) {
-    console.error("Import error:", err);
+    log.error("Import error", { error: err?.message || err });
     res.status(500).json({ error: err.message || "Failed to import zip" });
   } finally {
     if (filePath) {

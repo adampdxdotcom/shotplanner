@@ -5,7 +5,9 @@ import {
   executeUnifiedRemoteDownload, 
   COMFYUI_MODEL_CATEGORIES 
 } from "../services/modelHubService";
+import { createScopedLogger } from "../utils/logger";
 
+const log = createScopedLogger("ModelHubRoute");
 const router = Router();
 
 /**
@@ -48,7 +50,7 @@ router.get("/hf-info", async (req: Request, res: Response) => {
       ...metadata
     });
   } catch (err: any) {
-    console.error("[HF Model Info Error]:", err);
+    log.error("HF Model Info Error", { error: err?.message || err });
     return res.status(400).json({
       success: false,
       error: err.message || "Failed to inspect model on Hugging Face."
@@ -86,7 +88,7 @@ router.get("/civitai-info", async (req: Request, res: Response) => {
       ...metadata
     });
   } catch (err: any) {
-    console.error("[Civitai Model Info Error]:", err);
+    log.error("Civitai Model Info Error", { error: err?.message || err });
     return res.status(400).json({
       success: false,
       error: err.message || "Failed to inspect model on Civitai."
@@ -152,7 +154,7 @@ router.post("/download-remote", async (req: Request, res: Response) => {
     }
     return res.json(result);
   } catch (err: any) {
-    console.error("[Remote Model Download Error]:", err);
+    log.error("Remote Model Download Error", { error: err?.message || err });
     return res.status(500).json({
       success: false,
       error: err.message || "An unexpected error occurred during remote download."

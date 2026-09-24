@@ -3,6 +3,9 @@ import path from "path";
 import nodeFetchModule from "node-fetch";
 import { RUNPOD_CONFIG_FILE } from "../config/constants";
 import { writeJsonAtomicSync } from "../utils/atomicFs";
+import { createScopedLogger } from "../utils/logger";
+
+const log = createScopedLogger("RunPodService");
 
 const getFetch = (): typeof fetch => {
   if (typeof globalThis.fetch === "function") {
@@ -20,7 +23,7 @@ export function getStoredRunpodApiKey(): string | null {
       }
     }
   } catch (err) {
-    console.error("[RunPod] Error reading runpod_config.json:", err);
+    log.error("Error reading runpod_config.json", { error: err });
   }
   if (process.env.RUNPOD_API_KEY && process.env.RUNPOD_API_KEY.trim()) {
     return process.env.RUNPOD_API_KEY.trim();
@@ -32,7 +35,7 @@ export function saveRunpodApiKey(apiKey: string): void {
   try {
     writeJsonAtomicSync(RUNPOD_CONFIG_FILE, { api_key: apiKey.trim() });
   } catch (err) {
-    console.error("[RunPod] Error saving runpod_config.json:", err);
+    log.error("Error saving runpod_config.json", { error: err });
   }
 }
 
@@ -42,7 +45,7 @@ export function removeRunpodApiKey(): void {
       fs.unlinkSync(RUNPOD_CONFIG_FILE);
     }
   } catch (err) {
-    console.error("[RunPod] Error removing runpod_config.json:", err);
+    log.error("Error removing runpod_config.json", { error: err });
   }
 }
 

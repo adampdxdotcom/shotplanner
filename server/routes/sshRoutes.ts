@@ -2,7 +2,9 @@ import { Router, Request, Response } from "express";
 import { generateEd25519OpenSSH } from "../utils/crypto";
 import { processAssetTransfer, processSceneTransfer } from "../services/executionService";
 import { testSSHConnection } from "../services/sshService";
+import { createScopedLogger } from "../utils/logger";
 
+const log = createScopedLogger("SSHRoute");
 const router = Router();
 
 // Generate Ed25519 OpenSSH Keypair
@@ -11,7 +13,7 @@ router.post("/generate_keypair", (req: Request, res: Response) => {
     const keyPair = generateEd25519OpenSSH();
     res.json(keyPair);
   } catch (err: any) {
-    console.error("SSH Key generation failed:", err);
+    log.error("SSH Key generation failed", { error: err?.message || err });
     res.status(500).json({ error: err.message || "Failed to generate SSH key pair" });
   }
 });
@@ -22,7 +24,7 @@ router.post("/test", async (req: Request, res: Response) => {
     const result = await testSSHConnection(req.body);
     res.json(result);
   } catch (err: any) {
-    console.error("[SSH Route Test ERROR]:", err);
+    log.error("SSH Route Test failed", { error: err?.message || err });
     res.json({
       success: false,
       message: err.message || "Failed to establish SSH connection to remote host."

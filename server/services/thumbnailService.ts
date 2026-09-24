@@ -1,6 +1,9 @@
 import fs from "fs";
 import path from "path";
 import sharp from "sharp";
+import { createScopedLogger } from "../utils/logger";
+
+const log = createScopedLogger("ThumbnailService");
 
 /**
  * Ensures the thumbnails folder exists alongside the parent media directory.
@@ -41,7 +44,7 @@ export async function generateThumbnailFile(
 
     return resolvedTarget;
   } catch (err: any) {
-    console.warn(`[ThumbnailService] Sharp thumbnail generation failed for ${path.basename(sourcePath)}:`, err?.message);
+    log.warn(`Sharp thumbnail generation failed for ${path.basename(sourcePath)}: ${err?.message}`);
     try {
       // Fallback: copy source directly if sharp encounters an edge format
       fs.copyFileSync(sourcePath, resolvedTarget);

@@ -1,6 +1,9 @@
 import fs from "fs";
 import path from "path";
 import { TMP_DIR, ASSETS_DIR } from "../config/constants";
+import { createScopedLogger } from "./logger";
+
+const log = createScopedLogger("FileCleanup");
 
 /**
  * Safely removes a file from disk without throwing exceptions.
@@ -13,7 +16,7 @@ export function safeUnlinkSync(filePath?: string | null): boolean {
       return true;
     }
   } catch (err: any) {
-    console.warn(`[Cleanup] Non-fatal error deleting file ${filePath}:`, err.message);
+    log.warn(`Non-fatal error deleting file ${filePath}: ${err.message}`);
   }
   return false;
 }
@@ -55,7 +58,7 @@ export function cleanupStaleChunks(maxAgeMs: number = 24 * 60 * 60 * 1000): { cl
   }
 
   if (cleanedCount > 0) {
-    console.log(`[Cleanup] Pruned ${cleanedCount} stale temporary upload item(s) older than ${Math.round(maxAgeMs / (1000 * 60 * 60))}h.`);
+    log.info(`Pruned ${cleanedCount} stale temporary upload item(s) older than ${Math.round(maxAgeMs / (1000 * 60 * 60))}h.`);
   }
 
   return { cleanedCount };

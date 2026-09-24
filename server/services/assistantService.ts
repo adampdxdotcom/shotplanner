@@ -6,7 +6,9 @@ import { assetService } from "./assetService";
 import { getImageBase64ForVision } from "./thumbnailService";
 import { callLocalLLM } from "./llm_service";
 import { generateWithGeminiAPI, getStoredGeminiKey } from "./geminiService";
+import { createScopedLogger } from "../utils/logger";
 
+const log = createScopedLogger("AssistantService");
 const universeService = new UniverseService();
 
 export interface ChatMessage {
@@ -168,7 +170,7 @@ function buildProjectDossier(
       sections.push(`### GLOBAL UNIVERSE CHARACTER ROSTER:\n${universeSummaries}`);
     }
   } catch (err) {
-    console.warn("[AssistantService] Could not read universe characters:", err);
+    log.warn("Could not read universe characters", { error: err });
   }
 
   // 6. Registered Media Assets / Locations & Cached Visual Intelligence
@@ -218,7 +220,7 @@ function buildProjectDossier(
       sections.push(`### SCANNED VISUAL INTELLIGENCE REGISTRY (Pre-analyzed project images):\n${visualSummary}`);
     }
   } catch (err) {
-    console.warn("[AssistantService] Could not read assets:", err);
+    log.warn("Could not read assets", { error: err });
   }
 
   return sections.join("\n\n");
@@ -281,12 +283,12 @@ export async function chatWithAssistant(options: AssistantChatOptions): Promise<
           base64Data,
           filename: targetFilename
         };
-        console.log(`[Assistant Vision Pipeline] Loaded scaled 384px image asset '${targetFilename}' (${mimeType})`);
+        log.info(`Loaded scaled 384px image asset '${targetFilename}' (${mimeType})`);
       } catch (e: any) {
-        console.warn(`[Assistant Vision Pipeline] Failed to process asset file '${targetFilename}' for vision:`, e?.message || e);
+        log.warn(`Failed to process asset file '${targetFilename}' for vision`, { error: e?.message || e });
       }
     } else {
-      console.warn(`[Assistant Vision Pipeline] Asset file '${targetFilename}' not found on disk.`);
+      log.warn(`Asset file '${targetFilename}' not found on disk.`);
     }
   }
 

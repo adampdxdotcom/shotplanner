@@ -1,6 +1,9 @@
 import fs from "fs";
 import { LLM_CONFIG_FILE } from "../config/constants";
 import { writeJsonAtomicSync } from "../utils/atomicFs";
+import { createScopedLogger } from "../utils/logger";
+
+const log = createScopedLogger("LLMSettings");
 
 export interface StoredLLMSettings {
   lm_studio_url?: string;
@@ -33,7 +36,7 @@ export function getStoredLLMSettings(): StoredLLMSettings {
         ...data
       };
     } catch (e) {
-      console.warn("[LLM Settings] Failed to parse llm_config.json, returning defaults", e);
+      log.warn("Failed to parse llm_config.json, returning defaults", { error: e });
     }
   }
   return { ...DEFAULT_LLM_SETTINGS };

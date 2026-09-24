@@ -8,7 +8,8 @@ import {
   LLMSetupTab,
   RemoteServerTab,
   ModelHubConfig,
-  GeneralSettingsTab
+  GeneralSettingsTab,
+  DiagnosticsTab
 } from "./config";
 
 export { probeLMStudioConnection };
@@ -143,6 +144,13 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({
       {activeTab === "general" && (
         <section id="panel-general-settings" className="w-full">
           <GeneralSettingsTab />
+        </section>
+      )}
+
+      {/* Tab 5: System Diagnostics & Logs */}
+      {activeTab === "diagnostics" && (
+        <section id="panel-diagnostics-settings" className="w-full">
+          <DiagnosticsTab onShowToast={onShowToast} />
         </section>
       )}
     </div>

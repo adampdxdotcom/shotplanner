@@ -14,6 +14,9 @@ import { isCacheOrTempWorkflow } from "../utils/workflowFilter";
 import { WORKFLOWS_DIR, getSceneDirectories, formatSceneFolderName } from "../config/constants";
 import { parseWorkflowData } from "./workflowService";
 import { writeJsonAtomicSync } from "../utils/atomicFs";
+import { createScopedLogger } from "../utils/logger";
+
+const log = createScopedLogger("RemoteComfyService");
 
 export interface RemoteWorkflowItem {
   filename: string;
@@ -54,7 +57,7 @@ export async function listRemoteWorkflows(
   if (resolved.host && resolved.authMethod !== "None") {
     let client: Client | null = null;
     try {
-      console.log(`[Remote ComfyUI] Scanning workflow directories on ${resolved.username}@${resolved.host}:${resolved.port}...`);
+      log.info(`Scanning workflow directories on ${resolved.username}@${resolved.host}:${resolved.port}...`);
       client = await connectSSH(resolved.connectConfig);
 
       const root = resolved.remoteComfyUIRoot || "/workspace/runpod-slim/ComfyUI";
@@ -170,7 +173,7 @@ print(json.dumps(results))
           const parsed = JSON.parse(stdout.trim());
           if (Array.isArray(parsed) && parsed.length > 0) {
             const cleanedWorkflows = parsed.filter((w: any) => !isCacheOrTempWorkflow(w.filename, w.folder, w.path));
-            console.log(`[Remote ComfyUI] Found ${cleanedWorkflows.length} genuine workflows via SSH.`);
+            log.info(`Found ${cleanedWorkflows.length} genuine workflows via SSH.`);
             return {
               success: true,
               workflows: cleanedWorkflows,
@@ -180,7 +183,7 @@ print(json.dumps(results))
             };
           }
         } catch (parseErr) {
-          console.warn("[Remote ComfyUI] Failed to parse Python discovery JSON:", stdout);
+          log.warn("Failed to parse Python discovery JSON", { stdout });
         }
       }
 
@@ -215,7 +218,7 @@ print(json.dumps(results))
         };
       }
     } catch (sshErr: any) {
-      console.warn(`[Remote ComfyUI] SSH discovery failed: ${sshErr.message}. Attempting ComfyUI HTTP API...`);
+      log.warn(`SSH discovery failed: ${sshErr.message}. Attempting ComfyUI HTTP API...`);
     } finally {
       if (client) {
         try { client.end(); } catch {}
@@ -325,7 +328,7 @@ export async function fetchRemoteWorkflowJson(
         }
       }
     } catch (sshErr: any) {
-      console.warn(`[Remote ComfyUI] SSH fetch failed for ${remotePath}: ${sshErr.message}`);
+      log.warn(`SSH fetch failed for ${remotePath}: ${sshErr.message}`);
     } finally {
       if (client) {
         try { client.end(); } catch {}
@@ -408,7 +411,7 @@ export async function syncRemoteWorkflowToLocal(
 
   const parsed = parseWorkflowData(rawWorkflow);
 
-  console.log(`[Remote Workflow Sync] Successfully synced "${filename}" for scene "${sceneFolder}"`);
+  log.info(`Successfully synced "${filename}" for scene "${sceneFolder}"`);
 
   return {
     success: true,
@@ -560,7 +563,7 @@ export async function queuePromptToRemoteComfy(
         };
       }
     } catch (httpErr: any) {
-      console.log(`[ComfyUI Dispatch] Direct HTTP fetch failed (${httpErr.message}). Checking SSH fallback...`);
+      log.info(`Direct HTTP fetch failed (${httpErr.message}). Checking SSH fallback...`);
     }
   }
 

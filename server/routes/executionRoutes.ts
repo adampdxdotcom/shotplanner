@@ -1,6 +1,8 @@
 import { Router, Request, Response } from "express";
 import { executeWorkflow, processAssetTransfer } from "../services/executionService";
+import { createScopedLogger } from "../utils/logger";
 
+const log = createScopedLogger("ExecutionRoute");
 const router = Router();
 
 router.post("/execute", async (req: Request, res: Response) => {
@@ -17,7 +19,7 @@ router.post("/execute", async (req: Request, res: Response) => {
 // Alias for remote ComfyUI shot asset staging
 router.post(["/execution/stage-shot", "/stage-shot"], async (req: Request, res: Response) => {
   try {
-    console.log(`[Execution Route] POST /api/execution/stage-shot for scene "${req.body.scene_name || 'default'}"`);
+    log.info(`POST /api/execution/stage-shot for scene "${req.body.scene_name || 'default'}"`);
     const shot = Array.isArray(req.body.shots) && req.body.shots.length > 0 ? req.body.shots[0] : null;
     const transferOptions = {
       ...req.body,
@@ -34,7 +36,7 @@ router.post(["/execution/stage-shot", "/stage-shot"], async (req: Request, res: 
     const result = await processAssetTransfer(transferOptions);
     res.json(result);
   } catch (err: any) {
-    console.error("[Execution Route /stage-shot ERROR]:", err);
+    log.error("Failed to stage shot", { error: err?.message || err });
     const status = err.message && err.message.includes("is required") ? 400 : 500;
     res.status(status).json({ error: err.message || "Failed to stage shot." });
   }

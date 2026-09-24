@@ -1,7 +1,9 @@
 import { Router, Request, Response } from "express";
 import { fetchRunpodPods } from "../services/runpodService";
 import { appendAuthorizedKeyToPod } from "../services/sshService";
+import { createScopedLogger } from "../utils/logger";
 
+const log = createScopedLogger("RunPodRoute");
 const router = Router();
 
 // In-memory cache for RunPod pods to prevent hammering RunPod GraphQL API across multiple tabs
@@ -150,7 +152,7 @@ router.post("/pods", async (req: Request, res: Response) => {
       pods
     });
   } catch (err: any) {
-    console.error("[RunPod API Error]", err.message);
+    log.error("RunPod API Error", { error: err.message });
     res.status(400).json({
       success: false,
       error: err.message || "Failed to query RunPod active pods."
@@ -194,7 +196,7 @@ router.post("/add-key", async (req: Request, res: Response) => {
       message: result.message || "SSH Public Key successfully authorized on target Pod!"
     });
   } catch (err: any) {
-    console.error("[RunPod Key Push Error]", err.message);
+    log.error("RunPod Key Push Error", { error: err.message });
     res.status(400).json({
       success: false,
       error: err.message || "Failed to authorize SSH key on target Pod."

@@ -4,6 +4,9 @@ import { EMPTY_1X1_PNG_BUFFER, UPLOADS_DIR } from "../../config/constants";
 import { assetService } from "../assetService";
 import { TransferItem } from "../sshService";
 import { TransferFileSummary } from "../../types";
+import { createScopedLogger } from "../../utils/logger";
+
+const log = createScopedLogger("SFTPHelper");
 
 /**
  * Ensures the 1x1 transparent PNG exists locally for unassigned node bypasses.
@@ -41,7 +44,7 @@ export function resolveLocalAssetsForTransfer(
     }
 
     if (!localPath || !fs.existsSync(localPath)) {
-      console.warn(`[SFTP Helper Notice] Asset "${fname}" not found locally. Marking as missing.`);
+      log.warn(`Asset "${fname}" not found locally. Marking as missing.`);
       missingSummary.push({
         filename: fname,
         file: fname,

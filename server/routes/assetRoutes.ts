@@ -5,7 +5,9 @@ import { upload } from "../config/constants";
 import { assetService } from "../services/assetService";
 import { generateThumbnailFile } from "../services/thumbnailService";
 import { safeUnlinkSync } from "../utils/fileCleanup";
+import { createScopedLogger } from "../utils/logger";
 
+const log = createScopedLogger("AssetRoute");
 const router = Router();
 
 // Retrieve all assets
@@ -155,7 +157,7 @@ router.post("/upload_chunk", upload.single("file"), async (req: Request, res: Re
 
     return res.json({ success: true, message: "chunk received" });
   } catch (err: any) {
-    console.error("Chunk upload error:", err);
+    log.error("Chunk upload error", { error: err?.message || err });
     res.status(500).json({ error: err ? err.message || String(err) : "Unknown chunk error" });
   } finally {
     if (req.file?.path) safeUnlinkSync(req.file.path);

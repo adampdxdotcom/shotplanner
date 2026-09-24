@@ -1,5 +1,8 @@
 import { callLocalLLM } from "./llm_service";
 import { generateWithGeminiAPI, getStoredGeminiKey } from "./geminiService";
+import { createScopedLogger } from "../utils/logger";
+
+const log = createScopedLogger("SceneSketch");
 
 export interface ParsedSceneSketchShot {
   shot_number: number;
@@ -289,6 +292,13 @@ export async function parseSceneSketch(options: ParseSceneSketchOptions): Promis
   const normalizedShots: ParsedSceneSketchShot[] = rawShots.map((shot: any, index: number) =>
     normalizeShot(shot, index)
   );
+
+  log.info(`Parsed scene sketch into ${normalizedShots.length} shots`, {
+    sceneTitle: scene_title || "Untitled",
+    provider: providerUsed,
+    model: modelUsed
+  });
+  log.debug("Scene sketch raw output", { rawLength: rawLlmOutput.length });
 
   return {
     scene_title,

@@ -9,6 +9,9 @@ import {
 } from "../utils/formatters";
 import { generateWithGeminiAPI, getStoredGeminiKey } from "./geminiService";
 import { getStoredLLMSettings } from "./llmSettingsService";
+import { createScopedLogger } from "../utils/logger";
+
+const log = createScopedLogger("LocalLLM");
 
 export interface LocalLLMRequestOptions {
   url?: string;
@@ -116,7 +119,8 @@ export async function callLocalLLM(options: LocalLLMRequestOptions): Promise<Loc
     payload.max_tokens = options.max_tokens;
   }
 
-  console.log(`[Local LLM Service] Dispatching request to: ${endpoint} (model: ${model})`);
+  log.info(`Dispatching request to: ${endpoint} (model: ${model})`);
+  log.debug("Dispatching Local LLM options", { endpoint, model, temperature: payload.temperature, max_tokens: payload.max_tokens });
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -604,6 +608,11 @@ Generate ONLY the integrated_multimodal_description narrative incorporating the 
   });
 
   const latencyMs = Date.now() - startTime;
+  log.info(`Prompt expansion completed in ${latencyMs}ms`, {
+    provider: providerUsed,
+    model: modelUsedActual
+  });
+
   const debug: PromptDebugInfo = {
     system_prompt_sent: systemPrompt,
     user_prompt_sent: userPrompt,

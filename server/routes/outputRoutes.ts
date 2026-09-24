@@ -18,7 +18,9 @@ import {
 } from "../services/outputIngestionService";
 import { safeUnlinkSync } from "../utils/fileCleanup";
 import { writeJsonAtomicSync } from "../utils/atomicFs";
+import { createScopedLogger } from "../utils/logger";
 
+const log = createScopedLogger("OutputRoute");
 const router = Router();
 
 /**
@@ -66,7 +68,7 @@ router.post("/outputs/upload", upload.single("file"), async (req: Request, res: 
       stream_url: streamUrl
     });
   } catch (err: any) {
-    console.error("Take video upload error:", err);
+    log.error("Take video upload error", { error: err?.message || err });
     return res.status(500).json({ error: err.message || "Failed to upload video take" });
   } finally {
     if (req.file?.path) safeUnlinkSync(req.file.path);
@@ -134,7 +136,7 @@ router.post("/outputs/pull", async (req: Request, res: Response) => {
       saved_to_project: result.saved_to_project
     });
   } catch (error: any) {
-    console.error("[Output Ingestion Error]:", error);
+    log.error("Output Ingestion Error", { error: error?.message || error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -160,7 +162,7 @@ router.post("/outputs/sync-history", async (req: Request, res: Response) => {
 
     res.json(result);
   } catch (err: any) {
-    console.error("[Output Sync Error]:", err);
+    log.error("Output Sync Error", { error: err?.message || err });
     res.status(500).json({ success: false, error: err.message });
   }
 });

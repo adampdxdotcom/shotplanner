@@ -4,7 +4,9 @@ import { generateVariations, saveSelectedVariations, HEADSHOT_TEMPLATES } from "
 import { assetService } from "../services/assetService";
 import fs from "fs";
 import path from "path";
+import { createScopedLogger } from "../utils/logger";
 
+const log = createScopedLogger("HeadshotRoute");
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -69,7 +71,7 @@ router.post("/generate", upload.single("image"), async (req: Request, res: Respo
 
     res.json({ results });
   } catch (error: any) {
-    console.error(`[Headshot Generation] Google API Error 400: ${error.message || error}`);
+    log.error(`Google API Error: ${error.message || error}`);
     res.status(400).json({ error: error.message || "Failed to generate headshots" });
   }
 });
@@ -93,7 +95,7 @@ router.post("/save-selected", async (req: Request, res: Response) => {
 
     res.json({ success: true, savedAssets: savedRecords });
   } catch (error: any) {
-    console.error("Error saving selected headshots:", error);
+    log.error("Error saving selected headshots", { error: error?.message || error });
     res.status(500).json({ error: error.message || "Failed to save selected headshots" });
   }
 });

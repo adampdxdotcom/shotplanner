@@ -13,6 +13,9 @@ import { sanitizeFilenamePart, formatShotNumber } from "../utils/formatters";
 import { normalizeComfyUrl } from "./comfyQueueService";
 import { generateThumbnailFile } from "./thumbnailService";
 import { findProjectFile, getProjectData, saveProjectData } from "./project/projectCrud";
+import { createScopedLogger } from "../utils/logger";
+
+const log = createScopedLogger("TakeIngestion");
 
 export interface IngestedTakeResult {
   filename: string;
@@ -147,7 +150,7 @@ export async function downloadAndIngestTake(options: {
     headers["Authorization"] = `Bearer ${auth_token.trim()}`;
   }
 
-  console.log(`[Auto Take Ingestion] Downloading from ComfyUI: ${downloadUrl}`);
+  log.info(`Downloading from ComfyUI: ${downloadUrl}`);
   const response = await fetch(downloadUrl, { headers });
   if (!response.ok) {
     throw new Error(`Failed to download ${filename} from ComfyUI (${response.status} ${response.statusText})`);
@@ -175,7 +178,7 @@ export async function downloadAndIngestTake(options: {
       generateThumbnailFile(assetPath).catch(() => {});
     }
   } catch (copyErr) {
-    console.warn("[Auto Take Ingestion] Failed to copy to asset storage:", copyErr);
+    log.warn("Failed to copy to asset storage", { error: copyErr });
   }
 
   const streamUrl = `/api/outputs/stream/${encodeURIComponent(safeSceneName)}/${encodeURIComponent(filename)}`;
@@ -268,11 +271,11 @@ export async function downloadAndIngestTake(options: {
         projectData.shots[shotIdx] = targetShot;
         saveProjectData(safeSceneName, projectData);
         savedToProject = true;
-        console.log(`[Auto Take Ingestion] Successfully registered Take ${takeNum} under Shot ${formatShotNumber(targetShot.shot_number)} in ${safeSceneName}.json`);
+        log.info(`Successfully registered Take ${takeNum} under Shot ${formatShotNumber(targetShot.shot_number)} in ${safeSceneName}.json`);
       }
     }
   } catch (projErr) {
-    console.warn("[Auto Take Ingestion] Could not register take into project JSON:", projErr);
+    log.warn("Could not register take into project JSON", { error: projErr });
   }
 
   ingestedFilenames.add(filename);
@@ -349,7 +352,7 @@ export async function syncComfyOutputsFromHistory(options: {
           });
           ingestedList.push(takeResult);
         } catch (downloadErr: any) {
-          console.warn(`[Auto Take Ingestion] Failed to ingest ${f.filename}:`, downloadErr.message);
+          log.warn(`Failed to ingest ${f.filename}`, { error: downloadErr.message || downloadErr });
         }
       }
 

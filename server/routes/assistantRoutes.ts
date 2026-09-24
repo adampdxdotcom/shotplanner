@@ -2,7 +2,9 @@ import { Router, Request, Response } from "express";
 import { chatWithAssistant } from "../services/assistantService";
 import { getStoredGeminiKey } from "../services/geminiService";
 import { getStoredLLMSettings } from "../services/llmSettingsService";
+import { createScopedLogger } from "../utils/logger";
 
+const log = createScopedLogger("AssistantRoute");
 const router = Router();
 
 /**
@@ -50,7 +52,7 @@ router.post("/chat", async (req: Request, res: Response) => {
 
     res.json(result);
   } catch (err: any) {
-    console.error("[Assistant Chat Error]:", err?.message || err);
+    log.error("Assistant Chat Error", { error: err?.message || err });
     res.status(500).json({ error: err?.message || "Failed to process assistant chat request." });
   }
 });

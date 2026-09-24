@@ -15,7 +15,8 @@ import {
   Image,
   Film,
   Users,
-  Layers
+  Layers,
+  Terminal
 } from "lucide-react";
 
 interface NavbarProps {
@@ -29,6 +30,7 @@ interface NavbarProps {
   toasts?: ToastMessage[];
   onDismissToast?: (id: string) => void;
   monitorState?: ComfyMonitorState;
+  onOpenDiagnostics?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ 
@@ -41,7 +43,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onNewProject, 
   toasts = [], 
   onDismissToast,
-  monitorState
+  monitorState,
+  onOpenDiagnostics
 }) => {
   const activeToast = toasts && toasts.length > 0 ? toasts[0] : null;
   const { resolvedTheme, toggleTheme } = useTheme();
@@ -371,6 +374,22 @@ export const Navbar: React.FC<NavbarProps> = ({
                 >
                   <Server className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
                   <span>Server Configuration</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    if (onOpenDiagnostics) {
+                      onOpenDiagnostics();
+                    } else {
+                      onNavigate("config");
+                    }
+                  }}
+                  className="dropdown-item-btn w-full px-3 py-2 text-xs font-medium flex items-center gap-2.5 transition-colors text-left cursor-pointer text-slate-700 hover:text-slate-950 hover:bg-slate-100 dark:text-zinc-200 dark:hover:text-white dark:hover:bg-zinc-800/80"
+                >
+                  <Terminal className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <span>Diagnostics &amp; Logs</span>
                 </button>
 
                 <button

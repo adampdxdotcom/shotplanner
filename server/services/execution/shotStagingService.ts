@@ -18,6 +18,9 @@ import {
   normalizeRemoteComfyRoot,
   resolveLocalAssetsForTransfer
 } from "./sftpTransferHelper";
+import { createScopedLogger } from "../../utils/logger";
+
+const log = createScopedLogger("ShotStaging");
 
 export interface AssetTransferOptions extends SSHCredentials {
   take_number?: string | number;
@@ -82,7 +85,7 @@ export async function processAssetTransfer(options: AssetTransferOptions) {
   } = options;
 
   const targetHost = remote_host || options.host || options.runpod_ip;
-  console.log(`[SSH Staging] Initiating asset staging for scene: "${scene_name || 'default'}" (Host: ${targetHost || 'None'})`);
+  log.info(`Initiating asset staging for scene: "${scene_name || 'default'}" (Host: ${targetHost || 'None'})`);
 
   const resolvedSaveVideoPrefix =
     save_video_prefix ||
@@ -194,9 +197,9 @@ export async function processAssetTransfer(options: AssetTransferOptions) {
       remotePath: remoteWorkflowPath,
       sizeBytes: Buffer.byteLength(wfContentStr)
     });
-    console.log(`[SSH Staging] Prepared workflow JSON "${finalFilename}" (from template "${resolvedFilename}") for remote staging at ${remoteWorkflowPath}`);
+    log.info(`Prepared workflow JSON "${finalFilename}" (from template "${resolvedFilename}") for remote staging at ${remoteWorkflowPath}`);
   } catch (wfErr: any) {
-    console.error("[SSH Staging ERROR] Failed to resolve and prepare workflow JSON:", wfErr.message);
+    log.error("Failed to resolve and prepare workflow JSON", { error: wfErr.message });
     throw new Error(`Failed to stage workflow: ${wfErr.message}`);
   }
 
@@ -207,7 +210,7 @@ export async function processAssetTransfer(options: AssetTransferOptions) {
   const skippedFiles: string[] = [];
 
   if (sftpItems.length > 0) {
-    console.log(`[SSH Staging] Starting SFTP transfer of ${sftpItems.length} file(s) to ${targetHost}...`);
+    log.info(`Starting SFTP transfer of ${sftpItems.length} file(s) to ${targetHost}...`);
     const sftpSummary = await executeSFTPBatchTransfer(options, sftpItems);
 
     transferredCount = sftpSummary.transferredCount;
@@ -227,13 +230,13 @@ export async function processAssetTransfer(options: AssetTransferOptions) {
 
     if (!sftpSummary.success || sftpSummary.failedCount > 0) {
       const errDetail = sftpSummary.error || `Failed files: ${sftpSummary.failedFiles.join(", ")}`;
-      console.error(`[SSH Staging Failed] ${errDetail}`);
+      log.error(`Staging failed on ${targetHost}`, { error: errDetail });
       throw new Error(`Remote staging failed on ${targetHost}: ${errDetail}`);
     }
   }
 
   const statusMessage = `Successfully verified and staged workflow '${stagedWorkflowFilename}' + ${uploadedFiles.length} file(s) into Remote ComfyUI. Workflow at: ${remoteWorkflowPath}`;
-  console.log(`[SSH Staging Complete] ${statusMessage}`);
+  log.info(statusMessage);
 
   const effectiveStagedFilename = stagedWorkflowFilename || output_workflow_filename || workflow_filename;
   return {

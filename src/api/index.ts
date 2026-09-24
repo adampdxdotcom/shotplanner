@@ -8,3 +8,4 @@ export * from "./endpoints/execution";
 export * from "./endpoints/llm";
 export * from "./endpoints/modelHub";
 export * from "./endpoints/universe";
+export * from "./endpoints/diagnostics";
