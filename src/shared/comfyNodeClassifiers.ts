@@ -51,15 +51,31 @@ export const KNOWN_LORA_CLASSES = [
   "LoraLoaderModelOnly",
   "LoraLoaderAdvanced",
   "LoraLoaderBlockWeight",
+  "LoraLoaderTextOnly",
   "CR Load LoRA",
+  "CR LoRA Stack",
   "CR Apply LoRA Stack",
+  "CR LoRA List",
   "Power Lora Loader (rgthree)",
+  "Power Lora Loader",
+  "LoRA Stacker",
+  "LoraStacker",
+  "ApplyLoRAStack",
+  "Apply LoRA Stack",
+  "ApplyLoRA",
   "easy loraStack",
+  "easy a1111LoaderWithLora",
   "WANLoraLoader",
   "WanVideoLoraLoader",
+  "WanVideoLoraLoaderModelOnly",
+  "WanVideoLoraSelect",
   "LoraLoaderWanVideo",
   "FluxLoraLoader",
-  "LoraLoaderDiffusionModels"
+  "LoraLoaderDiffusionModels",
+  "HunyuanVideoLoraLoader",
+  "CogVideoXLoRALoader",
+  "LTXVLoraLoader",
+  "ChameleonLoraLoader"
 ];
 
 /**
@@ -69,9 +85,10 @@ export const KNOWN_LORA_CLASSES = [
 export function isExactLoraLoader(classType: string, title?: string): boolean {
   const ct = (classType || "").trim();
   const t = (title || "").trim().toLowerCase();
+  const cLower = ct.toLowerCase();
 
   // Exclude non-loader operations (e.g. LoraSave, LoraTrain, LoraExtract)
-  if (/save|train|extract|convert|dataset|caption/i.test(ct)) {
+  if (/save|train|extract|convert|dataset|caption|inspect/i.test(ct) || /save|train|extract|convert/i.test(t)) {
     return false;
   }
 
@@ -79,11 +96,13 @@ export function isExactLoraLoader(classType: string, title?: string): boolean {
     return true;
   }
 
-  if (/^LoraLoader/i.test(ct) || /^LoadLora/i.test(ct) || /LoraLoader$/i.test(ct) || /^WanVideoLora/i.test(ct)) {
+  // Matches any class containing 'lora' or 'loadlora' or 'loraloader' (e.g. LoraLoader|pysssss, WanVideoLoraLoader, etc.)
+  if (cLower.includes("loraloader") || cLower.includes("loadlora") || cLower.includes("lorastack") || cLower.includes("lora_loader") || cLower.includes("lora")) {
     return true;
   }
 
-  if (t === "load lora" || t.startsWith("load lora") || t === "lora loader" || t.startsWith("lora loader") || t.includes("lora slot")) {
+  // Title matches: e.g. "LoRA 1", "Character LoRA", "Style LoRA", "Detail LoRA", "Actor LoRA", "Load LoRA", "LoRA Loader"
+  if (t.includes("lora") || t.startsWith("load lora") || t.startsWith("lora loader") || t.includes("lora slot")) {
     return true;
   }
 

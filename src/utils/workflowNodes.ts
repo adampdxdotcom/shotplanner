@@ -1,4 +1,5 @@
 import { WorkflowNodeInfo, ParsedWorkflow } from "../types";
+import { isExactLoraLoader } from "../shared/comfyNodeClassifiers";
 
 /**
  * Categorize a node based on its title and ComfyUI class type.
@@ -7,6 +8,9 @@ export function categorizeWorkflowNode(classType: string = "", title: string = "
   const t = title.toLowerCase();
   const c = classType.toLowerCase();
 
+  if (isExactLoraLoader(classType, title)) {
+    return "LoRA Loader";
+  }
   if (c.includes("prompt") || c.includes("cliptextencode") || t.includes("prompt") || t.includes("positive") || t.includes("negative")) {
     return "Prompt";
   }
@@ -28,7 +32,7 @@ export function categorizeWorkflowNode(classType: string = "", title: string = "
   if (c.includes("video") || c.includes("frame") || c.includes("duration") || c.includes("animatediff") || t.includes("video") || t.includes("frame") || t.includes("length") || c.includes("wan") || c.includes("hunyuan") || c.includes("cogvideo")) {
     return "Video / Frames";
   }
-  if (c.includes("loader") || c.includes("checkpoint") || c.includes("lora") || c.includes("vae") || c.includes("clip") || c.includes("unet") || c.includes("model")) {
+  if (c.includes("loader") || c.includes("checkpoint") || c.includes("vae") || c.includes("clip") || c.includes("unet") || c.includes("model")) {
     return "Model / Weights";
   }
   if (c.includes("save") || c.includes("preview") || t.includes("save") || t.includes("preview") || t.includes("output")) {

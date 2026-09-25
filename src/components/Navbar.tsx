@@ -379,22 +379,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    setIsMenuOpen(false);
-                    if (onOpenDiagnostics) {
-                      onOpenDiagnostics();
-                    } else {
-                      onNavigate("config");
-                    }
-                  }}
-                  className="dropdown-item-btn w-full px-3 py-2 text-xs font-medium flex items-center gap-2.5 transition-colors text-left cursor-pointer text-slate-700 hover:text-slate-950 hover:bg-slate-100 dark:text-zinc-200 dark:hover:text-white dark:hover:bg-zinc-800/80"
-                >
-                  <Terminal className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                  <span>Diagnostics &amp; Logs</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
                     toggleTheme();
                   }}
                   className="dropdown-item-btn w-full px-3 py-2 text-xs font-medium text-slate-700 hover:text-slate-950 hover:bg-slate-100 dark:text-zinc-200 dark:hover:text-white dark:hover:bg-zinc-800/80 flex items-center justify-between transition-colors text-left cursor-pointer"

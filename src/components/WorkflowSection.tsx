@@ -94,9 +94,55 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
   const imageNodes = parsedWorkflow?.nodes_info?.image_loader_nodes || [];
   const videoNodes = parsedWorkflow?.nodes_info?.video_loader_nodes || [];
   const audioNodes = parsedWorkflow?.nodes_info?.audio_loader_nodes || [];
-  const loraNodes = parsedWorkflow?.nodes_info?.lora_loader_nodes || parsedWorkflow?.nodes_info?.lora_slots || [];
+  const autoLoraNodes = parsedWorkflow?.nodes_info?.lora_loader_nodes || parsedWorkflow?.nodes_info?.lora_slots || [];
 
   const activeShot = sceneProject.shots.find((s) => s.id === activeShotId);
+
+  // Compute full list of LoRA nodes combining auto-detection, inspector slot mappings (lora_1..lora_5), and saved assignments
+  const loraNodes = useMemo(() => {
+    const list: any[] = [...autoLoraNodes];
+    const allWorkflowNodes = parsedWorkflow?.nodes_info?.all_nodes || [];
+
+    // 1. Merge inspector-mapped slots (lora_1 through lora_5)
+    for (let i = 1; i <= 5; i++) {
+      const slotKey = `lora_${i}`;
+      const mappedNodeId = parameterNodeMappings?.[slotKey];
+      if (mappedNodeId && !list.some(n => String(n.id || n.node_id) === String(mappedNodeId))) {
+        const matchingNode = allWorkflowNodes.find((n: any) => String(n.id) === String(mappedNodeId));
+        list.push({
+          id: String(mappedNodeId),
+          node_id: String(mappedNodeId),
+          class_type: matchingNode?.class_type || "LoraLoader",
+          title: matchingNode?.title || `LoRA Slot ${i} (#${mappedNodeId})`,
+          category: "LoRA Loader",
+          mode: matchingNode?.mode ?? 0,
+          is_bypassed: matchingNode?.mode === 4
+        });
+      }
+    }
+
+    // 2. Merge any previously saved LoRA assignments on shot or scene
+    const assignedIds = new Set([
+      ...Object.keys(sceneProject.lora_slots || {}),
+      ...Object.keys(activeShot?.lora_slots || {})
+    ]);
+    assignedIds.forEach(id => {
+      if (id && !list.some(n => String(n.id || n.node_id) === String(id))) {
+        const matchingNode = allWorkflowNodes.find((n: any) => String(n.id) === String(id));
+        list.push({
+          id: String(id),
+          node_id: String(id),
+          class_type: matchingNode?.class_type || "LoraLoader",
+          title: matchingNode?.title || `LoRA Node #${id}`,
+          category: "LoRA Loader",
+          mode: 0,
+          is_bypassed: false
+        });
+      }
+    });
+
+    return list;
+  }, [autoLoraNodes, parameterNodeMappings, parsedWorkflow?.nodes_info?.all_nodes, sceneProject.lora_slots, activeShot?.lora_slots]);
 
   const handleAddBlankShot = () => {
     if (!onUpdateProject) return;
@@ -267,18 +313,6 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
                 activeShot={activeShot}
               />
 
-              <MediaLoaderMapper 
-                imageNodes={imageNodes}
-                videoNodes={videoNodes}
-                audioNodes={audioNodes}
-                activeShot={activeShot}
-                activeShotId={activeShotId}
-                nodeMappings={nodeMappings}
-                uploadedAssets={uploadedAssets}
-                onUpdateMapping={onUpdateMapping}
-                onUpdateShot={onUpdateShot}
-              />
-
               <LoraSlotMapper
                 loraNodes={loraNodes}
                 activeShot={activeShot}
@@ -290,6 +324,18 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
                     onUpdateProject(prev => ({ ...prev, lora_slots: slots }));
                   }
                 }}
+              />
+
+              <MediaLoaderMapper 
+                imageNodes={imageNodes}
+                videoNodes={videoNodes}
+                audioNodes={audioNodes}
+                activeShot={activeShot}
+                activeShotId={activeShotId}
+                nodeMappings={nodeMappings}
+                uploadedAssets={uploadedAssets}
+                onUpdateMapping={onUpdateMapping}
+                onUpdateShot={onUpdateShot}
               />
             </div>
           )

@@ -41,7 +41,7 @@ export const settingsApi = {
 
   // --- Civitai Settings ---
   getCivitaiKey(options?: RequestOptions) {
-    return apiClient.get<{ api_key: string; has_key: boolean }>("/api/settings/civitai", options);
+    return apiClient.get<{ configured: boolean; api_key: string | null; masked_key?: string | null; has_key?: boolean }>("/api/settings/civitai", options);
   },
   saveCivitaiKey(apiKey: string, options?: RequestOptions) {
     return apiClient.post<{ message: string }>("/api/settings/civitai", { api_key: apiKey }, options);

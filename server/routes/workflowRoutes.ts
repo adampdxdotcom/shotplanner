@@ -159,6 +159,8 @@ router.post("/parse", (req: Request, res: Response) => {
         image_loader_nodes: parsed.imageLoaderNodes,
         video_loader_nodes: parsed.videoLoaderNodes,
         audio_loader_nodes: parsed.audioLoaderNodes,
+        lora_loader_nodes: parsed.loraLoaderNodes,
+        lora_slots: parsed.loraSlots,
         other_nodes: parsed.otherNodes,
         all_nodes: parsed.allNodes || [],
         detected_nodes: parsed.detectedNodes,
@@ -264,6 +266,9 @@ router.post("/remote-get", async (req: Request, res: Response) => {
           image_loader_nodes: parsed.imageLoaderNodes,
           video_loader_nodes: parsed.videoLoaderNodes,
           audio_loader_nodes: parsed.audioLoaderNodes,
+          lora_loader_nodes: parsed.loraLoaderNodes,
+          lora_slots: parsed.loraSlots,
+          all_nodes: parsed.allNodes || [],
           detected_nodes: parsed.detectedNodes,
           total_nodes: parsed.totalNodes
         }

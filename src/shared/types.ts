@@ -67,12 +67,24 @@ export interface ParameterNodeMappings {
   steps: string;
   megapixels: string;
   frames: string;
+  lora_1?: string;
+  lora_2?: string;
+  lora_3?: string;
+  lora_4?: string;
+  lora_5?: string;
+  [key: string]: string | undefined;
 }
 
 export interface DetectedNodes {
   steps: string | null;
   megapixels: string | null;
   frames: string | null;
+  lora_1?: string | null;
+  lora_2?: string | null;
+  lora_3?: string | null;
+  lora_4?: string | null;
+  lora_5?: string | null;
+  [key: string]: string | null | undefined;
 }
 
 // ---------------------------------------------------------------------------

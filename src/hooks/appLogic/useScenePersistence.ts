@@ -51,7 +51,7 @@ interface UseScenePersistenceParams {
   setNodeMappings: (mappings: Record<string, string>) => void;
   bypassMissing: boolean;
   setBypassMissing: (bypass: boolean) => void;
-  fetchWorkflows: () => Promise<void>;
+  fetchWorkflows: (targetScene?: string) => Promise<any>;
   addToast: (text: string, type?: "success" | "error" | "info") => void;
   getShotOperationsDelegate?: () => Partial<ShotOperationsDelegate>;
 }
