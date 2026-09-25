@@ -48,6 +48,7 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
   onSelectAsset
 }) => {
   const [assetType, setAssetType] = useState<string>("Headshot");
+  const [customType, setCustomType] = useState<string>("");
   const [selectedModifier, setSelectedModifier] = useState<string>("");
   const [subjectName, setSubjectName] = useState<string>("");
   const [description, setDescription] = useState<string>("");
@@ -64,11 +65,18 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
   const activeXhrRef = useRef<XMLHttpRequest | null>(null);
   const visionState = useVisionCaption(config);
 
-  const modifierConfig = useMemo(() => getModifierConfig(assetType), [assetType]);
+  const effectiveType = useMemo(() => {
+    if (assetType === "Other") {
+      return customType.trim() || "Other";
+    }
+    return assetType;
+  }, [assetType, customType]);
+
+  const modifierConfig = useMemo(() => getModifierConfig(effectiveType) || getModifierConfig(assetType), [effectiveType, assetType]);
 
   const handleModifierChange = (modValue: string) => {
     setSelectedModifier(modValue);
-    setDescription(prev => updateDescriptionWithModifier(prev, assetType, modValue));
+    setDescription(prev => updateDescriptionWithModifier(prev, effectiveType, modValue));
   };
   
   const [uploadModalTab, setUploadModalTab] = useState<"upload" | "library">("upload");
@@ -76,33 +84,61 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
   const [libraryFilter, setLibraryFilter] = useState("All");
   const [selectedLibraryAsset, setSelectedLibraryAsset] = useState<MediaAsset | null>(null);
 
-  // Reset/clean up or initialize state on open/close
+  // Comprehensive modal state reset to ensure a blank slate
+  const resetModalFields = () => {
+    if (activeXhrRef.current) {
+      try { activeXhrRef.current.abort(); } catch (e) {}
+      activeXhrRef.current = null;
+    }
+    if (stagedPreviewUrl) {
+      revokeManagedBlobUrl(stagedPreviewUrl);
+    }
+    setStagedFile(null);
+    setStagedPreviewUrl(null);
+    setSubjectName("");
+    setDescription("");
+    setSelectedModifier("");
+    setAssetType("Headshot");
+    setCustomType("");
+    setUploadError(null);
+    setUploading(false);
+    setUploadProgress(0);
+    setIsCaptioning(false);
+    setCaptionToast(null);
+    setIsDraggingOver(false);
+    setSelectedLibraryAsset(null);
+    setLibrarySearch("");
+    setLibraryFilter("All");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const handleClose = () => {
+    resetModalFields();
+    onClose();
+  };
+
+  // Keyboard shortcut (Escape) to close cleanly
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isOpen && !uploading) {
+        handleClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, uploading]);
+
+  // Reset all state when modal opens, slot changes, or modal closes: modal starts blank every time
   useEffect(() => {
     if (isOpen) {
-      if (initialModalTab) {
-        setUploadModalTab(initialModalTab);
-      }
-      if (defaultSubject) {
-        setSubjectName(defaultSubject);
-      }
+      setUploadModalTab(initialModalTab || "upload");
+      resetModalFields();
     } else {
-      if (activeXhrRef.current) {
-        try { activeXhrRef.current.abort(); } catch (e) {}
-        activeXhrRef.current = null;
-      }
-      if (stagedPreviewUrl) {
-        revokeManagedBlobUrl(stagedPreviewUrl);
-      }
-      setStagedFile(null);
-      setStagedPreviewUrl(null);
-      setUploadError(null);
-      setUploading(false);
-      setUploadProgress(0);
-      setIsCaptioning(false);
-      setCaptionToast(null);
-      setIsDraggingOver(false);
+      resetModalFields();
     }
-  }, [isOpen, initialModalTab, defaultSubject]);
+  }, [isOpen, initialModalTab, uploadModalSlot?.index, uploadModalSlot?.type]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -157,14 +193,14 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
   }, [libraryAssets, libraryFilter, librarySearch, uploadModalSlot, activeTab]);
 
   // Request vision caption for staged file
-  const handleRequestVisionCaption = async (fileToDescribe: File) => {
+  const handleRequestVisionCaption = async (fileToDescribe: File, typeOverride?: string, subjectOverride?: string) => {
     if (!visionState.canCaption) return;
     setIsCaptioning(true);
     setCaptionToast(null);
     try {
       const res = await generateCaptionForFile(fileToDescribe, {
-        contextType: assetType,
-        subjectName: subjectName.trim(),
+        contextType: typeOverride || assetType,
+        subjectName: (subjectOverride !== undefined ? subjectOverride : subjectName).trim(),
         sceneName: sceneName,
         lmStudioUrl: visionState.lmStudioUrl
       });
@@ -192,10 +228,19 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
     setStagedFile(file);
     setStagedPreviewUrl(url);
     setUploadError(null);
+    setUploadProgress(0);
 
-    // If auto-caption is active for image assets, trigger auto caption
+    // Modal starts blank when the user uploads or replaces an image
+    setSubjectName("");
+    setDescription("");
+    setSelectedModifier("");
+    setAssetType("Headshot");
+    setCustomType("");
+    setCaptionToast(null);
+
+    // If auto-caption is active for image assets, trigger auto caption with blank subject
     if (activeTab === "image" && visionState.autoCaption) {
-      handleRequestVisionCaption(file);
+      handleRequestVisionCaption(file, "Headshot", "");
     }
   };
 
@@ -227,7 +272,7 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
 
     if (targetMediaType === "image") {
       formData.append("subject_name", subjectName.trim() || "subject");
-      formData.append("type", assetType);
+      formData.append("type", effectiveType);
       formData.append("description", description.trim());
     } else if (targetMediaType === "audio") {
       formData.append("subject_name", subjectName.trim() || "voice");
@@ -275,13 +320,13 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
       
       const newAsset = await p;
       setUploading(false);
-      
+
       if (uploadModalSlot && onAssetUploaded) {
         onAssetUploaded(newAsset, uploadModalSlot.index, uploadModalSlot.type);
       } else if (onSelectAsset) {
         onSelectAsset(newAsset);
       }
-      onClose();
+      handleClose();
     } catch (err: any) {
       setUploading(false);
       setUploadError(err.message);
@@ -292,12 +337,13 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
 
   const handleAssignExistingAsset = () => {
     if (!selectedLibraryAsset) return;
+    const assetToAssign = selectedLibraryAsset;
     if (uploadModalSlot && onAssetUploaded) {
-      onAssetUploaded(selectedLibraryAsset, uploadModalSlot.index, uploadModalSlot.type);
+      onAssetUploaded(assetToAssign, uploadModalSlot.index, uploadModalSlot.type);
     } else if (onSelectAsset) {
-      onSelectAsset(selectedLibraryAsset);
+      onSelectAsset(assetToAssign);
     }
-    onClose();
+    handleClose();
   };
 
   if (!isOpen) return null;
@@ -307,10 +353,17 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
 
   // Let's compute a simple preview filename
   const sanitize = (s: string) => s.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-  const previewFilename = `${sanitize(assetType)}_${sanitize(subjectName || "subject")}_<timestamp>.${activeTab === "image" ? "png" : activeTab === "audio" ? "mp3" : "mp4"}`;
+  const previewFilename = `${sanitize(effectiveType)}_${sanitize(subjectName || "subject")}_<timestamp>.${activeTab === "image" ? "png" : activeTab === "audio" ? "mp3" : "mp4"}`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 dark:bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 dark:bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-150"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !uploading) {
+          handleClose();
+        }
+      }}
+    >
       <div className="bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-700 rounded-xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-150">
         <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/80 dark:bg-zinc-950/50">
           <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
@@ -318,7 +371,7 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
             {customTitle || (uploadModalSlot ? `Assign ${uploadModalSlot.type.toUpperCase()} to Slot ${uploadModalSlot.index + 1}` : `Select or Upload Reference Asset`)}
           </h3>
           <button 
-            onClick={onClose} 
+            onClick={handleClose} 
             className="text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-white p-1 rounded-md hover:bg-zinc-200/60 dark:hover:bg-zinc-800 transition-colors cursor-pointer" 
             disabled={uploading}
           >
@@ -406,8 +459,8 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
                       {assetType === "Other" && (
                         <input
                           type="text"
-                          value={assetType}
-                          onChange={(e) => setAssetType(e.target.value)}
+                          value={customType}
+                          onChange={(e) => setCustomType(e.target.value)}
                           placeholder="Custom type..."
                           className="flex-1 bg-white dark:bg-zinc-950 border-2 border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-white focus:border-amber-500 transition-colors outline-none shadow-2xs"
                         />
@@ -517,11 +570,7 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
                       </button>
                       <button
                         type="button"
-                        onClick={() => {
-                          if (stagedPreviewUrl) revokeManagedBlobUrl(stagedPreviewUrl);
-                          setStagedFile(null);
-                          setStagedPreviewUrl(null);
-                        }}
+                        onClick={resetModalFields}
                         disabled={uploading}
                         className="px-2.5 py-1 text-[11px] font-medium bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-950/50 dark:hover:bg-red-900 dark:text-red-300 rounded transition-colors cursor-pointer"
                       >
@@ -564,7 +613,7 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
               <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800 flex justify-end gap-2.5 mt-auto">
                 <button
                   type="button"
-                  onClick={onClose}
+                  onClick={handleClose}
                   disabled={uploading}
                   className="px-4 py-2 text-xs font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors cursor-pointer"
                 >
