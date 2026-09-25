@@ -16,6 +16,7 @@ export const CIVITAI_CONFIG_FILE = path.join(SERVER_CONFIG_DIR, "civitai_config.
 export const CIVITAI_FAVORITES_FILE = path.join(SERVER_CONFIG_DIR, "civitai_favorites.json");
 export const HUGGINGFACE_CONFIG_FILE = path.join(SERVER_CONFIG_DIR, "huggingface_config.json");
 export const RUNPOD_CONFIG_FILE = path.join(SERVER_CONFIG_DIR, "runpod_config.json");
+export const REMOTE_CONFIG_FILE = path.join(SERVER_CONFIG_DIR, "remote_config.json");
 export const ASSET_DB_FILE = path.join(ASSETS_DIR, "assets_db.json");
 export const UNIVERSE_DIR = path.join(ASSETS_DIR, "universe");
 export const UNIVERSE_CHARACTERS_FILE = path.join(UNIVERSE_DIR, "characters.json");

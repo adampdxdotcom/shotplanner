@@ -125,4 +125,14 @@ export const settingsApi = {
       options
     );
   },
+  getRemoteSettings(options?: RequestOptions) {
+    return apiClient.get<Record<string, any>>("/api/settings/remote", options);
+  },
+  saveRemoteSettings(settings: Record<string, any>, options?: RequestOptions) {
+    return apiClient.post<{ success: boolean; settings?: any }>(
+      "/api/settings/remote",
+      settings,
+      options
+    );
+  },
 };

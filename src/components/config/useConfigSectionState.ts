@@ -178,6 +178,10 @@ export function useConfigSectionState({
     onChange({ ...config, [field]: value });
   };
 
+  const handleBatchUpdate = (updates: Partial<AppConfig>) => {
+    onChange({ ...config, ...updates });
+  };
+
   const handleProviderSelect = (provider: LLMProvider) => {
     if (onChangeProvider) {
       onChangeProvider(provider);
@@ -359,17 +363,29 @@ export function useConfigSectionState({
     try {
       const data: any = await settingsApi.generateSshKeyPair();
       if (data && data.private_key && data.public_key) {
+        try {
+          localStorage.setItem("ssh_private_key", data.private_key);
+          localStorage.setItem("ssh_public_key", data.public_key);
+        } catch (e) {}
+
         // Unconditionally persist generated key pair into application state
         onChange({
           ...config,
           ssh_private_key: data.private_key,
           ssh_public_key: data.public_key
         });
+
+        // Persist directly to server
+        settingsApi.saveRemoteSettings({
+          ssh_private_key: data.private_key,
+          ssh_public_key: data.public_key
+        }).catch(() => {});
+
         setGeneratedKeyPair(data);
-        setShowPublicKeyModal(false);
+        setShowPublicKeyModal(true);
         setHasCopiedPublicKey(false);
         if (onShowToast) {
-          onShowToast("Generated fresh SSH keypair! Fields updated below.", "success");
+          onShowToast("Generated fresh SSH keypair! Saved to configuration.", "success");
         }
       } else {
         throw new Error(data?.error || data?.detail || "Failed to generate key pair");
@@ -429,6 +445,7 @@ export function useConfigSectionState({
     availableModels,
     handleSelectModel,
     handleInputChange,
+    handleBatchUpdate,
     handleProviderSelect,
     handleDeactivateGemini,
     handleTestLMStudio,

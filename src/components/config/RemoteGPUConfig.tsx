@@ -9,6 +9,7 @@ import { settingsApi } from "../../api";
 export interface RemoteGPUConfigProps {
   config: AppConfig;
   handleInputChange: (field: keyof AppConfig, value: any) => void;
+  handleBatchUpdate?: (updates: Partial<AppConfig>) => void;
   handleGenerateKeyPair: () => void;
   isGeneratingKeyPair: boolean;
   generatedKeyPair?: { public_key: string; private_key: string } | null;
@@ -21,6 +22,7 @@ type SSHConnectionStatus = "untested" | "testing" | "connected" | "error";
 export const RemoteGPUConfig: React.FC<RemoteGPUConfigProps> = ({
   config,
   handleInputChange,
+  handleBatchUpdate,
   handleGenerateKeyPair,
   isGeneratingKeyPair,
   generatedKeyPair,
@@ -114,6 +116,7 @@ export const RemoteGPUConfig: React.FC<RemoteGPUConfigProps> = ({
       <RunpodPodManagerCard
         config={config}
         handleInputChange={handleInputChange}
+        onBatchUpdateConfig={handleBatchUpdate}
         onShowToast={onShowToast}
         effectivePublicKey={effectivePublicKey}
       />

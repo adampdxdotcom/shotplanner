@@ -4,6 +4,7 @@ import { getStoredCivitaiKey, saveCivitaiKey, removeCivitaiKey } from "../servic
 import { getStoredHuggingFaceToken, saveHuggingFaceToken, removeHuggingFaceToken } from "../services/huggingfaceService";
 import { getStoredRunpodApiKey, saveRunpodApiKey, removeRunpodApiKey } from "../services/runpodService";
 import { getStoredLLMSettings, saveStoredLLMSettings } from "../services/llmSettingsService";
+import { getStoredRemoteSettings, saveStoredRemoteSettings } from "../services/remoteSettingsService";
 import { detectVisionCapability } from "../services/visionCaptionService";
 import { createScopedLogger } from "../utils/logger";
 
@@ -24,6 +25,22 @@ router.get("/llm", (req: Request, res: Response) => {
  */
 router.post("/llm", (req: Request, res: Response) => {
   const settings = saveStoredLLMSettings(req.body || {});
+  res.json({ success: true, settings });
+});
+
+/**
+ * Get stored remote server, GPU, and SSH configuration
+ */
+router.get("/remote", (req: Request, res: Response) => {
+  const settings = getStoredRemoteSettings();
+  res.json(settings);
+});
+
+/**
+ * Save stored remote server, GPU, and SSH configuration
+ */
+router.post("/remote", (req: Request, res: Response) => {
+  const settings = saveStoredRemoteSettings(req.body || {});
   res.json({ success: true, settings });
 });
 

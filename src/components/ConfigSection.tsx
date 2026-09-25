@@ -61,6 +61,7 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({
     availableModels,
     handleSelectModel,
     handleInputChange,
+    handleBatchUpdate,
     handleProviderSelect,
     handleDeactivateGemini,
     handleTestLMStudio,
@@ -119,12 +120,18 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({
         <RemoteServerTab
           config={config}
           handleInputChange={handleInputChange}
+          handleBatchUpdate={handleBatchUpdate}
           handleTestSSH={handleTestSSH}
           testingSSH={testingSSH}
           testResult={testResult}
           handleGenerateKeyPair={handleGenerateKeyPair}
           isGeneratingKeyPair={isGeneratingKeyPair}
           generatedKeyPair={generatedKeyPair}
+          showPublicKeyModal={showPublicKeyModal}
+          onClosePublicKeyModal={() => setShowPublicKeyModal(false)}
+          hasCopiedPublicKey={hasCopiedPublicKey}
+          onCopyPublicKey={handleCopyPublicKey}
+          onDownloadFile={handleDownloadFile}
           onShowToast={onShowToast}
         />
       )}

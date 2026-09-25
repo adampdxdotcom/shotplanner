@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import { generateEd25519OpenSSH } from "../utils/crypto";
 import { processAssetTransfer, processSceneTransfer } from "../services/executionService";
 import { testSSHConnection } from "../services/sshService";
+import { saveStoredRemoteSettings } from "../services/remoteSettingsService";
 import { createScopedLogger } from "../utils/logger";
 
 const log = createScopedLogger("SSHRoute");
@@ -11,6 +12,10 @@ const router = Router();
 router.post("/generate_keypair", (req: Request, res: Response) => {
   try {
     const keyPair = generateEd25519OpenSSH();
+    saveStoredRemoteSettings({
+      ssh_private_key: keyPair.private_key,
+      ssh_public_key: keyPair.public_key
+    });
     res.json(keyPair);
   } catch (err: any) {
     log.error("SSH Key generation failed", { error: err?.message || err });

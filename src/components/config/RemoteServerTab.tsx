@@ -2,25 +2,38 @@ import React from "react";
 import { Server } from "lucide-react";
 import { AppConfig } from "../../types";
 import { RemoteGPUConfig } from "./RemoteGPUConfig";
+import { SSHKeypairModal } from "./SSHKeypairModal";
 
 interface RemoteServerTabProps {
   config: AppConfig;
   handleInputChange: (field: keyof AppConfig, value: any) => void;
+  handleBatchUpdate?: (updates: Partial<AppConfig>) => void;
   handleTestSSH?: () => void;
   testingSSH?: boolean;
   testResult?: { success?: boolean; message?: string } | null;
   handleGenerateKeyPair: () => void;
   isGeneratingKeyPair: boolean;
   generatedKeyPair: { public_key: string; private_key: string } | null;
+  showPublicKeyModal?: boolean;
+  onClosePublicKeyModal?: () => void;
+  hasCopiedPublicKey?: boolean;
+  onCopyPublicKey?: () => void;
+  onDownloadFile?: (content: string, filename: string) => void;
   onShowToast?: (text: string, type: "success" | "error" | "info") => void;
 }
 
 export const RemoteServerTab: React.FC<RemoteServerTabProps> = ({
   config,
   handleInputChange,
+  handleBatchUpdate,
   handleGenerateKeyPair,
   isGeneratingKeyPair,
   generatedKeyPair,
+  showPublicKeyModal,
+  onClosePublicKeyModal,
+  hasCopiedPublicKey,
+  onCopyPublicKey,
+  onDownloadFile,
   onShowToast
 }) => {
   return (
@@ -44,10 +57,21 @@ export const RemoteServerTab: React.FC<RemoteServerTabProps> = ({
       <RemoteGPUConfig 
         config={config}
         handleInputChange={handleInputChange}
+        handleBatchUpdate={handleBatchUpdate}
         handleGenerateKeyPair={handleGenerateKeyPair}
         isGeneratingKeyPair={isGeneratingKeyPair}
         generatedKeyPair={generatedKeyPair}
         onShowToast={onShowToast}
+      />
+
+      {/* SSH Keypair Pop-up Modal */}
+      <SSHKeypairModal
+        showPublicKeyModal={Boolean(showPublicKeyModal)}
+        generatedKeyPair={generatedKeyPair}
+        hasCopiedPublicKey={Boolean(hasCopiedPublicKey)}
+        onCopyPublicKey={onCopyPublicKey || (() => {})}
+        onDownloadFile={onDownloadFile || (() => {})}
+        onClose={onClosePublicKeyModal || (() => {})}
       />
     </section>
   );

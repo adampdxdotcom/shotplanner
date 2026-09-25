@@ -7,6 +7,7 @@ import { RunpodPodStatsCard } from "./RunpodPodStatsCard";
 interface RunpodPodManagerCardProps {
   config: AppConfig;
   handleInputChange: (field: keyof AppConfig, value: any) => void;
+  onBatchUpdateConfig?: (updates: Partial<AppConfig>) => void;
   onShowToast?: (text: string, type: "success" | "error" | "info") => void;
   effectivePublicKey?: string;
 }
@@ -16,6 +17,7 @@ type ConnectionStatus = "untested" | "testing" | "connected" | "error";
 export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
   config,
   handleInputChange,
+  onBatchUpdateConfig,
   onShowToast,
   effectivePublicKey
 }) => {
@@ -261,14 +263,30 @@ export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
   const handleConnectPod = (pod: RunpodPodItem, silent: boolean = false) => {
     if (!pod) return;
 
+    const updates: Partial<AppConfig> = {};
     if (pod.ip) {
-      handleInputChange("remote_host", pod.ip);
+      updates.remote_host = pod.ip;
     }
     if (pod.sshPort) {
-      handleInputChange("ssh_port", pod.sshPort);
+      updates.ssh_port = pod.sshPort;
     }
     if (pod.comfyUrl) {
-      handleInputChange("comfyui_api_url", pod.comfyUrl);
+      updates.comfyui_api_url = pod.comfyUrl;
+    }
+
+    if (onBatchUpdateConfig) {
+      onBatchUpdateConfig(updates);
+    } else {
+      let merged = { ...config, ...updates };
+      Object.entries(updates).forEach(([k, v]) => {
+        handleInputChange(k as keyof AppConfig, v);
+      });
+      // Ensure all fields in updates are applied together
+      if (typeof handleInputChange === "function") {
+        Object.keys(updates).forEach((k) => {
+          (config as any)[k] = updates[k as keyof AppConfig];
+        });
+      }
     }
 
     const msg = `Connected Pod '${pod.name}': Host ${pod.ip}:${pod.sshPort}, ComfyUI ${pod.comfyUrl}`;
@@ -463,7 +481,14 @@ export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
           <div className="flex flex-col sm:flex-row items-center gap-2">
             <select
               value={selectedPodId}
-              onChange={(e) => setSelectedPodId(e.target.value)}
+              onChange={(e) => {
+                const nextId = e.target.value;
+                setSelectedPodId(nextId);
+                const chosenPod = pods.find(p => p.id === nextId);
+                if (chosenPod) {
+                  handleConnectPod(chosenPod, false);
+                }
+              }}
               className="flex-1 w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-zinc-200 outline-none focus:border-blue-500 font-mono"
             >
               {pods.map((p) => (
