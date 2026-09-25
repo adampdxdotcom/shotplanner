@@ -29,6 +29,7 @@ export function useAppLogic() {
   // Mutable delegate ref to bridge shot operations to persistence actions
   const shotOpsRef = useRef<Partial<ShotOperationsDelegate>>({});
   const updateActiveShotRef = useRef<((updater: (shot: any) => any) => void) | null>(null);
+  const activeSceneNameRef = useRef<string>("");
 
   // Forward bridge for shot param updates from workflow controls
   const handleUpdateActiveShotParams = useCallback((updater: (shot: any) => any) => {
@@ -61,7 +62,7 @@ export function useAppLogic() {
     fetchWorkflows,
     syncRemoteWorkflow
   } = useWorkflowManagement({
-    activeSceneName: "",
+    getActiveSceneName: () => activeSceneNameRef.current,
     onUpdateActiveShotParams: handleUpdateActiveShotParams
   });
 
@@ -112,6 +113,9 @@ export function useAppLogic() {
     addToast,
     getShotOperationsDelegate: useCallback(() => shotOpsRef.current, [])
   });
+
+  // Keep activeSceneNameRef synchronized with live project scene name
+  activeSceneNameRef.current = sceneProject?.scene_name || currentProjectName || "";
 
   // 5. Cast & Character Management
   const {

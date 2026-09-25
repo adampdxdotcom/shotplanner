@@ -85,6 +85,11 @@ export const WorkflowFileSelector: React.FC<WorkflowFileSelectorProps> = ({
                   </option>
                 );
               })}
+              {selectedWorkflowFile && !workflows.some((w: any) => (typeof w === "string" ? w : w.filename) === selectedWorkflowFile) && (
+                <option value={selectedWorkflowFile}>
+                  {selectedWorkflowFile.replace(/\.json$/i, "").replace(/[_-]/g, " ")}
+                </option>
+              )}
             </select>
             <button
               onClick={onRefreshWorkflows}

@@ -50,11 +50,12 @@ export function listWorkflows(sceneName?: string) {
     }
   };
 
-  // 1. If scene specified, scan scene workflows first
+  // 1. If scene specified, scan scene workflows first (highest priority)
   if (sceneName) {
     const sceneFolder = formatSceneFolderName(sceneName);
     scanDir(getSceneDirectories(sceneName).workflows, sceneFolder, `/assets/${sceneFolder}/workflows`);
     scanDir(path.join(WORKFLOWS_DIR, sceneFolder), sceneFolder, `/assets/workflows/${sceneFolder}`);
+    scanDir(path.join(ASSETS_DIR, sceneFolder, "workflows"), sceneFolder, `/assets/${sceneFolder}/workflows`);
   }
 
   // 2. Scan top-level WORKFLOWS_DIR and process.cwd() workflows for global base templates
@@ -64,30 +65,28 @@ export function listWorkflows(sceneName?: string) {
     scanDir(topLevelWfDir, undefined, "/workflows");
   }
 
-  // 3. Only scan other project directories if no scene was specified
-  if (!sceneName) {
-    if (fs.existsSync(ASSETS_DIR)) {
-      try {
-        const dirs = fs.readdirSync(ASSETS_DIR, { withFileTypes: true });
-        for (const d of dirs) {
-          if (d.isDirectory() && d.name !== "workflows" && d.name !== "uploads") {
-            const sceneWfDir = path.join(ASSETS_DIR, d.name, "workflows");
-            scanDir(sceneWfDir, d.name, `/assets/${d.name}/workflows`);
-          }
+  // 3. Scan all project and scene directories in ASSETS_DIR and WORKFLOWS_DIR so any uploaded workflow is discoverable
+  if (fs.existsSync(ASSETS_DIR)) {
+    try {
+      const dirs = fs.readdirSync(ASSETS_DIR, { withFileTypes: true });
+      for (const d of dirs) {
+        if (d.isDirectory() && d.name !== "workflows" && d.name !== "uploads" && d.name !== "tmp_uploads" && d.name !== ".aistudio") {
+          const sceneWfDir = path.join(ASSETS_DIR, d.name, "workflows");
+          scanDir(sceneWfDir, d.name, `/assets/${d.name}/workflows`);
         }
-      } catch {}
-    }
+      }
+    } catch {}
+  }
 
-    if (fs.existsSync(WORKFLOWS_DIR)) {
-      try {
-        const dirs = fs.readdirSync(WORKFLOWS_DIR, { withFileTypes: true });
-        for (const d of dirs) {
-          if (d.isDirectory()) {
-            scanDir(path.join(WORKFLOWS_DIR, d.name), d.name, `/assets/workflows/${d.name}`);
-          }
+  if (fs.existsSync(WORKFLOWS_DIR)) {
+    try {
+      const dirs = fs.readdirSync(WORKFLOWS_DIR, { withFileTypes: true });
+      for (const d of dirs) {
+        if (d.isDirectory() && d.name !== "workflows") {
+          scanDir(path.join(WORKFLOWS_DIR, d.name), d.name, `/assets/workflows/${d.name}`);
         }
-      } catch {}
-    }
+      }
+    } catch {}
   }
 
   const workflowItems = Array.from(workflowMap.values());
@@ -127,6 +126,18 @@ export function resolveWorkflowTemplate(
     candidates.push(path.join(WORKFLOWS_DIR, cleanRequested));
     candidates.push(path.join(ASSETS_DIR, "workflows", cleanRequested));
     candidates.push(path.join(process.cwd(), "workflows", cleanRequested));
+
+    // Check all other scene workflow directories for the requested file
+    if (fs.existsSync(ASSETS_DIR)) {
+      try {
+        const dirs = fs.readdirSync(ASSETS_DIR, { withFileTypes: true });
+        for (const d of dirs) {
+          if (d.isDirectory() && d.name !== "workflows" && d.name !== "uploads" && d.name !== "tmp_uploads" && d.name !== ".aistudio") {
+            candidates.push(path.join(ASSETS_DIR, d.name, "workflows", cleanRequested));
+          }
+        }
+      } catch {}
+    }
   }
 
   // Fallback candidate templates

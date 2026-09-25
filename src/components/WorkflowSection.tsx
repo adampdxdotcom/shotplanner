@@ -205,7 +205,9 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
     try {
       const data: any = await workflowsApi.upload(formData);
       if (data && data.filename) {
-        onRefreshWorkflows();
+        if (onRefreshWorkflows) {
+          await onRefreshWorkflows();
+        }
         onSelectWorkflow(data.filename);
         if (activeShotId) {
           onUpdateShot(prev => ({ ...prev, workflow_file: data.filename }));

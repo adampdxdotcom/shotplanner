@@ -3,12 +3,14 @@ import { WorkflowItem, ParsedWorkflow, GenerationParameters, ParameterNodeMappin
 import { apiClient } from '../../api';
 
 interface UseWorkflowManagementParams {
-  activeSceneName: string;
+  activeSceneName?: string;
+  getActiveSceneName?: () => string;
   onUpdateActiveShotParams?: (updater: (shot: any) => any) => void;
 }
 
 export function useWorkflowManagement({
-  activeSceneName,
+  activeSceneName = "",
+  getActiveSceneName,
   onUpdateActiveShotParams
 }: UseWorkflowManagementParams) {
   const [workflows, setWorkflows] = useState<WorkflowItem[]>([]);
@@ -69,9 +71,9 @@ export function useWorkflowManagement({
     }
   }, [onUpdateActiveShotParams]);
 
-  const fetchWorkflows = useCallback(async () => {
+  const fetchWorkflows = useCallback(async (targetScene?: string) => {
     try {
-      const activeName = activeSceneName || "Untitled_Scene";
+      const activeName = targetScene || (getActiveSceneName ? getActiveSceneName() : activeSceneName) || "Untitled_Scene";
       const data: any = await apiClient.get("/api/workflows", { params: { scene: activeName } });
       const rawList: any[] = data.workflow_items || data.workflows || [];
       const normalized: WorkflowItem[] = rawList.map((item: any) => {
@@ -94,10 +96,12 @@ export function useWorkflowManagement({
       if (normalized.length > 0 && !selectedWorkflowFile) {
         setSelectedWorkflowFile(normalized[0].filename);
       }
+      return normalized;
     } catch (e) {
       console.error("Failed to load workflows", e);
+      return [];
     }
-  }, [activeSceneName, selectedWorkflowFile]);
+  }, [activeSceneName, getActiveSceneName, selectedWorkflowFile]);
 
   // Parse workflow when selection changes
   useEffect(() => {
@@ -105,7 +109,7 @@ export function useWorkflowManagement({
 
     const parseSelectedWorkflow = async () => {
       try {
-        const activeName = activeSceneName || "Untitled_Scene";
+        const activeName = (getActiveSceneName ? getActiveSceneName() : activeSceneName) || "Untitled_Scene";
         const data: any = await apiClient.post("/api/workflows/parse", {
           filename: selectedWorkflowFile,
           scene_name: activeName
