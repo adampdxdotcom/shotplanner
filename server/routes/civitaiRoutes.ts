@@ -5,7 +5,8 @@ import {
   getStoredCivitaiKey,
   getStoredCivitaiFavorites,
   saveCivitaiFavorite,
-  deleteCivitaiFavorite
+  deleteCivitaiFavorite,
+  searchCivitaiModels
 } from "../services/civitaiService";
 import { createScopedLogger } from "../utils/logger";
 
@@ -74,6 +75,45 @@ router.delete("/favorites/:version_id", (req: Request, res: Response) => {
     return res.status(500).json({
       success: false,
       error: err.message || "Failed to delete favorite."
+    });
+  }
+});
+
+/**
+ * GET /api/civitai/search
+ * Search Civitai models by keyword, type, base model, and sort
+ */
+router.get("/search", async (req: Request, res: Response) => {
+  try {
+    const query = (req.query.query || req.query.q || "").toString();
+    const tag = (req.query.tag || "").toString();
+    const baseModel = (req.query.base_model || req.query.baseModel || "").toString();
+    const type = (req.query.type || "").toString();
+    const sort = (req.query.sort || "Highest Rated").toString();
+    const limit = Number(req.query.limit) || 20;
+    const page = Number(req.query.page) || 1;
+    const nsfw = req.query.nsfw === "true";
+
+    const types = type ? [type] : ["LORA", "LoCon", "DoRA"];
+    const baseModels = baseModel ? [baseModel] : undefined;
+
+    const data = await searchCivitaiModels({
+      query,
+      tag,
+      types,
+      baseModels,
+      sort,
+      limit,
+      page,
+      nsfw
+    });
+
+    return res.json(data);
+  } catch (err: any) {
+    log.error("Civitai Search Error", { error: err?.message || err });
+    return res.status(500).json({
+      success: false,
+      error: err.message || "Failed to search Civitai models."
     });
   }
 });

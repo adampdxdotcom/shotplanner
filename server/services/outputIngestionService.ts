@@ -254,6 +254,7 @@ export async function downloadAndIngestTake(options: {
           generation_params: targetShot.generation_params,
           sampling_steps: targetShot.generation_params?.steps,
           assigned_slots: targetShot.assigned_slots ? { ...targetShot.assigned_slots } : undefined,
+          lora_slots: targetShot.lora_slots ? JSON.parse(JSON.stringify(targetShot.lora_slots)) : undefined,
           review_status: "unreviewed",
           rating: null,
           file_size: fileSize,

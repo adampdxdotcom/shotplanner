@@ -413,6 +413,12 @@ export const LLMSection: React.FC<LLMSectionProps> = ({
             });
             setReviewTakeId(null);
           }}
+          onRestoreLoras={(loraSlots) => {
+            onUpdateShot((prev) => ({
+              ...prev,
+              lora_slots: JSON.parse(JSON.stringify(loraSlots))
+            }));
+          }}
         />
       )}
 

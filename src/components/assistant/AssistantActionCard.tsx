@@ -8,6 +8,7 @@ import { UpdateCharacterActionCard } from "./actionCards/UpdateCharacterActionCa
 import { StageShotAssetsActionCard } from "./actionCards/StageShotAssetsActionCard";
 import { ExpandShotPromptActionCard } from "./actionCards/ExpandShotPromptActionCard";
 import { SaveVisualAnalysisActionCard } from "./actionCards/SaveVisualAnalysisActionCard";
+import { TransferLoraActionCard } from "./actionCards/TransferLoraActionCard";
 import { CharacterProfile, MediaAsset, ShotItem } from "../../types";
 
 interface AssistantActionCardProps {
@@ -152,6 +153,16 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
           onApply={() => onApply(action)}
           onDismiss={() => onDismiss?.(action)}
           onUndo={() => onUndo?.(action)}
+        />
+      );
+
+    case "transfer_lora_to_remote":
+      return (
+        <TransferLoraActionCard
+          action={action}
+          isApplied={isApplied}
+          onApply={onApply}
+          onDismiss={onDismiss}
         />
       );
 

@@ -22,7 +22,8 @@ import {
   Video, 
   Aperture, 
   RectangleHorizontal,
-  UserPlus
+  UserPlus,
+  ShieldCheck
 } from "lucide-react";
 
 export { formatShotNumber, generateSaveVideoPrefix, sanitizeFilenamePart, generatePromptPrefix, assembleFinalPrompt };
@@ -42,12 +43,14 @@ interface ScenePlanningHeaderProps {
   planning: ScenePlanning;
   onChangePlanning: (newPlanning: ScenePlanning) => void;
   onAddCharacter?: () => void;
+  onAuditContinuity?: () => void;
 }
 
 export const ScenePlanningHeader: React.FC<ScenePlanningHeaderProps> = ({
   planning,
   onChangePlanning,
-  onAddCharacter
+  onAddCharacter,
+  onAuditContinuity
 }) => {
   const [copied, setCopied] = useState(false);
 
@@ -156,6 +159,17 @@ export const ScenePlanningHeader: React.FC<ScenePlanningHeaderProps> = ({
             >
               <UserPlus className="w-3.5 h-3.5" />
               <span>Add Character</span>
+            </button>
+          )}
+          {onAuditContinuity && (
+            <button
+              type="button"
+              onClick={onAuditContinuity}
+              className="px-2.5 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded-md text-xs font-semibold transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
+              title="Run AI Script Supervisor Continuity Audit across all shots"
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>Audit Continuity</span>
             </button>
           )}
         </div>

@@ -9,6 +9,7 @@ import {
 } from "../utils/formatters";
 import { generateWithGeminiAPI, getStoredGeminiKey } from "./geminiService";
 import { getStoredLLMSettings } from "./llmSettingsService";
+import { getAllSystemLoras } from "./loraService";
 import { createScopedLogger } from "../utils/logger";
 
 const log = createScopedLogger("LocalLLM");
@@ -536,12 +537,34 @@ export async function expandPrompt(
     ? `\nSCENE PLANNING & ATMOSPHERIC DIRECTIVES:\n${sceneDirectivesList.join("\n")}\n`
     : "";
 
+  // Active LoRA Trigger Directives
+  const activeLoraSlots = (active_shot as any)?.lora_slots || (options as any).lora_slots || {};
+  const activeTriggers: string[] = [];
+  try {
+    const allSystemLoras = getAllSystemLoras();
+    Object.values(activeLoraSlots).forEach((slot: any) => {
+      if (slot && !slot.bypassed && slot.lora_name) {
+        const matched = allSystemLoras.find(
+          l => l.filename === slot.lora_name || l.name === slot.lora_name
+        );
+        if (matched?.trigger_words && matched.trigger_words.length > 0) {
+          activeTriggers.push(...matched.trigger_words);
+        }
+      }
+    });
+  } catch (e) {}
+
+  const uniqueTriggers = Array.from(new Set(activeTriggers));
+  const loraTriggersBlock = uniqueTriggers.length > 0
+    ? `\nACTIVE LORA TRIGGER WORDS & DIRECTIVES:\nTrigger Words: [${uniqueTriggers.join(", ")}]\nNaturally harmonize these stylistic/character trigger words into the visual description and atmosphere.\n`
+    : "";
+
   const userPrompt = `CREATIVE CONCEPT / STUB (IMMUTABLE STORY & ACTION GROUND TRUTH):
 "${basic_stub}"
 
 SHOT PLANNING CONTEXT:
 ${resolvedPromptPrefix || "Shot 01"}
-${cameraContextBlock}${opticsContextBlock}${framingContextBlock}${scenePlanDirectivesBlock}
+${cameraContextBlock}${opticsContextBlock}${framingContextBlock}${scenePlanDirectivesBlock}${loraTriggersBlock}
 AVAILABLE MULTIMODAL REFERENCE ASSETS:
 ${subjectDefinitions || "No reference definitions"}
 

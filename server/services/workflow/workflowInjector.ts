@@ -18,7 +18,8 @@ export function injectAndPrepareWorkflowData(
   parameterNodeMappings: Record<string, string> = {},
   promptPrefix: string = "",
   saveVideoPrefix: string = "",
-  aspectRatio?: string
+  aspectRatio?: string,
+  loraAssignments?: Record<string, any>
 ): any {
   if (!workflowData) return null;
 
@@ -34,6 +35,7 @@ export function injectAndPrepareWorkflowData(
     promptNodeId,
     finalPrompt,
     nodeMappings,
+    loraAssignments,
     bypassMissing,
     safePlaceholder,
     parameterOverrides,

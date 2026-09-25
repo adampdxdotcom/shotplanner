@@ -1,19 +1,21 @@
 import React, { useState } from "react";
-import { ShotItem, ShotTake } from "../types";
-import { X, Star, ArrowRightLeft, Check, Sparkles, Sliders, Film } from "lucide-react";
+import { ShotItem, ShotTake, ShotLoraAssignment } from "../types";
+import { X, Star, ArrowRightLeft, Check, Sparkles, Sliders, Film, RotateCcw, Layers } from "lucide-react";
 
 interface TakeComparisonModalProps {
   shot: ShotItem;
   sceneName: string;
   onClose: () => void;
   onSetHeroTake: (takeId: string) => void;
+  onRestoreLoras?: (loraSlots: Record<string, ShotLoraAssignment>) => void;
 }
 
 export function TakeComparisonModal({
   shot,
   sceneName,
   onClose,
-  onSetHeroTake
+  onSetHeroTake,
+  onRestoreLoras
 }: TakeComparisonModalProps) {
   const takes = shot.takes || [];
   
@@ -255,6 +257,100 @@ export function TakeComparisonModal({
               </table>
             </div>
           </div>
+
+          {/* LoRA Configuration Comparison */}
+          {((takeA?.lora_slots && Object.keys(takeA.lora_slots).length > 0) || (takeB?.lora_slots && Object.keys(takeB.lora_slots).length > 0)) && (
+            <div className="bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 space-y-3 shadow-2xs">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-bold text-purple-700 dark:text-purple-400 uppercase tracking-wider">
+                  <Sparkles className="w-4 h-4" />
+                  <span>LoRA Stack Diff</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Take A LoRAs */}
+                <div className="bg-white dark:bg-zinc-950 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 space-y-2">
+                  <div className="flex items-center justify-between text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                    <span>Take {takeA?.take_number} LoRAs</span>
+                    {onRestoreLoras && takeA?.lora_slots && (
+                      <button
+                        type="button"
+                        onClick={() => onRestoreLoras(takeA.lora_slots!)}
+                        className="px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-[10px] font-semibold flex items-center gap-1 hover:bg-indigo-100 dark:hover:bg-indigo-900 cursor-pointer transition-colors"
+                      >
+                        <RotateCcw className="w-2.5 h-2.5" />
+                        <span>Restore to Shot</span>
+                      </button>
+                    )}
+                  </div>
+                  {takeA?.lora_slots && Object.keys(takeA.lora_slots).length > 0 ? (
+                    <div className="space-y-1.5 font-mono text-[11px]">
+                      {Object.entries(takeA.lora_slots).map(([nodeId, lora]) => (
+                        <div key={nodeId} className="p-1.5 rounded bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800">
+                          <div className="flex items-center justify-between text-[10px]">
+                            <span className="font-bold text-zinc-900 dark:text-zinc-200">Slot #{nodeId}</span>
+                            <span className={lora.bypassed ? "text-zinc-500" : "text-emerald-400"}>
+                              {lora.bypassed ? "Bypassed" : "Active"}
+                            </span>
+                          </div>
+                          <p className="text-purple-600 dark:text-purple-300 truncate">{lora.lora_name || "None"}</p>
+                          {!lora.bypassed && (
+                            <div className="flex justify-between text-[10px] text-zinc-500 pt-0.5">
+                              <span>Model: {lora.strength_model ?? 1.0}</span>
+                              <span>CLIP: {lora.strength_clip ?? 1.0}</span>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-zinc-400 italic">No LoRAs recorded for Take {takeA?.take_number}</p>
+                  )}
+                </div>
+
+                {/* Take B LoRAs */}
+                <div className="bg-white dark:bg-zinc-950 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 space-y-2">
+                  <div className="flex items-center justify-between text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                    <span>Take {takeB?.take_number} LoRAs</span>
+                    {onRestoreLoras && takeB?.lora_slots && (
+                      <button
+                        type="button"
+                        onClick={() => onRestoreLoras(takeB.lora_slots!)}
+                        className="px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[10px] font-semibold flex items-center gap-1 hover:bg-emerald-100 dark:hover:bg-emerald-900 cursor-pointer transition-colors"
+                      >
+                        <RotateCcw className="w-2.5 h-2.5" />
+                        <span>Restore to Shot</span>
+                      </button>
+                    )}
+                  </div>
+                  {takeB?.lora_slots && Object.keys(takeB.lora_slots).length > 0 ? (
+                    <div className="space-y-1.5 font-mono text-[11px]">
+                      {Object.entries(takeB.lora_slots).map(([nodeId, lora]) => (
+                        <div key={nodeId} className="p-1.5 rounded bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800">
+                          <div className="flex items-center justify-between text-[10px]">
+                            <span className="font-bold text-zinc-900 dark:text-zinc-200">Slot #{nodeId}</span>
+                            <span className={lora.bypassed ? "text-zinc-500" : "text-emerald-400"}>
+                              {lora.bypassed ? "Bypassed" : "Active"}
+                            </span>
+                          </div>
+                          <p className="text-purple-600 dark:text-purple-300 truncate">{lora.lora_name || "None"}</p>
+                          {!lora.bypassed && (
+                            <div className="flex justify-between text-[10px] text-zinc-500 pt-0.5">
+                              <span>Model: {lora.strength_model ?? 1.0}</span>
+                              <span>CLIP: {lora.strength_clip ?? 1.0}</span>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-zinc-400 italic">No LoRAs recorded for Take {takeB?.take_number}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Prompt Comparison */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">

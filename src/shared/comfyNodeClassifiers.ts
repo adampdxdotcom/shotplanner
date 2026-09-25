@@ -45,6 +45,51 @@ export const KNOWN_PROMPT_CLASSES = [
   "ShowText"
 ];
 
+// Known LoRA loader node class types in ComfyUI ecosystem
+export const KNOWN_LORA_CLASSES = [
+  "LoraLoader",
+  "LoraLoaderModelOnly",
+  "LoraLoaderAdvanced",
+  "LoraLoaderBlockWeight",
+  "CR Load LoRA",
+  "CR Apply LoRA Stack",
+  "Power Lora Loader (rgthree)",
+  "easy loraStack",
+  "WANLoraLoader",
+  "WanVideoLoraLoader",
+  "LoraLoaderWanVideo",
+  "FluxLoraLoader",
+  "LoraLoaderDiffusionModels"
+];
+
+/**
+ * Accurately identifies whether a node is a LoRA loader or LoRA stack node.
+ * Excludes LoRA trainers, converters, savers, and extractors.
+ */
+export function isExactLoraLoader(classType: string, title?: string): boolean {
+  const ct = (classType || "").trim();
+  const t = (title || "").trim().toLowerCase();
+
+  // Exclude non-loader operations (e.g. LoraSave, LoraTrain, LoraExtract)
+  if (/save|train|extract|convert|dataset|caption/i.test(ct)) {
+    return false;
+  }
+
+  if (KNOWN_LORA_CLASSES.includes(ct)) {
+    return true;
+  }
+
+  if (/^LoraLoader/i.test(ct) || /^LoadLora/i.test(ct) || /LoraLoader$/i.test(ct) || /^WanVideoLora/i.test(ct)) {
+    return true;
+  }
+
+  if (t === "load lora" || t.startsWith("load lora") || t === "lora loader" || t.startsWith("lora loader") || t.includes("lora slot")) {
+    return true;
+  }
+
+  return false;
+}
+
 /**
  * Accurately identifies whether a node is a true input image loader.
  * Excludes latent generators, scalers, previews, saves, blends, crops, upscalers, converters.

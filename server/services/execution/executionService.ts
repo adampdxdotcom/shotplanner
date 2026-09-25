@@ -51,6 +51,8 @@ export interface ExecuteWorkflowOptions {
   parameter_overrides?: Record<string, any>;
   parameter_node_mappings?: Record<string, string>;
   generation_parameters?: any;
+  lora_slots?: Record<string, any>;
+  lora_assignments?: Record<string, any>;
   dry_run_only?: boolean;
   client_id?: string;
   stage_assets_first?: boolean;
@@ -86,6 +88,8 @@ export async function executeWorkflow(options: ExecuteWorkflowOptions) {
     parameter_overrides = {},
     parameter_node_mappings = {},
     generation_parameters = null,
+    lora_slots = {},
+    lora_assignments = {},
     dry_run_only = false,
     client_id = "comfyui-bridge-session",
     stage_assets_first = false
@@ -140,6 +144,11 @@ export async function executeWorkflow(options: ExecuteWorkflowOptions) {
   );
   resolvedWorkflowFilename = resolvedFilename;
 
+  const effectiveLora = {
+    ...(lora_assignments || {}),
+    ...(lora_slots || {})
+  };
+
   const modifiedWf = injectAndPrepareWorkflowData(
     workflow,
     prompt_node_id,
@@ -159,7 +168,9 @@ export async function executeWorkflow(options: ExecuteWorkflowOptions) {
     },
     parameter_node_mappings,
     resolvedPromptPrefix,
-    resolvedSaveVideoPrefix
+    resolvedSaveVideoPrefix,
+    aspect_ratio,
+    effectiveLora
   );
 
   // Convert to ComfyUI API Prompt format for direct execution

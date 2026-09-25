@@ -101,6 +101,7 @@ export interface ShotTake {
   generation_params?: GenerationParameters;
   sampling_steps?: number;
   assigned_slots?: Record<number, string>;
+  lora_slots?: Record<string, ShotLoraAssignment>;
   review_status?: "unreviewed" | "approved" | "needs_work" | "good" | "bad" | string;
   rating?: "good" | "bad" | null;
   notes?: string;
@@ -157,6 +158,26 @@ export interface ShotFirstFrame {
 // Shots & Planning
 // ---------------------------------------------------------------------------
 
+export interface ShotLoraAssignment {
+  lora_name: string;
+  strength_model?: number;
+  strength_clip?: number;
+  bypassed?: boolean;
+}
+
+export interface WorkflowLoraSlot {
+  id: string;
+  node_id?: string;
+  class_type: string;
+  title: string;
+  lora_name?: string;
+  strength_model?: number;
+  strength_clip?: number;
+  mode?: number; // 0: active, 4: bypassed
+  is_bypassed?: boolean;
+  category?: string;
+}
+
 export interface ShotItem {
   id: string;
   shot_number: number;
@@ -173,6 +194,7 @@ export interface ShotItem {
   prompt_variations?: PromptVariation[];
   active_variation_id?: string;
   assigned_slots?: Record<number, string>;
+  lora_slots?: Record<string, ShotLoraAssignment>;
   status?: "unstaged" | "staged" | "rendering" | "rendered";
   staged?: boolean;
   latest_prompt_id?: string;
@@ -347,6 +369,7 @@ export interface SceneProjectFile {
   llm_provider?: LLMProvider;
   generation_params?: GenerationParameters;
   parameter_node_mappings?: ParameterNodeMappings;
+  lora_slots?: Record<string, ShotLoraAssignment>;
   takes?: ShotTake[];
   active_take_id?: string;
   hero_take_id?: string;
@@ -392,6 +415,12 @@ export interface WorkflowNodeInfo {
   inputs?: Record<string, any>;
   current_value?: string;
   current_file?: string;
+  lora_details?: {
+    lora_name?: string;
+    strength_model?: number;
+    strength_clip?: number;
+    bypassed?: boolean;
+  };
 }
 
 export interface ParsedWorkflowData {
@@ -399,6 +428,8 @@ export interface ParsedWorkflowData {
   imageLoaderNodes: WorkflowNodeInfo[];
   videoLoaderNodes: WorkflowNodeInfo[];
   audioLoaderNodes: WorkflowNodeInfo[];
+  loraLoaderNodes?: WorkflowNodeInfo[];
+  loraSlots?: WorkflowLoraSlot[];
   otherNodes: WorkflowNodeInfo[];
   allNodes?: WorkflowNodeInfo[];
   detectedNodes: {
@@ -421,6 +452,8 @@ export interface ParsedWorkflow {
     image_loader_nodes: WorkflowNodeInfo[];
     video_loader_nodes: WorkflowNodeInfo[];
     audio_loader_nodes: WorkflowNodeInfo[];
+    lora_loader_nodes?: WorkflowNodeInfo[];
+    lora_slots?: WorkflowLoraSlot[];
     other_nodes?: WorkflowNodeInfo[];
     all_nodes?: WorkflowNodeInfo[];
     total_nodes: number;
@@ -753,3 +786,114 @@ export interface ToastMessage {
   text: string;
   type: "success" | "error" | "info";
 }
+
+// ---------------------------------------------------------------------------
+// System-Level LoRA Library & Remote Status
+// ---------------------------------------------------------------------------
+
+export interface SystemLora {
+  id: string;
+  name: string;
+  filename: string;
+  version_name?: string;
+  base_model?: string;
+  category?: "lora" | "lycoris" | "dora" | "locon" | "style" | "character" | "concept" | string;
+  trigger_words?: string[];
+  default_destination_folder?: string;
+  suggested_remote_path?: string;
+  download_url?: string;
+  source?: "civitai" | "huggingface" | "custom" | "local";
+  model_id?: number;
+  version_id?: number;
+  preview_image_url?: string;
+  file_size_formatted?: string;
+  file_size_bytes?: number;
+  description?: string;
+  notes?: string;
+  preferred_strength_model?: number;
+  preferred_strength_clip?: number;
+  is_favorite?: boolean;
+  added_at?: string;
+  updated_at?: string;
+}
+
+export interface RemoteLoraFileStatus {
+  filename: string;
+  exists_on_remote: boolean;
+  remote_path?: string;
+  size_bytes?: number;
+  size_formatted?: string;
+  last_modified?: string;
+}
+
+export interface RemoteLoraStatusReport {
+  success: boolean;
+  remote_host: string;
+  scanned_directory: string;
+  total_remote_files: number;
+  loras_status: Record<string, RemoteLoraFileStatus>;
+  error?: string;
+}
+
+export interface TransferLoraResult {
+  success: boolean;
+  message: string;
+  filename: string;
+  destination_path?: string;
+  file_size?: string;
+  duration_seconds?: number;
+  error?: string;
+}
+
+export interface CivitaiSearchItem {
+  id: number;
+  name: string;
+  type: string;
+  nsfw: boolean;
+  tags?: string[];
+  creator?: {
+    username: string;
+    image?: string;
+  };
+  stats?: {
+    downloadCount: number;
+    favoriteCount: number;
+    ratingCount: number;
+    rating: number;
+  };
+  modelVersions?: Array<{
+    id: number;
+    name: string;
+    baseModel?: string;
+    description?: string;
+    trainedWords?: string[];
+    downloadUrl?: string;
+    files?: Array<{
+      id: number;
+      name: string;
+      sizeKB: number;
+      primary?: boolean;
+    }>;
+    images?: Array<{
+      url: string;
+      nsfwLevel?: number;
+      width?: number;
+      height?: number;
+    }>;
+  }>;
+}
+
+export interface CivitaiSearchResponse {
+  success: boolean;
+  items: CivitaiSearchItem[];
+  metadata?: {
+    totalItems?: number;
+    currentPage?: number;
+    pageSize?: number;
+    totalPages?: number;
+    nextPage?: string;
+  };
+  error?: string;
+}
+
+

@@ -3,6 +3,8 @@ import path from "path";
 import { SceneProjectFile, ShotItem, UniverseCharacterProfile, MediaAsset } from "../types";
 import { UniverseService } from "./universeService";
 import { assetService } from "./assetService";
+import { getAllSystemLoras } from "./loraService";
+import { resolveWorkflowTemplate, parseWorkflowData } from "./workflowService";
 import { getImageBase64ForVision } from "./thumbnailService";
 import { callLocalLLM } from "./llm_service";
 import { generateWithGeminiAPI, getStoredGeminiKey } from "./geminiService";
@@ -223,6 +225,49 @@ function buildProjectDossier(
     log.warn("Could not read assets", { error: err });
   }
 
+  // 7. System-Level Favorited LoRAs & Model Library (persisting across all projects)
+  try {
+    const loras = getAllSystemLoras();
+    if (loras.length > 0) {
+      const loraSummaries = loras.map(l => {
+        const triggers = (l.trigger_words && l.trigger_words.length > 0) ? `Triggers: [${l.trigger_words.join(", ")}]` : "No trigger words";
+        const base = l.base_model ? `Base: ${l.base_model}` : "SDXL";
+        const weight = l.preferred_strength_model !== undefined ? `Weight: ${l.preferred_strength_model}` : "Weight: 0.85";
+        const hasUrl = Boolean(l.download_url);
+        return `- "${l.name}" (Filename: \`${l.filename}\` | Base: ${base} | ${triggers} | Preferred ${weight} | Source: ${l.source || 'custom'}${hasUrl ? ' | Direct Download Ready' : ''})`;
+      }).join("\n");
+      sections.push(`### SYSTEM-LEVEL LORA & MODEL LIBRARY (${loras.length} favorited models across all projects):\n${loraSummaries}`);
+    }
+  } catch (err) {
+    log.warn("Could not read system loras", { error: err });
+  }
+
+  // 8. Active Workflow Template & Detected LoRA Slots
+  try {
+    const wfName = sceneProject?.workflow_file || activeShot?.workflow_file || "default";
+    const { resolvedFilename, rawWorkflow } = resolveWorkflowTemplate(wfName, sceneProject?.scene_name);
+    if (rawWorkflow) {
+      const parsed = parseWorkflowData(rawWorkflow);
+      const loraSlots = parsed.loraLoaderNodes || [];
+      if (loraSlots.length > 0) {
+        const slotSummaries = loraSlots.map(s => {
+          const slotId = s.id;
+          const assigned = (activeShot?.lora_slots && activeShot.lora_slots[slotId]) || (sceneProject?.lora_slots && sceneProject.lora_slots[slotId]);
+          const currentLora = assigned?.lora_name || s.current_file || s.lora_details?.lora_name || "(Unassigned)";
+          const mStr = assigned?.strength_model ?? s.lora_details?.strength_model ?? 1.0;
+          const cStr = assigned?.strength_clip ?? s.lora_details?.strength_clip ?? 1.0;
+          const isBypassed = assigned?.bypassed ?? s.lora_details?.bypassed ?? false;
+          return `- Node #${slotId} [${s.title || s.class_type}]: Attached: "${currentLora}" (Model: ${mStr}, CLIP: ${cStr}) [Status: ${isBypassed ? "BYPASSED" : "ACTIVE"}]`;
+        }).join("\n");
+        sections.push(`### ACTIVE WORKFLOW LORA SLOTS (${loraSlots.length} slot(s) in template "${resolvedFilename}"):\n${slotSummaries}`);
+      } else {
+        sections.push(`### ACTIVE WORKFLOW TEMPLATE: "${resolvedFilename}" (No dedicated LoRA slots detected in this template)`);
+      }
+    }
+  } catch (err) {
+    log.warn("Could not inspect workflow lora slots", { error: err });
+  }
+
   return sections.join("\n\n");
 }
 
@@ -328,6 +373,13 @@ WORKFLOW GENERATION PARAMETERS (Sampling Steps, Megapixels, Total Seconds):
   - \`frames\` (Total Duration in Seconds: number, e.g. 3.4, 5.0, 6.7 seconds, default 3.4)
 - When the user asks to adjust render sampling, quality/steps, resolution/megapixels, or duration/total seconds for a shot (e.g. "Set shot 1 to 40 steps and 5 seconds" or "Increase resolution to 1.0 MP and sampling to 35 on shot 2"), include \`generation_params\` in \`update_shot\` (or \`add_shot\`).
 - Modifying generation parameters is strictly per-shot and will only affect the specified shot.
+
+WORKFLOW LORA SLOTS & MODEL ATTACHMENTS:
+- The Project Dossier lists detected LoRA slots in the active workflow (e.g. Node #12, Node #14) and all system-level favorited LoRAs.
+- When recommending a style, character, or visual aesthetic that matches a favorited LoRA, recommend attaching it to a workflow slot.
+- If the recommended LoRA is NOT yet staged to the remote GPU, output a \`transfer_lora_to_remote\` action card.
+- To attach or configure a LoRA on a shot, include \`lora_slots\` in \`update_shot\` (or \`add_shot\`) keyed by node ID:
+  \`"lora_slots": { "12": { "lora_name": "wan2.1_cinematic.safetensors", "strength_model": 0.85, "strength_clip": 1.0, "bypassed": false } }\`
 
 BEHAVIOR GUIDELINES:
 - Be concise, cinematic, and directly helpful.
@@ -497,7 +549,20 @@ When an image asset is inspected or attached for visual analysis, you MUST inclu
 }
 \`\`\`
 
-8. Multi-Action Coordinated Batch (Array format):
+8. Remote LoRA Staging / Download:
+When you recommend a favorited or registered system LoRA for a shot or aesthetic, or when the user asks to stage/download a LoRA to their remote ComfyUI GPU, output a \`transfer_lora_to_remote\` action:
+\`\`\`action
+{
+  "type": "transfer_lora_to_remote",
+  "lora_name": "Flux Realistic Skin",
+  "filename": "flux_realism.safetensors",
+  "download_url": "https://civitai.com/api/download/models/123456",
+  "destination_folder": "models/loras/",
+  "title": "Transfer 'Flux Realistic Skin' LoRA to Remote GPU"
+}
+\`\`\`
+
+9. Multi-Action Coordinated Batch (Array format):
 \`\`\`action
 [
   {
@@ -518,9 +583,10 @@ When an image asset is inspected or attached for visual analysis, you MUST inclu
     }
   },
   {
-    "type": "stage_shot_assets",
-    "shot_number": 2,
-    "title": "Stage Shot #2 assets to remote ComfyUI"
+    "type": "transfer_lora_to_remote",
+    "lora_name": "Cyberpunk Neon",
+    "filename": "cyberpunk_neon.safetensors",
+    "title": "Transfer Cyberpunk Neon LoRA to Remote GPU"
   }
 ]
 \`\`\`

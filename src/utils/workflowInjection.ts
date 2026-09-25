@@ -1,4 +1,4 @@
-import { ShotItem, GenerationParameters, ParameterNodeMappings } from "../types";
+import { ShotItem, GenerationParameters, ParameterNodeMappings, ShotLoraAssignment } from "../types";
 import { formatShotNumber, generateSaveVideoPrefix } from "./formatters";
 import { injectWorkflowGraph } from "../shared/workflowInjectionEngine";
 
@@ -7,12 +7,14 @@ export {
   isExactImageLoader,
   isExactVideoLoader,
   isExactAudioLoader,
+  isExactLoraLoader,
   isExactPromptNode,
   isExactNegativePromptNode,
   isSaveVideoNode,
   KNOWN_IMAGE_LOADER_CLASSES,
   KNOWN_VIDEO_LOADER_CLASSES,
   KNOWN_AUDIO_LOADER_CLASSES,
+  KNOWN_LORA_CLASSES,
   KNOWN_PROMPT_CLASSES,
   KNOWN_SAVE_VIDEO_CLASSES
 } from "../shared/comfyNodeClassifiers";
@@ -20,6 +22,7 @@ import {
   isExactImageLoader,
   isExactVideoLoader,
   isExactAudioLoader,
+  isExactLoraLoader,
   isExactPromptNode,
   isSaveVideoNode
 } from "../shared/comfyNodeClassifiers";
@@ -39,7 +42,8 @@ export function generateLiveInjectedWorkflow(
   generationParams: GenerationParameters,
   parameterNodeMappings: ParameterNodeMappings,
   activeSceneName: string,
-  imageNodes: { id: string }[]
+  imageNodes: { id: string }[],
+  loraAssignments?: Record<string, ShotLoraAssignment>
 ): any {
   if (!rawJson) return null;
 
@@ -68,6 +72,11 @@ export function generateLiveInjectedWorkflow(
     }
   });
 
+  const effectiveLoraSlots: Record<string, ShotLoraAssignment> = {
+    ...(loraAssignments || {}),
+    ...(activeShot?.lora_slots || {})
+  };
+
   const effectiveParams = activeShot?.generation_params || generationParams;
   const effectiveParamNodes = activeShot?.parameter_node_mappings || parameterNodeMappings;
   const shotNumStr = activeShot ? formatShotNumber(activeShot.shot_number) : "01";
@@ -78,6 +87,7 @@ export function generateLiveInjectedWorkflow(
     promptNodeId: activeShot?.prompt_node_id || selectedPromptNodeId,
     finalPrompt: effectivePrompt,
     nodeMappings: effectiveMappings,
+    loraAssignments: effectiveLoraSlots,
     bypassMissing,
     safePlaceholder: "empty.png",
     parameterOverrides: effectiveParams,
@@ -101,6 +111,15 @@ export interface WorkflowInspectionAnalysis {
     assignedAsset: string;
     status: "assigned" | "bypassed" | "empty";
   }[];
+  loraSlots: {
+    nodeId: string;
+    title: string;
+    classType: string;
+    loraName: string;
+    strengthModel: number;
+    strengthClip: number;
+    status: "assigned" | "bypassed" | "empty";
+  }[];
   appliedParameters: {
     name: string;
     value: any;
@@ -119,6 +138,7 @@ export function inspectWorkflowGraph(
 ): WorkflowInspectionAnalysis {
   const warnings: string[] = [];
   const loaders: WorkflowInspectionAnalysis["loaders"] = [];
+  const loraSlots: WorkflowInspectionAnalysis["loraSlots"] = [];
   const appliedParameters: WorkflowInspectionAnalysis["appliedParameters"] = [];
 
   let promptInjected = "";
@@ -134,6 +154,7 @@ export function inspectWorkflowGraph(
       mappedLoadersCount: 0,
       unmappedLoadersCount: 0,
       loaders: [],
+      loraSlots: [],
       appliedParameters: [],
       warnings: ["No workflow JSON provided."]
     };
@@ -146,6 +167,7 @@ export function inspectWorkflowGraph(
       const strId = String(node.id ?? "");
       const classType = String(node.type ?? "");
       const title = String(node.title ?? classType);
+      const mode = node.mode ?? 0;
 
       if (isExactPromptNode(classType, title)) {
         promptInjected = node.widgets_values?.[0] || node.widgets_values_named?.value || node.widgets_values_named?.text || "";
@@ -153,13 +175,28 @@ export function inspectWorkflowGraph(
         saveVideoPrefix = node.widgets_values?.[0] || node.widgets_values_named?.filename_prefix || "";
       } else if (isExactImageLoader(classType, title) || isExactVideoLoader(classType, title) || isExactAudioLoader(classType, title)) {
         const val = node.widgets_values?.[0] || node.widgets_values_named?.image || node.widgets_values_named?.video || node.widgets_values_named?.audio || "";
-        const isBypassed = val === "empty.png" || !val;
+        const isBypassed = val === "empty.png" || !val || mode === 4;
         loaders.push({
           nodeId: strId,
           title,
           classType,
           assignedAsset: val || "",
-          status: isBypassed ? (val === "empty.png" ? "bypassed" : "empty") : "assigned"
+          status: isBypassed ? (val === "empty.png" || mode === 4 ? "bypassed" : "empty") : "assigned"
+        });
+      } else if (isExactLoraLoader(classType, title)) {
+        const loraVal = node.widgets_values?.[0] || node.widgets_values_named?.lora_name || node.widgets_values_named?.lora || "";
+        const strModel = typeof node.widgets_values?.[1] === "number" ? node.widgets_values[1] : (typeof node.widgets_values_named?.strength_model === "number" ? node.widgets_values_named.strength_model : 1.0);
+        const strClip = typeof node.widgets_values?.[2] === "number" ? node.widgets_values[2] : (typeof node.widgets_values_named?.strength_clip === "number" ? node.widgets_values_named.strength_clip : 1.0);
+        const isBypassed = mode === 4 || !loraVal || loraVal === "None";
+
+        loraSlots.push({
+          nodeId: strId,
+          title,
+          classType,
+          loraName: loraVal || "",
+          strengthModel: strModel,
+          strengthClip: strClip,
+          status: isBypassed ? "bypassed" : "assigned"
         });
       }
     }
@@ -186,6 +223,21 @@ export function inspectWorkflowGraph(
           assignedAsset: val || "",
           status: isBypassed ? (val === "empty.png" ? "bypassed" : "empty") : "assigned"
         });
+      } else if (isExactLoraLoader(classType, title)) {
+        const loraVal = inputs.lora_name || inputs.lora || "";
+        const strModel = typeof inputs.strength_model === "number" ? inputs.strength_model : 1.0;
+        const strClip = typeof inputs.strength_clip === "number" ? inputs.strength_clip : 1.0;
+        const isBypassed = !loraVal || loraVal === "None";
+
+        loraSlots.push({
+          nodeId,
+          title,
+          classType,
+          loraName: loraVal || "",
+          strengthModel: strModel,
+          strengthClip: strClip,
+          status: isBypassed ? "bypassed" : "assigned"
+        });
       }
     }
   }
@@ -208,6 +260,7 @@ export function inspectWorkflowGraph(
     mappedLoadersCount,
     unmappedLoadersCount,
     loaders,
+    loraSlots,
     appliedParameters,
     warnings
   };

@@ -6,6 +6,7 @@ import { copyToClipboard } from "../utils/clipboard";
 import { generateLiveInjectedWorkflow } from "../utils/workflowInjection";
 import { WorkflowFileSelector } from "./workflow/WorkflowFileSelector";
 import { MediaLoaderMapper } from "./workflow/MediaLoaderMapper";
+import { LoraSlotMapper } from "./workflow/LoraSlotMapper";
 import { LiveWorkflowPreview } from "./workflow/LiveWorkflowPreview";
 import { GenerationParametersSection } from "./GenerationParametersSection";
 import { JsonViewerWithSearch } from "./JsonViewerWithSearch";
@@ -93,6 +94,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
   const imageNodes = parsedWorkflow?.nodes_info?.image_loader_nodes || [];
   const videoNodes = parsedWorkflow?.nodes_info?.video_loader_nodes || [];
   const audioNodes = parsedWorkflow?.nodes_info?.audio_loader_nodes || [];
+  const loraNodes = parsedWorkflow?.nodes_info?.lora_loader_nodes || parsedWorkflow?.nodes_info?.lora_slots || [];
 
   const activeShot = sceneProject.shots.find((s) => s.id === activeShotId);
 
@@ -153,7 +155,8 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
       generationParams,
       parameterNodeMappings,
       activeSceneName || sceneProject.scene_name,
-      imageNodes
+      imageNodes,
+      sceneProject.lora_slots
     );
   }, [
     rawWorkflowData,
@@ -165,7 +168,8 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
     parameterNodeMappings,
     activeSceneName,
     sceneProject.scene_name,
-    imageNodes
+    imageNodes,
+    sceneProject.lora_slots
   ]);
 
   const handleCopyJson = async () => {
@@ -271,6 +275,19 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
                 uploadedAssets={uploadedAssets}
                 onUpdateMapping={onUpdateMapping}
                 onUpdateShot={onUpdateShot}
+              />
+
+              <LoraSlotMapper
+                loraNodes={loraNodes}
+                activeShot={activeShot}
+                activeShotId={activeShotId}
+                onUpdateShot={onUpdateShot}
+                sceneDefaultLoras={sceneProject.lora_slots}
+                onUpdateSceneLoras={(slots) => {
+                  if (onUpdateProject) {
+                    onUpdateProject(prev => ({ ...prev, lora_slots: slots }));
+                  }
+                }}
               />
             </div>
           )

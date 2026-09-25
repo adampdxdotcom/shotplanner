@@ -1,9 +1,10 @@
-import { ParsedWorkflowData, WorkflowNodeInfo } from "../../types";
+import { ParsedWorkflowData, WorkflowNodeInfo, WorkflowLoraSlot } from "../../types";
 import {
   isExactPromptNode,
   isExactImageLoader,
   isExactVideoLoader,
-  isExactAudioLoader
+  isExactAudioLoader,
+  isExactLoraLoader
 } from "../../../src/shared/comfyNodeClassifiers";
 
 /**
@@ -17,23 +18,26 @@ export function categorizeWorkflowNode(classType: string, metaTitle: string): st
   if (isExactImageLoader(classType, metaTitle)) return "Image Loader";
   if (isExactVideoLoader(classType, metaTitle)) return "Video Loader";
   if (isExactAudioLoader(classType, metaTitle)) return "Audio Loader";
+  if (isExactLoraLoader(classType, metaTitle)) return "LoRA Loader";
   if (c.includes("sampler") || c.includes("scheduler") || t.includes("sampler") || t.includes("step") || c.includes("fluxguidance")) return "Sampler / Steps";
   if (c.includes("latent") || c.includes("resolution") || c.includes("megapixels") || t.includes("resolution") || t.includes("megapixel") || c.includes("scale")) return "Resolution / Latent";
   if (c.includes("video") || c.includes("frame") || c.includes("duration") || c.includes("animatediff") || t.includes("video") || t.includes("frame") || t.includes("length")) return "Video / Frames";
-  if (c.includes("loader") || c.includes("checkpoint") || c.includes("lora") || c.includes("vae") || c.includes("clip")) return "Model / VAE";
+  if (c.includes("loader") || c.includes("checkpoint") || c.includes("vae") || c.includes("clip")) return "Model / VAE";
   if (c.includes("save") || c.includes("preview") || t.includes("save") || t.includes("output")) return "Output / Save";
   return "Utility / Other";
 }
 
 /**
  * Parses ComfyUI workflow JSON (supports both visual canvas format and API prompt dict).
- * Discovers prompt nodes, image/video/audio loaders, and auto-detects steps, resolution, and frame parameters.
+ * Discovers prompt nodes, image/video/audio loaders, LoRA slots, and auto-detects steps, resolution, and frame parameters.
  */
 export function parseWorkflowData(workflow: any): ParsedWorkflowData {
   const promptNodes: WorkflowNodeInfo[] = [];
   const imageLoaderNodes: WorkflowNodeInfo[] = [];
   const videoLoaderNodes: WorkflowNodeInfo[] = [];
   const audioLoaderNodes: WorkflowNodeInfo[] = [];
+  const loraLoaderNodes: WorkflowNodeInfo[] = [];
+  const loraSlots: WorkflowLoraSlot[] = [];
   const otherNodes: WorkflowNodeInfo[] = [];
   const allNodes: WorkflowNodeInfo[] = [];
 
@@ -86,6 +90,52 @@ export function parseWorkflowData(workflow: any): ParsedWorkflowData {
       } else if (category === "Audio Loader") {
         const currentFile = widgetsValues.length > 0 && typeof widgetsValues[0] === "string" ? widgetsValues[0] : "";
         audioLoaderNodes.push({ ...nodeInfo, current_file: currentFile });
+      } else if (category === "LoRA Loader") {
+        let loraName = "";
+        let strModel = 1.0;
+        let strClip = 1.0;
+
+        if (node.widgets_values_named && typeof node.widgets_values_named === "object") {
+          loraName = node.widgets_values_named.lora_name || node.widgets_values_named.lora || "";
+          if (typeof node.widgets_values_named.strength_model === "number") strModel = node.widgets_values_named.strength_model;
+          if (typeof node.widgets_values_named.strength_clip === "number") strClip = node.widgets_values_named.strength_clip;
+        }
+        if (!loraName && widgetsValues.length > 0 && typeof widgetsValues[0] === "string") {
+          loraName = widgetsValues[0];
+        }
+        if (widgetsValues.length > 1 && typeof widgetsValues[1] === "number") {
+          strModel = widgetsValues[1];
+        }
+        if (widgetsValues.length > 2 && typeof widgetsValues[2] === "number") {
+          strClip = widgetsValues[2];
+        }
+
+        const loraDetails = {
+          lora_name: loraName,
+          strength_model: strModel,
+          strength_clip: strClip,
+          bypassed: mode === 4
+        };
+
+        const enrichedNode = {
+          ...nodeInfo,
+          current_file: loraName,
+          lora_details: loraDetails
+        };
+
+        loraLoaderNodes.push(enrichedNode);
+        loraSlots.push({
+          id: nodeId,
+          node_id: nodeId,
+          class_type: classType,
+          title: metaTitle,
+          lora_name: loraName,
+          strength_model: strModel,
+          strength_clip: strClip,
+          mode,
+          is_bypassed: mode === 4,
+          category
+        });
       } else {
         otherNodes.push(nodeInfo);
       }
@@ -166,6 +216,8 @@ export function parseWorkflowData(workflow: any): ParsedWorkflowData {
       imageLoaderNodes,
       videoLoaderNodes,
       audioLoaderNodes,
+      loraLoaderNodes,
+      loraSlots,
       otherNodes,
       allNodes,
       detectedNodes,
@@ -192,6 +244,29 @@ export function parseWorkflowData(workflow: any): ParsedWorkflowData {
       videoLoaderNodes.push({ ...nodeInfo, current_file: inputs.video || "" });
     } else if (category === "Audio Loader") {
       audioLoaderNodes.push({ ...nodeInfo, current_file: inputs.audio || "" });
+    } else if (category === "LoRA Loader") {
+      const loraName = inputs.lora_name || inputs.lora || "";
+      const strModel = typeof inputs.strength_model === "number" ? inputs.strength_model : 1.0;
+      const strClip = typeof inputs.strength_clip === "number" ? inputs.strength_clip : 1.0;
+      const loraDetails = {
+        lora_name: loraName,
+        strength_model: strModel,
+        strength_clip: strClip,
+        bypassed: false
+      };
+      loraLoaderNodes.push({ ...nodeInfo, current_file: loraName, lora_details: loraDetails });
+      loraSlots.push({
+        id: String(nodeId),
+        node_id: String(nodeId),
+        class_type: classType,
+        title,
+        lora_name: loraName,
+        strength_model: strModel,
+        strength_clip: strClip,
+        mode: 0,
+        is_bypassed: false,
+        category
+      });
     } else {
       otherNodes.push(nodeInfo);
     }
@@ -238,6 +313,8 @@ export function parseWorkflowData(workflow: any): ParsedWorkflowData {
     imageLoaderNodes,
     videoLoaderNodes,
     audioLoaderNodes,
+    loraLoaderNodes,
+    loraSlots,
     otherNodes,
     allNodes,
     detectedNodes,

@@ -55,6 +55,8 @@ export interface AssetTransferOptions extends SSHCredentials {
   generation_parameters?: any;
   parameter_overrides?: Record<string, any>;
   parameter_node_mappings?: Record<string, string>;
+  lora_slots?: Record<string, any>;
+  lora_assignments?: Record<string, any>;
 }
 
 /**
@@ -84,7 +86,9 @@ export async function processAssetTransfer(options: AssetTransferOptions) {
     safe_placeholder = "empty.png",
     generation_parameters = null,
     parameter_overrides = {},
-    parameter_node_mappings = {}
+    parameter_node_mappings = {},
+    lora_slots = {},
+    lora_assignments = {}
   } = options;
 
   const targetHost = remote_host || options.host || options.runpod_ip;
@@ -163,6 +167,11 @@ export async function processAssetTransfer(options: AssetTransferOptions) {
       }
     }
 
+    const effectiveLora = {
+      ...(lora_assignments || {}),
+      ...(lora_slots || {})
+    };
+
     updatedWorkflowJson = injectAndPrepareWorkflowData(
       rawWorkflow,
       prompt_node_id,
@@ -182,7 +191,9 @@ export async function processAssetTransfer(options: AssetTransferOptions) {
       },
       parameter_node_mappings,
       resolvedPromptPrefix,
-      resolvedSaveVideoPrefix
+      resolvedSaveVideoPrefix,
+      aspect_ratio,
+      effectiveLora
     );
 
     // Determine final filename and remote path

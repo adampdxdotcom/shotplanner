@@ -17,7 +17,7 @@ import {
 } from "../../types/assistantActions";
 import { toCanonicalSubjectName, findCanonicalSubject } from "../../utils/subjectUtils";
 import { generateUUID } from "../../utils/formatters";
-import { apiClient, llmApi } from "../../api";
+import { apiClient, llmApi, lorasApi } from "../../api";
 
 export interface StagingProgressState {
   status: "idle" | "staging" | "success" | "error";
@@ -121,6 +121,7 @@ export function useAssistantActions({
   const [undoShotSnapshots, setUndoShotSnapshots] = useState<Record<string, ShotItem>>({});
   const [undoPlanningSnapshots, setUndoPlanningSnapshots] = useState<Record<string, ScenePlanningDetails | undefined>>({});
   const [undoCharSnapshots, setUndoCharSnapshots] = useState<Record<string, { key: string; profile?: CharacterProfile; wasNew?: boolean }>>({});
+  const [undoVisualSnapshots, setUndoVisualSnapshots] = useState<Record<string, { filename: string; previousAnalysis?: any }>>({});
 
   // Real-time progress trackers for staging & prompt expansion
   const [stagingProgressMap, setStagingProgressMap] = useState<Record<string, StagingProgressState>>({});
@@ -617,6 +618,12 @@ export function useAssistantActions({
       const fn = action.filename;
       if (!fn || !action.analysis) return;
 
+      const previousAnalysis = sceneProject.visual_analysis_cache?.[fn];
+      setUndoVisualSnapshots((prev) => ({
+        ...prev,
+        [actionKey]: { filename: fn, previousAnalysis }
+      }));
+
       onUpdateProject((prev) => {
         const nextCache = { ...(prev.visual_analysis_cache || {}) };
         nextCache[fn] = {
@@ -638,6 +645,28 @@ export function useAssistantActions({
       setAppliedActionKeys((prev) => ({ ...prev, [actionKey]: true }));
       injectStateFeedback(`Visual analysis cached into project for '${fn}'`);
       onShowToast?.(`Cached visual analysis for ${fn}.`, "success");
+    } else if (action.type === "transfer_lora_to_remote") {
+      const loraName = action.lora_name || action.filename;
+      try {
+        onShowToast?.(`Initiating remote GPU download for LoRA '${loraName}'...`, "info");
+        const res = await lorasApi.transferRemote({
+          filename: action.filename,
+          download_url: action.download_url,
+          destination_folder: action.destination_folder || "models/loras/",
+          creds: config
+        });
+
+        if (res?.success) {
+          setAppliedActionKeys((prev) => ({ ...prev, [actionKey]: true }));
+          injectStateFeedback(`Successfully transferred LoRA '${loraName}' (${action.filename}) to remote GPU host`);
+          onShowToast?.(`Successfully transferred LoRA '${loraName}' to remote GPU!`, "success");
+        } else {
+          throw new Error(res?.message || res?.error || "Transfer failed.");
+        }
+      } catch (err: any) {
+        const errorMsg = err.message || "Failed to transfer LoRA to remote GPU.";
+        onShowToast?.(`LoRA transfer failed: ${errorMsg}`, "error");
+      }
     }
   }, [
     onUpdateProject, 
@@ -736,8 +765,34 @@ export function useAssistantActions({
 
       injectStateFeedback(`User reverted (undid) changes for "${snapInfo.key}"`);
       onShowToast?.(`Reverted changes for "${snapInfo.key}".`, "info");
+
+    } else if (action.type === "save_visual_analysis") {
+      const snapInfo = undoVisualSnapshots[actionKey];
+      if (!snapInfo) return;
+
+      onUpdateProject((prev) => {
+        const nextCache = { ...(prev.visual_analysis_cache || {}) };
+        if (snapInfo.previousAnalysis) {
+          nextCache[snapInfo.filename] = snapInfo.previousAnalysis;
+        } else {
+          delete nextCache[snapInfo.filename];
+        }
+        return {
+          ...prev,
+          visual_analysis_cache: nextCache
+        };
+      });
+
+      setAppliedActionKeys((prev) => {
+        const next = { ...prev };
+        delete next[actionKey];
+        return next;
+      });
+
+      injectStateFeedback(`User reverted visual analysis cache for '${snapInfo.filename}'`);
+      onShowToast?.(`Reverted visual analysis for ${snapInfo.filename}.`, "info");
     }
-  }, [undoShotSnapshots, undoPlanningSnapshots, undoCharSnapshots, onUpdateProject, onShowToast, injectStateFeedback]);
+  }, [undoShotSnapshots, undoPlanningSnapshots, undoCharSnapshots, undoVisualSnapshots, onUpdateProject, onShowToast, injectStateFeedback]);
 
   const handleApplyAllActions = (actions: AssistantAction[], msgIdx: number) => {
     const existingShotNums = (sceneProject.shots || []).map((s) => s.shot_number);

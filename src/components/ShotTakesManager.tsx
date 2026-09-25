@@ -113,6 +113,7 @@ export const ShotTakesManager: React.FC<ShotTakesManagerProps> = ({
         rating: null,
         notes: "",
         file_size: data.size || file.size,
+        lora_slots: shot.lora_slots ? JSON.parse(JSON.stringify(shot.lora_slots)) : undefined,
         is_hero: takes.length === 0
       };
 

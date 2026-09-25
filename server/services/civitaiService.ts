@@ -786,3 +786,72 @@ fi
     };
   }
 }
+
+export interface CivitaiSearchOptions {
+  query?: string;
+  tag?: string;
+  types?: string[];
+  baseModels?: string[];
+  sort?: "Highest Rated" | "Most Downloaded" | "Newest" | "Most Liked" | string;
+  period?: "AllTime" | "Month" | "Week" | "Day" | string;
+  limit?: number;
+  page?: number;
+  nsfw?: boolean;
+  token?: string;
+}
+
+/**
+ * Search Civitai models by keyword, tag, base model, and model type (e.g. LORA).
+ */
+export async function searchCivitaiModels(options: CivitaiSearchOptions): Promise<any> {
+  const token = (options.token || getStoredCivitaiKey()).trim();
+  const params = new URLSearchParams();
+
+  if (options.query && options.query.trim()) {
+    params.set("query", options.query.trim());
+  }
+  if (options.tag && options.tag.trim()) {
+    params.set("tag", options.tag.trim());
+  }
+
+  const types = options.types && options.types.length > 0 ? options.types : ["LORA", "LoCon", "DoRA"];
+  types.forEach(t => params.append("types", t));
+
+  if (options.baseModels && options.baseModels.length > 0) {
+    options.baseModels.forEach(bm => params.append("baseModels", bm));
+  }
+
+  params.set("sort", options.sort || "Highest Rated");
+  params.set("period", options.period || "AllTime");
+  params.set("limit", String(Math.min(options.limit || 20, 50)));
+  if (options.page && options.page > 1) {
+    params.set("page", String(options.page));
+  }
+  if (options.nsfw !== undefined) {
+    params.set("nsfw", options.nsfw ? "true" : "false");
+  }
+
+  const url = `https://civitai.com/api/v1/models?${params.toString()}`;
+  log.info(`Querying Civitai search: ${url}`);
+
+  const headers: Record<string, string> = {
+    "Accept": "application/json",
+    "User-Agent": "ComfyUI-Bridge/1.0 (AI Studio)"
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(url, { headers });
+  if (!res.ok) {
+    throw new Error(`Civitai search API error (HTTP ${res.status}): ${res.statusText}`);
+  }
+
+  const data = await res.json();
+  return {
+    success: true,
+    items: data.items || [],
+    metadata: data.metadata || {}
+  };
+}
+

@@ -250,7 +250,11 @@ export const NodeScannerModal: React.FC<NodeScannerModalProps> = ({
                           </span>
                           
                           {node.category && (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${
+                              node.category === "LoRA Loader"
+                                ? "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 border-purple-200 dark:border-purple-800 font-semibold"
+                                : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700"
+                            }`}>
                               {node.category}
                             </span>
                           )}

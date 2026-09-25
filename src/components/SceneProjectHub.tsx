@@ -12,7 +12,7 @@ import { AiReferenceStagingStudioModal } from "./cast/AiReferenceStagingStudioMo
 import { SceneSketchImportModal } from "./scenes/SceneSketchImportModal";
 import { ScenePlanModal } from "./scenes/ScenePlanModal";
 import { fetchUniverseCharacters, fetchUniverseAssets } from "../utils/universeApi";
-import { Film, Sparkles, Plus, Compass } from "lucide-react";
+import { Film, Sparkles, Plus, Compass, ShieldCheck } from "lucide-react";
 
 interface Props {
   project: SceneProjectFile;
@@ -355,7 +355,22 @@ export default function SceneProjectHub({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 self-end sm:self-auto">
+        <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap">
+          <button
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent("open-assistant-with-prompt", {
+                detail: {
+                  prompt: "Please run a complete Script Supervisor & Cinematography Continuity Audit across all shots in this scene. Check character wardrobe continuity, reference photo completeness, lighting coherence, and camera motion constraints, and propose any needed action fixes."
+                }
+              }));
+              onShowToast("Dispatched Continuity Audit to Script Supervisor Assistant...", "info");
+            }}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-purple-600 hover:bg-purple-500 text-white shadow-xs transition-colors cursor-pointer"
+            title="Run AI Script Supervisor Continuity Audit across all shots"
+          >
+            <ShieldCheck className="w-4 h-4" />
+            <span>Audit Continuity</span>
+          </button>
           <button
             onClick={() => setIsSketchImportOpen(true)}
             className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs transition-colors cursor-pointer"
@@ -487,6 +502,20 @@ export default function SceneProjectHub({
               return { ...prev, shots };
             });
           }}
+          onRestoreLoras={(loraSlots) => {
+            onUpdateProject(prev => {
+              const shots = [...prev.shots];
+              const idx = shots.findIndex(s => s.id === activeShot.id);
+              if (idx !== -1) {
+                shots[idx] = {
+                  ...shots[idx],
+                  lora_slots: JSON.parse(JSON.stringify(loraSlots))
+                };
+              }
+              return { ...prev, shots };
+            });
+            onShowToast("Restored LoRA settings from take to active shot!", "success");
+          }}
         />
       )}
 
@@ -495,6 +524,20 @@ export default function SceneProjectHub({
           shot={activeShot}
           sceneName={project.scene_name}
           onClose={() => setIsComparisonOpen(false)}
+          onRestoreLoras={(loraSlots) => {
+            onUpdateProject(prev => {
+              const shots = [...prev.shots];
+              const idx = shots.findIndex(s => s.id === activeShot.id);
+              if (idx !== -1) {
+                shots[idx] = {
+                  ...shots[idx],
+                  lora_slots: JSON.parse(JSON.stringify(loraSlots))
+                };
+              }
+              return { ...prev, shots };
+            });
+            onShowToast("Restored LoRA settings to active shot!", "success");
+          }}
           onSetHeroTake={(takeId) => {
             onUpdateProject(prev => {
               const shots = [...prev.shots];

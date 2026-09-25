@@ -4,11 +4,13 @@ import {
   DownloadCloud, 
   Globe, 
   Sparkles, 
-  Server 
+  Server,
+  Layers
 } from "lucide-react";
 import { COMFYUI_MODEL_CATEGORIES } from "./modelhub/modelHubConstants";
 import { HuggingFaceIngestionTab } from "./modelhub/HuggingFaceIngestionTab";
 import { CivitaiIngestionTab } from "./modelhub/CivitaiIngestionTab";
+import { SystemLoRAManager } from "./SystemLoRAManager";
 import { ModelDownloadStatusCard, DownloadResult } from "./modelhub/ModelDownloadStatusCard";
 import { settingsApi, modelHubApi } from "../../api";
 
@@ -27,8 +29,8 @@ export const ModelHubConfig: React.FC<ModelHubConfigProps> = ({
   onChange,
   onShowToast
 }) => {
-  // Active Source Tab: 'huggingface' | 'civitai'
-  const [activeTab, setActiveTab] = useState<"huggingface" | "civitai">("huggingface");
+  // Active Source Tab: 'loras' | 'huggingface' | 'civitai'
+  const [activeTab, setActiveTab] = useState<"loras" | "huggingface" | "civitai">("loras");
 
   // Credential status indicators
   const [civitaiConfigured, setCivitaiConfigured] = useState(false);
@@ -183,7 +185,21 @@ export const ModelHubConfig: React.FC<ModelHubConfigProps> = ({
         </div>
 
         {/* Source Navigation Tabs */}
-        <div className="flex items-center gap-2 mt-5 border-t border-zinc-200 dark:border-neutral-800/80 pt-4">
+        <div className="flex items-center gap-2 mt-5 border-t border-zinc-200 dark:border-neutral-800/80 pt-4 flex-wrap">
+          <button
+            id="tab-loras"
+            type="button"
+            onClick={() => setActiveTab("loras")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              activeTab === "loras"
+                ? "bg-purple-500/10 dark:bg-purple-500/20 text-purple-800 dark:text-purple-300 border border-purple-300 dark:border-purple-500/40 shadow-sm"
+                : "bg-zinc-100 dark:bg-neutral-800/60 text-zinc-600 dark:text-neutral-400 hover:text-zinc-900 hover:dark:text-neutral-200 hover:bg-zinc-200 dark:hover:bg-neutral-800 border border-transparent"
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+            System LoRA Library &amp; Remote GPU
+          </button>
+
           <button
             id="tab-huggingface"
             type="button"
@@ -212,13 +228,21 @@ export const ModelHubConfig: React.FC<ModelHubConfigProps> = ({
             }`}
           >
             <Sparkles className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-            Civitai Models & LoRAs
+            Civitai Models &amp; LoRAs
             {civitaiConfigured && (
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" title="API Key Configured" />
             )}
           </button>
         </div>
       </div>
+
+      {/* Tab 0: System LoRA Library & Remote GPU Manager */}
+      {activeTab === "loras" && (
+        <SystemLoRAManager
+          config={config}
+          onShowToast={onShowToast}
+        />
+      )}
 
       {/* Tab 1: Hugging Face & Direct URL Ingestion */}
       {activeTab === "huggingface" && (

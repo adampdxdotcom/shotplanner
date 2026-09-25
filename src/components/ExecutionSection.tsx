@@ -191,6 +191,8 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
         generation_params: activeShot.generation_params,
         generation_parameters: activeShot.generation_params,
         parameter_node_mappings: activeShot.parameter_node_mappings,
+        lora_slots: activeShot.lora_slots || sceneProject.lora_slots || {},
+        lora_assignments: activeShot.lora_slots || sceneProject.lora_slots || {},
         workflow_file: resolvedWorkflowFilename,
         workflow_filename: resolvedWorkflowFilename,
         output_workflow_filename: synthesizedFilename
@@ -213,6 +215,8 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
         assigned_slots: activeShot.assigned_slots || {},
         generation_parameters: activeShot.generation_params,
         parameter_node_mappings: activeShot.parameter_node_mappings,
+        lora_slots: activeShot.lora_slots || sceneProject.lora_slots || {},
+        lora_assignments: activeShot.lora_slots || sceneProject.lora_slots || {},
         shots: [formattedShot],
         project_data: sceneProject
       };
@@ -270,6 +274,8 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
         node_mappings: activeShot.assigned_slots,
         generation_parameters: activeShot.generation_params,
         parameter_node_mappings: activeShot.parameter_node_mappings,
+        lora_slots: activeShot.lora_slots || sceneProject.lora_slots || {},
+        lora_assignments: activeShot.lora_slots || sceneProject.lora_slots || {},
         client_id: monitorState?.clientId || (typeof window !== "undefined" ? (window as any).__comfyMonitorClientId : undefined) || "comfyui-bridge-session",
         stage_assets_first: true
       };
@@ -335,10 +341,13 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
             generation_params: s.generation_params,
             generation_parameters: s.generation_params,
             parameter_node_mappings: s.parameter_node_mappings,
+            lora_slots: s.lora_slots || sceneProject.lora_slots || {},
+            lora_assignments: s.lora_slots || sceneProject.lora_slots || {},
             workflow_file: shotWf,
             workflow_filename: shotWf,
           };
         }),
+        lora_slots: sceneProject.lora_slots || {},
         project_data: sceneProject
       };
 

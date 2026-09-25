@@ -164,6 +164,16 @@ export interface SaveVisualAnalysisAction {
   };
 }
 
+export interface TransferLoraToRemoteAction {
+  type: "transfer_lora_to_remote";
+  title?: string;
+  description?: string;
+  lora_name: string;
+  filename: string;
+  download_url?: string;
+  destination_folder?: string;
+}
+
 export type AssistantAction = 
   | UpdateShotAction 
   | AddShotAction 
@@ -171,7 +181,8 @@ export type AssistantAction =
   | UpdateCharacterAction
   | StageShotAssetsAction
   | ExpandShotPromptAction
-  | SaveVisualAnalysisAction;
+  | SaveVisualAnalysisAction
+  | TransferLoraToRemoteAction;
 
 export interface ParsedAssistantMessage {
   cleanContent: string;

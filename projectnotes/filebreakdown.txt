@@ -1364,5 +1364,57 @@
   - **Updates:** Refactored the `runUnifiedUpload` execution loop. Converted sequential `await fetch()` calls into a concurrent `Promise.all()` pipeline, allowing bulk character packs and arbitrary queue items to upload simultaneously rather than blocking on the network consecutively.
 - **`backend/utils/file_handlers.py`**
   - **Updates:** Wrapped the synchronous PIL `generate_thumbnail` call inside `asyncio.to_thread`. This prevents the FastAPI asyncio event loop from stalling during heavy image processing, successfully decoupling media uploads from ComfyUI WebSocket pings and other incoming network traffic.
-- **`backend/services/asset_service.py`**
-  - **Updates:** Refactored `handle_chunk_upload` to delegate synchronous file IO (`open("ab")`, `shutil.copyfile`, and `os.remove`) to an executor thread via `asyncio.to_thread`. This eliminates event loop blocking during chunked multipart uploads.
+## Phase 1: System-Level LoRA Registry & Remote GPU Inspection
+- **`server/config/constants.ts`**
+  - Added `SYSTEM_LORAS_FILE` path (`data/config/system_loras.json`) to persist system-level LoRAs across all scenes and projects.
+- **`server/services/loraService.ts` & `server/routes/loraRoutes.ts`**
+  - **System LoRA Registry:** Implemented full CRUD (`getAllSystemLoras`, `saveSystemLora`, `deleteSystemLora`) merging custom LoRAs with Civitai favorites.
+  - **Remote GPU Inspection:** Added `checkRemoteLoraStatus` (endpoint `POST /api/loras/remote-status`) probing `{remote_comfyui_root}/models/loras/` over SSH to determine real-time file presence, file sizes, and paths on the remote GPU instance.
+  - **1-Click Remote Transfer:** Added `transferLoraToRemote` (endpoint `POST /api/loras/transfer-remote`) to download and stage LoRAs directly to remote ComfyUI `models/loras/`.
+- **`server/services/assistantService.ts`**
+  - Injected System-Level LoRA Library into the Project Dossier so the Assistant has complete visibility into favorited LoRAs, trigger words, base models, and remote GPU readiness.
+  - Added `transfer_lora_to_remote` action card specification to the system prompt, allowing the assistant to propose 1-click remote GPU staging for recommended LoRAs.
+- **`src/types/` & `src/api/`**
+  - Defined `SystemLora`, `RemoteLoraStatusReport`, `TransferLoraResult`, and `TransferLoraToRemoteAction` interfaces.
+  - Implemented `lorasApi` client (`listLoras`, `saveLora`, `deleteLora`, `checkRemoteStatus`, `transferRemote`).
+- **`src/components/config/SystemLoRAManager.tsx` & `ModelHubConfig.tsx`**
+  - Added a dedicated "System LoRA Library & Remote GPU" dashboard tab in Model Hub with search, base model filters, remote status badges ("On Remote GPU" / "Not on Remote"), trigger word copy buttons, 1-click "Transfer to GPU" buttons, and an Add/Edit LoRA modal.
+## Phase 2: Workflow LoRA Slots Detection, UI Binding & AST Injection
+- **`src/shared/comfyNodeClassifiers.ts` & `src/utils/workflowInjection.ts`**
+  - **AST Node Classification & Heuristics:** Added detection for standard and custom ComfyUI LoRA nodes (`LoraLoader`, `LoraLoaderModelOnly`, `LoraLoaderAdvanced`, `CR Load LoRA`, `WANLoraLoader`, `WanVideoLoraLoader`, `FluxLoraLoader`, `LoraLoaderDiffusionModels`, `Power Lora Loader`).
+  - **Slot Metadata & Bypass Extraction:** Added slot metadata extraction for `lora_name`, `strength_model`, `strength_clip`, and bypass state.
+  - **Server-Side & Client-Side AST Workflow Injection:** Fully integrated into `injectAndPrepareWorkflowData` and `generateLiveInjectedWorkflow`. Injects assigned LoRA safetensors filenames and strengths into visual canvas (`nodes` array) and API graph dictionaries (`inputs`), cleanly bypassing unassigned LoRA nodes with `mode = 4` to prevent workflow crashes on remote servers.
+  - **Per-Shot & Scene-Wide Bindings:** Saves LoRA slot configurations to `shot.lora_slots` and `sceneProject.lora_slots`.
+- **`src/components/workflow/LoraSlotMapper.tsx`**
+  - Interactive LoRA slot mapper dashboard with model and CLIP strength sliders, system library selectors, trigger words display, and 1-click staging.
+
+## Phase 3: Civitai In-Slot Search, Trigger Harmonization, Multi-Take LoRA Tracking & Pre-Flight Staging
+- **`server/services/civitaiService.ts` & `server/routes/civitaiRoutes.ts`**
+  - Implemented `searchCivitaiModels` and route `GET /api/civitai/search` querying `https://civitai.com/api/v1/models` by keywords, tags, base models (Wan 2.1, Flux.1 D, SDXL, SD 1.5), and sort orders (Highest Rated, Most Downloaded, Newest, Most Liked).
+- **`src/components/workflow/CivitaiLoraSearchModal.tsx` & `src/components/workflow/LoraSlotMapper.tsx`**
+  - **Embedded Civitai Search Modal:** Direct in-slot search from `LoraSlotMapper` with thumbnail previews, tags, trigger words copy, and "Assign to Slot" button.
+  - **1-Click Prompt Injection (`✨ Inject Prompt`):** Injects trigger words directly into `shot.basic_stub` or `shot.expanded_prompt` with duplicate prevention.
+  - **Pre-Flight Auto-Stage Banner:** Proactively identifies assigned LoRAs missing from the remote GPU disk and provides a 1-click "Stage All Missing" button.
+- **`server/services/llm_service.ts` & Prompt Expansion Director**
+  - Injected active non-bypassed LoRA trigger words directly into the LLM prompt expansion context (`ACTIVE LORA TRIGGER WORDS & DIRECTIVES`), naturally harmonizing stylistic and character triggers into the synthesized scene description.
+- **`src/components/TakeReviewModal.tsx`, `TakeComparisonModal.tsx`, `ShotTakesManager.tsx` & `outputIngestionService.ts`**
+  - **Take Snapshot LoRA Capture:** Preserves exact `lora_slots` snapshot per take across manual uploads and automated ComfyUI render ingestion.
+  - **Take Review LoRA Display & 1-Click Restore:** Displays the exact LoRAs, Model Strength, and CLIP Strength used during each take, with a "⚡ Restore Take's LoRA Settings" action button.
+  - **Take Comparison LoRA Diff:** Side-by-side comparison of LoRA configurations between Take A and Take B with diff highlights and restore actions.
+- **`src/components/ExecutionSection.tsx`**
+  - Bundled `lora_slots` and `lora_assignments` directly into single-shot staging (`handleSendShot`), full scene staging (`handleSendScene`), and direct execution (`handleExecuteShot`).
+
+## Phase 4: Multimodal Vision AI, Script Supervisor Continuity Audit & Visual Breakdown Caching
+- **`src/components/AssetLightbox.tsx`**
+  - **On-Demand Vision AI Analysis:** Integrated interactive multimodal inspection into the Asset Lightbox with "✨ Analyze with Vision AI" trigger.
+  - **Structured Visual AI Breakdown:** Displays AI analysis for facial/physical traits, wardrobe details, lighting key direction & color temperature, and cinematography optics.
+- **`src/components/SceneProjectHub.tsx` & `ScenePlanningHeader.tsx`**
+  - **Scene Continuity Audit:** Added "🛡️ Audit Continuity" quick action to the Scene Planning header and action bar.
+  - **Cross-Component Dispatch:** Emits global `open-assistant-with-prompt` events connecting the user directly to the Script Supervisor co-director.
+- **`src/components/assistant/AssistantFloatingChat.tsx` & `useAssistantActions.ts`**
+  - **Prompt Listening & Vision Attachment:** Listens for external prompt dispatches and multimodal asset attachments for instant deep visual analysis.
+  - **Visual Analysis Caching:** Automatically persists `save_visual_analysis` action cards into `visual_analysis_cache` and project records with undo history.
+
+
+
+

@@ -14,6 +14,7 @@ export const LLM_CONFIG_FILE = path.join(SERVER_CONFIG_DIR, "llm_config.json");
 export const GEMINI_CONFIG_FILE = path.join(SERVER_CONFIG_DIR, "gemini_config.json");
 export const CIVITAI_CONFIG_FILE = path.join(SERVER_CONFIG_DIR, "civitai_config.json");
 export const CIVITAI_FAVORITES_FILE = path.join(SERVER_CONFIG_DIR, "civitai_favorites.json");
+export const SYSTEM_LORAS_FILE = path.join(SERVER_CONFIG_DIR, "system_loras.json");
 export const HUGGINGFACE_CONFIG_FILE = path.join(SERVER_CONFIG_DIR, "huggingface_config.json");
 export const RUNPOD_CONFIG_FILE = path.join(SERVER_CONFIG_DIR, "runpod_config.json");
 export const REMOTE_CONFIG_FILE = path.join(SERVER_CONFIG_DIR, "remote_config.json");

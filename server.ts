@@ -21,6 +21,7 @@ import comfyRoutes from "./server/routes/comfyRoutes";
 import runpodRoutes from "./server/routes/runpodRoutes";
 import firstFrameRoutes from "./server/routes/firstFrameRoutes";
 import diagnosticRoutes from "./server/routes/diagnosticRoutes";
+import loraRoutes from "./server/routes/loraRoutes";
 
 // Re-export utility functions for external consumers
 export {
@@ -51,6 +52,7 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // Domain API routes
 app.use("/api/settings", settingsRoutes);
+app.use("/api/loras", loraRoutes);
 app.use("/api/civitai", civitaiRoutes);
 app.use("/api/model-hub", modelHubRoutes);
 app.use("/api/workflows", workflowRoutes);

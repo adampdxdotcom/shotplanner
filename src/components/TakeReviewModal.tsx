@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
-import { ShotTake, PromptVariation } from "../types";
-import { X, Star, CheckCircle, XCircle, ThumbsUp, ThumbsDown, Download, Sparkles, Link as LinkIcon } from "lucide-react";
+import { ShotTake, PromptVariation, ShotLoraAssignment } from "../types";
+import { X, Star, CheckCircle, XCircle, ThumbsUp, ThumbsDown, Download, Sparkles, Link as LinkIcon, Layers, RotateCcw } from "lucide-react";
 
 interface TakeReviewModalProps {
   take: ShotTake;
@@ -12,6 +12,7 @@ interface TakeReviewModalProps {
   onUpdateRating?: (rating: "good" | "bad" | null) => void;
   onUpdateNotes?: (notes: string) => void;
   onChainLastFrameToNextShot?: (take: ShotTake, videoUrl: string) => Promise<void> | void;
+  onRestoreLoras?: (loraSlots: Record<string, ShotLoraAssignment>) => void;
 }
 
 export function TakeReviewModal({ 
@@ -23,7 +24,8 @@ export function TakeReviewModal({
   onSetHero,
   onUpdateRating,
   onUpdateNotes,
-  onChainLastFrameToNextShot
+  onChainLastFrameToNextShot,
+  onRestoreLoras
 }: TakeReviewModalProps) {
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
   const [isChaining, setIsChaining] = useState(false);
@@ -235,6 +237,60 @@ export function TakeReviewModal({
               </div>
             </div>
             
+            {/* LoRA Configuration Snapshot */}
+            {take.lora_slots && Object.keys(take.lora_slots).length > 0 && (
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-semibold text-purple-400 flex items-center gap-1.5 uppercase tracking-wider">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>LoRA Weights Snapshot</span>
+                  </h3>
+                  {onRestoreLoras && (
+                    <button
+                      type="button"
+                      onClick={() => onRestoreLoras(take.lora_slots!)}
+                      className="px-2 py-0.5 rounded bg-purple-600/80 hover:bg-purple-600 text-white text-[10px] font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                      title="Restore these LoRA assignments and strength settings to the active shot"
+                    >
+                      <RotateCcw className="w-2.5 h-2.5" />
+                      <span>Restore LoRAs</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {Object.entries(take.lora_slots).map(([nodeId, lora]) => {
+                    if (!lora) return null;
+                    return (
+                      <div
+                        key={nodeId}
+                        className={`p-2 rounded-lg border text-[11px] ${
+                          lora.bypassed
+                            ? "bg-zinc-950/40 border-zinc-800/60 opacity-60"
+                            : "bg-zinc-950 border-purple-900/40 text-zinc-200"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-1 font-mono text-[10px]">
+                          <span className="font-bold text-purple-300 truncate">
+                            Node #{nodeId}: {lora.lora_name || "Unassigned"}
+                          </span>
+                          <span className={lora.bypassed ? "text-zinc-500" : "text-emerald-400 font-semibold"}>
+                            {lora.bypassed ? "Bypassed" : "Active"}
+                          </span>
+                        </div>
+                        {!lora.bypassed && lora.lora_name && (
+                          <div className="flex items-center justify-between text-[10px] text-zinc-400 pt-1">
+                            <span>Model: <b className="text-purple-300 font-mono">{lora.strength_model ?? 1.0}</b></span>
+                            <span>CLIP: <b className="text-purple-300 font-mono">{lora.strength_clip ?? 1.0}</b></span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 grid grid-cols-3 gap-3 text-center">
               <div className="bg-zinc-950 border border-zinc-800/50 rounded-lg p-2">
                 <div className="text-[10px] text-zinc-500 font-medium uppercase mb-1">Steps</div>

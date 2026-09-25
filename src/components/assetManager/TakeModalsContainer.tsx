@@ -151,6 +151,20 @@ export const TakeModalsContainer: React.FC<TakeModalsContainerProps> = ({
               if (addToast) addToast(`Failed to chain frame: ${err.message}`, "error");
             }
           }}
+          onRestoreLoras={(loraSlots) => {
+            onUpdateProject(prev => {
+              const shots = [...prev.shots];
+              const idx = shots.findIndex(s => s.id === activeShot.id);
+              if (idx !== -1) {
+                shots[idx] = {
+                  ...shots[idx],
+                  lora_slots: JSON.parse(JSON.stringify(loraSlots))
+                };
+              }
+              return { ...prev, shots };
+            });
+            if (addToast) addToast("Restored LoRA settings from take to active shot!", "success");
+          }}
         />
       )}
 
@@ -172,6 +186,20 @@ export const TakeModalsContainer: React.FC<TakeModalsContainerProps> = ({
               }
               return { ...prev, shots };
             });
+          }}
+          onRestoreLoras={(loraSlots) => {
+            onUpdateProject(prev => {
+              const shots = [...prev.shots];
+              const idx = shots.findIndex(s => s.id === activeShot.id);
+              if (idx !== -1) {
+                shots[idx] = {
+                  ...shots[idx],
+                  lora_slots: JSON.parse(JSON.stringify(loraSlots))
+                };
+              }
+              return { ...prev, shots };
+            });
+            if (addToast) addToast("Restored LoRA settings to active shot!", "success");
           }}
         />
       )}

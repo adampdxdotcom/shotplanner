@@ -8,6 +8,7 @@ import {
   isExactImageLoader,
   isExactVideoLoader,
   isExactAudioLoader,
+  isExactLoraLoader,
   isSaveVideoNode
 } from "./comfyNodeClassifiers";
 import { formatAspectRatioForComfyUI } from "./aspectRatioUtils";
@@ -17,6 +18,7 @@ export interface WorkflowInjectionOptions {
   promptNodeId?: string | null;
   finalPrompt?: string;
   nodeMappings?: Record<string, string>;
+  loraAssignments?: Record<string, { lora_name?: string; strength_model?: number; strength_clip?: number; bypassed?: boolean } | string> | null;
   bypassMissing?: boolean;
   safePlaceholder?: string;
   parameterOverrides?: {
@@ -45,6 +47,7 @@ export function injectWorkflowGraph(options: WorkflowInjectionOptions): any {
     promptNodeId,
     finalPrompt = "",
     nodeMappings = {},
+    loraAssignments = {},
     bypassMissing = true,
     safePlaceholder = "empty.png",
     parameterOverrides = {},
@@ -58,6 +61,7 @@ export function injectWorkflowGraph(options: WorkflowInjectionOptions): any {
   const placeholder = safePlaceholder || "empty.png";
 
   const effectiveMappings: Record<string, string> = { ...nodeMappings };
+  const effectiveLoraAssignments: Record<string, any> = { ...(loraAssignments || {}) };
   const effectiveOverrides = parameterOverrides || {};
   const effectiveParamMappings = parameterNodeMappings || {};
 
@@ -95,10 +99,12 @@ export function injectWorkflowGraph(options: WorkflowInjectionOptions): any {
       const isImgLoader = isExactImageLoader(classType, metaTitle);
       const isVidLoader = isExactVideoLoader(classType, metaTitle);
       const isAudLoader = isExactAudioLoader(classType, metaTitle);
+      const isLora = isExactLoraLoader(classType, metaTitle);
       const hasExplicitMapping = Boolean(effectiveMappings && strId in effectiveMappings && effectiveMappings[strId] && String(effectiveMappings[strId]).trim());
+      const hasExplicitLora = Boolean(effectiveLoraAssignments && strId in effectiveLoraAssignments && effectiveLoraAssignments[strId]);
 
       // 2. Image Loaders & explicitly mapped image nodes
-      if (isImgLoader || (hasExplicitMapping && !isVidLoader && !isAudLoader)) {
+      if (isImgLoader || (hasExplicitMapping && !isVidLoader && !isAudLoader && !isLora)) {
         if (hasExplicitMapping) {
           const assigned = String(effectiveMappings[strId]).trim();
           if (Array.isArray(node.widgets_values) && node.widgets_values.length > 0) {
@@ -171,6 +177,40 @@ export function injectWorkflowGraph(options: WorkflowInjectionOptions): any {
             if (Array.isArray(node.widgets_values) && node.widgets_values.length > 0 && (!node.widgets_values[0] || String(node.widgets_values[0]).includes("default"))) {
               node.widgets_values[0] = placeholder;
             }
+          }
+        }
+      }
+
+      // 5. LoRA Loader Nodes & explicit LoRA bindings
+      else if (isLora || hasExplicitLora) {
+        if (hasExplicitLora) {
+          const loraCfg = effectiveLoraAssignments[strId];
+          const loraName = typeof loraCfg === "string" ? loraCfg.trim() : (loraCfg?.lora_name || "").trim();
+          const isBypassed = typeof loraCfg === "object" && loraCfg?.bypassed === true;
+          const strModel = typeof loraCfg === "object" && typeof loraCfg?.strength_model === "number" ? loraCfg.strength_model : undefined;
+          const strClip = typeof loraCfg === "object" && typeof loraCfg?.strength_clip === "number" ? loraCfg.strength_clip : undefined;
+
+          if (isBypassed || !loraName) {
+            node.mode = 4; // Mode 4: Bypassed
+          } else {
+            node.mode = 0; // Mode 0: Active
+            if (Array.isArray(node.widgets_values) && node.widgets_values.length > 0) {
+              node.widgets_values[0] = loraName;
+              if (strModel !== undefined && node.widgets_values.length > 1) node.widgets_values[1] = strModel;
+              if (strClip !== undefined && node.widgets_values.length > 2) node.widgets_values[2] = strClip;
+            } else {
+              node.widgets_values = [loraName, strModel ?? 1.0, strClip ?? 1.0];
+            }
+            if (node.widgets_values_named && typeof node.widgets_values_named === "object") {
+              node.widgets_values_named.lora_name = loraName;
+              if (strModel !== undefined) node.widgets_values_named.strength_model = strModel;
+              if (strClip !== undefined) node.widgets_values_named.strength_clip = strClip;
+            }
+          }
+        } else if (isLora && bypassMissing) {
+          const currentVal = Array.isArray(node.widgets_values) && node.widgets_values.length > 0 ? String(node.widgets_values[0] || "") : "";
+          if (!currentVal || currentVal === "None" || currentVal.toLowerCase().includes("none") || currentVal.toLowerCase().includes("placeholder")) {
+            node.mode = 4;
           }
         }
       }
@@ -329,9 +369,11 @@ export function injectWorkflowGraph(options: WorkflowInjectionOptions): any {
       const isImg = isExactImageLoader(classType, metaTitle);
       const isVid = isExactVideoLoader(classType, metaTitle);
       const isAud = isExactAudioLoader(classType, metaTitle);
+      const isLora = isExactLoraLoader(classType, metaTitle);
       const hasExplicitMapping = Boolean(effectiveMappings && nodeId in effectiveMappings && effectiveMappings[nodeId] && String(effectiveMappings[nodeId]).trim());
+      const hasExplicitLora = Boolean(effectiveLoraAssignments && nodeId in effectiveLoraAssignments && effectiveLoraAssignments[nodeId]);
 
-      if (isImg || (hasExplicitMapping && !isVid && !isAud)) {
+      if (isImg || (hasExplicitMapping && !isVid && !isAud && !isLora)) {
         if (hasExplicitMapping) {
           nodeData.inputs.image = String(effectiveMappings[nodeId]).trim();
         } else if (isImg && bypassMissing) {
@@ -354,6 +396,19 @@ export function injectWorkflowGraph(options: WorkflowInjectionOptions): any {
           nodeData.inputs.audio = assigned;
         } else if (bypassMissing && (!nodeData.inputs.audio || String(nodeData.inputs.audio).includes("default"))) {
           nodeData.inputs.audio = placeholder;
+        }
+      } else if (isLora || hasExplicitLora) {
+        if (hasExplicitLora) {
+          const loraCfg = effectiveLoraAssignments[nodeId];
+          const loraName = typeof loraCfg === "string" ? loraCfg.trim() : (loraCfg?.lora_name || "").trim();
+          const strModel = typeof loraCfg === "object" && typeof loraCfg?.strength_model === "number" ? loraCfg.strength_model : undefined;
+          const strClip = typeof loraCfg === "object" && typeof loraCfg?.strength_clip === "number" ? loraCfg.strength_clip : undefined;
+
+          if (loraName) {
+            nodeData.inputs.lora_name = loraName;
+            if (strModel !== undefined) nodeData.inputs.strength_model = strModel;
+            if (strClip !== undefined) nodeData.inputs.strength_clip = strClip;
+          }
         }
       } else if (isSaveVideoNode(classType, metaTitle)) {
         if (saveVideoPrefix && saveVideoPrefix.trim()) {

@@ -97,6 +97,19 @@ export const AssistantFloatingChat: React.FC<AssistantFloatingChatProps> = ({
     onShowToast
   });
 
+  // Global listener to open assistant with pre-populated prompt (e.g. Continuity Audit)
+  React.useEffect(() => {
+    const handleOpenWithPrompt = (e: any) => {
+      const prompt = e.detail?.prompt;
+      if (prompt) {
+        setIsOpen(true);
+        setInputQuery(prompt);
+      }
+    };
+    window.addEventListener("open-assistant-with-prompt", handleOpenWithPrompt);
+    return () => window.removeEventListener("open-assistant-with-prompt", handleOpenWithPrompt);
+  }, [setInputQuery]);
+
   // Hook 2: Project mutation actions, batch execution, undo engine, and remote staging
   const {
     appliedActionKeys,
