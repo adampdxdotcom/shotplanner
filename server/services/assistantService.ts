@@ -234,12 +234,15 @@ function buildProjectDossier(
         const base = l.base_model ? `Base: ${l.base_model}` : "SDXL";
         const weight = l.preferred_strength_model !== undefined ? `Weight: ${l.preferred_strength_model}` : "Weight: 0.85";
         const hasUrl = Boolean(l.download_url);
-        return `- "${l.name}" (Filename: \`${l.filename}\` | Base: ${base} | ${triggers} | Preferred ${weight} | Source: ${l.source || 'custom'}${hasUrl ? ' | Direct Download Ready' : ''})`;
+        return `- "${l.name}" (Filename: \`${l.filename}\` | Base: ${base} | ${triggers} | Preferred ${weight} | Source: ${l.source || 'civitai'}${hasUrl ? ' | Direct Download Ready' : ''})`;
       }).join("\n");
-      sections.push(`### SYSTEM-LEVEL LORA & MODEL LIBRARY (${loras.length} favorited models across all projects):\n${loraSummaries}`);
+      sections.push(`### SAVED FAVORITES & LORA LIBRARY (${loras.length} favorited models across all projects):\n${loraSummaries}`);
+    } else {
+      sections.push(`### SAVED FAVORITES & LORA LIBRARY:\n(No models or LoRAs are currently saved in your favorites library. Do not invent any fictional LoRAs.)`);
     }
   } catch (err) {
     log.warn("Could not read system loras", { error: err });
+    sections.push(`### SAVED FAVORITES & LORA LIBRARY:\n(No models or LoRAs are currently saved in your favorites library. Do not invent any fictional LoRAs.)`);
   }
 
   // 8. Active Workflow Template & Detected LoRA Slots
@@ -375,11 +378,12 @@ WORKFLOW GENERATION PARAMETERS (Sampling Steps, Megapixels, Total Seconds):
 - Modifying generation parameters is strictly per-shot and will only affect the specified shot.
 
 WORKFLOW LORA SLOTS & MODEL ATTACHMENTS:
-- The Project Dossier lists detected LoRA slots in the active workflow (e.g. Node #12, Node #14) and all system-level favorited LoRAs.
-- When recommending a style, character, or visual aesthetic that matches a favorited LoRA, recommend attaching it to a workflow slot.
-- If the recommended LoRA is NOT yet staged to the remote GPU, output a \`transfer_lora_to_remote\` action card.
+- The Project Dossier lists detected LoRA slots in the active workflow (e.g. Node #12, Node #14) and all saved favorited LoRAs.
+- CRITICAL INTEGRITY RULE: You must ONLY reference or recommend LoRAs that are explicitly listed under "SAVED FAVORITES & LORA LIBRARY". If that section is empty or states that no LoRAs are saved, explicitly inform the user that no LoRAs are currently saved in their favorites. NEVER invent, hallucinate, assume, or make up fictional LoRAs or models.
+- When recommending a style, character, or visual aesthetic that matches an actual favorited LoRA in the library, recommend attaching it to a workflow slot.
+- If the recommended favorited LoRA is NOT yet staged to the remote GPU, output a \`transfer_lora_to_remote\` action card.
 - To attach or configure a LoRA on a shot, include \`lora_slots\` in \`update_shot\` (or \`add_shot\`) keyed by node ID:
-  \`"lora_slots": { "12": { "lora_name": "wan2.1_cinematic.safetensors", "strength_model": 0.85, "strength_clip": 1.0, "bypassed": false } }\`
+  \`"lora_slots": { "12": { "lora_name": "<favorited_lora_filename>.safetensors", "strength_model": 0.85, "strength_clip": 1.0, "bypassed": false } }\`
 
 BEHAVIOR GUIDELINES:
 - Be concise, cinematic, and directly helpful.
@@ -550,15 +554,15 @@ When an image asset is inspected or attached for visual analysis, you MUST inclu
 \`\`\`
 
 8. Remote LoRA Staging / Download:
-When you recommend a favorited or registered system LoRA for a shot or aesthetic, or when the user asks to stage/download a LoRA to their remote ComfyUI GPU, output a \`transfer_lora_to_remote\` action:
+When you recommend a favorited LoRA from the user's library for a shot or aesthetic, or when the user asks to stage/download a LoRA to their remote ComfyUI GPU, output a \`transfer_lora_to_remote\` action:
 \`\`\`action
 {
   "type": "transfer_lora_to_remote",
-  "lora_name": "Flux Realistic Skin",
-  "filename": "flux_realism.safetensors",
+  "lora_name": "<favorited_lora_name>",
+  "filename": "<favorited_lora_filename>.safetensors",
   "download_url": "https://civitai.com/api/download/models/123456",
   "destination_folder": "models/loras/",
-  "title": "Transfer 'Flux Realistic Skin' LoRA to Remote GPU"
+  "title": "Transfer LoRA to Remote GPU"
 }
 \`\`\`
 
@@ -581,12 +585,6 @@ When you recommend a favorited or registered system LoRA for a shot or aesthetic
       "basic_stub": "Marcus steps into the dim alleyway, radio harness catching the flickers of amber neon.",
       "shot_type": "Medium Shot (MS)"
     }
-  },
-  {
-    "type": "transfer_lora_to_remote",
-    "lora_name": "Cyberpunk Neon",
-    "filename": "cyberpunk_neon.safetensors",
-    "title": "Transfer Cyberpunk Neon LoRA to Remote GPU"
   }
 ]
 \`\`\`

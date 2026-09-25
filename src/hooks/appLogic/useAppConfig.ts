@@ -238,6 +238,17 @@ export function useAppConfig({ addToast, onUpdateProjectConfig }: UseAppConfigPa
       })
       .catch(() => {});
 
+    settingsApi.getCivitaiKey()
+      .then(data => {
+        if (data && (data.configured || data.api_key)) {
+          setConfig(prev => ({
+            ...prev,
+            civitai_api_key: data.api_key || (data.configured ? "CONFIGURED" : prev.civitai_api_key)
+          }));
+        }
+      })
+      .catch(() => {});
+
     settingsApi.getRemoteSettings()
       .then(data => {
         if (data) {

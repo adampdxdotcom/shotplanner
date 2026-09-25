@@ -4,7 +4,7 @@ import { Client } from "ssh2";
 import { SYSTEM_LORAS_FILE, CIVITAI_FAVORITES_FILE } from "../config/constants";
 import { writeJsonAtomicSync } from "../utils/atomicFs";
 import { createScopedLogger } from "../utils/logger";
-import { getStoredCivitaiFavorites, getStoredCivitaiKey } from "./civitaiService";
+import { getStoredCivitaiFavorites, getStoredCivitaiKey, saveCivitaiFavorite, deleteCivitaiFavorite } from "./civitaiService";
 import { getStoredHuggingFaceToken } from "./huggingfaceService";
 import { getStoredRemoteSettings } from "./remoteSettingsService";
 import { resolveSSHConfig, SSHCredentials } from "./sshService";
@@ -207,6 +207,29 @@ export function saveSystemLora(data: Partial<SystemLora> & { name: string; filen
   }
 
   writeCustomSystemLoras(customLoras);
+
+  // Also synchronize directly into unified Civitai Favorites storage
+  try {
+    saveCivitaiFavorite({
+      version_id: updatedItem.version_id,
+      model_id: updatedItem.model_id,
+      name: updatedItem.name,
+      filename: updatedItem.filename,
+      version_name: updatedItem.version_name,
+      base_model: updatedItem.base_model,
+      category: updatedItem.category || "LoRA",
+      trigger_words: updatedItem.trigger_words,
+      download_url: updatedItem.download_url,
+      preview_image_url: updatedItem.preview_image_url,
+      file_size_formatted: updatedItem.file_size_formatted,
+      file_size_bytes: updatedItem.file_size_bytes,
+      description: updatedItem.description,
+      default_destination_folder: updatedItem.default_destination_folder || "models/loras/"
+    });
+  } catch (err: any) {
+    log.warn(`Failed to mirror LoRA into Civitai favorites: ${err?.message}`);
+  }
+
   log.info(`Saved system LoRA '${updatedItem.name}' (${updatedItem.filename})`);
   return updatedItem;
 }
@@ -223,7 +246,21 @@ export function deleteSystemLora(idOrFilename: string): boolean {
     l => l.id.toLowerCase() !== cleanTarget && l.filename.toLowerCase() !== cleanTarget
   );
 
-  if (filtered.length !== initialCount) {
+  let removedFromFavorites = false;
+  try {
+    const favs = getStoredCivitaiFavorites();
+    const matchingFav = favs.find(f => 
+      String(f.version_id).toLowerCase() === cleanTarget || 
+      (f.filename && f.filename.toLowerCase() === cleanTarget) ||
+      (f.name && f.name.toLowerCase() === cleanTarget)
+    );
+    if (matchingFav) {
+      deleteCivitaiFavorite(matchingFav.version_id);
+      removedFromFavorites = true;
+    }
+  } catch {}
+
+  if (filtered.length !== initialCount || removedFromFavorites) {
     writeCustomSystemLoras(filtered);
     log.info(`Deleted system LoRA '${idOrFilename}'`);
     return true;

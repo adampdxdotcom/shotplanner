@@ -313,7 +313,7 @@ export const LoraSlotMapper: React.FC<LoraSlotMapperProps> = ({
               </span>
             </div>
             <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-              Attach favorited System LoRAs or search Civitai directly to inject character, style, and motion weights into active workflow AST nodes.
+              Attach favorited LoRAs or search Civitai directly to inject character, style, and motion weights into active workflow AST nodes.
             </p>
           </div>
         </div>
@@ -334,7 +334,7 @@ export const LoraSlotMapper: React.FC<LoraSlotMapperProps> = ({
             onClick={fetchLoras}
             disabled={loadingLoras}
             className="flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 transition-colors cursor-pointer"
-            title="Refresh System LoRA Library & Remote Status"
+            title="Refresh Favorites & Remote GPU Status"
           >
             <RefreshCw className={`w-3 h-3 ${loadingLoras ? "animate-spin" : ""}`} />
             <span>Refresh</span>

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { SystemLora, CivitaiSearchItem } from "../../types";
 import { lorasApi } from "../../api";
+import { addCivitaiFavorite } from "../../services/civitaiFavoritesService";
 import { copyToClipboard } from "../../utils/clipboard";
 
 interface CivitaiLoraSearchModalProps {
@@ -140,8 +141,30 @@ export const CivitaiLoraSearchModal: React.FC<CivitaiLoraSearchModalProps> = ({
     };
 
     try {
-      // 1. Save to System LoRAs
-      await lorasApi.saveLora(systemLora);
+      // 1. Save directly to Favorites
+      await addCivitaiFavorite({
+        version_id: version.id,
+        model_id: model.id,
+        name: model.name,
+        model_name: model.name,
+        version_name: version.name || "v1.0",
+        category: "LoRA",
+        base_model: version.baseModel || "SDXL",
+        image_url: previewUrl,
+        preview_image_url: previewUrl,
+        filename,
+        download_url: version.downloadUrl || `https://civitai.com/api/download/models/${version.id}`,
+        default_destination_folder: "models/loras/",
+        trigger_words: triggerWords,
+        trained_words: triggerWords,
+        description: version.description || "",
+        tags: model.tags || []
+      }).catch(err => {
+        console.warn("Failed saving favorite via service:", err);
+      });
+
+      // Also ensure backend system LoRA registry is updated
+      await lorasApi.saveLora(systemLora).catch(() => {});
 
       // 2. Stage to Remote GPU if requested
       if (stageDirectly && systemLora.download_url) {

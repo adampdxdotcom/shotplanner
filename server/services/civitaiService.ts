@@ -158,13 +158,20 @@ export function getStoredCivitaiFavorites(): CivitaiFavorite[] {
  * Add or update a Civitai model in favorites
  */
 export function saveCivitaiFavorite(modelData: Partial<CivitaiFavorite> & { [key: string]: any }): CivitaiFavorite {
-  const versionId = modelData.version_id || modelData.versionId || modelData.id;
-  if (!versionId) {
-    throw new Error("Missing 'version_id' in model favorite data.");
+  const rawId = modelData.version_id || modelData.versionId || modelData.id || modelData.model_id || modelData.modelId;
+  let normVersionId = Number(rawId) || Number(String(rawId || "").replace(/\D/g, "")) || 0;
+  if (!normVersionId) {
+    // Generate deterministic numeric ID from filename or name if versionId is missing
+    const seed = (modelData.filename || modelData.name || modelData.model_name || `model_${Date.now()}`);
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) {
+      hash = ((hash << 5) - hash) + seed.charCodeAt(i);
+      hash |= 0;
+    }
+    normVersionId = Math.abs(hash) || Date.now();
   }
 
-  const normVersionId = Number(versionId) || Number(String(versionId).replace(/\D/g, "")) || 0;
-  const normModelId = Number(modelData.model_id || modelData.modelId) || 0;
+  const normModelId = Number(modelData.model_id || modelData.modelId) || normVersionId;
 
   const trainedWords = (
     modelData.trained_words ||
@@ -173,13 +180,19 @@ export function saveCivitaiFavorite(modelData: Partial<CivitaiFavorite> & { [key
     []
   );
 
+  const rawCat = (modelData.category || "").toLowerCase();
+  const isLora = rawCat.includes("lora") || rawCat.includes("locon") || rawCat.includes("dora") || rawCat.includes("lycoris") || (!modelData.category && (modelData.filename || "").endsWith(".safetensors"));
+  const cleanCategory = modelData.category || (isLora ? "LoRA" : "Checkpoint");
+  const cleanDest = modelData.default_destination_folder || (isLora ? "models/loras/" : "models/checkpoints/");
+
+  const nameVal = modelData.name || modelData.model_name || "Unnamed Model";
   const cleanItem: CivitaiFavorite = {
     version_id: normVersionId,
     model_id: normModelId,
-    name: modelData.name || modelData.model_name || "Unnamed Model",
-    model_name: modelData.model_name || modelData.name || "Unnamed Model",
-    version_name: modelData.version_name || modelData.versionName || "",
-    category: modelData.category || "Checkpoint",
+    name: nameVal,
+    model_name: modelData.model_name || nameVal,
+    version_name: modelData.version_name || modelData.versionName || "v1.0",
+    category: cleanCategory,
     base_model: modelData.base_model || modelData.baseModel || "SDXL 1.0",
     image_url: modelData.image_url || modelData.preview_image_url || "",
     preview_image_url: modelData.preview_image_url || modelData.image_url || "",
@@ -188,8 +201,8 @@ export function saveCivitaiFavorite(modelData: Partial<CivitaiFavorite> & { [key
     file_size_bytes: modelData.file_size_bytes || 0,
     filename: modelData.filename || "",
     download_url: modelData.download_url || "",
-    default_destination_folder: modelData.default_destination_folder || "models/checkpoints/",
-    suggested_remote_path: modelData.suggested_remote_path || "",
+    default_destination_folder: cleanDest,
+    suggested_remote_path: modelData.suggested_remote_path || `${cleanDest}${modelData.filename || ""}`,
     trigger_words: trainedWords,
     trained_words: trainedWords,
     trainedWords: trainedWords,
@@ -201,10 +214,10 @@ export function saveCivitaiFavorite(modelData: Partial<CivitaiFavorite> & { [key
   };
 
   const favorites = getStoredCivitaiFavorites();
-  const existingIndex = favorites.findIndex((f) => String(f.version_id) === String(normVersionId));
+  const existingIndex = favorites.findIndex((f) => String(f.version_id) === String(normVersionId) || (cleanItem.filename && f.filename && f.filename.toLowerCase() === cleanItem.filename.toLowerCase()));
 
   if (existingIndex >= 0) {
-    favorites[existingIndex] = cleanItem;
+    favorites[existingIndex] = { ...favorites[existingIndex], ...cleanItem };
   } else {
     favorites.unshift(cleanItem);
   }

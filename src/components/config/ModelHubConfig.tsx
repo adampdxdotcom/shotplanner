@@ -10,7 +10,6 @@ import {
 import { COMFYUI_MODEL_CATEGORIES } from "./modelhub/modelHubConstants";
 import { HuggingFaceIngestionTab } from "./modelhub/HuggingFaceIngestionTab";
 import { CivitaiIngestionTab } from "./modelhub/CivitaiIngestionTab";
-import { SystemLoRAManager } from "./SystemLoRAManager";
 import { ModelDownloadStatusCard, DownloadResult } from "./modelhub/ModelDownloadStatusCard";
 import { settingsApi, modelHubApi } from "../../api";
 
@@ -29,8 +28,8 @@ export const ModelHubConfig: React.FC<ModelHubConfigProps> = ({
   onChange,
   onShowToast
 }) => {
-  // Active Source Tab: 'loras' | 'huggingface' | 'civitai'
-  const [activeTab, setActiveTab] = useState<"loras" | "huggingface" | "civitai">("loras");
+  // Active Source Tab: 'civitai' | 'huggingface'
+  const [activeTab, setActiveTab] = useState<"civitai" | "huggingface">("civitai");
 
   // Credential status indicators
   const [civitaiConfigured, setCivitaiConfigured] = useState(false);
@@ -187,17 +186,20 @@ export const ModelHubConfig: React.FC<ModelHubConfigProps> = ({
         {/* Source Navigation Tabs */}
         <div className="flex items-center gap-2 mt-5 border-t border-zinc-200 dark:border-neutral-800/80 pt-4 flex-wrap">
           <button
-            id="tab-loras"
+            id="tab-civitai"
             type="button"
-            onClick={() => setActiveTab("loras")}
+            onClick={() => setActiveTab("civitai")}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-              activeTab === "loras"
-                ? "bg-purple-500/10 dark:bg-purple-500/20 text-purple-800 dark:text-purple-300 border border-purple-300 dark:border-purple-500/40 shadow-sm"
+              activeTab === "civitai"
+                ? "bg-blue-500/10 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300 border border-blue-300 dark:border-blue-500/40 shadow-sm"
                 : "bg-zinc-100 dark:bg-neutral-800/60 text-zinc-600 dark:text-neutral-400 hover:text-zinc-900 hover:dark:text-neutral-200 hover:bg-zinc-200 dark:hover:bg-neutral-800 border border-transparent"
             }`}
           >
-            <Layers className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-            System LoRA Library &amp; Remote GPU
+            <Sparkles className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+            Civitai Models &amp; Saved Favorites
+            {civitaiConfigured && (
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" title="API Key Configured" />
+            )}
           </button>
 
           <button
@@ -216,52 +218,10 @@ export const ModelHubConfig: React.FC<ModelHubConfigProps> = ({
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" title="Token Configured" />
             )}
           </button>
-
-          <button
-            id="tab-civitai"
-            type="button"
-            onClick={() => setActiveTab("civitai")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-              activeTab === "civitai"
-                ? "bg-blue-500/10 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300 border border-blue-300 dark:border-blue-500/40 shadow-sm"
-                : "bg-zinc-100 dark:bg-neutral-800/60 text-zinc-600 dark:text-neutral-400 hover:text-zinc-900 hover:dark:text-neutral-200 hover:bg-zinc-200 dark:hover:bg-neutral-800 border border-transparent"
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-            Civitai Models &amp; LoRAs
-            {civitaiConfigured && (
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" title="API Key Configured" />
-            )}
-          </button>
         </div>
       </div>
 
-      {/* Tab 0: System LoRA Library & Remote GPU Manager */}
-      {activeTab === "loras" && (
-        <SystemLoRAManager
-          config={config}
-          onShowToast={onShowToast}
-        />
-      )}
-
-      {/* Tab 1: Hugging Face & Direct URL Ingestion */}
-      {activeTab === "huggingface" && (
-        <HuggingFaceIngestionTab
-          config={config}
-          onChange={onChange}
-          onShowToast={onShowToast}
-          hfConfigured={hfConfigured}
-          setHfConfigured={setHfConfigured}
-          hfMaskedToken={hfMaskedToken}
-          setHfMaskedToken={setHfMaskedToken}
-          downloading={downloading}
-          downloadElapsed={downloadElapsed}
-          onExecuteDownload={handleExecuteRemoteDownload}
-          onResetDownloadResult={() => setDownloadResult(null)}
-        />
-      )}
-
-      {/* Tab 2: Civitai Models & LoRAs Ingestion */}
+      {/* Tab 1: Civitai Models & LoRAs Ingestion & Favorites */}
       {activeTab === "civitai" && (
         <CivitaiIngestionTab
           config={config}
@@ -271,6 +231,23 @@ export const ModelHubConfig: React.FC<ModelHubConfigProps> = ({
           setCivitaiConfigured={setCivitaiConfigured}
           civitaiMaskedKey={civitaiMaskedKey}
           setCivitaiMaskedKey={setCivitaiMaskedKey}
+          downloading={downloading}
+          downloadElapsed={downloadElapsed}
+          onExecuteDownload={handleExecuteRemoteDownload}
+          onResetDownloadResult={() => setDownloadResult(null)}
+        />
+      )}
+
+      {/* Tab 2: Hugging Face & Direct URL Ingestion */}
+      {activeTab === "huggingface" && (
+        <HuggingFaceIngestionTab
+          config={config}
+          onChange={onChange}
+          onShowToast={onShowToast}
+          hfConfigured={hfConfigured}
+          setHfConfigured={setHfConfigured}
+          hfMaskedToken={hfMaskedToken}
+          setHfMaskedToken={setHfMaskedToken}
           downloading={downloading}
           downloadElapsed={downloadElapsed}
           onExecuteDownload={handleExecuteRemoteDownload}
