@@ -15,6 +15,8 @@ import {
   TakeModalsContainer, 
   useAssetManagerSlots 
 } from "./assetManager";
+import { useTransfer } from "../context/TransferContext";
+import { RecentUpdatedAssetsCard } from "./execution/RecentUpdatedAssetsCard";
 
 interface AssetManagerSectionProps {
   assets: MediaAsset[];
@@ -55,6 +57,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
   hasScenePlan = false
 }) => {
   const [activeTab, setActiveTab] = useState<"image" | "audio" | "video" | "takes">(() => getLastAssetTab("image"));
+  const { recentAssets, fetchRecentAssets, clearRecentAssets } = useTransfer();
 
   useEffect(() => {
     setLastAssetTab(activeTab);
@@ -355,6 +358,13 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
         onConfirmAddCharacterToShot={handleConfirmAddCharacterToShot}
         onAssetUploaded={onAssetUploaded}
         addToast={addToast}
+      />
+
+      {/* Running List of Most Recently Updated Assets on Remote GPU */}
+      <RecentUpdatedAssetsCard
+        recentAssets={recentAssets}
+        onRefresh={fetchRecentAssets}
+        onClear={clearRecentAssets}
       />
     </div>
   );

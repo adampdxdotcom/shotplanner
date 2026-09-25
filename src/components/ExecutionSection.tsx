@@ -11,6 +11,7 @@ import { ExecutionConsole } from "./execution/ExecutionConsole";
 import { RemoteWorkflowMonitorPanel } from "./execution/RemoteWorkflowMonitorPanel";
 import { RunpodQuickSyncBar } from "./execution/RunpodQuickSyncBar";
 import { settingsApi, apiClient } from "../api";
+import { useTransfer } from "../context/TransferContext";
 
 interface ExecutionSectionProps {
   config: AppConfig;
@@ -44,15 +45,30 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
   hasScenePlan = false
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<"stage" | "monitor">("stage");
-  const [transferState, setTransferState] = useState<"idle" | "progress" | "error" | "success">("idle");
-  const [progressStep, setProgressStep] = useState<string>("");
-  const [progressPercent, setProgressPercent] = useState(0);
-  const [transferResult, setTransferResult] = useState<TransferResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [lastAction, setLastAction] = useState<"shot" | "scene" | "execute_shot" | null>(null);
-  const [lastStagedTime, setLastStagedTime] = useState<string | null>(null);
+  const {
+    transferState,
+    isTransferring,
+    progressStep,
+    progressPercent,
+    currentFile,
+    currentFilePercent,
+    currentFileBytes,
+    fileIndex,
+    totalFiles,
+    activeFiles,
+    transferResult,
+    error,
+    lastAction,
+    lastStagedTime,
+    recentAssets,
+    startTransferJob,
+    setTransferSuccess,
+    setTransferError,
+    dismissError,
+    fetchRecentAssets,
+    clearRecentAssets
+  } = useTransfer();
   
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
   const hasAutoConnectedRef = useRef(false);
 
   // Phase 2: Auto-connect to active pod on startup if enabled
@@ -146,44 +162,11 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
     onSelectShot(newId);
   };
 
-  const simulateProgress = () => {
-    setProgressPercent(0);
-    setProgressStep("[1/3] Compiling workflow JSON(s)...");
-    
-    let currentPercent = 0;
-    timerRef.current = setInterval(() => {
-      currentPercent += Math.floor(Math.random() * 15) + 5;
-      if (currentPercent > 90) currentPercent = 90;
-      setProgressPercent(currentPercent);
-      
-      if (currentPercent > 20 && currentPercent <= 50) {
-        setProgressStep(`[2/3] Connecting to Remote GPU via SSH (${config.remote_host}:${config.ssh_port})...`);
-      } else if (currentPercent > 50 && currentPercent <= 80) {
-        setProgressStep("[3/3] Transferring assets and workflows...");
-      } else if (currentPercent > 80) {
-        setProgressStep("Finalizing: Writing to /workflows/...");
-      }
-    }, 400);
-  };
-
-  const clearProgress = () => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-    }
-  };
-
-  useEffect(() => {
-    return () => clearProgress();
-  }, []);
-
   const handleSendShot = async () => {
     if (!activeShot) return;
     
-    setTransferState("progress");
-    setLastAction("shot");
-    setError(null);
-    setTransferResult(null);
-    simulateProgress();
+    const jobId = `stage_shot_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    startTransferJob(jobId, "shot", activeShotAssets.length + 1);
     
     try {
       const resolvedWorkflowFilename =
@@ -214,6 +197,7 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
       };
 
       const payload = {
+        job_id: jobId,
         remote_host: config.remote_host,
         runpod_ip: config.remote_host,
         ssh_port: config.ssh_port,
@@ -234,26 +218,19 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
       };
 
       const data: any = await apiClient.post("/api/workflow/stage-shot", payload);
-      clearProgress();
-      setProgressPercent(100);
       
       if (data && !data.error) {
-        setTransferResult(data);
-        setTransferState("success");
-        setLastStagedTime(new Date().toLocaleTimeString());
+        setTransferSuccess(data, "shot");
         onUpdateShot(prev => ({ ...prev, status: "staged" as const }));
         onShowToast?.("Shot staged successfully!", "success");
       } else {
         const errorMsg = data?.detail || data?.error || data?.message || "Failed to stage shot.";
-        setError(errorMsg);
-        setTransferState("error");
+        setTransferError(errorMsg);
         onShowToast?.(errorMsg, "error");
       }
     } catch (err: any) {
-      clearProgress();
       const errorMsg = err.message || "Failed to connect to staging server.";
-      setError(errorMsg);
-      setTransferState("error");
+      setTransferError(errorMsg);
       onShowToast?.(errorMsg, "error");
     }
   };
@@ -261,11 +238,8 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
   const handleExecuteShot = async () => {
     if (!activeShot) return;
     
-    setTransferState("progress");
-    setLastAction("execute_shot");
-    setError(null);
-    setTransferResult(null);
-    simulateProgress();
+    const jobId = `exec_shot_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    startTransferJob(jobId, "execute_shot", activeShotAssets.length + 1);
     
     try {
       const baseWorkflow = activeShot.workflow_file || activeShot.monitored_workflow || sceneProject.workflow_file || "default.json";
@@ -273,6 +247,7 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
       const synthesizedFilename = `${sanitizedSceneName}_Shot_${shotNumFormatted}.json`;
 
       const payload = {
+        job_id: jobId,
         remote_host: config.remote_host,
         ssh_port: config.ssh_port,
         ssh_username: config.ssh_username,
@@ -300,13 +275,9 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
       };
 
       const data: any = await apiClient.post("/api/execute", payload);
-      clearProgress();
-      setProgressPercent(100);
       
       if (data && !data.error) {
-        setTransferResult(data);
-        setTransferState("success");
-        setLastStagedTime(new Date().toLocaleTimeString());
+        setTransferSuccess(data, "execute_shot");
         onUpdateShot(prev => ({ 
           ...prev, 
           status: "rendering",
@@ -315,25 +286,19 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
         onShowToast?.(`Sent to ComfyUI! Prompt ID: ${data.prompt_id || 'Unknown'}`, "success");
       } else {
         const errorMsg = data?.detail || data?.error || data?.message || "Failed to execute shot.";
-        setError(errorMsg);
-        setTransferState("error");
+        setTransferError(errorMsg);
         onShowToast?.(errorMsg, "error");
       }
     } catch (err: any) {
-      clearProgress();
       const errorMsg = err.message || "Failed to connect to execution server.";
-      setError(errorMsg);
-      setTransferState("error");
+      setTransferError(errorMsg);
       onShowToast?.(errorMsg, "error");
     }
   };
 
   const handleSendScene = async () => {
-    setTransferState("progress");
-    setLastAction("scene");
-    setError(null);
-    setTransferResult(null);
-    simulateProgress();
+    const jobId = `stage_scene_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    startTransferJob(jobId, "scene", allSceneAssets.length + sceneProject.shots.length);
     
     try {
       const sceneWorkflowFilename =
@@ -343,6 +308,7 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
         "default.json";
 
       const payload = {
+        job_id: jobId,
         remote_host: config.remote_host,
         runpod_ip: config.remote_host,
         ssh_port: config.ssh_port,
@@ -377,13 +343,9 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
       };
 
       const data: any = await apiClient.post("/api/workflow/stage-scene", payload);
-      clearProgress();
-      setProgressPercent(100);
       
       if (data && !data.error) {
-        setTransferResult(data);
-        setTransferState("success");
-        setLastStagedTime(new Date().toLocaleTimeString());
+        setTransferSuccess(data, "scene");
         onUpdateSceneProject(prev => ({
           ...prev,
           shots: prev.shots.map(s => ({ ...s, status: "staged" as const }))
@@ -391,29 +353,19 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
         onShowToast?.("Scene staged successfully!", "success");
       } else {
         const errorMsg = data?.detail || data?.error || data?.message || "Failed to stage scene.";
-        setError(errorMsg);
-        setTransferState("error");
+        setTransferError(errorMsg);
         onShowToast?.(errorMsg, "error");
       }
     } catch (err: any) {
-      clearProgress();
       const errorMsg = err.message || "Failed to connect to staging server.";
-      setError(errorMsg);
-      setTransferState("error");
+      setTransferError(errorMsg);
       onShowToast?.(errorMsg, "error");
     }
-  };
-
-  const handleDismissError = () => {
-    setTransferState("idle");
-    setError(null);
   };
 
   const allSceneAssets = Array.from(new Set(
     sceneProject.shots.flatMap(s => getShotAssets(s))
   ));
-
-  const isTransferring = transferState === "progress";
 
   return (
     <div id="execution-section" className="w-full space-y-5 flex flex-col min-h-0">
@@ -478,7 +430,7 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
               errorMessage={error}
               handleSendShot={handleSendShot}
               handleExecuteShot={handleExecuteShot}
-              handleDismissError={handleDismissError}
+              handleDismissError={dismissError}
             />
             <SendScenePanel
               sceneProject={sceneProject}
@@ -489,7 +441,7 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
               transferState={transferState}
               errorMessage={error}
               handleSendScene={handleSendScene}
-              handleDismissError={handleDismissError}
+              handleDismissError={dismissError}
             />
           </div>
 
@@ -497,16 +449,25 @@ export const ExecutionSection: React.FC<ExecutionSectionProps> = ({
             transferState={transferState}
             progressStep={progressStep}
             progressPercent={progressPercent}
+            currentFile={currentFile}
+            currentFilePercent={currentFilePercent}
+            currentFileBytes={currentFileBytes}
+            fileIndex={fileIndex}
+            totalFiles={totalFiles}
+            activeFiles={activeFiles}
             transferResult={transferResult}
             error={error}
             lastAction={lastAction}
             lastStagedTime={lastStagedTime}
+            recentAssets={recentAssets}
+            onRefreshRecentAssets={fetchRecentAssets}
+            onClearRecentAssets={clearRecentAssets}
             activeShot={activeShot}
             sceneProject={sceneProject}
             sanitizedSceneName={sanitizedSceneName}
             handleSendShot={handleSendShot}
             handleSendScene={handleSendScene}
-            handleDismissError={handleDismissError}
+            handleDismissError={dismissError}
           />
         </div>
       )}

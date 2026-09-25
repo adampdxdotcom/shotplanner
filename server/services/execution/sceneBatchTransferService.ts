@@ -14,6 +14,7 @@ import {
   resolveWorkflowTemplate
 } from "../workflowService";
 import { executeSFTPBatchTransfer, SSHCredentials, TransferItem } from "../sshService";
+import { transferJobManager } from "../transferJobManager";
 import {
   ensureEmptyPngExists,
   normalizeRemoteComfyRoot,
@@ -24,6 +25,7 @@ import { createScopedLogger } from "../../utils/logger";
 const log = createScopedLogger("SceneBatchTransfer");
 
 export interface SceneTransferOptions extends SSHCredentials {
+  job_id?: string;
   remote_host?: string;
   remote_comfyui_root?: string;
   workflow_filename?: string;
@@ -177,29 +179,85 @@ export async function processSceneTransfer(options: SceneTransferOptions) {
   const uploadedFiles: string[] = [];
   const skippedFiles: string[] = [];
 
+  const effectiveJobId = options.job_id || `scene_stage_${Date.now()}`;
+  transferJobManager.startJob({
+    jobId: effectiveJobId,
+    action: "scene",
+    sceneName: activeSceneName,
+    targetHost,
+    totalFiles: sftpItems.length,
+    initialFiles: sftpItems.map((item) => ({
+      filename: item.filename,
+      sizeBytes: item.sizeBytes,
+      remotePath: item.remotePath
+    }))
+  });
+
   if (targetHost && sftpItems.length > 0) {
     log.info(`Commencing SFTP batch upload of ${sftpItems.length} items (${filesToTransfer.length} assets, ${shots.length} workflows) to ${targetHost}...`);
-    const sftpSummary = await executeSFTPBatchTransfer(options, sftpItems);
-
-    transferredCount = sftpSummary.transferredCount;
-    uploadedFiles.push(...sftpSummary.uploadedFiles);
-    skippedFiles.push(...sftpSummary.failedFiles);
-
-    sftpSummary.transferredFiles.forEach(t => {
-      transferredSummary.push({
-        filename: t.filename,
-        file: t.filename,
-        size_bytes: t.size_bytes,
-        status: t.status as any,
-        remote_path: t.remote_path,
-        message: t.message
+    try {
+      const sftpSummary = await executeSFTPBatchTransfer(options, sftpItems, (ev) => {
+        if (ev.stage === "file_start") {
+          transferJobManager.updateFileStart(
+            ev.filename || "",
+            ev.fileIndex || 0,
+            ev.totalFiles || sftpItems.length,
+            ev.fileTotalBytes || 0
+          );
+        } else if (ev.stage === "file_progress") {
+          transferJobManager.updateFileProgress(
+            ev.filename || "",
+            ev.fileBytesTransferred || 0,
+            ev.fileTotalBytes || 0,
+            ev.filePercent || 0,
+            ev.totalBytesTransferred || 0,
+            ev.totalPercent || 0
+          );
+        } else if (ev.stage === "file_complete") {
+          const item = sftpItems.find((it) => it.filename === ev.filename);
+          transferJobManager.updateFileComplete(
+            ev.filename || "",
+            ev.fileBytesTransferred || 0,
+            item?.remotePath || `${cleanRemoteDir}/${ev.filename}`,
+            ev.durationMs || 0,
+            ev.message
+          );
+        } else if (ev.stage === "file_error") {
+          const item = sftpItems.find((it) => it.filename === ev.filename);
+          transferJobManager.updateFileError(
+            ev.filename || "",
+            item?.remotePath || `${cleanRemoteDir}/${ev.filename}`,
+            ev.message || "SFTP upload failed"
+          );
+        } else if (ev.stage === "connecting" || ev.stage === "preparing_dirs") {
+          transferJobManager.updateStepMessage(ev.message || "");
+        }
       });
-    });
 
-    if (!sftpSummary.success || sftpSummary.failedCount > 0) {
-      const errDetail = sftpSummary.error || `Failed files: ${sftpSummary.failedFiles.join(", ")}`;
-      log.error(`Scene staging failed on ${targetHost}`, { error: errDetail });
-      throw new Error(`Scene staging failed on ${targetHost}: ${errDetail}`);
+      transferredCount = sftpSummary.transferredCount;
+      uploadedFiles.push(...sftpSummary.uploadedFiles);
+      skippedFiles.push(...sftpSummary.failedFiles);
+
+      sftpSummary.transferredFiles.forEach(t => {
+        transferredSummary.push({
+          filename: t.filename,
+          file: t.filename,
+          size_bytes: t.size_bytes,
+          status: t.status as any,
+          remote_path: t.remote_path,
+          message: t.message
+        });
+      });
+
+      if (!sftpSummary.success || sftpSummary.failedCount > 0) {
+        const errDetail = sftpSummary.error || `Failed files: ${sftpSummary.failedFiles.join(", ")}`;
+        log.error(`Scene staging failed on ${targetHost}`, { error: errDetail });
+        transferJobManager.failJob(errDetail);
+        throw new Error(`Scene staging failed on ${targetHost}: ${errDetail}`);
+      }
+    } catch (err: any) {
+      transferJobManager.failJob(err.message || "Failed to stage scene via SFTP");
+      throw err;
     }
   } else if (!targetHost) {
     log.info(`No remote host provided. Staged ${sftpItems.length} items locally only.`);
@@ -214,13 +272,20 @@ export async function processSceneTransfer(options: SceneTransferOptions) {
         remote_path: item.remotePath,
         message: "Prepared locally (No remote SSH host specified)."
       });
+      transferJobManager.recordTransferredAsset({
+        filename: item.filename,
+        size_bytes: item.sizeBytes || 0,
+        remote_path: item.remotePath,
+        status: "transferred",
+        scene_name: activeSceneName
+      });
     });
   }
 
   const statusMessage = `Successfully verified and staged ${shots.length} workflow(s) and ${uploadedFiles.length} file(s) into Remote ComfyUI. Workflows in: ${cleanRemoteRoot}/user/default/workflows/`;
   log.info(statusMessage);
 
-  return {
+  const finalResult = {
     success: true,
     remote_dir: cleanRemoteDir,
     remote_workflow_paths: remoteWorkflowPaths,
@@ -237,4 +302,7 @@ export async function processSceneTransfer(options: SceneTransferOptions) {
     updated_workflows: updatedWorkflows,
     message: statusMessage
   };
+
+  transferJobManager.completeJob(finalResult);
+  return finalResult;
 }

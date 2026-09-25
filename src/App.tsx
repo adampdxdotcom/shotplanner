@@ -6,6 +6,8 @@ import { ShotDossierCard } from "./components/ShotDossierCard";
 import { ShotItem } from "./types";
 import { useAppLogic } from "./hooks/useAppLogic";
 import { getLastConfigTab, setLastConfigTab } from "./utils/workspaceSessionStore";
+import { TransferProvider } from "./context/TransferContext";
+import { GlobalTransferBanner } from "./components/execution/GlobalTransferBanner";
 
 // Lazy-loaded top-level sections for optimal initial bundle performance
 const SceneProjectHub = lazy(() => import("./components/SceneProjectHub"));
@@ -172,8 +174,9 @@ export default function App() {
   }, [sceneProject.scene_name, currentProjectName]);
 
   return (
-    <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] font-sans selection:bg-indigo-500 selection:text-white flex flex-col transition-colors duration-200">
-      {/* Top Navbar */}
+    <TransferProvider>
+      <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] font-sans selection:bg-indigo-500 selection:text-white flex flex-col transition-colors duration-200">
+        {/* Top Navbar */}
       <Navbar 
         projectName={sceneProject.scene_name}
         isDirty={isDirty}
@@ -469,6 +472,13 @@ export default function App() {
       <footer className="border-t border-zinc-200 dark:border-zinc-800/80 py-6 mt-12 text-center text-xs text-zinc-500">
         <p>Shot Planner version 1.0</p>
       </footer>
+
+      {/* Floating Background Transfer Banner (Active when navigating away) */}
+      <GlobalTransferBanner
+        activeSection={activeSection}
+        onNavigateToExecute={() => scrollToSection("execute")}
+      />
     </div>
+  </TransferProvider>
   );
 }

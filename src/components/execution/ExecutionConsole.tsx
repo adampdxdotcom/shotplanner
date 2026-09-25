@@ -1,40 +1,64 @@
 import React from "react";
-import { Terminal, AlertCircle, CheckCircle2, Check, Server, FileCode, HardDrive, ArrowRight, Layers, Sliders, Sparkles, Folder } from "lucide-react";
+import { Terminal, AlertCircle, CheckCircle2, Check, Server, FileCode, HardDrive, ArrowRight, Layers, Sliders, Sparkles, Folder, UploadCloud, Clock, Loader2, FileCheck } from "lucide-react";
 import { TransferResult, SceneProjectFile, ShotItem } from "../../types";
 import { formatShotNumber } from "../../utils/formatters";
+import { useTransfer, ActiveFileProgress, RecentAssetItem } from "../../context/TransferContext";
+import { RecentUpdatedAssetsCard } from "./RecentUpdatedAssetsCard";
 
 export interface ExecutionConsoleProps {
-  transferState: "idle" | "progress" | "error" | "success";
-  progressStep: string;
-  progressPercent: number;
-  transferResult: TransferResult | null;
-  error: string | null;
-  lastAction: "shot" | "scene" | "execute_shot" | null;
-  lastStagedTime: string | null;
-  activeShot: ShotItem | null | undefined;
+  transferState?: "idle" | "progress" | "error" | "success";
+  progressStep?: string;
+  progressPercent?: number;
+  currentFile?: string | null;
+  currentFilePercent?: number;
+  currentFileBytes?: { transferred: number; total: number } | null;
+  fileIndex?: number;
+  totalFiles?: number;
+  activeFiles?: ActiveFileProgress[];
+  transferResult?: TransferResult | null;
+  error?: string | null;
+  lastAction?: "shot" | "scene" | "execute_shot" | null;
+  lastStagedTime?: string | null;
+  activeShot?: ShotItem | null | undefined;
   sceneProject: SceneProjectFile;
   sanitizedSceneName: string;
   handleSendShot: () => void;
   handleSendScene: () => void;
   handleDismissError: () => void;
+  recentAssets?: RecentAssetItem[];
+  onRefreshRecentAssets?: () => void;
+  onClearRecentAssets?: () => void;
 }
 
-export const ExecutionConsole: React.FC<ExecutionConsoleProps> = ({
-  transferState,
-  progressStep,
-  progressPercent,
-  transferResult,
-  error,
-  lastAction,
-  lastStagedTime,
-  activeShot,
-  sceneProject,
-  sanitizedSceneName,
-  handleSendShot,
-  handleSendScene,
-  handleDismissError
-}) => {
-  if (transferState === "idle") return null;
+export const ExecutionConsole: React.FC<ExecutionConsoleProps> = (props) => {
+  const transferContext = useTransfer();
+
+  // Prefer props if provided, fallback to context
+  const transferState = props.transferState ?? transferContext.transferState;
+  const progressStep = props.progressStep ?? transferContext.progressStep;
+  const progressPercent = props.progressPercent ?? transferContext.progressPercent;
+  const currentFile = props.currentFile ?? transferContext.currentFile;
+  const currentFilePercent = props.currentFilePercent ?? transferContext.currentFilePercent;
+  const currentFileBytes = props.currentFileBytes ?? transferContext.currentFileBytes;
+  const fileIndex = props.fileIndex ?? transferContext.fileIndex;
+  const totalFiles = props.totalFiles ?? transferContext.totalFiles;
+  const activeFiles = props.activeFiles ?? transferContext.activeFiles;
+  const transferResult = props.transferResult ?? transferContext.transferResult;
+  const error = props.error ?? transferContext.error;
+  const lastAction = props.lastAction ?? transferContext.lastAction;
+  const lastStagedTime = props.lastStagedTime ?? transferContext.lastStagedTime;
+  const recentAssets = props.recentAssets ?? transferContext.recentAssets;
+  const onRefreshRecentAssets = props.onRefreshRecentAssets ?? transferContext.fetchRecentAssets;
+  const onClearRecentAssets = props.onClearRecentAssets ?? transferContext.clearRecentAssets;
+
+  const {
+    activeShot,
+    sceneProject,
+    sanitizedSceneName,
+    handleSendShot,
+    handleSendScene,
+    handleDismissError
+  } = props;
 
   // Extract workflow filenames & paths robustly
   const stagedWorkflowFilename =
@@ -61,38 +85,170 @@ export const ExecutionConsole: React.FC<ExecutionConsoleProps> = ({
   const frames = activeShot?.generation_params?.frames ?? 81;
   const durationSec = (frames / 24).toFixed(1);
 
+  const formatBytes = (bytes?: number): string => {
+    if (!bytes || bytes <= 0) return "0 KB";
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  };
+
   return (
-    <div className="w-full mt-2">
-      {/* In-Progress State */}
+    <div className="w-full mt-2 space-y-4">
+      {/* 1. In-Progress State with File-by-File Visibility */}
       {transferState === "progress" && (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-lg">
+        <div className="bg-zinc-900 border-2 border-indigo-500/50 rounded-xl overflow-hidden shadow-xl">
           <div className="p-5 flex flex-col gap-4">
-            <div className="flex items-center gap-3">
-              <Terminal className="w-5 h-5 text-indigo-400 animate-pulse" />
-              <h3 className="text-sm font-bold text-zinc-200">
-                {lastAction === "execute_shot" ? "Executing on Remote GPU..." : "Staging in Progress..."}
-              </h3>
-            </div>
-            
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs text-zinc-400">
-                <span className="font-mono">{progressStep}</span>
-                <span>{progressPercent}%</span>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-indigo-500/20 text-indigo-400">
+                  <UploadCloud className="w-5 h-5 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
+                    <span>
+                      {lastAction === "execute_shot"
+                        ? "Executing on Remote GPU..."
+                        : lastAction === "scene"
+                        ? "Batch Staging Scene to Remote GPU..."
+                        : "Staging Shot to Remote GPU..."}
+                    </span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">
+                      Live SFTP
+                    </span>
+                  </h3>
+                  <p className="text-xs text-zinc-400 font-mono mt-0.5">{progressStep}</p>
+                </div>
               </div>
-              <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-indigo-500 rounded-full transition-all duration-300 ease-out relative"
+
+              {totalFiles > 0 && (
+                <div className="text-right">
+                  <span className="text-xs font-mono font-bold text-indigo-300">
+                    File {Math.min(fileIndex + 1, totalFiles)} of {totalFiles}
+                  </span>
+                  <span className="text-[10px] text-zinc-500 block">
+                    {progressPercent}% total
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Overall Progress Bar */}
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-xs text-zinc-400 font-mono">
+                <span>Overall Batch Progress</span>
+                <span className="font-bold text-indigo-300">{progressPercent}%</span>
+              </div>
+              <div className="w-full h-2.5 bg-zinc-800 rounded-full overflow-hidden p-0.5 border border-zinc-700/50">
+                <div
+                  className="h-full bg-linear-to-r from-indigo-500 to-indigo-400 rounded-full transition-all duration-300 ease-out relative"
                   style={{ width: `${progressPercent}%` }}
                 >
                   <div className="absolute inset-0 bg-white/20 animate-pulse" />
                 </div>
               </div>
             </div>
+
+            {/* Currently Active Uploading File Card */}
+            {currentFile && (
+              <div className="bg-zinc-950/90 border border-indigo-500/30 rounded-lg p-3.5 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Loader2 className="w-4 h-4 text-indigo-400 animate-spin shrink-0" />
+                    <span className="text-xs font-mono font-bold text-zinc-200 truncate">
+                      {currentFile}
+                    </span>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="text-xs font-mono font-bold text-indigo-300">
+                      {currentFilePercent}%
+                    </span>
+                    {currentFileBytes && (
+                      <span className="text-[10px] text-zinc-400 font-mono block">
+                        {formatBytes(currentFileBytes.transferred)} / {formatBytes(currentFileBytes.total)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-emerald-500 rounded-full transition-all duration-150 ease-out"
+                    style={{ width: `${currentFilePercent}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Active Transfer Files Checklist */}
+            {activeFiles && activeFiles.length > 0 && (
+              <div className="space-y-1.5 pt-1">
+                <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider block">
+                  Transfer Queue ({activeFiles.length} files)
+                </span>
+                <div className="bg-zinc-950/80 border border-zinc-800 rounded-lg max-h-40 overflow-y-auto divide-y divide-zinc-800/60 p-1">
+                  {activeFiles.map((file, idx) => (
+                    <div
+                      key={idx}
+                      className="px-2.5 py-1.5 flex items-center justify-between gap-2 text-xs font-mono"
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        {file.status === "transferred" ? (
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                        ) : file.status === "transferring" ? (
+                          <Loader2 className="w-3.5 h-3.5 text-indigo-400 animate-spin shrink-0" />
+                        ) : file.status === "failed" ? (
+                          <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                        ) : (
+                          <Clock className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+                        )}
+                        <span
+                          className={`truncate ${
+                            file.status === "transferred"
+                              ? "text-zinc-400"
+                              : file.status === "transferring"
+                              ? "text-indigo-200 font-bold"
+                              : file.status === "failed"
+                              ? "text-red-300"
+                              : "text-zinc-500"
+                          }`}
+                        >
+                          {file.filename}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {file.size_bytes > 0 && (
+                          <span className="text-[10px] text-zinc-500">
+                            {formatBytes(file.size_bytes)}
+                          </span>
+                        )}
+                        <span
+                          className={`text-[10px] uppercase font-sans font-semibold px-1.5 py-0.2 rounded ${
+                            file.status === "transferred"
+                              ? "bg-emerald-950/80 text-emerald-400 border border-emerald-800/40"
+                              : file.status === "transferring"
+                              ? "bg-indigo-950 text-indigo-300 border border-indigo-700"
+                              : file.status === "failed"
+                              ? "bg-red-950 text-red-300 border border-red-800"
+                              : "bg-zinc-800 text-zinc-400"
+                          }`}
+                        >
+                          {file.status === "transferred"
+                            ? "✓ Staged"
+                            : file.status === "transferring"
+                            ? `${file.percent || 0}%`
+                            : file.status}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Error State */}
+      {/* 2. Error State */}
       {transferState === "error" && (
         <div className="bg-red-950/20 border border-red-900/50 rounded-xl shadow-lg p-5">
           <div className="flex items-start gap-4">
@@ -107,13 +263,13 @@ export const ExecutionConsole: React.FC<ExecutionConsoleProps> = ({
                 <p className="text-sm text-red-300 font-mono break-words">{error}</p>
               </div>
               <div className="flex gap-3 pt-2">
-                <button 
+                <button
                   onClick={lastAction === "shot" || lastAction === "execute_shot" ? handleSendShot : handleSendScene}
                   className="px-4 py-2 bg-red-900/40 hover:bg-red-900/60 text-red-200 text-sm font-medium rounded-lg transition-colors cursor-pointer"
                 >
                   Retry
                 </button>
-                <button 
+                <button
                   onClick={handleDismissError}
                   className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-medium rounded-lg transition-colors cursor-pointer"
                 >
@@ -125,7 +281,7 @@ export const ExecutionConsole: React.FC<ExecutionConsoleProps> = ({
         </div>
       )}
 
-      {/* Success State */}
+      {/* 3. Success State */}
       {transferState === "success" && transferResult && (
         <div className="bg-emerald-950/20 border border-emerald-900/40 rounded-xl shadow-lg overflow-hidden flex flex-col">
           {/* Header */}
@@ -158,10 +314,10 @@ export const ExecutionConsole: React.FC<ExecutionConsoleProps> = ({
               </span>
             )}
           </div>
-          
+
           {/* Main Console Content */}
           <div className="p-5 space-y-5">
-            {/* 1. Synthesized Shot Workflow & Base Template Card */}
+            {/* Synthesized Shot Workflow & Base Template Card */}
             <div className="bg-emerald-950/40 border border-emerald-900/30 rounded-lg p-3.5 space-y-2.5">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2">
@@ -186,7 +342,7 @@ export const ExecutionConsole: React.FC<ExecutionConsoleProps> = ({
               </div>
             </div>
 
-            {/* 2. Remote SFTP Path & Assets Grid */}
+            {/* Remote SFTP Path & Assets Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {/* Remote Workflow Destination */}
               <div className="space-y-2">
@@ -223,7 +379,7 @@ export const ExecutionConsole: React.FC<ExecutionConsoleProps> = ({
                   ) : null}
                 </div>
                 {transferResult.uploaded_files?.length ? (
-                  <div className="bg-zinc-950/80 border border-emerald-900/40 rounded p-2.5 max-h-[100px] overflow-y-auto">
+                  <div className="bg-zinc-950/80 border border-emerald-900/40 rounded p-2.5 max-h-[120px] overflow-y-auto">
                     <ul className="space-y-1">
                       {transferResult.uploaded_files.map((file, i) => (
                         <li key={i} className="text-[11px] text-emerald-200/90 font-mono truncate flex items-center justify-between gap-1.5">
@@ -244,7 +400,7 @@ export const ExecutionConsole: React.FC<ExecutionConsoleProps> = ({
               </div>
             </div>
 
-            {/* 3. Injected Specs Summary */}
+            {/* Injected Specs Summary */}
             <div className="space-y-2 pt-1">
               <div className="flex items-center gap-2">
                 <Sliders className="w-4 h-4 text-emerald-500/80 shrink-0" />
@@ -289,6 +445,14 @@ export const ExecutionConsole: React.FC<ExecutionConsoleProps> = ({
           </div>
         </div>
       )}
+
+      {/* 4. Running List of Most Recently Updated Assets */}
+      <RecentUpdatedAssetsCard
+        recentAssets={recentAssets}
+        onRefresh={onRefreshRecentAssets}
+        onClear={onClearRecentAssets}
+      />
     </div>
   );
 };
+
