@@ -1,5 +1,5 @@
 import React from "react";
-import { Send, Eye, X, CheckCircle2, Sparkles } from "lucide-react";
+import { Send, Eye, X, CheckCircle2, Sparkles, Image as ImageIcon } from "lucide-react";
 import { MediaAsset } from "../../types";
 import { getAssetMediaUrl } from "../../utils/assetUrl";
 
@@ -9,12 +9,14 @@ interface AssistantInputBarProps {
   isLoading: boolean;
   stagedAsset?: MediaAsset | null;
   isAssetScanned?: boolean;
+  activeShotNumber?: number;
   onInputChange: (val: string) => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onSendMessage: () => void;
   onResetChat: () => void;
   onOpenMediaBrowser: () => void;
   onClearStagedAsset?: () => void;
+  onGenerateImagePrompt?: () => void;
 }
 
 /**
@@ -27,12 +29,14 @@ export const AssistantInputBar: React.FC<AssistantInputBarProps> = ({
   isLoading,
   stagedAsset,
   isAssetScanned,
+  activeShotNumber,
   onInputChange,
   onKeyDown,
   onSendMessage,
   onResetChat,
   onOpenMediaBrowser,
-  onClearStagedAsset
+  onClearStagedAsset,
+  onGenerateImagePrompt
 }) => {
   const isSendDisabled = (!inputQuery.trim() && !stagedAsset) || isLoading;
 
@@ -48,6 +52,7 @@ export const AssistantInputBar: React.FC<AssistantInputBarProps> = ({
         {/* Vision Skill Pill */}
         <button
           onClick={onOpenMediaBrowser}
+          type="button"
           className={`px-2.5 py-1 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
             stagedAsset
               ? "bg-indigo-600 text-white border-indigo-500 shadow-2xs"
@@ -60,6 +65,17 @@ export const AssistantInputBar: React.FC<AssistantInputBarProps> = ({
           {stagedAsset && (
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse ml-0.5" />
           )}
+        </button>
+
+        {/* Image Prompt Skill Pill */}
+        <button
+          onClick={onGenerateImagePrompt}
+          type="button"
+          className="px-2.5 py-1 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer bg-slate-100 dark:bg-zinc-800/90 hover:bg-slate-200 dark:hover:bg-zinc-700/80 text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-zinc-700 hover:border-amber-400/60 dark:hover:border-amber-500/60 hover:text-amber-700 dark:hover:text-amber-300"
+          title={activeShotNumber ? `Generate a standalone still image prompt from Shot #${activeShotNumber} stub` : "Generate a standalone still image prompt from active shot stub"}
+        >
+          <ImageIcon className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
+          <span>Image Prompt</span>
         </button>
       </div>
 

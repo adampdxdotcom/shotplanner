@@ -142,6 +142,17 @@ export const AssistantFloatingChat: React.FC<AssistantFloatingChatProps> = ({
   };
 
   const existingShotNumbers = (sceneProject.shots || []).map((s) => s.shot_number);
+  const activeShot = (sceneProject.shots || []).find((s) => s.id === activeShotId) || sceneProject.shots?.[0];
+  const activeShotNumber = activeShot?.shot_number || 1;
+
+  const handleGenerateImagePrompt = () => {
+    const stubText = activeShot?.basic_stub ? ` based on its stub: "${activeShot.basic_stub}"` : "";
+    const promptText = `Generate a rich, standalone still image prompt for Shot #${activeShotNumber}${stubText} suitable for text-to-image generators (Midjourney/Flux/SDXL). Do not modify or ask to expand the shot's basic stub.`;
+    setInputQuery(promptText);
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 50);
+  };
 
   return (
     <>
@@ -212,12 +223,14 @@ export const AssistantFloatingChat: React.FC<AssistantFloatingChatProps> = ({
             isLoading={isLoading}
             stagedAsset={stagedAsset}
             isAssetScanned={stagedAsset ? Boolean(sceneProject.visual_analysis_cache?.[stagedAsset.filename]) : false}
+            activeShotNumber={activeShotNumber}
             onInputChange={setInputQuery}
             onKeyDown={handleKeyDown}
             onSendMessage={handleSendMessage}
             onResetChat={handleResetChat}
             onOpenMediaBrowser={() => setIsMediaBrowserOpen(true)}
             onClearStagedAsset={handleClearStagedAsset}
+            onGenerateImagePrompt={handleGenerateImagePrompt}
           />
         </div>
       )}
