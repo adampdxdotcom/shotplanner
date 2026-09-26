@@ -40,6 +40,7 @@ export {
 
 export {
   listWorkflows,
+  deleteWorkflow,
   resolveWorkflowTemplate,
   type ResolvedWorkflowTemplate
 } from "./workflow/workflowResolver";

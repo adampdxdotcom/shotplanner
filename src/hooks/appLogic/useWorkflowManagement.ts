@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { WorkflowItem, ParsedWorkflow, GenerationParameters, ParameterNodeMappings } from '../../types';
-import { apiClient } from '../../api';
+import { apiClient, workflowsApi } from '../../api';
 
 interface UseWorkflowManagementParams {
   activeSceneName?: string;
@@ -207,6 +207,28 @@ export function useWorkflowManagement({
     handleUpdateParameterMapping,
     handleUpdateMapping,
     fetchWorkflows,
+    handleDeleteWorkflow: async (filename: string) => {
+      if (!filename) return false;
+      try {
+        const activeName = (getActiveSceneName ? getActiveSceneName() : activeSceneName) || "Untitled_Scene";
+        await workflowsApi.delete(filename, activeName);
+        const updatedList = await fetchWorkflows();
+        if (selectedWorkflowFile === filename) {
+          if (updatedList && updatedList.length > 0) {
+            setSelectedWorkflowFile(updatedList[0].filename);
+          } else {
+            setSelectedWorkflowFile("");
+            setParsedWorkflow(null);
+            setSelectedPromptNodeId("");
+            setNodeMappings({});
+          }
+        }
+        return true;
+      } catch (err) {
+        console.error("Failed to delete workflow", err);
+        throw err;
+      }
+    },
     syncRemoteWorkflow: async (remotePath: string, config: any) => {
       try {
         const activeName = activeSceneName || "Untitled_Scene";

@@ -628,6 +628,87 @@ export interface RunpodPodItem {
   ports?: RunpodPodPort[];
 }
 
+export interface RunpodGpuType {
+  id: string;
+  displayName: string;
+  memoryInGb: number;
+  securePrice?: number;
+  communityPrice?: number;
+  secureSpotPrice?: number;
+  communitySpotPrice?: number;
+  lowestPrice?: {
+    minimumBidPrice?: number;
+    uninterruptablePrice?: number;
+  };
+  stockStatus?: "HIGH" | "MEDIUM" | "LOW" | "OUT_OF_STOCK" | "AVAILABLE";
+  isPopular?: boolean;
+}
+
+export interface RunpodTemplateItem {
+  id: string;
+  name: string;
+  imageName: string;
+  containerDiskInGb?: number;
+  volumeInGb?: number;
+  volumeMountPath?: string;
+  ports?: string;
+  env?: Array<{ key: string; value: string }>;
+  isServerless?: boolean;
+  isPublic?: boolean;
+  readme?: string;
+  isCurated?: boolean;
+  description?: string;
+  recommendedCategory?: "comfyui" | "video" | "base";
+}
+
+export interface RunpodNetworkVolumeItem {
+  id: string;
+  name: string;
+  size: number;
+  dataCenterId: string;
+}
+
+export interface RunpodDeployOptions {
+  gpuTypeId: string;
+  name?: string;
+  cloudType?: "COMMUNITY" | "SECURE" | "ALL";
+  gpuCount?: number;
+  volumeInGb?: number;
+  containerDiskInGb?: number;
+  volumeMountPath?: string;
+  ports?: string;
+  templateId?: string;
+  imageName?: string;
+  networkVolumeId?: string;
+  publicKey?: string;
+  env?: Record<string, string>;
+  isSpot?: boolean;
+}
+
+export interface RunpodWatcherItem {
+  id: string;
+  createdAt: number;
+  apiKey?: string;
+  gpuTypeId: string;
+  gpuDisplayName?: string;
+  cloudType: "COMMUNITY" | "SECURE" | "ALL";
+  maxPricePerHour?: number;
+  deployOptions: RunpodDeployOptions;
+  status: "WATCHING" | "CLAIMED" | "FAILED" | "CANCELLED";
+  lastCheckedAt?: number;
+  checkCount: number;
+  claimedPod?: any;
+  error?: string;
+}
+
+export interface RunpodCreateWatcherOptions {
+  gpuTypeId: string;
+  gpuDisplayName?: string;
+  cloudType?: "COMMUNITY" | "SECURE" | "ALL";
+  maxPricePerHour?: number;
+  deployOptions: RunpodDeployOptions;
+}
+
 export interface ModelCategoryPreset {
   id: string;
   label: string;

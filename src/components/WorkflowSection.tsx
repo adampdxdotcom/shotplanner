@@ -57,6 +57,7 @@ export interface WorkflowSectionProps {
   onUpdateProject?: React.Dispatch<React.SetStateAction<SceneProjectFile>> | ((updater: (prev: SceneProjectFile) => SceneProjectFile) => void);
   onOpenScenePlan?: () => void;
   hasScenePlan?: boolean;
+  onDeleteWorkflow?: (filename: string) => Promise<boolean | void> | void;
 }
 
 export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
@@ -64,6 +65,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
   selectedWorkflowFile,
   onSelectWorkflow,
   onRefreshWorkflows,
+  onDeleteWorkflow,
   parsedWorkflow,
   selectedPromptNodeId,
   onSelectPromptNodeId,
@@ -269,6 +271,20 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
     }
   };
 
+  const handleDeleteWorkflow = async (filename: string) => {
+    if (!onDeleteWorkflow) return;
+    try {
+      setUploadError(null);
+      await onDeleteWorkflow(filename);
+      if (activeShotId && activeShot?.workflow_file === filename) {
+        onUpdateShot(prev => ({ ...prev, workflow_file: "" }));
+      }
+    } catch (err: any) {
+      setUploadError(err.message || "Failed to delete workflow");
+      throw err;
+    }
+  };
+
   return (
     <div id="workflow-section" className="w-full space-y-5 flex flex-col min-h-0">
       <div className="bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-700 rounded-xl p-5 shadow-xs space-y-5">
@@ -279,6 +295,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
           selectedWorkflowFile={selectedWorkflowFile}
           onSelectWorkflow={onSelectWorkflow}
           onRefreshWorkflows={onRefreshWorkflows}
+          onDeleteWorkflow={onDeleteWorkflow ? handleDeleteWorkflow : undefined}
           handleFileUpload={handleFileUpload}
           uploading={uploading}
           uploadError={uploadError}

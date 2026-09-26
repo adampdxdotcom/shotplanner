@@ -1,4 +1,5 @@
 import { apiClient, RequestOptions } from "../client";
+import { RunpodGpuType, RunpodTemplateItem, RunpodNetworkVolumeItem, RunpodDeployOptions, RunpodWatcherItem, RunpodCreateWatcherOptions } from "../../shared/types";
 
 export const settingsApi = {
   // --- Global LLM Settings ---
@@ -122,6 +123,81 @@ export const settingsApi = {
     return apiClient.post<{ success: boolean; error?: string }>(
       "/api/runpod/add-key",
       payload,
+      options
+    );
+  },
+  getRunpodGpuTypes(runpodApiKey?: string, options?: RequestOptions) {
+    return apiClient.post<{ success: boolean; count?: number; gpus?: RunpodGpuType[]; cached?: boolean; error?: string }>(
+      "/api/runpod/gpus",
+      { runpod_api_key: runpodApiKey },
+      options
+    );
+  },
+  getRunpodTemplates(runpodApiKey?: string, options?: RequestOptions) {
+    return apiClient.post<{ success: boolean; count?: number; templates?: RunpodTemplateItem[]; error?: string }>(
+      "/api/runpod/templates",
+      { runpod_api_key: runpodApiKey },
+      options
+    );
+  },
+  getRunpodNetworkVolumes(runpodApiKey: string, options?: RequestOptions) {
+    return apiClient.post<{ success: boolean; count?: number; volumes?: RunpodNetworkVolumeItem[]; error?: string }>(
+      "/api/runpod/network-volumes",
+      { runpod_api_key: runpodApiKey },
+      options
+    );
+  },
+  deployRunpodPod(payload: RunpodDeployOptions & { runpod_api_key?: string }, options?: RequestOptions) {
+    return apiClient.post<{ success: boolean; message?: string; pod?: any; error?: string }>(
+      "/api/runpod/deploy",
+      payload,
+      options
+    );
+  },
+  getRunpodWatchers(runpodApiKey?: string, options?: RequestOptions) {
+    return apiClient.get<{ success: boolean; count?: number; watchers?: RunpodWatcherItem[]; error?: string }>(
+      runpodApiKey ? `/api/runpod/watchers?apiKey=${encodeURIComponent(runpodApiKey)}` : "/api/runpod/watchers",
+      options
+    );
+  },
+  createRunpodWatcher(payload: RunpodCreateWatcherOptions & { runpod_api_key?: string }, options?: RequestOptions) {
+    return apiClient.post<{ success: boolean; message?: string; watcher?: RunpodWatcherItem; error?: string }>(
+      "/api/runpod/watchers",
+      payload,
+      options
+    );
+  },
+  cancelRunpodWatcher(watcherId: string, options?: RequestOptions) {
+    return apiClient.delete<{ success: boolean; message?: string; error?: string }>(
+      `/api/runpod/watchers/${encodeURIComponent(watcherId)}`,
+      options
+    );
+  },
+  clearRunpodWatchers(options?: RequestOptions) {
+    return apiClient.post<{ success: boolean; message?: string; error?: string }>(
+      "/api/runpod/watchers/clear",
+      {},
+      options
+    );
+  },
+  startRunpodPod(podId: string, payload?: { runpod_api_key?: string; gpuCount?: number }, options?: RequestOptions) {
+    return apiClient.post<{ success: boolean; message?: string; result?: any; error?: string }>(
+      `/api/runpod/pods/${podId}/start`,
+      payload || {},
+      options
+    );
+  },
+  stopRunpodPod(podId: string, payload?: { runpod_api_key?: string }, options?: RequestOptions) {
+    return apiClient.post<{ success: boolean; message?: string; result?: any; error?: string }>(
+      `/api/runpod/pods/${podId}/stop`,
+      payload || {},
+      options
+    );
+  },
+  terminateRunpodPod(podId: string, payload?: { runpod_api_key?: string }, options?: RequestOptions) {
+    return apiClient.post<{ success: boolean; message?: string; error?: string }>(
+      `/api/runpod/pods/${podId}/terminate`,
+      payload || {},
       options
     );
   },

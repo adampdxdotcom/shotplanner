@@ -62,6 +62,7 @@ export default function App() {
     handleUpdateCharacter,
     handleDeleteCharacter,
     fetchWorkflows,
+    handleDeleteWorkflow,
     handleUpdateParam,
     handleUpdateParameterMapping,
     handleSceneExpandPrompt,
@@ -313,6 +314,7 @@ export default function App() {
                 selectedWorkflowFile={selectedWorkflowFile}
                 onSelectWorkflow={setSelectedWorkflowFile}
                 onRefreshWorkflows={fetchWorkflows}
+                onDeleteWorkflow={handleDeleteWorkflow}
                 parsedWorkflow={parsedWorkflow}
                 selectedPromptNodeId={selectedPromptNodeId}
                 onSelectPromptNodeId={setSelectedPromptNodeId}

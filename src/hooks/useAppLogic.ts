@@ -60,6 +60,7 @@ export function useAppLogic() {
     handleUpdateParameterMapping,
     handleUpdateMapping,
     fetchWorkflows,
+    handleDeleteWorkflow,
     syncRemoteWorkflow
   } = useWorkflowManagement({
     getActiveSceneName: () => activeSceneNameRef.current,
@@ -238,6 +239,7 @@ export function useAppLogic() {
     handleUpdateCharacter,
     handleDeleteCharacter,
     fetchWorkflows,
+    handleDeleteWorkflow,
     syncRemoteWorkflow,
     handleUpdateParam,
     handleUpdateParameterMapping,

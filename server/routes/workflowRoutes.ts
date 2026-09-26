@@ -2,7 +2,7 @@ import { Router, Request, Response } from "express";
 import fs from "fs";
 import path from "path";
 import { upload, LEGACY_WORKFLOWS_DIR, WORKFLOWS_DIR, formatSceneFolderName, getSceneDirectories, ASSETS_DIR } from "../config/constants";
-import { listWorkflows, parseWorkflowData } from "../services/workflowService";
+import { listWorkflows, deleteWorkflow, parseWorkflowData } from "../services/workflowService";
 import { processAssetTransfer, processSceneTransfer } from "../services/executionService";
 import { listRemoteWorkflows, fetchRemoteWorkflowJson, syncRemoteWorkflowToLocal, getRemoteComfyObjectInfo } from "../services/remoteComfyService";
 import { safeUnlinkSync } from "../utils/fileCleanup";
@@ -10,6 +10,45 @@ import { createScopedLogger } from "../utils/logger";
 
 const log = createScopedLogger("WorkflowRoute");
 const router = Router();
+
+
+// Delete workflow JSON file
+router.delete("/:filename", (req: Request, res: Response) => {
+  try {
+    const filename = req.params.filename;
+    const sceneName = (req.query.scene_name as string) || (req.query.scene as string) || undefined;
+    log.info(`DELETE /api/workflows/${filename} for scene: ${sceneName || "global"}`);
+    const result = deleteWorkflow(filename, sceneName);
+    res.json({
+      success: true,
+      message: `Workflow "${result.filename}" deleted successfully.`,
+      ...result
+    });
+  } catch (err: any) {
+    log.error("Failed to delete workflow", { error: err?.message || err });
+    res.status(400).json({ success: false, error: err.message || "Failed to delete workflow." });
+  }
+});
+
+router.post("/delete", (req: Request, res: Response) => {
+  try {
+    const filename = req.body.filename;
+    const sceneName = req.body.scene_name || req.body.scene || undefined;
+    if (!filename) {
+      return res.status(400).json({ success: false, error: "Filename is required" });
+    }
+    log.info(`POST /api/workflows/delete for ${filename}`);
+    const result = deleteWorkflow(filename, sceneName);
+    res.json({
+      success: true,
+      message: `Workflow "${result.filename}" deleted successfully.`,
+      ...result
+    });
+  } catch (err: any) {
+    log.error("Failed to delete workflow", { error: err?.message || err });
+    res.status(400).json({ success: false, error: err.message || "Failed to delete workflow." });
+  }
+});
 
 router.get("/", (req: Request, res: Response) => {
   const sceneName = (req.query.scene as string) || undefined;
