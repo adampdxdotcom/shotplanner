@@ -198,6 +198,24 @@ export interface ExpandPromptOptions {
 }
 
 /**
+ * Extracts all phrases enclosed in double, single, or typographic quotes from a string.
+ */
+export function extractQuotedPhrases(text: string): string[] {
+  if (!text) return [];
+  const phrases: string[] = [];
+  // Match standard and smart quotes: "...", '...', “...”, ‘...’
+  const regex = /["“]([^"“”]+)["”]|['‘]([^'‘’]+)['’]/g;
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    const phrase = (match[1] || match[2] || "").trim();
+    if (phrase && phrase.length > 1 && !phrases.includes(phrase)) {
+      phrases.push(phrase);
+    }
+  }
+  return phrases;
+}
+
+/**
  * Programmatically constructs the Global Subject Definitions block.
  * Groups multiple reference assets for the same subject together to prevent LLMs from treating them as multiple distinct entities.
  */
@@ -277,6 +295,7 @@ Your task is to generate ONLY the integrated_multimodal_description content. Do 
 
 ### Strict Output Constraints:
 - Core Story & Action Ground Truth: The user's creative concept/stub is the immutable ground truth for the scene's action and character performance. You must preserve and expand around the user's specific action, rather than replacing or rewriting it.
+- Verbatim Quoted Text Preservation: Any text or phrase enclosed in quotation marks ("..." or '...') by the user is an immutable, literal directive (e.g. locked wardrobe, props, specific dialogue, or exact tokens). You must preserve quoted text word-for-word exactly without paraphrasing, altering, or substituting synonyms.
 - Spatial Initialization: Always define the subject's exact spatial position and initial posture at the very beginning (e.g., "[Shot 1] Live-action, cinematic... At the start of the shot, [Subject] is positioned at...").
 - Exact Tags: Differentiate between facial likeness and styling using the exact tags provided (e.g., "<Picture 1>"). Do NOT invent new tags or reference off-screen characters.
 - Cinematography & Optical Rendering: Reflect the visual characteristics of the selected lens (${lens}) and framing (${aspect}) in depth-of-field, perspective compression, and environmental sharpness, while strictly adhering to camera motion constraints.
@@ -559,9 +578,14 @@ export async function expandPrompt(
     ? `\nACTIVE LORA TRIGGER WORDS & DIRECTIVES:\nTrigger Words: [${uniqueTriggers.join(", ")}]\nNaturally harmonize these stylistic/character trigger words into the visual description and atmosphere.\n`
     : "";
 
+  const quotedPhrases = extractQuotedPhrases(basic_stub);
+  const literalPhrasesBlock = quotedPhrases.length > 0
+    ? `\nLITERAL VERBATIM PHRASES (MUST NOT BE PARAPHRASED OR REINTERPRETED):\nThe user has enclosed the following phrase(s) in quotation marks:\n${quotedPhrases.map(p => `- "${p}"`).join("\n")}\nCRITICAL MANDATE: You MUST incorporate these exact words/phrases verbatim in the expanded description without altering the wording, rephrasing, or substituting synonyms.\n`
+    : "";
+
   const userPrompt = `CREATIVE CONCEPT / STUB (IMMUTABLE STORY & ACTION GROUND TRUTH):
 "${basic_stub}"
-
+${literalPhrasesBlock}
 SHOT PLANNING CONTEXT:
 ${resolvedPromptPrefix || "Shot 01"}
 ${cameraContextBlock}${opticsContextBlock}${framingContextBlock}${scenePlanDirectivesBlock}${loraTriggersBlock}

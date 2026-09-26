@@ -283,21 +283,21 @@ export const ExecutionConsole: React.FC<ExecutionConsoleProps> = (props) => {
 
       {/* 3. Success State */}
       {transferState === "success" && transferResult && (
-        <div className="bg-emerald-950/20 border border-emerald-900/40 rounded-xl shadow-lg overflow-hidden flex flex-col">
-          {/* Header */}
-          <div className="p-4 border-b border-emerald-900/30 flex items-center justify-between bg-emerald-900/10">
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-md overflow-hidden flex flex-col text-zinc-900 dark:text-zinc-100">
+          {/* Light Blue Header */}
+          <div className="p-4 border-b border-sky-100 dark:border-sky-900/40 flex items-center justify-between bg-sky-50 dark:bg-sky-950/40">
             <div className="flex items-center gap-3">
-              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+              <CheckCircle2 className="w-5 h-5 text-sky-500 dark:text-sky-400" />
               <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-emerald-300">
+                <h3 className="text-sm font-bold text-sky-950 dark:text-sky-100">
                   {lastAction === "execute_shot" ? "Executed on Remote GPU" : "Successfully Staged to Remote GPU"}
                 </h3>
                 {activeShot && lastAction === "execute_shot" && (
-                  <span className={`px-2 py-0.5 text-[10px] font-bold rounded shadow uppercase tracking-wider ${
-                    activeShot.status === "rendered" ? "bg-purple-500/20 text-purple-400 border border-purple-500/30" :
-                    activeShot.status === "rendering" ? "bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 animate-pulse" :
-                    activeShot.status === "staged" ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" :
-                    "bg-orange-500/20 text-orange-400 border border-orange-500/30"
+                  <span className={`px-2 py-0.5 text-[10px] font-bold rounded shadow-xs uppercase tracking-wider ${
+                    activeShot.status === "rendered" ? "bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30" :
+                    activeShot.status === "rendering" ? "bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/30 animate-pulse" :
+                    activeShot.status === "staged" ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30" :
+                    "bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30"
                   }`}>
                     {activeShot.status === "rendered" ? "✓ Rendered" :
                      activeShot.status === "rendering" ? "⟳ Rendering" :
@@ -308,23 +308,23 @@ export const ExecutionConsole: React.FC<ExecutionConsoleProps> = (props) => {
               </div>
             </div>
             {lastStagedTime && (
-              <span className="text-xs text-emerald-500/70 font-medium flex items-center gap-1.5">
+              <span className="text-xs text-sky-700 dark:text-sky-400 font-medium flex items-center gap-1.5">
                 <Check className="w-3.5 h-3.5" />
                 {lastAction === "execute_shot" ? `Executed at ${lastStagedTime}` : `Staged at ${lastStagedTime}`}
               </span>
             )}
           </div>
 
-          {/* Main Console Content */}
-          <div className="p-5 space-y-5">
+          {/* Main White/Gray Console Content */}
+          <div className="p-5 space-y-5 bg-white dark:bg-zinc-900">
             {/* Synthesized Shot Workflow & Base Template Card */}
-            <div className="bg-emerald-950/40 border border-emerald-900/30 rounded-lg p-3.5 space-y-2.5">
+            <div className="bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800/80 rounded-lg p-3.5 space-y-2.5">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2">
-                  <FileCode className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span className="text-xs font-bold text-emerald-200">Synthesized Shot Workflow</span>
+                  <FileCode className="w-4 h-4 text-sky-500 dark:text-sky-400 shrink-0" />
+                  <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">Synthesized Shot Workflow</span>
                 </div>
-                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono">
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded bg-sky-100/70 dark:bg-sky-950/70 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/60 font-mono">
                   <Sparkles className="w-2.5 h-2.5" />
                   Synthesized & Injected
                 </span>
@@ -332,12 +332,12 @@ export const ExecutionConsole: React.FC<ExecutionConsoleProps> = (props) => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs pt-1">
                 <div>
-                  <span className="text-[10px] text-emerald-500/80 font-medium uppercase tracking-wider block">Generated Workflow File</span>
-                  <p className="text-emerald-100 font-mono font-bold truncate mt-0.5">{stagedWorkflowFilename}</p>
+                  <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-medium uppercase tracking-wider block">Generated Workflow File</span>
+                  <p className="text-zinc-900 dark:text-zinc-100 font-mono font-bold truncate mt-0.5">{stagedWorkflowFilename}</p>
                 </div>
                 <div>
-                  <span className="text-[10px] text-emerald-500/80 font-medium uppercase tracking-wider block">Base Template Used</span>
-                  <p className="text-emerald-300/80 font-mono text-[11px] truncate mt-0.5">{baseTemplateUsed}</p>
+                  <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-medium uppercase tracking-wider block">Base Template Used</span>
+                  <p className="text-zinc-600 dark:text-zinc-400 font-mono text-[11px] truncate mt-0.5">{baseTemplateUsed}</p>
                 </div>
               </div>
             </div>
@@ -347,18 +347,18 @@ export const ExecutionConsole: React.FC<ExecutionConsoleProps> = (props) => {
               {/* Remote Workflow Destination */}
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <Folder className="w-4 h-4 text-emerald-500/80 shrink-0" />
-                  <h4 className="text-xs font-semibold text-emerald-500/80 uppercase tracking-wider">Remote SFTP Path</h4>
+                  <Folder className="w-4 h-4 text-sky-600 dark:text-sky-400 shrink-0" />
+                  <h4 className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">Remote SFTP Path</h4>
                 </div>
                 <div className="space-y-1.5">
                   {remoteWorkflowPaths.length > 0 ? (
                     remoteWorkflowPaths.map((pathStr, i) => (
-                      <div key={i} className="bg-zinc-950/80 border border-emerald-900/40 px-3 py-2 rounded text-[11px] text-emerald-300 font-mono break-all" title={pathStr}>
+                      <div key={i} className="bg-zinc-50 dark:bg-zinc-950/80 border border-zinc-200 dark:border-zinc-800 px-3 py-2 rounded text-[11px] text-zinc-800 dark:text-zinc-200 font-mono break-all shadow-2xs" title={pathStr}>
                         {pathStr}
                       </div>
                     ))
                   ) : (
-                    <div className="bg-zinc-950/80 border border-emerald-900/40 px-3 py-2 rounded text-[11px] text-zinc-400 font-mono">
+                    <div className="bg-zinc-50 dark:bg-zinc-950/80 border border-zinc-200 dark:border-zinc-800 px-3 py-2 rounded text-[11px] text-zinc-600 dark:text-zinc-400 font-mono">
                       {transferResult.remote_dir}/user/default/workflows/{stagedWorkflowFilename}
                     </div>
                   )}
@@ -369,31 +369,31 @@ export const ExecutionConsole: React.FC<ExecutionConsoleProps> = (props) => {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <HardDrive className="w-4 h-4 text-emerald-500/80 shrink-0" />
-                    <h4 className="text-xs font-semibold text-emerald-500/80 uppercase tracking-wider">Transferred & Verified Files</h4>
+                    <HardDrive className="w-4 h-4 text-sky-600 dark:text-sky-400 shrink-0" />
+                    <h4 className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">Transferred & Verified Files</h4>
                   </div>
                   {transferResult.verified_files?.length ? (
-                    <span className="text-[10px] text-emerald-400 font-mono bg-emerald-950/60 border border-emerald-800/50 px-1.5 py-0.5 rounded">
+                    <span className="text-[10px] text-sky-700 dark:text-sky-300 font-mono bg-sky-100/70 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-800 px-1.5 py-0.5 rounded font-medium">
                       ✓ {transferResult.verified_files.length} verified
                     </span>
                   ) : null}
                 </div>
                 {transferResult.uploaded_files?.length ? (
-                  <div className="bg-zinc-950/80 border border-emerald-900/40 rounded p-2.5 max-h-[120px] overflow-y-auto">
+                  <div className="bg-zinc-50 dark:bg-zinc-950/80 border border-zinc-200 dark:border-zinc-800 rounded p-2.5 max-h-[120px] overflow-y-auto">
                     <ul className="space-y-1">
                       {transferResult.uploaded_files.map((file, i) => (
-                        <li key={i} className="text-[11px] text-emerald-200/90 font-mono truncate flex items-center justify-between gap-1.5">
+                        <li key={i} className="text-[11px] text-zinc-700 dark:text-zinc-300 font-mono truncate flex items-center justify-between gap-1.5">
                           <span className="flex items-center gap-1.5 truncate">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/60 shrink-0" />
+                            <span className="w-1.5 h-1.5 rounded-full bg-sky-500 shrink-0" />
                             {file}
                           </span>
-                          <span className="text-[9px] text-emerald-400/80 uppercase font-sans shrink-0">Verified</span>
+                          <span className="text-[9px] text-sky-600 dark:text-sky-400 uppercase font-sans font-semibold shrink-0">Verified</span>
                         </li>
                       ))}
                     </ul>
                   </div>
                 ) : (
-                  <p className="text-xs text-emerald-300/60 italic bg-zinc-950/40 border border-emerald-900/20 rounded p-2.5">
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 italic bg-zinc-50 dark:bg-zinc-950/40 border border-zinc-200 dark:border-zinc-800 rounded p-2.5">
                     No new files transferred (assets verified in remote <code className="font-mono">/input</code>).
                   </p>
                 )}
@@ -403,42 +403,42 @@ export const ExecutionConsole: React.FC<ExecutionConsoleProps> = (props) => {
             {/* Injected Specs Summary */}
             <div className="space-y-2 pt-1">
               <div className="flex items-center gap-2">
-                <Sliders className="w-4 h-4 text-emerald-500/80 shrink-0" />
-                <h4 className="text-xs font-semibold text-emerald-500/80 uppercase tracking-wider">Injected Generation Specs</h4>
+                <Sliders className="w-4 h-4 text-sky-600 dark:text-sky-400 shrink-0" />
+                <h4 className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">Injected Generation Specs</h4>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono">
-                <div className="bg-emerald-950/30 border border-emerald-900/30 rounded p-2 text-center">
-                  <span className="text-[10px] text-emerald-400/70 block uppercase font-sans">Prompt Node</span>
-                  <span className="text-emerald-200 font-bold">#{activeShot?.prompt_node_id || "Auto"}</span>
+                <div className="bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800 rounded p-2 text-center">
+                  <span className="text-[10px] text-zinc-500 dark:text-zinc-400 block uppercase font-sans font-medium">Prompt Node</span>
+                  <span className="text-zinc-900 dark:text-zinc-100 font-bold">#{activeShot?.prompt_node_id || "Auto"}</span>
                 </div>
-                <div className="bg-emerald-950/30 border border-emerald-900/30 rounded p-2 text-center">
-                  <span className="text-[10px] text-emerald-400/70 block uppercase font-sans">Steps</span>
-                  <span className="text-indigo-300 font-bold">{steps} steps</span>
+                <div className="bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800 rounded p-2 text-center">
+                  <span className="text-[10px] text-zinc-500 dark:text-zinc-400 block uppercase font-sans font-medium">Steps</span>
+                  <span className="text-zinc-900 dark:text-zinc-100 font-bold">{steps} steps</span>
                 </div>
-                <div className="bg-emerald-950/30 border border-emerald-900/30 rounded p-2 text-center">
-                  <span className="text-[10px] text-emerald-400/70 block uppercase font-sans">Resolution</span>
-                  <span className="text-amber-300 font-bold">{megapixels} MP</span>
+                <div className="bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800 rounded p-2 text-center">
+                  <span className="text-[10px] text-zinc-500 dark:text-zinc-400 block uppercase font-sans font-medium">Resolution</span>
+                  <span className="text-zinc-900 dark:text-zinc-100 font-bold">{megapixels} MP</span>
                 </div>
-                <div className="bg-emerald-950/30 border border-emerald-900/30 rounded p-2 text-center">
-                  <span className="text-[10px] text-emerald-400/70 block uppercase font-sans">Duration</span>
-                  <span className="text-emerald-300 font-bold">{frames}f (~{durationSec}s)</span>
+                <div className="bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800 rounded p-2 text-center">
+                  <span className="text-[10px] text-zinc-500 dark:text-zinc-400 block uppercase font-sans font-medium">Duration</span>
+                  <span className="text-zinc-900 dark:text-zinc-100 font-bold">{frames}f (~{durationSec}s)</span>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Footer Action Notice */}
-          <div className="bg-emerald-900/20 p-4 border-t border-emerald-900/30 flex items-start gap-3">
-            <ArrowRight className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+          <div className="bg-zinc-50 dark:bg-zinc-950/60 p-4 border-t border-zinc-200 dark:border-zinc-800 flex items-start gap-3">
+            <ArrowRight className="w-5 h-5 text-sky-600 dark:text-sky-400 shrink-0 mt-0.5" />
             <div>
-              <h4 className="text-sm font-bold text-emerald-300">
+              <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
                 {lastAction === "execute_shot" ? "Execution Triggered Successfully" : "Ready for Remote Execution"}
               </h4>
-              <p className="text-xs text-emerald-200/70 mt-1">
+              <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1 leading-relaxed">
                 {lastAction === "execute_shot" ? (
-                  <>Prompt queued in ComfyUI! Prompt ID: <code className="bg-emerald-950 px-1.5 py-0.5 rounded border border-emerald-900/50 text-emerald-300 font-mono">{(transferResult as any).prompt_id || "Queued"}</code></>
+                  <>Prompt queued in ComfyUI! Prompt ID: <code className="bg-white dark:bg-zinc-900 px-1.5 py-0.5 rounded border border-zinc-200 dark:border-zinc-700 text-sky-700 dark:text-sky-300 font-mono shadow-2xs font-semibold">{(transferResult as any).prompt_id || "Queued"}</code></>
                 ) : (
-                  <>Open ComfyUI on your Remote GPU, navigate to <code className="bg-emerald-950 px-1.5 py-0.5 rounded border border-emerald-900/50 text-emerald-300 font-mono">Workflows -&gt; {sanitizedSceneName}</code>, load <code className="bg-emerald-950 px-1.5 py-0.5 rounded border border-emerald-900/50 text-emerald-300 font-mono">{stagedWorkflowFilename}</code>, and click <strong>Queue Prompt</strong>.</>
+                  <>Open ComfyUI on your Remote GPU, navigate to <code className="bg-white dark:bg-zinc-900 px-1.5 py-0.5 rounded border border-zinc-200 dark:border-zinc-700 text-sky-700 dark:text-sky-300 font-mono shadow-2xs font-semibold">Workflows -&gt; {sanitizedSceneName}</code>, load <code className="bg-white dark:bg-zinc-900 px-1.5 py-0.5 rounded border border-zinc-200 dark:border-zinc-700 text-sky-700 dark:text-sky-300 font-mono shadow-2xs font-semibold">{stagedWorkflowFilename}</code>, and click <strong>Queue Prompt</strong>.</>
                 )}
               </p>
             </div>

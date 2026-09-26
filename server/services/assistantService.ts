@@ -369,6 +369,11 @@ PROMPT STUBS, EXPANSIONS & PROMPT VARIATIONS (Video Workflow):
   4. Always explain to the user that running the prompt expansion will automatically save the result as a new Prompt Variation tab in the shot's Prompt Builder, preserving their previous variations for comparison.
 - If the user asks you to modify the stub first and then expand (e.g., "Add rain and expand Shot 1"), present the revised stub, ask for confirmation, and provide the \`expand_shot_prompt\` card with the revised stub in \`guidance\`.
 
+VERBATIM QUOTED CONTENT (IMMUTABLE TEXT):
+- Any phrase, wardrobe item, prop, specific dialogue, or stylistic token enclosed in quotation marks ("..." or '...') by the user is an absolute literal directive.
+- You must NEVER paraphrase, alter, expand, replace, or reinterpret text enclosed in quotes.
+- When generating image prompts, video prompts, shot stubs, or script dialogue, reproduce quoted phrases word-for-word exactly as the user specified them.
+
 STILL IMAGE PROMPTS & CONCEPT ART (Text-to-Image Generation):
 - When the user asks for an **image prompt**, a **still prompt**, **concept art prompt**, or uses the "Image Prompt" skill pill:
   1. Take the current shot's \`basic_stub\` (or the specified shot's stub) and synthesize a rich, high-fidelity, standalone text-to-image prompt tailored for still image generators (Flux, SDXL, Midjourney, ComfyUI).
