@@ -1,11 +1,23 @@
-import React, { useEffect } from "react";
-import { Bot, Clapperboard, Loader2, CheckCheck, X, Clock } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { 
+  Bot, 
+  Clapperboard, 
+  Loader2, 
+  CheckCheck, 
+  X, 
+  Clock, 
+  Copy, 
+  Check, 
+  RotateCw, 
+  Pencil 
+} from "lucide-react";
 import Markdown from "react-markdown";
 import { AssistantChatMessage } from "../../services/assistantClient";
 import { AssistantAction, parseAssistantActions, validateActionSafety, validateActionSequenceSafety } from "../../types/assistantActions";
 import { AssistantActionCard } from "./AssistantActionCard";
 import { StagingProgressState, ExpandingProgressState } from "./useAssistantActions";
 import { CharacterProfile, MediaAsset, ShotItem } from "../../types";
+import { copyToClipboard } from "../../utils/clipboard";
 
 interface AssistantMessageListProps {
   messages: AssistantChatMessage[];
@@ -27,6 +39,9 @@ interface AssistantMessageListProps {
   onDismissAction: (action: AssistantAction, actionKey: string) => void;
   onUndoAction: (action: AssistantAction, actionKey: string) => void;
   onApplyAllActions: (actions: AssistantAction[], msgIdx: number) => void;
+  onRerunPrompt?: (promptText: string) => void;
+  onEditPrompt?: (promptText: string) => void;
+  onShowToast?: (text: string, type?: "success" | "error" | "info") => void;
 }
 
 /**
@@ -52,8 +67,13 @@ export const AssistantMessageList: React.FC<AssistantMessageListProps> = ({
   onApplyAction,
   onDismissAction,
   onUndoAction,
-  onApplyAllActions
+  onApplyAllActions,
+  onRerunPrompt,
+  onEditPrompt,
+  onShowToast
 }) => {
+  const [copiedMsgIdx, setCopiedMsgIdx] = useState<number | null>(null);
+
   // Auto-apply `save_visual_analysis` actions immediately upon message arrival
   useEffect(() => {
     messages.forEach((msg, idx) => {
@@ -71,6 +91,15 @@ export const AssistantMessageList: React.FC<AssistantMessageListProps> = ({
     });
   }, [messages, appliedActionKeys, dismissedActionKeys, onApplyAction]);
 
+  const handleCopyText = async (text: string, msgIdx: number, label: string) => {
+    const success = await copyToClipboard(text);
+    if (success) {
+      setCopiedMsgIdx(msgIdx);
+      setTimeout(() => setCopiedMsgIdx(null), 1500);
+      onShowToast?.(`Copied ${label} to clipboard.`, "info");
+    }
+  };
+
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-4 text-sm bg-slate-50/60 dark:bg-zinc-950">
       {messages.map((msg, idx) => {
@@ -86,98 +115,185 @@ export const AssistantMessageList: React.FC<AssistantMessageListProps> = ({
           );
         }
 
-        return (
-          <div
-            key={idx}
-            className={`flex gap-2.5 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-          >
-            {msg.role === "assistant" && (
-              <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-2xs mt-0.5">
-                <Bot className="w-4 h-4" />
+        if (msg.role === "user") {
+          return (
+            <div key={idx} className="flex justify-end group relative">
+              <div className="flex flex-col items-end max-w-[85%]">
+                {/* User Message Bubble */}
+                <div className="rounded-2xl rounded-tr-xs px-3.5 py-2.5 bg-indigo-600 text-white leading-relaxed shadow-xs whitespace-pre-wrap">
+                  {msg.content}
+                </div>
+
+                {/* Mouse-over Action Toolbar for User Prompts */}
+                <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex items-center gap-1 mt-1 px-1 text-slate-500 dark:text-zinc-400">
+                  <button
+                    type="button"
+                    onClick={() => handleCopyText(msg.content, idx, "prompt")}
+                    title="Copy prompt"
+                    className="p-1 rounded-md hover:bg-slate-200/80 dark:hover:bg-zinc-800 hover:text-slate-800 dark:hover:text-zinc-200 transition-colors flex items-center gap-1 text-[11px] cursor-pointer"
+                  >
+                    {copiedMsgIdx === idx ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-500" />
+                        <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span className="text-[10px] hidden sm:inline">Copy prompt</span>
+                      </>
+                    )}
+                  </button>
+
+                  {onRerunPrompt && (
+                    <button
+                      type="button"
+                      onClick={() => onRerunPrompt(msg.content)}
+                      disabled={isLoading}
+                      title="Re-run prompt"
+                      className="p-1 rounded-md hover:bg-slate-200/80 dark:hover:bg-zinc-800 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors flex items-center gap-1 text-[11px] cursor-pointer disabled:opacity-40"
+                    >
+                      <RotateCw className="w-3.5 h-3.5" />
+                      <span className="text-[10px] hidden sm:inline">Re-run</span>
+                    </button>
+                  )}
+
+                  {onEditPrompt && (
+                    <button
+                      type="button"
+                      onClick={() => onEditPrompt(msg.content)}
+                      title="Edit in input bar"
+                      className="p-1 rounded-md hover:bg-slate-200/80 dark:hover:bg-zinc-800 hover:text-slate-800 dark:hover:text-zinc-200 transition-colors flex items-center gap-1 text-[11px] cursor-pointer"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      <span className="text-[10px] hidden sm:inline">Edit</span>
+                    </button>
+                  )}
+                </div>
               </div>
-            )}
+            </div>
+          );
+        }
 
-            <div
-              className={`rounded-2xl px-3.5 py-2.5 max-w-[85%] leading-relaxed ${
-                msg.role === "user"
-                  ? "bg-indigo-600 text-white rounded-tr-xs shadow-xs"
-                  : "bg-white text-slate-800 border border-slate-200/90 rounded-tl-xs shadow-xs dark:bg-zinc-800/90 dark:text-zinc-200 dark:border-zinc-700/70"
-              }`}
-            >
-              {msg.role === "user" ? (
-                <div className="whitespace-pre-wrap">{msg.content}</div>
-              ) : (() => {
-                const { cleanContent, actions } = parseAssistantActions(msg.content);
-                const sequenceSafety = validateActionSequenceSafety(actions, existingShotNumbers);
-                const validActions = actions.filter((_, actIdx) => sequenceSafety[actIdx]?.valid);
-                const unappliedCount = validActions.filter((act, actIdx) => {
-                  const actionKey = `${idx}_${act.type}_${act.type === "update_shot" ? act.shot_number : act.type === "update_character" ? act.character_name : actIdx}`;
-                  return !appliedActionKeys[actionKey] && !dismissedActionKeys[actionKey];
-                }).length;
+        // Assistant Message Role
+        const { cleanContent, actions } = parseAssistantActions(msg.content);
+        const sequenceSafety = validateActionSequenceSafety(actions, existingShotNumbers);
+        const validActions = actions.filter((_, actIdx) => sequenceSafety[actIdx]?.valid);
+        const unappliedCount = validActions.filter((act, actIdx) => {
+          const actionKey = `${idx}_${act.type}_${act.type === "update_shot" ? act.shot_number : act.type === "update_character" ? act.character_name : actIdx}`;
+          return !appliedActionKeys[actionKey] && !dismissedActionKeys[actionKey];
+        }).length;
 
-                return (
-                  <div>
-                    {cleanContent && (
-                      <div className="markdown-body prose prose-slate dark:prose-invert prose-sm max-w-none text-xs sm:text-sm space-y-2 text-slate-800 dark:text-zinc-200">
-                        <Markdown>{cleanContent}</Markdown>
-                      </div>
-                    )}
+        // Find preceding user prompt for Re-run/Regenerate capability
+        let precedingUserPrompt = "";
+        for (let i = idx - 1; i >= 0; i--) {
+          if (messages[i].role === "user") {
+            precedingUserPrompt = messages[i].content;
+            break;
+          }
+        }
 
-                    {/* Batch Action Group Header if multiple actions */}
-                    {actions.length > 1 && (
-                      <div className="mt-3 pt-2 border-t border-slate-200/80 dark:border-zinc-700 flex items-center justify-between gap-2">
-                        <span className="text-[11px] font-semibold text-slate-600 dark:text-zinc-400">
-                          Proposed Batch Changes ({actions.length})
-                        </span>
-                        {unappliedCount > 0 ? (
-                          <button
-                            onClick={() => onApplyAllActions(actions, idx)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-[11px] font-semibold transition-colors shadow-2xs cursor-pointer"
-                          >
-                            <CheckCheck className="w-3.5 h-3.5" />
-                            <span>Apply All ({unappliedCount})</span>
-                          </button>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 text-[11px] font-medium">
-                            <CheckCheck className="w-3.5 h-3.5" /> All Applied
-                          </span>
-                        )}
-                      </div>
-                    )}
+        return (
+          <div key={idx} className="flex gap-2.5 justify-start group relative">
+            <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-2xs mt-0.5">
+              <Bot className="w-4 h-4" />
+            </div>
 
-                    {actions.length > 0 && (
-                      <div className="space-y-2 mt-2">
-                        {actions.map((act, actIdx) => {
-                          const actionKey = `${idx}_${act.type}_${act.type === "update_shot" ? act.shot_number : act.type === "update_character" ? act.character_name : actIdx}`;
-                          const isApplied = !!appliedActionKeys[actionKey];
-                          const isDismissed = !!dismissedActionKeys[actionKey];
-                          const safetyCheck = sequenceSafety[actIdx] || validateActionSafety(act, existingShotNumbers);
+            <div className="rounded-2xl rounded-tl-xs px-3.5 py-2.5 max-w-[85%] leading-relaxed bg-white text-slate-800 border border-slate-200/90 shadow-xs dark:bg-zinc-800/90 dark:text-zinc-200 dark:border-zinc-700/70">
+              {cleanContent && (
+                <div className="markdown-body prose prose-slate dark:prose-invert prose-sm max-w-none text-xs sm:text-sm space-y-2 text-slate-800 dark:text-zinc-200">
+                  <Markdown>{cleanContent}</Markdown>
+                </div>
+              )}
 
-                          return (
-                            <AssistantActionCard
-                              key={actionKey}
-                              action={act}
-                              isApplied={isApplied}
-                              isDismissed={isDismissed}
-                              validationError={!safetyCheck.valid ? safetyCheck.reason : null}
-                              shots={shots}
-                              characters={characters}
-                              assets={assets}
-                              sceneName={sceneName}
-                              onNavigateToSection={onNavigateToSection}
-                              onApply={(action) => onApplyAction(action, actionKey)}
-                              onDismiss={(action) => onDismissAction(action, actionKey)}
-                              onUndo={(action) => onUndoAction(action, actionKey)}
-                              stagingProgress={stagingProgressMap[actionKey]}
-                              expandingProgress={expandingProgressMap[actionKey]}
-                            />
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
+              {/* Batch Action Group Header if multiple actions */}
+              {actions.length > 1 && (
+                <div className="mt-3 pt-2 border-t border-slate-200/80 dark:border-zinc-700 flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-semibold text-slate-600 dark:text-zinc-400">
+                    Proposed Batch Changes ({actions.length})
+                  </span>
+                  {unappliedCount > 0 ? (
+                    <button
+                      onClick={() => onApplyAllActions(actions, idx)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-[11px] font-semibold transition-colors shadow-2xs cursor-pointer"
+                    >
+                      <CheckCheck className="w-3.5 h-3.5" />
+                      <span>Apply All ({unappliedCount})</span>
+                    </button>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 text-[11px] font-medium">
+                      <CheckCheck className="w-3.5 h-3.5" /> All Applied
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Action Cards */}
+              {actions.length > 0 && (
+                <div className="space-y-2 mt-2">
+                  {actions.map((act, actIdx) => {
+                    const actionKey = `${idx}_${act.type}_${act.type === "update_shot" ? act.shot_number : act.type === "update_character" ? act.character_name : actIdx}`;
+                    const isApplied = !!appliedActionKeys[actionKey];
+                    const isDismissed = !!dismissedActionKeys[actionKey];
+                    const safetyCheck = sequenceSafety[actIdx] || validateActionSafety(act, existingShotNumbers);
+
+                    return (
+                      <AssistantActionCard
+                        key={actionKey}
+                        action={act}
+                        isApplied={isApplied}
+                        isDismissed={isDismissed}
+                        validationError={!safetyCheck.valid ? safetyCheck.reason : null}
+                        shots={shots}
+                        characters={characters}
+                        assets={assets}
+                        sceneName={sceneName}
+                        onNavigateToSection={onNavigateToSection}
+                        onApply={(action) => onApplyAction(action, actionKey)}
+                        onDismiss={(action) => onDismissAction(action, actionKey)}
+                        onUndo={(action) => onUndoAction(action, actionKey)}
+                        stagingProgress={stagingProgressMap[actionKey]}
+                        expandingProgress={expandingProgressMap[actionKey]}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Mouse-over Action Toolbar for Assistant Replies */}
+              <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex items-center gap-1 mt-2.5 pt-1.5 border-t border-slate-100 dark:border-zinc-700/60 text-slate-400 dark:text-zinc-500">
+                <button
+                  type="button"
+                  onClick={() => handleCopyText(cleanContent || msg.content, idx, "response")}
+                  title="Copy response text"
+                  className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-zinc-700/60 hover:text-slate-700 dark:hover:text-zinc-200 transition-colors flex items-center gap-1 text-[11px] cursor-pointer"
+                >
+                  {copiedMsgIdx === idx ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-500" />
+                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">Copied response</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      <span className="text-[10px] hidden sm:inline">Copy response</span>
+                    </>
+                  )}
+                </button>
+
+                {onRerunPrompt && precedingUserPrompt && (
+                  <button
+                    type="button"
+                    onClick={() => onRerunPrompt(precedingUserPrompt)}
+                    disabled={isLoading}
+                    title={`Re-run prompt: "${precedingUserPrompt.slice(0, 40)}${precedingUserPrompt.length > 40 ? "..." : ""}"`}
+                    className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-zinc-700/60 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors flex items-center gap-1 text-[11px] cursor-pointer disabled:opacity-40"
+                  >
+                    <RotateCw className="w-3.5 h-3.5" />
+                    <span className="text-[10px] hidden sm:inline">Re-run</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         );

@@ -119,14 +119,13 @@ export const AssistantInputBar: React.FC<AssistantInputBarProps> = ({
               ? "Ask about this image, or leave blank for full visual analysis..."
               : "Ask assistant to update scene, stage assets, or expand prompts..."
           }
-          rows={1}
-          className="w-full resize-none bg-transparent px-2.5 py-1.5 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:outline-none max-h-28"
-          style={{ height: "auto" }}
+          rows={4}
+          className="w-full resize-none bg-transparent px-2.5 py-1.5 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-zinc-500 focus:outline-none min-h-[5.5rem] max-h-48 overflow-y-auto leading-relaxed"
         />
         <button
           onClick={onSendMessage}
           disabled={isSendDisabled}
-          className="p-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer shrink-0 ml-1 shadow-2xs"
+          className="p-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer shrink-0 ml-1 mb-0.5 shadow-2xs"
           title="Send query"
         >
           <Send className="w-3.5 h-3.5" />

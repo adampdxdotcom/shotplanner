@@ -287,6 +287,110 @@ export function useAssistantChat({
     onShowToast?.("Conversation history reset for this scene.", "info");
   }, [sceneProject, persistMessages, onShowToast]);
 
+  const handleEditPrompt = useCallback(
+    (promptText: string) => {
+      // Remove any leading Vision tag if present for clean editing
+      const cleanPrompt = promptText.replace(/^\[👁️ Vision Inspection:[^\]]*\]\s*/, "").trim();
+      setInputQuery(cleanPrompt || promptText);
+      setTimeout(() => inputRef.current?.focus(), 50);
+      onShowToast?.("Prompt loaded into input bar.", "info");
+    },
+    [onShowToast]
+  );
+
+  const handleRerunPrompt = useCallback(
+    async (promptText: string) => {
+      const trimmed = promptText.trim();
+      if (!trimmed || isLoading) return;
+
+      setErrorMessage(null);
+      const newMessages: AssistantChatMessage[] = [
+        ...messages,
+        { role: "user", content: trimmed }
+      ];
+
+      setMessages(newMessages);
+      persistMessages(newMessages);
+      setIsLoading(true);
+      onShowToast?.("Resubmitting prompt to Production Assistant...", "info");
+
+      const controller = new AbortController();
+      setAbortController(controller);
+
+      try {
+        const model = sceneProject?.config?.local_model || sceneProject?.local_model || sceneProject?.config?.selected_ollama_model;
+        const response = await sendAssistantChatMessage(
+          {
+            messages: getRollingChatWindow(newMessages, 16),
+            scene_project: sceneProject,
+            active_shot_id: activeShotId,
+            active_section: activeSection,
+            provider: effectiveDefault,
+            model,
+            lm_studio_url: lmStudioUrl
+          },
+          { signal: controller.signal }
+        );
+
+        if (response && response.reply) {
+          const finalMessages: AssistantChatMessage[] = [
+            ...newMessages,
+            { role: "assistant", content: response.reply }
+          ];
+          setMessages(finalMessages);
+          persistMessages(finalMessages);
+          setIsDefaultLlmConnected(true);
+        } else {
+          throw new Error("Received empty response from assistant.");
+        }
+      } catch (err: any) {
+        if (err.name === "AbortError" || controller.signal.aborted) {
+          const cancelMessages: AssistantChatMessage[] = [
+            ...newMessages,
+            {
+              role: "assistant",
+              content: `🛑 *Request cancelled by user after ${elapsedSeconds} seconds.*`
+            }
+          ];
+          setMessages(cancelMessages);
+          persistMessages(cancelMessages);
+        } else {
+          console.error("[AssistantFloatingChat] Error re-running assistant prompt:", err);
+          const errText = err.message || "Failed to communicate with LLM provider.";
+          setErrorMessage(errText);
+          setIsDefaultLlmConnected(false);
+
+          const errorMessages: AssistantChatMessage[] = [
+            ...newMessages,
+            {
+              role: "assistant",
+              content: `⚠️ **Connection Error**: ${errText}\n\nPlease verify that your **${
+                effectiveDefault === "gemini" ? "Google Gemini API Key" : "LM Studio instance"
+              }** is running and configured correctly in the settings.`
+            }
+          ];
+          setMessages(errorMessages);
+          persistMessages(errorMessages);
+        }
+      } finally {
+        setIsLoading(false);
+        setAbortController(null);
+      }
+    },
+    [
+      messages,
+      isLoading,
+      persistMessages,
+      sceneProject,
+      activeShotId,
+      activeSection,
+      effectiveDefault,
+      lmStudioUrl,
+      elapsedSeconds,
+      onShowToast
+    ]
+  );
+
   const injectStateFeedback = useCallback(
     (feedbackText: string) => {
       setMessages((prev) => {
@@ -323,6 +427,8 @@ export function useAssistantChat({
     elapsedSeconds,
     handleCancelRequest,
     handleSendMessage,
+    handleRerunPrompt,
+    handleEditPrompt,
     handleKeyDown,
     handleResetChat,
     injectStateFeedback

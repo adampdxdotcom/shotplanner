@@ -82,6 +82,8 @@ export const AssistantFloatingChat: React.FC<AssistantFloatingChatProps> = ({
     elapsedSeconds,
     handleCancelRequest,
     handleSendMessage,
+    handleRerunPrompt,
+    handleEditPrompt,
     handleKeyDown,
     handleResetChat,
     injectStateFeedback
@@ -198,6 +200,9 @@ export const AssistantFloatingChat: React.FC<AssistantFloatingChatProps> = ({
             onDismissAction={handleDismissAction}
             onUndoAction={handleUndoAction}
             onApplyAllActions={handleApplyAllActions}
+            onRerunPrompt={handleRerunPrompt}
+            onEditPrompt={handleEditPrompt}
+            onShowToast={onShowToast}
           />
 
           {/* Bottom Input Area */}
