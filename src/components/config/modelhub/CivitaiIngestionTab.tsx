@@ -8,7 +8,8 @@ import { copyToClipboard } from "../../../utils/clipboard";
 import { 
   fetchCivitaiFavorites, 
   addCivitaiFavorite, 
-  removeCivitaiFavorite 
+  removeCivitaiFavorite,
+  CIVITAI_FAVORITES_EVENT
 } from "../../../services/civitaiFavoritesService";
 import { settingsApi } from "../../../api";
 import { CivitaiFavoritesTray } from "../CivitaiFavoritesTray";
@@ -74,13 +75,27 @@ export const CivitaiIngestionTab: React.FC<CivitaiIngestionTabProps> = ({
   const [favorites, setFavorites] = useState<CivitaiFavorite[]>([]);
   const [loadingFavorites, setLoadingFavorites] = useState(false);
 
-  // Load favorites on mount
+  // Load favorites on mount and subscribe to updates
   useEffect(() => {
     setLoadingFavorites(true);
     fetchCivitaiFavorites()
       .then((favs) => setFavorites(favs))
       .catch(() => {})
       .finally(() => setLoadingFavorites(false));
+
+    const handleFavChange = (e: Event) => {
+      const customEvent = e as CustomEvent<CivitaiFavorite[]>;
+      if (customEvent.detail && Array.isArray(customEvent.detail)) {
+        setFavorites(customEvent.detail);
+      } else {
+        fetchCivitaiFavorites().then((favs) => setFavorites(favs)).catch(() => {});
+      }
+    };
+
+    window.addEventListener(CIVITAI_FAVORITES_EVENT, handleFavChange);
+    return () => {
+      window.removeEventListener(CIVITAI_FAVORITES_EVENT, handleFavChange);
+    };
   }, []);
 
   // Handle saving Civitai API Key

@@ -2,6 +2,18 @@ import { CivitaiFavorite, CivitaiModelMetadata } from "../types";
 import { modelHubApi } from "../api";
 
 const LOCAL_STORAGE_KEY = "civitai_saved_favorites_cache";
+export const CIVITAI_FAVORITES_EVENT = "civitai_favorites_changed";
+
+/**
+ * Dispatch custom event so all active trays/components re-sync their favorites list
+ */
+function broadcastFavoritesChange(favorites: CivitaiFavorite[]): void {
+  if (typeof window !== "undefined") {
+    try {
+      window.dispatchEvent(new CustomEvent(CIVITAI_FAVORITES_EVENT, { detail: favorites }));
+    } catch (e) {}
+  }
+}
 
 /**
  * Fetch all saved Civitai favorites from the backend (with localStorage cache fallback)
@@ -13,6 +25,7 @@ export async function fetchCivitaiFavorites(): Promise<CivitaiFavorite[]> {
     try {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(list));
     } catch (e) {}
+    broadcastFavoritesChange(list);
     return list;
   } catch (err) {
     console.warn("[Civitai Favorites] Backend fetch failed, reading from localStorage:", err);
@@ -22,7 +35,10 @@ export async function fetchCivitaiFavorites(): Promise<CivitaiFavorite[]> {
   try {
     const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (cached) {
-      return JSON.parse(cached);
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
     }
   } catch (e) {}
 
@@ -49,7 +65,7 @@ export async function addCivitaiFavorite(
 
   const payload: CivitaiFavorite = {
     version_id: Number(versionId),
-    model_id: Number(anyModel.model_id) || 0,
+    model_id: Number(anyModel.model_id) || Number(versionId) || 0,
     name: nameVal,
     model_name: nameVal,
     version_name: anyModel.version_name || "",
@@ -74,27 +90,32 @@ export async function addCivitaiFavorite(
     added_at: new Date().toISOString()
   };
 
+  let savedItem = payload;
+
   try {
     const data: any = await modelHubApi.addCivitaiFavorite(payload);
-    return data?.favorite || payload;
+    if (data?.favorite) {
+      savedItem = data.favorite;
+    }
   } catch (err) {
     console.warn("[Civitai Favorites] Save POST failed, updating localStorage:", err);
   }
 
-  // Update local cache
+  // Update local cache and broadcast
   try {
     const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
     const list: CivitaiFavorite[] = cached ? JSON.parse(cached) : [];
-    const idx = list.findIndex((f) => String(f.version_id) === String(payload.version_id));
+    const idx = list.findIndex((f) => String(f.version_id) === String(savedItem.version_id));
     if (idx >= 0) {
-      list[idx] = payload;
+      list[idx] = savedItem;
     } else {
-      list.unshift(payload);
+      list.unshift(savedItem);
     }
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(list));
+    broadcastFavoritesChange(list);
   } catch (e) {}
 
-  return payload;
+  return savedItem;
 }
 
 /**
@@ -104,20 +125,21 @@ export async function removeCivitaiFavorite(versionId: number | string): Promise
   const normId = String(versionId);
   try {
     await modelHubApi.removeCivitaiFavorite(Number(normId) || (normId as any));
-    return true;
   } catch (err) {
     console.warn("[Civitai Favorites] Delete request failed:", err);
   }
 
-  // Update local cache
+  // Update local cache and broadcast
   try {
     const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (cached) {
       const list: CivitaiFavorite[] = JSON.parse(cached);
-      const filtered = list.filter((f) => String(f.version_id) !== normId);
+      const filtered = list.filter((f) => String(f.version_id) !== normId && String(f.model_id) !== normId);
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(filtered));
+      broadcastFavoritesChange(filtered);
     }
   } catch (e) {}
 
   return true;
 }
+

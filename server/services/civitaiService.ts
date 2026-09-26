@@ -100,14 +100,32 @@ export function getStoredCivitaiKey(): string {
     try {
       const data = JSON.parse(fs.readFileSync(CIVITAI_CONFIG_FILE, "utf-8"));
       if (typeof data.api_key === "string" && data.api_key.trim()) {
-        return data.api_key.trim();
+        const key = data.api_key.trim();
+        // Avoid returning masked key
+        if (key !== "CONFIGURED" && !key.includes("...") && !key.startsWith("***")) {
+          return key;
+        }
       }
     } catch (e) {}
   }
   if (process.env.CIVITAI_API_KEY && process.env.CIVITAI_API_KEY.trim()) {
-    return process.env.CIVITAI_API_KEY.trim();
+    const envKey = process.env.CIVITAI_API_KEY.trim();
+    if (envKey !== "CONFIGURED" && !envKey.includes("...") && !envKey.startsWith("***")) {
+      return envKey;
+    }
   }
   return "";
+}
+
+/**
+ * Resolve effective Civitai token, ignoring masked or placeholder strings
+ */
+export function resolveEffectiveCivitaiToken(tokenOverride?: string): string {
+  const clean = (tokenOverride || "").trim();
+  if (clean && clean !== "CONFIGURED" && !clean.includes("...") && !clean.startsWith("***")) {
+    return clean;
+  }
+  return getStoredCivitaiKey();
 }
 
 /**
@@ -117,6 +135,10 @@ export function saveCivitaiKey(apiKey: string): void {
   const cleanKey = (apiKey || "").trim();
   if (!cleanKey) {
     removeCivitaiKey();
+    return;
+  }
+  // Never save masked keys
+  if (cleanKey === "CONFIGURED" || cleanKey.includes("...") || cleanKey.startsWith("***")) {
     return;
   }
   writeJsonAtomicSync(CIVITAI_CONFIG_FILE, { api_key: cleanKey, updated_at: new Date().toISOString() });
@@ -136,7 +158,7 @@ export function removeCivitaiKey(): void {
 }
 
 /**
- * Retrieve saved Civitai favorites from assets/civitai_favorites.json
+ * Retrieve saved Civitai favorites from data/config/civitai_favorites.json
  */
 export function getStoredCivitaiFavorites(): CivitaiFavorite[] {
   if (fs.existsSync(CIVITAI_FAVORITES_FILE)) {
@@ -227,12 +249,12 @@ export function saveCivitaiFavorite(modelData: Partial<CivitaiFavorite> & { [key
 }
 
 /**
- * Remove a Civitai model from favorites by version ID
+ * Remove a Civitai model from favorites by version ID or model ID
  */
 export function deleteCivitaiFavorite(versionId: string | number): boolean {
   const favorites = getStoredCivitaiFavorites();
   const targetStr = String(versionId).trim();
-  const filtered = favorites.filter((f) => String(f.version_id) !== targetStr);
+  const filtered = favorites.filter((f) => String(f.version_id) !== targetStr && String(f.model_id) !== targetStr);
 
   if (filtered.length === favorites.length) {
     return false;
@@ -429,7 +451,7 @@ export async function fetchCivitaiModelInfo(
   query: string,
   tokenOverride?: string
 ): Promise<CivitaiModelMetadata> {
-  const token = (tokenOverride || getStoredCivitaiKey()).trim();
+  const token = resolveEffectiveCivitaiToken(tokenOverride);
   const { modelId, versionId } = parseCivitaiQuery(query);
 
   if (!modelId && !versionId) {
@@ -714,7 +736,7 @@ export async function executeRemoteModelDownload(
     throw new Error("Filename is required.");
   }
 
-  const token = (civitai_token || getStoredCivitaiKey()).trim();
+  const token = resolveEffectiveCivitaiToken(civitai_token);
   const cleanRoot = remote_comfyui_root.replace(/\/$/, "");
   
   // Resolve absolute destination path on remote machine
@@ -817,7 +839,7 @@ export interface CivitaiSearchOptions {
  * Search Civitai models by keyword, tag, base model, and model type (e.g. LORA).
  */
 export async function searchCivitaiModels(options: CivitaiSearchOptions): Promise<any> {
-  const token = (options.token || getStoredCivitaiKey()).trim();
+  const token = resolveEffectiveCivitaiToken(options.token);
   const params = new URLSearchParams();
 
   if (options.query && options.query.trim()) {

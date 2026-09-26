@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { CivitaiFavorite } from "../../types";
-import { Star, ChevronDown, ChevronUp, X, Sparkles, Layers, HardDrive } from "lucide-react";
+import { Star, ChevronDown, ChevronUp, X, Sparkles, Layers, Copy, Check, Filter } from "lucide-react";
+import { copyToClipboard } from "../../utils/clipboard";
 
 export interface CivitaiFavoritesTrayProps {
   favorites: CivitaiFavorite[];
@@ -18,6 +19,30 @@ export const CivitaiFavoritesTray: React.FC<CivitaiFavoritesTrayProps> = ({
   isLoading = false
 }) => {
   const [isOpen, setIsOpen] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [trayFilter, setTrayFilter] = useState<string>("");
+  const [copiedTriggerId, setCopiedTriggerId] = useState<string | null>(null);
+
+  // Derive unique categories from favorites
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    favorites.forEach(f => {
+      if (f.category) set.add(f.category);
+    });
+    return Array.from(set);
+  }, [favorites]);
+
+  // Filter favorites by category and search text
+  const filteredFavorites = useMemo(() => {
+    return favorites.filter(fav => {
+      const matchCat = selectedCategory === "all" || (fav.category || "").toLowerCase() === selectedCategory.toLowerCase();
+      const matchText = !trayFilter.trim() || 
+        (fav.name || "").toLowerCase().includes(trayFilter.toLowerCase()) ||
+        (fav.base_model || "").toLowerCase().includes(trayFilter.toLowerCase()) ||
+        (fav.filename || "").toLowerCase().includes(trayFilter.toLowerCase());
+      return matchCat && matchText;
+    });
+  }, [favorites, selectedCategory, trayFilter]);
 
   // Helper for category badge color
   const getCategoryColor = (category?: string) => {
@@ -37,6 +62,18 @@ export const CivitaiFavoritesTray: React.FC<CivitaiFavoritesTrayProps> = ({
     return "bg-blue-50 dark:bg-blue-950/70 border-blue-200 dark:border-blue-800/60 text-blue-700 dark:text-blue-300";
   };
 
+  const handleCopyTriggers = async (e: React.MouseEvent, fav: CivitaiFavorite) => {
+    e.stopPropagation();
+    const words = fav.trained_words || fav.trigger_words || fav.trainedWords || [];
+    if (!words || words.length === 0) return;
+    const text = words.join(", ");
+    const ok = await copyToClipboard(text);
+    if (ok) {
+      setCopiedTriggerId(String(fav.version_id));
+      setTimeout(() => setCopiedTriggerId(null), 1500);
+    }
+  };
+
   return (
     <div id="civitai-saved-favorites-tray" className="w-full bg-zinc-50 dark:bg-neutral-950/70 border border-zinc-200 dark:border-neutral-800/80 rounded-xl overflow-hidden shadow-xs transition-all text-zinc-900 dark:text-zinc-100">
       {/* Tray Header Bar */}
@@ -53,6 +90,11 @@ export const CivitaiFavoritesTray: React.FC<CivitaiFavoritesTrayProps> = ({
           <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800/50 text-amber-800 dark:text-amber-300 font-semibold">
             {favorites.length}
           </span>
+          {isLoading && (
+            <span className="text-[10px] text-zinc-400 dark:text-neutral-500 animate-pulse font-normal">
+              Syncing...
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-1.5 text-zinc-500 dark:text-neutral-400 text-xs font-medium">
@@ -69,23 +111,76 @@ export const CivitaiFavoritesTray: React.FC<CivitaiFavoritesTrayProps> = ({
 
       {/* Collapsible Content */}
       {isOpen && (
-        <div className="p-3">
+        <div className="p-3 space-y-3">
+          {/* Filter Bar if favorites exist */}
+          {favorites.length > 3 && (
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pb-1 border-b border-zinc-200/80 dark:border-neutral-800/60">
+              {/* Category Pills */}
+              <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategory("all")}
+                  className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer border ${
+                    selectedCategory === "all"
+                      ? "bg-amber-500/20 text-amber-800 dark:text-amber-300 border-amber-400/40"
+                      : "bg-white dark:bg-neutral-900 text-zinc-600 dark:text-neutral-400 border-zinc-200 dark:border-neutral-800 hover:bg-zinc-100"
+                  }`}
+                >
+                  All ({favorites.length})
+                </button>
+                {categories.map((cat) => {
+                  const count = favorites.filter(f => (f.category || "").toLowerCase() === cat.toLowerCase()).length;
+                  return (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setSelectedCategory(cat)}
+                      className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer border whitespace-nowrap ${
+                        selectedCategory.toLowerCase() === cat.toLowerCase()
+                          ? "bg-amber-500/20 text-amber-800 dark:text-amber-300 border-amber-400/40"
+                          : "bg-white dark:bg-neutral-900 text-zinc-600 dark:text-neutral-400 border-zinc-200 dark:border-neutral-800 hover:bg-zinc-100"
+                      }`}
+                    >
+                      {cat} ({count})
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Quick filter input */}
+              <input
+                type="text"
+                placeholder="Filter favorites..."
+                value={trayFilter}
+                onChange={(e) => setTrayFilter(e.target.value)}
+                className="px-2 py-1 text-[11px] bg-white dark:bg-neutral-900 border border-zinc-200 dark:border-neutral-800 rounded-lg text-zinc-800 dark:text-zinc-200 placeholder-zinc-400 outline-none w-full sm:w-36"
+              />
+            </div>
+          )}
+
           {favorites.length === 0 ? (
             <div className="flex items-center justify-between gap-3 px-3 py-3 rounded-lg bg-white dark:bg-neutral-900/40 border border-dashed border-zinc-200 dark:border-neutral-800 text-xs text-zinc-500 dark:text-neutral-400">
               <div className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-amber-500/70 dark:text-amber-400/70 shrink-0" />
                 <span>
-                  No favorite models saved yet. Click the <strong>⭐ Favorite</strong> button on any model preview to pin it here for 1-click access.
+                  No favorite models saved yet. Click the <strong>⭐ Favorite</strong> button on any model preview or search result to pin it here for 1-click access.
                 </span>
               </div>
             </div>
+          ) : filteredFavorites.length === 0 ? (
+            <div className="p-3 text-center text-xs text-zinc-500 dark:text-neutral-400">
+              No favorites match the selected filter.
+            </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 max-h-64 overflow-y-auto pr-1">
-              {favorites.map((fav) => {
+              {filteredFavorites.map((fav) => {
                 const isSelected = activeVersionId && String(fav.version_id) === String(activeVersionId);
                 const title = fav.name || fav.model_name || "Civitai Model";
                 const img = fav.image_url || fav.preview_image_url;
                 const size = fav.file_size_formatted || fav.file_size;
+                const words = fav.trained_words || fav.trigger_words || fav.trainedWords || [];
+                const hasTriggers = words.length > 0;
+                const isCopied = copiedTriggerId === String(fav.version_id);
 
                 return (
                   <div
@@ -113,7 +208,7 @@ export const CivitaiFavoritesTray: React.FC<CivitaiFavoritesTrayProps> = ({
                     </div>
 
                     {/* Meta Details */}
-                    <div className="flex-1 min-w-0 pr-4">
+                    <div className="flex-1 min-w-0 pr-5">
                       <h4 className="text-xs font-semibold text-zinc-800 dark:text-neutral-200 truncate group-hover:text-amber-650 dark:group-hover:text-amber-300 transition-colors">
                         {title}
                       </h4>
@@ -140,6 +235,22 @@ export const CivitaiFavoritesTray: React.FC<CivitaiFavoritesTrayProps> = ({
                       </div>
                     </div>
 
+                    {/* Quick Trigger Copy Button */}
+                    {hasTriggers && (
+                      <button
+                        type="button"
+                        onClick={(e) => handleCopyTriggers(e, fav)}
+                        title={`Copy triggers: ${words.join(", ")}`}
+                        className="absolute bottom-1.5 right-1.5 p-1 rounded hover:bg-zinc-200 dark:hover:bg-neutral-800 text-purple-600 dark:text-purple-400 transition-colors cursor-pointer"
+                      >
+                        {isCopied ? (
+                          <Check className="w-3 h-3 text-emerald-500" />
+                        ) : (
+                          <Copy className="w-3 h-3 opacity-60 group-hover:opacity-100" />
+                        )}
+                      </button>
+                    )}
+
                     {/* Remove Action Button */}
                     <button
                       type="button"
@@ -160,3 +271,4 @@ export const CivitaiFavoritesTray: React.FC<CivitaiFavoritesTrayProps> = ({
   );
 };
 export default CivitaiFavoritesTray;
+

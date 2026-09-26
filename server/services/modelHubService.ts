@@ -225,6 +225,9 @@ export async function executeUnifiedRemoteDownload(
 
   // Resolve token based on URL or auth_type
   let resolvedToken = (api_token || "").trim();
+  if (resolvedToken === "CONFIGURED" || resolvedToken.includes("...") || resolvedToken.startsWith("***")) {
+    resolvedToken = "";
+  }
   const lowerUrl = download_url.toLowerCase();
 
   if (!resolvedToken) {

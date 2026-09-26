@@ -240,11 +240,9 @@ export function useAppConfig({ addToast, onUpdateProjectConfig }: UseAppConfigPa
 
     settingsApi.getCivitaiKey()
       .then(data => {
-        if (data && (data.configured || data.has_key || data.api_key)) {
-          setConfig(prev => ({
-            ...prev,
-            civitai_api_key: data.api_key || (data.configured || data.has_key ? "CONFIGURED" : prev.civitai_api_key)
-          }));
+        // Do not overwrite client state with masked strings
+        if (data && data.api_key && !data.api_key.includes("...") && data.api_key !== "CONFIGURED") {
+          setConfig(prev => ({ ...prev, civitai_api_key: data.api_key || prev.civitai_api_key }));
         }
       })
       .catch(() => {});

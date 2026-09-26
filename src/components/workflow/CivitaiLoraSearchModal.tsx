@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { 
   Search, 
   X, 
@@ -12,11 +12,17 @@ import {
   RefreshCw,
   Layers,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Bookmark
 } from "lucide-react";
-import { SystemLora, CivitaiSearchItem } from "../../types";
+import { SystemLora, CivitaiSearchItem, CivitaiFavorite } from "../../types";
 import { lorasApi } from "../../api";
-import { addCivitaiFavorite } from "../../services/civitaiFavoritesService";
+import { 
+  addCivitaiFavorite, 
+  removeCivitaiFavorite, 
+  fetchCivitaiFavorites, 
+  CIVITAI_FAVORITES_EVENT 
+} from "../../services/civitaiFavoritesService";
 import { copyToClipboard } from "../../utils/clipboard";
 
 interface CivitaiLoraSearchModalProps {
@@ -45,20 +51,43 @@ export const CivitaiLoraSearchModal: React.FC<CivitaiLoraSearchModalProps> = ({
   onSelectLora,
   onShowToast
 }) => {
+  const [activeTab, setActiveTab] = useState<"search" | "favorites">("search");
   const [searchQuery, setSearchQuery] = useState("");
   const [baseModel, setBaseModel] = useState("");
   const [sort, setSort] = useState("Highest Rated");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<CivitaiSearchItem[]>([]);
+  const [favorites, setFavorites] = useState<CivitaiFavorite[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [copiedTrigger, setCopiedTrigger] = useState<string | null>(null);
   const [stagingId, setStagingId] = useState<number | null>(null);
 
+  // Load favorites & subscribe to changes
   useEffect(() => {
     if (isOpen) {
+      fetchCivitaiFavorites().then(favs => setFavorites(favs)).catch(() => {});
+    }
+
+    const handleFavChange = (e: Event) => {
+      const customEvent = e as CustomEvent<CivitaiFavorite[]>;
+      if (customEvent.detail && Array.isArray(customEvent.detail)) {
+        setFavorites(customEvent.detail);
+      } else {
+        fetchCivitaiFavorites().then(favs => setFavorites(favs)).catch(() => {});
+      }
+    };
+
+    window.addEventListener(CIVITAI_FAVORITES_EVENT, handleFavChange);
+    return () => {
+      window.removeEventListener(CIVITAI_FAVORITES_EVENT, handleFavChange);
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen && activeTab === "search") {
       handleSearch();
     }
-  }, [isOpen, baseModel, sort]);
+  }, [isOpen, baseModel, sort, activeTab]);
 
   const handleSearch = async (overrideQuery?: string) => {
     const query = overrideQuery !== undefined ? overrideQuery : searchQuery;
@@ -89,7 +118,9 @@ export const CivitaiLoraSearchModal: React.FC<CivitaiLoraSearchModalProps> = ({
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
-      handleSearch();
+      if (activeTab === "search") {
+        handleSearch();
+      }
     }
   };
 
@@ -105,6 +136,47 @@ export const CivitaiLoraSearchModal: React.FC<CivitaiLoraSearchModalProps> = ({
     }
   };
 
+  // Toggle favorite for search result item
+  const handleToggleFavoriteResult = async (e: React.MouseEvent, model: CivitaiSearchItem) => {
+    e.stopPropagation();
+    const version = model.modelVersions?.[0];
+    if (!version) return;
+
+    const versionId = version.id;
+    const isFav = favorites.some(f => String(f.version_id) === String(versionId) || String(f.model_id) === String(model.id));
+
+    if (isFav) {
+      await removeCivitaiFavorite(versionId);
+      onShowToast?.(`Removed "${model.name}" from Favorites`, "info");
+    } else {
+      const files = version.files || [];
+      const primaryFile = files.find(f => f.primary || f.name.endsWith(".safetensors")) || files[0];
+      const filename = primaryFile?.name || `${model.name.toLowerCase().replace(/[^a-z0-9_.-]/g, "_")}.safetensors`;
+      const previewUrl = version.images?.[0]?.url || "";
+
+      await addCivitaiFavorite({
+        version_id: version.id,
+        model_id: model.id,
+        name: model.name,
+        model_name: model.name,
+        version_name: version.name || "v1.0",
+        category: "LoRA",
+        base_model: version.baseModel || "SDXL",
+        image_url: previewUrl,
+        preview_image_url: previewUrl,
+        filename,
+        download_url: version.downloadUrl || `https://civitai.com/api/download/models/${version.id}`,
+        default_destination_folder: "models/loras/",
+        trigger_words: version.trainedWords || [],
+        trained_words: version.trainedWords || [],
+        description: version.description || "",
+        tags: model.tags || []
+      });
+      onShowToast?.(`Saved "${model.name}" to Favorites ⭐`, "success");
+    }
+  };
+
+  // Choose model from search or favorite
   const handleChooseModel = async (model: CivitaiSearchItem, versionIdx = 0, stageDirectly = false) => {
     const version = model.modelVersions?.[versionIdx] || model.modelVersions?.[0];
     if (!version) return;
@@ -141,29 +213,7 @@ export const CivitaiLoraSearchModal: React.FC<CivitaiLoraSearchModalProps> = ({
     };
 
     try {
-      // 1. Save directly to Favorites
-      await addCivitaiFavorite({
-        version_id: version.id,
-        model_id: model.id,
-        name: model.name,
-        model_name: model.name,
-        version_name: version.name || "v1.0",
-        category: "LoRA",
-        base_model: version.baseModel || "SDXL",
-        image_url: previewUrl,
-        preview_image_url: previewUrl,
-        filename,
-        download_url: version.downloadUrl || `https://civitai.com/api/download/models/${version.id}`,
-        default_destination_folder: "models/loras/",
-        trigger_words: triggerWords,
-        trained_words: triggerWords,
-        description: version.description || "",
-        tags: model.tags || []
-      }).catch(err => {
-        console.warn("Failed saving favorite via service:", err);
-      });
-
-      // Also ensure backend system LoRA registry is updated
+      // 1. Ensure backend system LoRA registry is updated
       await lorasApi.saveLora(systemLora).catch(() => {});
 
       // 2. Stage to Remote GPU if requested
@@ -195,6 +245,77 @@ export const CivitaiLoraSearchModal: React.FC<CivitaiLoraSearchModalProps> = ({
     }
   };
 
+  // Choose from favorite
+  const handleChooseFavorite = async (fav: CivitaiFavorite, stageDirectly = false) => {
+    const triggerWords = fav.trained_words || fav.trigger_words || fav.trainedWords || [];
+    const filename = fav.filename || `${(fav.name || "lora").toLowerCase().replace(/[^a-z0-9_.-]/g, "_")}.safetensors`;
+
+    const systemLora: SystemLora = {
+      id: `civitai_${fav.version_id}`,
+      name: fav.name || fav.model_name || "Civitai LoRA",
+      filename,
+      version_name: fav.version_name || "v1.0",
+      base_model: fav.base_model || "SDXL",
+      category: "lora",
+      trigger_words: triggerWords,
+      default_destination_folder: fav.default_destination_folder || "models/loras/",
+      suggested_remote_path: fav.suggested_remote_path || `models/loras/${filename}`,
+      download_url: fav.download_url || `https://civitai.com/api/download/models/${fav.version_id}`,
+      source: "civitai",
+      model_id: fav.model_id,
+      version_id: fav.version_id,
+      preview_image_url: fav.preview_image_url || fav.image_url || "",
+      file_size_formatted: fav.file_size_formatted || fav.file_size,
+      file_size_bytes: fav.file_size_bytes,
+      description: fav.clean_description || fav.description || "",
+      preferred_strength_model: 0.85,
+      preferred_strength_clip: 1.0,
+      is_favorite: true
+    };
+
+    try {
+      await lorasApi.saveLora(systemLora).catch(() => {});
+
+      if (stageDirectly && systemLora.download_url) {
+        setStagingId(fav.version_id);
+        onShowToast?.(`Staging "${systemLora.name}" to remote GPU...`, "info");
+        lorasApi.transferRemote({
+          lora_id: systemLora.id,
+          filename: systemLora.filename,
+          download_url: systemLora.download_url,
+          destination_folder: "models/loras/"
+        }).then(res => {
+          if (res?.success) {
+            onShowToast?.(`Successfully staged "${systemLora.name}" to remote GPU!`, "success");
+          }
+        }).catch(err => {
+          console.warn("Failed remote download:", err);
+        });
+      }
+
+      onSelectLora(systemLora, true);
+      onShowToast?.(`Assigned "${systemLora.name}" to Slot #${targetNodeId || 'LoRA'}`, "success");
+      onClose();
+    } catch (err: any) {
+      onShowToast?.(err.message || "Failed to assign LoRA.", "error");
+    } finally {
+      setStagingId(null);
+    }
+  };
+
+  // Filtered favorites list
+  const filteredFavorites = useMemo(() => {
+    return favorites.filter(fav => {
+      const isLora = (fav.category || "").toLowerCase().includes("lora") || (fav.category || "").toLowerCase().includes("dora") || (fav.category || "").toLowerCase().includes("locon") || (fav.filename || "").endsWith(".safetensors");
+      const matchBase = !baseModel || (fav.base_model || "").toLowerCase().includes(baseModel.toLowerCase());
+      const matchQuery = !searchQuery.trim() || 
+        (fav.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (fav.filename || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (fav.trained_words || []).some(w => w.toLowerCase().includes(searchQuery.toLowerCase()));
+      return matchBase && matchQuery && isLora;
+    });
+  }, [favorites, baseModel, searchQuery]);
+
   if (!isOpen) return null;
 
   return (
@@ -210,7 +331,7 @@ export const CivitaiLoraSearchModal: React.FC<CivitaiLoraSearchModalProps> = ({
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-base sm:text-lg font-bold text-white">
-                  Civitai LoRA Library Search
+                  Civitai LoRA Library Search &amp; Favorites
                 </h2>
                 {targetNodeId && (
                   <span className="px-2 py-0.5 rounded-md text-[11px] font-mono font-semibold bg-purple-950 text-purple-300 border border-purple-800">
@@ -219,7 +340,7 @@ export const CivitaiLoraSearchModal: React.FC<CivitaiLoraSearchModalProps> = ({
                 )}
               </div>
               <p className="text-xs text-zinc-400">
-                Search community LoRAs, preview trigger words, assign directly to workflow slots, and stage onto remote GPU.
+                Search community LoRAs, pick from saved favorites, preview trigger words, assign directly to workflow slots, and stage onto remote GPU.
               </p>
             </div>
           </div>
@@ -233,6 +354,35 @@ export const CivitaiLoraSearchModal: React.FC<CivitaiLoraSearchModalProps> = ({
           </button>
         </div>
 
+        {/* View Mode Navigation Tabs */}
+        <div className="flex items-center gap-2 px-4 pt-3 bg-zinc-900/40 border-b border-zinc-800/80">
+          <button
+            type="button"
+            onClick={() => setActiveTab("search")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-t-lg text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+              activeTab === "search"
+                ? "border-purple-500 text-white bg-zinc-900/80"
+                : "border-transparent text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            <Search className="w-3.5 h-3.5 text-purple-400" />
+            Explore Civitai Hub
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("favorites")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-t-lg text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+              activeTab === "favorites"
+                ? "border-amber-500 text-white bg-zinc-900/80"
+                : "border-transparent text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+            My Saved Favorites ({favorites.length})
+          </button>
+        </div>
+
         {/* Filter & Search Bar */}
         <div className="p-4 bg-zinc-900/40 border-b border-zinc-800/80 space-y-3">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
@@ -243,30 +393,38 @@ export const CivitaiLoraSearchModal: React.FC<CivitaiLoraSearchModalProps> = ({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Search LoRAs (e.g. cinematic, anime, cyberpunk, wan2.1, vintage lighting)..."
+                placeholder={
+                  activeTab === "search"
+                    ? "Search Civitai LoRAs (e.g. cinematic, anime, cyberpunk, wan2.1, vintage lighting)..."
+                    : "Filter your saved favorites..."
+                }
                 className="w-full pl-9 pr-20 py-2 text-xs bg-zinc-900 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-hidden focus:ring-2 focus:ring-purple-500 font-medium"
               />
-              <button
-                type="button"
-                onClick={() => handleSearch()}
-                disabled={loading}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
-              >
-                {loading ? <RefreshCw className="w-3 h-3 animate-spin" /> : "Search"}
-              </button>
+              {activeTab === "search" && (
+                <button
+                  type="button"
+                  onClick={() => handleSearch()}
+                  disabled={loading}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                >
+                  {loading ? <RefreshCw className="w-3 h-3 animate-spin" /> : "Search"}
+                </button>
+              )}
             </div>
 
-            {/* Sort select */}
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value)}
-              className="bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-200 focus:outline-hidden focus:ring-2 focus:ring-purple-500 cursor-pointer font-medium"
-            >
-              <option value="Highest Rated">⭐ Highest Rated</option>
-              <option value="Most Downloaded">🔥 Most Downloaded</option>
-              <option value="Newest">🕒 Newest</option>
-              <option value="Most Liked">❤️ Most Liked</option>
-            </select>
+            {/* Sort select (for search mode) */}
+            {activeTab === "search" && (
+              <select
+                value={sort}
+                onChange={(e) => setSort(e.target.value)}
+                className="bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-200 focus:outline-hidden focus:ring-2 focus:ring-purple-500 cursor-pointer font-medium"
+              >
+                <option value="Highest Rated">⭐ Highest Rated</option>
+                <option value="Most Downloaded">🔥 Most Downloaded</option>
+                <option value="Newest">🕒 Newest</option>
+                <option value="Most Liked">❤️ Most Liked</option>
+              </select>
+            )}
           </div>
 
           {/* Base Model Filter Chips */}
@@ -291,7 +449,128 @@ export const CivitaiLoraSearchModal: React.FC<CivitaiLoraSearchModalProps> = ({
 
         {/* Results Container */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 min-h-[300px]">
-          {loading ? (
+          {activeTab === "favorites" ? (
+            filteredFavorites.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-64 space-y-2 text-zinc-500 text-center">
+                <Bookmark className="w-8 h-8 opacity-40 text-amber-500" />
+                <p className="text-xs font-medium">No LoRAs found in your favorites matching filters.</p>
+                <p className="text-[11px] text-zinc-600">Switch to the "Explore Civitai Hub" tab and click the ⭐ icon on any LoRA to pin it here.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {filteredFavorites.map((fav) => {
+                  const previewImg = fav.preview_image_url || fav.image_url;
+                  const triggers = fav.trained_words || fav.trigger_words || fav.trainedWords || [];
+                  const baseM = fav.base_model || "SDXL";
+                  const sizeFormatted = fav.file_size_formatted || fav.file_size;
+                  const isStagingThis = stagingId === fav.version_id;
+
+                  return (
+                    <div
+                      key={fav.version_id}
+                      className="bg-zinc-900/70 border border-zinc-800 hover:border-amber-500/50 rounded-xl overflow-hidden flex flex-col group transition-all duration-200 shadow-2xs hover:shadow-md"
+                    >
+                      {/* Thumbnail Image */}
+                      <div className="aspect-4/3 bg-zinc-950 relative overflow-hidden flex items-center justify-center">
+                        {previewImg ? (
+                          <img
+                            src={previewImg}
+                            alt={fav.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            loading="lazy"
+                            referrerPolicy="no-referrer"
+                          />
+                        ) : (
+                          <div className="text-zinc-600 flex flex-col items-center gap-1">
+                            <Layers className="w-8 h-8 opacity-40" />
+                            <span className="text-[10px]">No Preview</span>
+                          </div>
+                        )}
+
+                        {/* Base Model Badge */}
+                        <span className="absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-black/70 text-purple-300 border border-purple-500/30 backdrop-blur-xs">
+                          {baseM}
+                        </span>
+
+                        {/* Favorited Badge */}
+                        <span className="absolute top-2 right-2 px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-950/80 text-amber-300 border border-amber-500/40 backdrop-blur-xs flex items-center gap-1">
+                          <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
+                          <span>Saved</span>
+                        </span>
+                      </div>
+
+                      {/* Body */}
+                      <div className="p-3.5 flex-1 flex flex-col justify-between space-y-2.5">
+                        <div className="space-y-1">
+                          <h4 className="text-xs font-bold text-white line-clamp-1 group-hover:text-amber-300 transition-colors" title={fav.name}>
+                            {fav.name}
+                          </h4>
+                          <p className="text-[10px] text-zinc-400 truncate">
+                            {fav.version_name || "v1.0"} {sizeFormatted && <span>• {sizeFormatted}</span>}
+                          </p>
+                        </div>
+
+                        {/* Triggers */}
+                        {triggers.length > 0 && (
+                          <div className="bg-zinc-950/80 border border-zinc-800/80 rounded-lg p-2 space-y-1 text-[11px]">
+                            <div className="flex items-center justify-between text-[10px]">
+                              <span className="text-zinc-400 font-semibold flex items-center gap-1">
+                                <Flame className="w-2.5 h-2.5 text-amber-500" />
+                                <span>Triggers</span>
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => handleCopyTrigger(e, triggers, String(fav.version_id))}
+                                className="text-purple-400 hover:text-purple-300 flex items-center gap-0.5 cursor-pointer font-medium"
+                              >
+                                {copiedTrigger === String(fav.version_id) ? (
+                                  <>
+                                    <Check className="w-2.5 h-2.5 text-emerald-400" />
+                                    <span className="text-emerald-400 text-[9px]">Copied</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="w-2.5 h-2.5" />
+                                    <span className="text-[9px]">Copy</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                            <p className="font-mono text-[10px] text-purple-300 line-clamp-2">
+                              {triggers.join(", ")}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Actions */}
+                        <div className="grid grid-cols-2 gap-1.5 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => handleChooseFavorite(fav, false)}
+                            className="px-2.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs flex items-center justify-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                          >
+                            <CheckCircle2 className="w-3 h-3" />
+                            <span>Assign Slot</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleChooseFavorite(fav, true)}
+                            disabled={isStagingThis}
+                            className="px-2.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:bg-zinc-800 text-white font-semibold text-xs flex items-center justify-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                            title="Assign to slot and stage file to Remote GPU immediately"
+                          >
+                            <Download className={`w-3 h-3 ${isStagingThis ? "animate-bounce" : ""}`} />
+                            <span>{isStagingThis ? "Staging..." : "Assign & Stage"}</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )
+          ) : loading ? (
             <div className="flex flex-col items-center justify-center h-64 space-y-3 text-zinc-400">
               <RefreshCw className="w-8 h-8 animate-spin text-purple-500" />
               <span className="text-xs font-medium">Searching Civitai Model Hub...</span>
@@ -324,6 +603,7 @@ export const CivitaiLoraSearchModal: React.FC<CivitaiLoraSearchModalProps> = ({
                 const sizeKB = primaryVersion?.files?.[0]?.sizeKB;
                 const sizeMb = sizeKB ? (sizeKB / 1024).toFixed(1) + " MB" : undefined;
                 const isStagingThis = stagingId === primaryVersion?.id;
+                const isFav = primaryVersion && favorites.some(f => String(f.version_id) === String(primaryVersion.id) || String(f.model_id) === String(model.id));
 
                 return (
                   <div
@@ -352,13 +632,19 @@ export const CivitaiLoraSearchModal: React.FC<CivitaiLoraSearchModalProps> = ({
                         {baseM}
                       </span>
 
-                      {/* Rating / Stats */}
-                      {model.stats && (
-                        <span className="absolute top-2 right-2 px-2 py-0.5 rounded text-[10px] font-semibold bg-black/70 text-amber-300 border border-amber-500/30 backdrop-blur-xs flex items-center gap-1">
-                          <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
-                          <span>{model.stats.rating ? model.stats.rating.toFixed(1) : "5.0"}</span>
-                        </span>
-                      )}
+                      {/* Favorite Button */}
+                      <button
+                        type="button"
+                        onClick={(e) => handleToggleFavoriteResult(e, model)}
+                        title={isFav ? "Remove from favorites" : "Save to favorites"}
+                        className={`absolute top-2 right-2 p-1.5 rounded-lg border backdrop-blur-xs transition-all cursor-pointer ${
+                          isFav
+                            ? "bg-amber-950/80 border-amber-500/70 text-amber-300"
+                            : "bg-black/60 border-zinc-700/60 text-zinc-300 hover:text-amber-300 hover:bg-black/80"
+                        }`}
+                      >
+                        <Star className={`w-3 h-3 ${isFav ? "fill-amber-400 text-amber-400" : ""}`} />
+                      </button>
                     </div>
 
                     {/* Body */}
@@ -443,3 +729,4 @@ export const CivitaiLoraSearchModal: React.FC<CivitaiLoraSearchModalProps> = ({
     </div>
   );
 };
+

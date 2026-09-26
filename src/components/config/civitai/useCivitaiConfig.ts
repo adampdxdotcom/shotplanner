@@ -9,7 +9,8 @@ import { copyToClipboard } from "../../../utils/clipboard";
 import { 
   fetchCivitaiFavorites, 
   addCivitaiFavorite, 
-  removeCivitaiFavorite 
+  removeCivitaiFavorite,
+  CIVITAI_FAVORITES_EVENT
 } from "../../../services/civitaiFavoritesService";
 import { settingsApi, modelHubApi, apiClient } from "../../../api";
 
@@ -77,6 +78,20 @@ export function useCivitaiConfig({
       .then((favs) => setFavorites(favs))
       .catch(() => {})
       .finally(() => setLoadingFavorites(false));
+
+    const handleFavChange = (e: Event) => {
+      const customEvent = e as CustomEvent<CivitaiFavorite[]>;
+      if (customEvent.detail && Array.isArray(customEvent.detail)) {
+        setFavorites(customEvent.detail);
+      } else {
+        fetchCivitaiFavorites().then((favs) => setFavorites(favs)).catch(() => {});
+      }
+    };
+
+    window.addEventListener(CIVITAI_FAVORITES_EVENT, handleFavChange);
+    return () => {
+      window.removeEventListener(CIVITAI_FAVORITES_EVENT, handleFavChange);
+    };
   }, []);
 
   // Timer effect for download feedback
