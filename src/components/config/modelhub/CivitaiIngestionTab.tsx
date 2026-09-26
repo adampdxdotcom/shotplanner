@@ -111,6 +111,9 @@ export const CivitaiIngestionTab: React.FC<CivitaiIngestionTabProps> = ({
 
     try {
       await settingsApi.saveCivitaiKey(clean);
+      try {
+        localStorage.setItem("civitai_api_key", clean);
+      } catch (e) {}
 
       setCivitaiConfigured(true);
       const masked = clean.length > 8 ? `${clean.slice(0, 4)}...${clean.slice(-4)}` : "***";
@@ -130,6 +133,9 @@ export const CivitaiIngestionTab: React.FC<CivitaiIngestionTabProps> = ({
     setSavingCivitaiKey(true);
     try {
       await settingsApi.deleteCivitaiKey();
+      try {
+        localStorage.removeItem("civitai_api_key");
+      } catch (e) {}
       setCivitaiConfigured(false);
       setCivitaiMaskedKey("");
       setCivitaiKeyInput("");

@@ -9,7 +9,8 @@ const log = createScopedLogger("Config");
 export const ROOT_DIR = process.cwd();
 export const ASSETS_DIR = path.join(ROOT_DIR, "assets");
 export const PROJECTS_DIR = path.join(ASSETS_DIR, "project_jsons");
-export const SERVER_CONFIG_DIR = path.join(ROOT_DIR, "data", "config");
+export const SERVER_CONFIG_DIR = path.join(ASSETS_DIR, "config");
+export const LEGACY_DATA_CONFIG_DIR = path.join(ROOT_DIR, "data", "config");
 export const LLM_CONFIG_FILE = path.join(SERVER_CONFIG_DIR, "llm_config.json");
 export const GEMINI_CONFIG_FILE = path.join(SERVER_CONFIG_DIR, "gemini_config.json");
 export const CIVITAI_CONFIG_FILE = path.join(SERVER_CONFIG_DIR, "civitai_config.json");
@@ -110,15 +111,39 @@ export function initDirectories(): void {
     }
   });
 
-  // Migrate any legacy config files from public ASSETS_DIR to protected SERVER_CONFIG_DIR
-  const legacyConfigNames = [
+  // Migrate any existing config files from legacy data/config or root assets to persistent SERVER_CONFIG_DIR (assets/config)
+  const allConfigNames = [
+    "llm_config.json",
     "gemini_config.json",
     "civitai_config.json",
     "civitai_favorites.json",
+    "system_loras.json",
     "huggingface_config.json",
-    "runpod_config.json"
+    "runpod_config.json",
+    "remote_config.json",
+    "recent_assets.json"
   ];
-  legacyConfigNames.forEach((fileName) => {
+
+  // 1. Migrate from legacy data/config
+  if (fs.existsSync(LEGACY_DATA_CONFIG_DIR)) {
+    allConfigNames.forEach((fileName) => {
+      const srcPath = path.join(LEGACY_DATA_CONFIG_DIR, fileName);
+      const destPath = path.join(SERVER_CONFIG_DIR, fileName);
+      if (fs.existsSync(srcPath)) {
+        try {
+          if (!fs.existsSync(destPath) || fs.statSync(destPath).size <= 2) {
+            fs.copyFileSync(srcPath, destPath);
+            log.info(`Migrated ${fileName} from data/config to persistent assets/config`);
+          }
+        } catch (err) {
+          log.warn(`Legacy data migration note for ${fileName}`, { error: err });
+        }
+      }
+    });
+  }
+
+  // 2. Migrate from legacy root ASSETS_DIR
+  allConfigNames.forEach((fileName) => {
     const legacyPath = path.join(ASSETS_DIR, fileName);
     const targetPath = path.join(SERVER_CONFIG_DIR, fileName);
     if (fs.existsSync(legacyPath)) {

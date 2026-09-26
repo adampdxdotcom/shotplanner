@@ -122,6 +122,9 @@ export function useCivitaiConfig({
     try {
       const data: any = await settingsApi.saveCivitaiKey(clean);
       if (data && (data.success || data.message)) {
+        try {
+          localStorage.setItem("civitai_api_key", clean);
+        } catch (e) {}
         setIsConfigured(true);
         setMaskedKey(clean.length > 8 ? `${clean.slice(0, 4)}...${clean.slice(-4)}` : "***");
         setApiKeyInput("");
@@ -144,6 +147,9 @@ export function useCivitaiConfig({
   const handleClearApiKey = async () => {
     try {
       await settingsApi.deleteCivitaiKey();
+      try {
+        localStorage.removeItem("civitai_api_key");
+      } catch (e) {}
       setIsConfigured(false);
       setMaskedKey("");
       setApiKeyInput("");

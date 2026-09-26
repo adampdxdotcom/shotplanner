@@ -30,6 +30,9 @@ export function useAppConfig({ addToast, onUpdateProjectConfig }: UseAppConfigPa
     let savedLmStudioUrl = "http://localhost:1234/v1";
     let savedRunpodApiKey = "";
     let savedRunpodAutoConnect = false;
+    let savedCivitaiApiKey = "";
+    let savedHfToken = "";
+    let savedGeminiApiKey = "";
     let savedLocalModel = "";
     let savedRemoteHost = "";
     let savedSshPort = 22;
@@ -57,6 +60,9 @@ export function useAppConfig({ addToast, onUpdateProjectConfig }: UseAppConfigPa
       savedLocalModel = localStorage.getItem("local_llm_model") || "";
       savedRunpodApiKey = localStorage.getItem("runpod_api_key") || "";
       savedRunpodAutoConnect = localStorage.getItem("runpod_auto_connect") === "true";
+      savedCivitaiApiKey = localStorage.getItem("civitai_api_key") || "";
+      savedHfToken = localStorage.getItem("huggingface_token") || "";
+      savedGeminiApiKey = localStorage.getItem("gemini_api_key") || "";
 
       savedRemoteHost = localStorage.getItem("remote_host") || "";
       const portVal = localStorage.getItem("ssh_port");
@@ -91,9 +97,9 @@ export function useAppConfig({ addToast, onUpdateProjectConfig }: UseAppConfigPa
       runpod_api_key: savedRunpodApiKey,
       runpod_auto_connect: savedRunpodAutoConnect,
       default_llm_provider: getDefaultLlmProvider(),
-      gemini_api_key: "",
-      civitai_api_key: "",
-      huggingface_token: "",
+      gemini_api_key: savedGeminiApiKey,
+      civitai_api_key: savedCivitaiApiKey,
+      huggingface_token: savedHfToken,
       llm_custom_system_prompt: savedPrompt,
       llm_temperature: savedTemp !== undefined ? savedTemp : 0.45,
       llm_max_tokens: savedMaxTokens !== undefined ? savedMaxTokens : 800,
@@ -122,6 +128,27 @@ export function useAppConfig({ addToast, onUpdateProjectConfig }: UseAppConfigPa
       }
       if (config.runpod_auto_connect !== undefined) {
         localStorage.setItem("runpod_auto_connect", String(config.runpod_auto_connect));
+      }
+      if (config.civitai_api_key !== undefined) {
+        if (config.civitai_api_key.trim() && !config.civitai_api_key.includes("...") && config.civitai_api_key !== "CONFIGURED") {
+          localStorage.setItem("civitai_api_key", config.civitai_api_key.trim());
+        } else if (config.civitai_api_key === "") {
+          localStorage.removeItem("civitai_api_key");
+        }
+      }
+      if (config.huggingface_token !== undefined) {
+        if (config.huggingface_token.trim() && !config.huggingface_token.includes("...") && config.huggingface_token !== "CONFIGURED") {
+          localStorage.setItem("huggingface_token", config.huggingface_token.trim());
+        } else if (config.huggingface_token === "") {
+          localStorage.removeItem("huggingface_token");
+        }
+      }
+      if (config.gemini_api_key !== undefined) {
+        if (config.gemini_api_key.trim() && !config.gemini_api_key.includes("...") && config.gemini_api_key !== "CONFIGURED") {
+          localStorage.setItem("gemini_api_key", config.gemini_api_key.trim());
+        } else if (config.gemini_api_key === "") {
+          localStorage.removeItem("gemini_api_key");
+        }
       }
 
       // Remote Server & SSH Keypair local persistence
@@ -230,19 +257,44 @@ export function useAppConfig({ addToast, onUpdateProjectConfig }: UseAppConfigPa
       })
       .catch(() => {});
 
+    const localRunpodKey = localStorage.getItem("runpod_api_key") || "";
+    const localCivitaiKey = localStorage.getItem("civitai_api_key") || "";
+    const localHfToken = localStorage.getItem("huggingface_token") || "";
+    const localGeminiKey = localStorage.getItem("gemini_api_key") || "";
+
     settingsApi.getRunpodKey()
       .then(data => {
         if (data && data.api_key) {
           setConfig(prev => ({ ...prev, runpod_api_key: data.api_key }));
+        } else if (localRunpodKey) {
+          settingsApi.saveRunpodKey(localRunpodKey).catch(() => {});
         }
       })
       .catch(() => {});
 
     settingsApi.getCivitaiKey()
       .then(data => {
-        // Do not overwrite client state with masked strings
-        if (data && data.api_key && !data.api_key.includes("...") && data.api_key !== "CONFIGURED") {
+        if (data && data.configured && data.api_key && !data.api_key.includes("...") && data.api_key !== "CONFIGURED") {
           setConfig(prev => ({ ...prev, civitai_api_key: data.api_key || prev.civitai_api_key }));
+        } else if (!data?.configured && localCivitaiKey) {
+          // Auto-push cached client key to server persistent storage
+          settingsApi.saveCivitaiKey(localCivitaiKey).catch(() => {});
+        }
+      })
+      .catch(() => {});
+
+    settingsApi.getHuggingFaceToken()
+      .then((data: any) => {
+        if (!data?.configured && !data?.has_token && localHfToken) {
+          settingsApi.saveHuggingFaceToken(localHfToken).catch(() => {});
+        }
+      })
+      .catch(() => {});
+
+    settingsApi.getGeminiKey()
+      .then((data: any) => {
+        if (!data?.api_key && localGeminiKey) {
+          settingsApi.saveGeminiKey(localGeminiKey).catch(() => {});
         }
       })
       .catch(() => {});

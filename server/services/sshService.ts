@@ -286,7 +286,7 @@ export interface SFTPBatchProgressCallback {
 }
 
 /**
- * Upload single item via SFTP with remote duplicate size verification and stream-based stall protection
+ * Upload single item via SFTP with fastPut chunking, remote duplicate verification, and stall protection
  */
 export function uploadSFTPItem(
   sftp: SFTPWrapper,
@@ -296,7 +296,7 @@ export function uploadSFTPItem(
   return new Promise((resolve, reject) => {
     let settled = false;
     let activityTimer: NodeJS.Timeout | null = null;
-    const INACTIVITY_TIMEOUT_MS = 25000; // 25s watchdog for stalled SFTP sockets
+    const INACTIVITY_TIMEOUT_MS = 30000; // 30s watchdog for stalled SFTP sockets
 
     const resetWatchdog = () => {
       if (activityTimer) clearTimeout(activityTimer);
@@ -304,21 +304,16 @@ export function uploadSFTPItem(
         if (!settled) {
           settled = true;
           cleanup();
-          reject(new Error(`SFTP transfer of "${item.filename}" stalled (no progress for 25s). Remote server may be unresponsive.`));
+          reject(new Error(`SFTP transfer of "${item.filename}" stalled (no progress for 30s). Remote server may be unresponsive.`));
         }
       }, INACTIVITY_TIMEOUT_MS);
     };
-
-    let readStream: fs.ReadStream | null = null;
-    let writeStream: NodeJS.WritableStream | null = null;
 
     const cleanup = () => {
       if (activityTimer) {
         clearTimeout(activityTimer);
         activityTimer = null;
       }
-      try { readStream?.destroy(); } catch {}
-      try { (writeStream as any)?.destroy?.(); } catch {}
     };
 
     resetWatchdog();
@@ -340,12 +335,59 @@ export function uploadSFTPItem(
         return reject(new Error(`Local file not found: ${item.localPath}`));
       }
 
-      const stats = fs.statSync(item.localPath);
-      const totalBytes = stats.size;
+      let totalBytes = 0;
+      try {
+        const stats = fs.statSync(item.localPath);
+        totalBytes = stats.size;
+      } catch (statErr: any) {
+        cleanup();
+        settled = true;
+        return reject(statErr);
+      }
 
-      // Check if file already exists remotely with the same size (skip unnecessary re-uploads of large assets)
-      // Only do this for non-json assets to ensure dynamic workflows are always rewritten
+      if (totalBytes === 0) {
+        sftp.writeFile(item.remotePath, Buffer.alloc(0), (err) => {
+          cleanup();
+          if (settled) return;
+          settled = true;
+          if (err) return reject(err);
+          onProgress?.(0, 0);
+          resolve(0);
+        });
+        return;
+      }
+
       const isJsonWorkflow = item.filename.endsWith(".json");
+
+      const doFastPut = () => {
+        if (settled) return;
+        sftp.fastPut(
+          item.localPath!,
+          item.remotePath,
+          {
+            concurrency: 2,
+            chunkSize: 32768,
+            step: (transferred, _chunk, total) => {
+              resetWatchdog();
+              if (!settled) {
+                onProgress?.(transferred, total || totalBytes);
+              }
+            }
+          },
+          (err) => {
+            cleanup();
+            if (settled) return;
+            settled = true;
+            if (err) {
+              return reject(err);
+            }
+            onProgress?.(totalBytes, totalBytes);
+            resolve(totalBytes);
+          }
+        );
+      };
+
+      // For binary image assets, check if remote file already exists with matching size
       if (!isJsonWorkflow && totalBytes > 0) {
         sftp.stat(item.remotePath, (statErr, remoteStats) => {
           if (settled) return;
@@ -356,57 +398,10 @@ export function uploadSFTPItem(
             onProgress?.(totalBytes, totalBytes);
             return resolve(totalBytes);
           }
-
-          // Otherwise proceed with stream upload
-          doStreamUpload();
+          doFastPut();
         });
       } else {
-        doStreamUpload();
-      }
-
-      function doStreamUpload() {
-        if (settled) return;
-        try {
-          readStream = fs.createReadStream(item.localPath!, { highWaterMark: 32768 });
-          writeStream = sftp.createWriteStream(item.remotePath);
-          let streamedBytes = 0;
-
-          readStream.on("data", (chunk: Buffer) => {
-            resetWatchdog();
-            streamedBytes += chunk.length;
-            if (!settled) {
-              onProgress?.(streamedBytes, totalBytes);
-            }
-          });
-
-          readStream.on("error", (rErr) => {
-            cleanup();
-            if (settled) return;
-            settled = true;
-            reject(rErr);
-          });
-
-          writeStream.on("error", (wErr) => {
-            cleanup();
-            if (settled) return;
-            settled = true;
-            reject(wErr);
-          });
-
-          writeStream.on("finish", () => {
-            cleanup();
-            if (settled) return;
-            settled = true;
-            onProgress?.(totalBytes, totalBytes);
-            resolve(totalBytes);
-          });
-
-          readStream.pipe(writeStream);
-        } catch (streamErr) {
-          cleanup();
-          settled = true;
-          reject(streamErr);
-        }
+        doFastPut();
       }
     } else {
       cleanup();
@@ -562,8 +557,24 @@ export async function executeSFTPBatchTransfer(
     await execSSHCommand(client, mkdirCmd);
 
     // Open SFTP session
-    const sftp = await openSFTP(client);
-    log.info("SFTP session established. Starting transfers...");
+    let sftp = await openSFTP(client);
+    log.info("SFTP session established. Starting individual file transfers...");
+
+    const getOrRefreshSFTP = async (): Promise<SFTPWrapper> => {
+      try {
+        if (client) {
+          return await openSFTP(client);
+        }
+      } catch (refreshErr) {
+        log.warn("SFTP channel reopen failed, reconnecting SSH client...", { error: (refreshErr as any)?.message });
+      }
+
+      // Reconnect SSH if client dropped
+      try { client?.end(); } catch {}
+      client = await connectSSH(resolved.connectConfig);
+      sftp = await openSFTP(client);
+      return sftp;
+    };
 
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
@@ -586,64 +597,89 @@ export async function executeSFTPBatchTransfer(
         message: `Transferring [${i + 1}/${items.length}]: ${item.filename} (${(itemSize / 1024).toFixed(1)} KB)...`
       });
 
-      try {
-        log.info(`Transferring: ${item.filename} -> ${item.remotePath}`);
-        const bytes = await uploadSFTPItem(sftp, item, (fileTransferred, fileTotal) => {
-          const filePct = fileTotal > 0 ? Math.min(100, Math.round((fileTransferred / fileTotal) * 100)) : 0;
-          const currentTotalTransferred = accumulatedTransferredBytes + fileTransferred;
-          const overallPct = overallTotalBytes > 0
-            ? Math.min(99, Math.round((currentTotalTransferred / overallTotalBytes) * 100))
-            : Math.min(99, Math.round(((i + (filePct / 100)) / items.length) * 100));
+      let transferredSuccessfully = false;
+      let lastErrorMsg = "";
+      const MAX_ATTEMPTS = 2;
+
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        try {
+          if (attempt > 1) {
+            log.info(`[SSHService] Retrying [${i + 1}/${items.length}] ${item.filename} (Attempt ${attempt}/${MAX_ATTEMPTS})...`);
+            sftp = await getOrRefreshSFTP();
+          } else {
+            log.info(`Transferring: ${item.filename} -> ${item.remotePath}`);
+          }
+
+          const bytes = await uploadSFTPItem(sftp, item, (fileTransferred, fileTotal) => {
+            const filePct = fileTotal > 0 ? Math.min(100, Math.round((fileTransferred / fileTotal) * 100)) : 0;
+            const currentTotalTransferred = accumulatedTransferredBytes + fileTransferred;
+            const overallPct = overallTotalBytes > 0
+              ? Math.min(99, Math.round((currentTotalTransferred / overallTotalBytes) * 100))
+              : Math.min(99, Math.round(((i + (filePct / 100)) / items.length) * 100));
+
+            onProgress?.({
+              stage: "file_progress",
+              filename: item.filename,
+              fileIndex: i,
+              totalFiles: items.length,
+              fileBytesTransferred: fileTransferred,
+              fileTotalBytes: fileTotal,
+              filePercent: filePct,
+              totalBytesTransferred: currentTotalTransferred,
+              totalBytes: overallTotalBytes,
+              totalPercent: overallPct,
+              message: `Transferring [${i + 1}/${items.length}] ${item.filename}: ${(fileTransferred / 1024).toFixed(1)}/${(fileTotal / 1024).toFixed(1)} KB (${filePct}%)`
+            });
+          });
+
+          const elapsed = Date.now() - itemStart;
+          accumulatedTransferredBytes += bytes;
+
+          summary.transferredCount++;
+          summary.totalBytes += bytes;
+          summary.uploadedFiles.push(item.filename);
+          summary.transferredFiles.push({
+            filename: item.filename,
+            file: item.filename,
+            size_bytes: bytes,
+            status: "transferred",
+            remote_path: item.remotePath,
+            message: `Transferred via SFTP (${(bytes / 1024).toFixed(1)} KB in ${elapsed}ms)`
+          });
+
+          log.info(`Completed: ${item.filename} (${bytes} bytes in ${elapsed}ms)`);
 
           onProgress?.({
-            stage: "file_progress",
+            stage: "file_complete",
             filename: item.filename,
             fileIndex: i,
             totalFiles: items.length,
-            fileBytesTransferred: fileTransferred,
-            fileTotalBytes: fileTotal,
-            filePercent: filePct,
-            totalBytesTransferred: currentTotalTransferred,
+            fileBytesTransferred: bytes,
+            fileTotalBytes: bytes,
+            filePercent: 100,
+            totalBytesTransferred: accumulatedTransferredBytes,
             totalBytes: overallTotalBytes,
-            totalPercent: overallPct,
-            message: `Transferring [${i + 1}/${items.length}] ${item.filename}: ${(fileTransferred / 1024).toFixed(1)}/${(fileTotal / 1024).toFixed(1)} KB (${filePct}%)`
+            totalPercent: overallTotalBytes > 0
+              ? Math.min(100, Math.round((accumulatedTransferredBytes / overallTotalBytes) * 100))
+              : Math.round(((i + 1) / items.length) * 100),
+            message: `Completed [${i + 1}/${items.length}]: ${item.filename} in ${elapsed}ms`,
+            durationMs: elapsed
           });
-        });
 
-        const elapsed = Date.now() - itemStart;
-        accumulatedTransferredBytes += bytes;
+          transferredSuccessfully = true;
+          break; // Exit attempt loop on success
+        } catch (uploadErr: any) {
+          lastErrorMsg = uploadErr.message || String(uploadErr);
+          log.warn(`Attempt ${attempt}/${MAX_ATTEMPTS} failed for ${item.filename}: ${lastErrorMsg}`);
+          if (attempt < MAX_ATTEMPTS) {
+            // Brief pause before retry
+            await new Promise((r) => setTimeout(r, 600));
+          }
+        }
+      }
 
-        summary.transferredCount++;
-        summary.totalBytes += bytes;
-        summary.uploadedFiles.push(item.filename);
-        summary.transferredFiles.push({
-          filename: item.filename,
-          file: item.filename,
-          size_bytes: bytes,
-          status: "transferred",
-          remote_path: item.remotePath,
-          message: `Transferred via SFTP (${(bytes / 1024).toFixed(1)} KB in ${elapsed}ms)`
-        });
-
-        log.info(`Completed: ${item.filename} (${bytes} bytes in ${elapsed}ms)`);
-
-        onProgress?.({
-          stage: "file_complete",
-          filename: item.filename,
-          fileIndex: i,
-          totalFiles: items.length,
-          fileBytesTransferred: bytes,
-          fileTotalBytes: bytes,
-          filePercent: 100,
-          totalBytesTransferred: accumulatedTransferredBytes,
-          totalBytes: overallTotalBytes,
-          totalPercent: overallTotalBytes > 0
-            ? Math.min(100, Math.round((accumulatedTransferredBytes / overallTotalBytes) * 100))
-            : Math.round(((i + 1) / items.length) * 100),
-          message: `Completed [${i + 1}/${items.length}]: ${item.filename} in ${elapsed}ms`,
-          durationMs: elapsed
-        });
-      } catch (uploadErr: any) {
+      // If all attempts failed for this individual file, record failure and continue to next file
+      if (!transferredSuccessfully) {
         summary.failedCount++;
         summary.failedFiles.push(item.filename);
         summary.transferredFiles.push({
@@ -652,50 +688,17 @@ export async function executeSFTPBatchTransfer(
           size_bytes: 0,
           status: "failed",
           remote_path: item.remotePath,
-          message: `SFTP upload failed: ${uploadErr.message}`
+          message: `SFTP upload failed: ${lastErrorMsg}`
         });
-        log.error(`Failed to transfer ${item.filename}`, { error: uploadErr.message });
+        log.error(`Permanently failed to transfer ${item.filename} after retries. Continuing with remaining files...`, { error: lastErrorMsg });
 
         onProgress?.({
           stage: "file_error",
           filename: item.filename,
           fileIndex: i,
           totalFiles: items.length,
-          message: `Failed to transfer ${item.filename}: ${uploadErr.message}`
+          message: `Failed to transfer ${item.filename}: ${lastErrorMsg}`
         });
-
-        // If transfer stalled or connection dropped, abort remaining items immediately with clear feedback
-        const isFatalConnectionError =
-          uploadErr.message?.includes("stalled") ||
-          uploadErr.message?.includes("closed") ||
-          uploadErr.message?.includes("ECONNRESET") ||
-          uploadErr.message?.includes("ETIMEDOUT") ||
-          uploadErr.message?.includes("not open");
-
-        if (isFatalConnectionError && i < items.length - 1) {
-          log.warn(`Aborting remaining ${items.length - 1 - i} transfer(s) due to SFTP connection loss/stall: ${uploadErr.message}`);
-          for (let rem = i + 1; rem < items.length; rem++) {
-            const remItem = items[rem];
-            summary.failedCount++;
-            summary.failedFiles.push(remItem.filename);
-            summary.transferredFiles.push({
-              filename: remItem.filename,
-              file: remItem.filename,
-              size_bytes: 0,
-              status: "failed",
-              remote_path: remItem.remotePath,
-              message: `Aborted: connection lost or stalled while uploading ${item.filename}`
-            });
-            onProgress?.({
-              stage: "file_error",
-              filename: remItem.filename,
-              fileIndex: rem,
-              totalFiles: items.length,
-              message: `Aborted: remote connection lost or stalled`
-            });
-          }
-          break;
-        }
       }
     }
 

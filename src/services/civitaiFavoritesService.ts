@@ -16,31 +16,57 @@ function broadcastFavoritesChange(favorites: CivitaiFavorite[]): void {
 }
 
 /**
- * Fetch all saved Civitai favorites from the backend (with localStorage cache fallback)
+ * Fetch all saved Civitai favorites from the backend (with localStorage cache fallback and auto-recovery)
  */
 export async function fetchCivitaiFavorites(): Promise<CivitaiFavorite[]> {
+  let cachedList: CivitaiFavorite[] = [];
+  try {
+    const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        cachedList = parsed;
+      }
+    }
+  } catch (e) {}
+
   try {
     const data: any = await modelHubApi.getCivitaiFavorites();
     const list = Array.isArray(data?.favorites) ? data.favorites : Array.isArray(data) ? data : [];
+
+    if (list.length > 0) {
+      try {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(list));
+      } catch (e) {}
+      broadcastFavoritesChange(list);
+      return list;
+    }
+
+    // If backend returned empty array but browser has local cached favorites (e.g. after container rebuild),
+    // restore cached favorites to backend automatically!
+    if (cachedList.length > 0) {
+      console.info(`[Civitai Favorites] Auto-restoring ${cachedList.length} cached favorites to persistent storage...`);
+      for (const fav of cachedList) {
+        modelHubApi.addCivitaiFavorite(fav).catch(() => {});
+      }
+      broadcastFavoritesChange(cachedList);
+      return cachedList;
+    }
+
     try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(list));
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify([]));
     } catch (e) {}
-    broadcastFavoritesChange(list);
-    return list;
+    broadcastFavoritesChange([]);
+    return [];
   } catch (err) {
     console.warn("[Civitai Favorites] Backend fetch failed, reading from localStorage:", err);
   }
 
   // Fallback to local storage
-  try {
-    const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (cached) {
-      const parsed = JSON.parse(cached);
-      if (Array.isArray(parsed)) {
-        return parsed;
-      }
-    }
-  } catch (e) {}
+  if (cachedList.length > 0) {
+    broadcastFavoritesChange(cachedList);
+    return cachedList;
+  }
 
   return [];
 }
