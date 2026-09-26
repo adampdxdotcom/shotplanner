@@ -415,7 +415,7 @@ export const RunpodPodManagerCard: React.FC<RunpodPodManagerCardProps> = ({
               RunPod Cloud &amp; GPU Management
             </h3>
             <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-              Deploy GPU pods, manage active instance lifecycle (Resume/Pause/Terminate), or queue stock watchers.
+              Deploy GPU pods, manage active instance lifecycle (Resume/Pause/Terminate), or queue auto-deploy watchers.
             </p>
           </div>
         </div>

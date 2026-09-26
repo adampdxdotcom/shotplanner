@@ -137,38 +137,19 @@ export const RunpodDeployPodPanel: React.FC<RunpodDeployPodPanelProps> = ({
       const matchesName = gpu.displayName.toLowerCase().includes(q) || gpu.id.toLowerCase().includes(q);
       if (!matchesName) return false;
     }
-    if (vramFilter === "24") {
+    if (vramFilter === "16") {
+      return gpu.memoryInGb === 16;
+    } else if (vramFilter === "24") {
       return gpu.memoryInGb === 24;
     } else if (vramFilter === "48+") {
-      return gpu.memoryInGb >= 48;
-    } else if (vramFilter === "budget") {
-      const price = gpu.communityPrice || gpu.lowestPrice?.uninterruptablePrice || 999;
-      return price < 0.50;
+      return gpu.memoryInGb >= 48 && gpu.memoryInGb < 80;
+    } else if (vramFilter === "80+") {
+      return gpu.memoryInGb >= 80;
     }
     return true;
   });
 
   const selectedGpu = gpus.find(g => g.id === selectedGpuId) || filteredGpus[0];
-
-  const getDisplayPrice = (gpu?: RunpodGpuType): { price: string; note: string; numericPrice?: number } => {
-    if (!gpu) return { price: "--", note: "" };
-    if (cloudType === "COMMUNITY" && gpu.communityPrice) {
-      return { price: `$${gpu.communityPrice.toFixed(2)}/hr`, note: "Community Cloud", numericPrice: gpu.communityPrice };
-    }
-    if (cloudType === "SECURE" && gpu.securePrice) {
-      return { price: `$${gpu.securePrice.toFixed(2)}/hr`, note: "Secure Cloud", numericPrice: gpu.securePrice };
-    }
-    if (gpu.lowestPrice?.uninterruptablePrice) {
-      return { price: `$${gpu.lowestPrice.uninterruptablePrice.toFixed(2)}/hr`, note: "Lowest On-Demand", numericPrice: gpu.lowestPrice.uninterruptablePrice };
-    }
-    if (gpu.communityPrice) {
-      return { price: `$${gpu.communityPrice.toFixed(2)}/hr`, note: "Community Cloud", numericPrice: gpu.communityPrice };
-    }
-    if (gpu.securePrice) {
-      return { price: `$${gpu.securePrice.toFixed(2)}/hr`, note: "Secure Cloud", numericPrice: gpu.securePrice };
-    }
-    return { price: "Dynamic", note: "On Demand" };
-  };
 
   const handleSubmit = async () => {
     if (!selectedGpuId) {
@@ -462,18 +443,24 @@ export const RunpodDeployPodPanel: React.FC<RunpodDeployPodPanelProps> = ({
             />
           </div>
           <div className="flex items-center gap-1 shrink-0 w-full sm:w-auto">
-            {["all", "24", "48+", "budget"].map((v) => (
+            {[
+              { id: "all", label: "All VRAM" },
+              { id: "16", label: "16 GB" },
+              { id: "24", label: "24 GB" },
+              { id: "48+", label: "48 GB" },
+              { id: "80+", label: "80 GB+" },
+            ].map((v) => (
               <button
-                key={v}
+                key={v.id}
                 type="button"
-                onClick={() => setVramFilter(v)}
+                onClick={() => setVramFilter(v.id)}
                 className={`flex-1 sm:flex-none px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-colors cursor-pointer border ${
-                  vramFilter === v
+                  vramFilter === v.id
                     ? "bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900 border-zinc-800 dark:border-zinc-100"
                     : "bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50"
                 }`}
               >
-                {v === "all" ? "All VRAM" : v === "24" ? "24GB VRAM" : v === "48+" ? "48GB+ VRAM" : "< $0.50/hr"}
+                {v.label}
               </button>
             ))}
           </div>
@@ -483,46 +470,37 @@ export const RunpodDeployPodPanel: React.FC<RunpodDeployPodPanelProps> = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-56 overflow-y-auto pr-1 border border-zinc-200 dark:border-zinc-800 rounded-lg p-2 bg-white/60 dark:bg-zinc-900/60">
           {filteredGpus.map((gpu) => {
             const isSelected = selectedGpuId === gpu.id;
-            const priceInfo = getDisplayPrice(gpu);
-            const isAvailable = gpu.stockStatus !== "OUT_OF_STOCK";
 
             return (
               <div
                 key={gpu.id}
                 onClick={() => setSelectedGpuId(gpu.id)}
-                className={`p-2.5 rounded-lg border text-left cursor-pointer transition-all flex flex-col justify-between ${
+                className={`p-2.5 rounded-lg border text-left cursor-pointer transition-all flex items-center justify-between gap-2 ${
                   isSelected
-                    ? "bg-blue-50/90 dark:bg-blue-950/50 border-blue-500 ring-1 ring-blue-500/50"
+                    ? "bg-blue-50/90 dark:bg-blue-950/50 border-blue-500 ring-1 ring-blue-500/50 shadow-2xs"
                     : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
                 }`}
               >
-                <div className="flex items-start justify-between gap-1 mb-1.5">
-                  <div>
-                    <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100 block truncate" title={gpu.displayName}>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <Cpu className={`w-3.5 h-3.5 shrink-0 ${isSelected ? "text-blue-600 dark:text-blue-400" : "text-zinc-400"}`} />
+                    <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate" title={gpu.displayName}>
                       {gpu.displayName}
                     </span>
-                    <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono">
-                      {gpu.memoryInGb} GB VRAM
-                    </span>
                   </div>
-                  <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold ${
-                    isAvailable
-                      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                      : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
-                  }`}>
-                    {isAvailable ? "In Stock" : "Scarce / Queue"}
-                  </span>
+                  <div className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono mt-0.5 pl-5">
+                    {gpu.memoryInGb} GB VRAM
+                  </div>
                 </div>
-
-                <div className="flex items-center justify-between pt-1 border-t border-zinc-100 dark:border-zinc-800/80 text-[10px] font-mono">
-                  <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center">
-                    <DollarSign className="w-3 h-3 -mr-0.5" />
-                    {priceInfo.price}
+                {isSelected ? (
+                  <span className="shrink-0 p-1 rounded-full bg-blue-600 text-white">
+                    <Check className="w-3 h-3" />
                   </span>
-                  <span className="text-[9px] text-zinc-400">
-                    {priceInfo.note}
+                ) : (
+                  <span className="shrink-0 text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-medium">
+                    {gpu.memoryInGb}G
                   </span>
-                </div>
+                )}
               </div>
             );
           })}
@@ -700,13 +678,43 @@ export const RunpodDeployPodPanel: React.FC<RunpodDeployPodPanelProps> = ({
         </div>
       </div>
 
-      {/* Feedback / Error notifications */}
+      {/* Feedback / Error notifications with smart fallbacks */}
       {error && (
-        <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/60 text-xs text-red-800 dark:text-red-300 flex items-start gap-2.5 font-medium shadow-2xs">
-          <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
-          <div className="space-y-0.5">
-            <p className="font-bold">Deployment Error</p>
-            <p className="text-[11px] opacity-90">{error}</p>
+        <div className="p-3.5 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/60 text-xs text-red-800 dark:text-red-300 space-y-2.5 font-medium shadow-2xs">
+          <div className="flex items-start gap-2.5">
+            <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+            <div className="space-y-0.5 flex-1">
+              <p className="font-bold">Deployment Notice</p>
+              <p className="text-[11px] opacity-90">{error}</p>
+            </div>
+          </div>
+          
+          <div className="pl-6.5 pt-1.5 border-t border-red-200/60 dark:border-red-800/40 flex flex-wrap items-center gap-2">
+            <span className="text-[10px] text-red-700 dark:text-red-300 font-bold">Fallback Options:</span>
+            <button
+              type="button"
+              onClick={() => {
+                setDeployMode("watcher");
+                setError(null);
+              }}
+              className="px-2.5 py-1 rounded bg-white dark:bg-zinc-900 border border-red-300 dark:border-red-700 hover:bg-red-50 dark:hover:bg-red-950 text-red-900 dark:text-red-200 text-[10px] font-semibold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+            >
+              <Radio className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+              <span>Queue Auto-Deploy Watcher</span>
+            </button>
+            {cloudType !== "ALL" && (
+              <button
+                type="button"
+                onClick={() => {
+                  setCloudType("ALL");
+                  setError(null);
+                }}
+                className="px-2.5 py-1 rounded bg-white dark:bg-zinc-900 border border-red-300 dark:border-red-700 hover:bg-red-50 dark:hover:bg-red-950 text-red-900 dark:text-red-200 text-[10px] font-semibold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+              >
+                <Layers className="w-3 h-3 text-blue-600 dark:text-blue-400" />
+                <span>Search Both Cloud Types (Community + Secure)</span>
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -714,12 +722,12 @@ export const RunpodDeployPodPanel: React.FC<RunpodDeployPodPanelProps> = ({
       {/* Action Footer */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-zinc-200 dark:border-zinc-800">
         <div className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
-          <span className="font-semibold text-zinc-900 dark:text-zinc-100">Target Cost:</span>
-          <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-bold font-mono">
-            {getDisplayPrice(selectedGpu).price}
+          <span className="font-semibold text-zinc-900 dark:text-zinc-100">Selected GPU:</span>
+          <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-900 dark:bg-blue-950 dark:text-blue-300 font-bold font-mono">
+            {selectedGpu?.displayName || selectedGpuId} ({selectedGpu?.memoryInGb || 24} GB VRAM)
           </span>
           <span className="text-[10px] text-zinc-400">
-            {deployMode === "watcher" ? "(Will deploy when in stock)" : "(Billed per second while active)"}
+            {deployMode === "watcher" ? "(Auto-claims when available)" : "(On-demand hourly billing via RunPod)"}
           </span>
         </div>
 

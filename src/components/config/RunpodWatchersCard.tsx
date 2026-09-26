@@ -86,10 +86,10 @@ export const RunpodWatchersCard: React.FC<RunpodWatchersCardProps> = ({
       <div className="bg-zinc-50 dark:bg-zinc-950/60 border border-dashed border-zinc-300 dark:border-zinc-800 rounded-xl p-4 text-center space-y-1.5 transition-colors">
         <Radio className="w-5 h-5 text-zinc-400 dark:text-zinc-500 mx-auto" />
         <h4 className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
-          No Active Stock Watchers
+          No Active Auto-Deploy Watchers
         </h4>
         <p className="text-[11px] text-zinc-500 dark:text-zinc-400 max-w-md mx-auto">
-          When a GPU is out of stock or above your target price, queue an auto-deploy watcher from the <span className="font-semibold text-blue-600 dark:text-blue-400">Deploy New Pod</span> tab. The app will claim the instance automatically the second it appears.
+          When a GPU is unavailable or in high demand, queue an auto-deploy watcher from the <span className="font-semibold text-blue-600 dark:text-blue-400">Deploy New Pod</span> tab. The background worker will monitor RunPod inventory and claim your instance automatically the moment it becomes available.
         </p>
       </div>
     );
