@@ -112,10 +112,10 @@ export const apiClient = {
     return handleResponse<T>(res);
   },
 
-  async upload<T>(path: string, formData: FormData, options?: RequestOptions): Promise<T> {
+  async upload<T>(path: string, formData: FormData, options?: RequestOptions & { method?: string }): Promise<T> {
     const url = buildUrl(path, options?.params);
     const res = await fetch(url, {
-      method: "POST",
+      method: options?.method || "POST",
       signal: options?.signal,
       headers: {
         Accept: "application/json",

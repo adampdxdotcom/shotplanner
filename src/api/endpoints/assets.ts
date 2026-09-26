@@ -34,9 +34,16 @@ export const assetsApi = {
   },
 
   /**
-   * Update asset metadata tags/notes/character links.
+   * Update asset metadata tags/notes/character links (supports FormData or JSON object).
    */
-  update(id: string, updates: Partial<AssetRecord>, options?: RequestOptions) {
+  update(id: string, updates: Partial<AssetRecord> | FormData, options?: RequestOptions) {
+    if (typeof FormData !== "undefined" && updates instanceof FormData) {
+      return apiClient.upload<{ message: string; asset: AssetRecord }>(
+        `/api/assets/${id}`,
+        updates,
+        { ...options, method: "POST" }
+      );
+    }
     return apiClient.post<{ message: string; asset: AssetRecord }>(
       `/api/assets/${id}`,
       updates,
