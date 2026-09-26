@@ -32,6 +32,25 @@ import App from './App.tsx';
 import './index.css';
 import { ThemeProvider } from './context/ThemeContext.tsx';
 
+// Vite official hook to catch dynamic chunk loading errors on redeployment
+if (typeof window !== 'undefined') {
+  window.addEventListener('vite:preloadError', (event) => {
+    console.warn('[Vite Preload Error] Stale chunk detected. Refreshing for latest assets...', event);
+    const hasReloaded = sessionStorage.getItem('vite_preload_error_reload');
+    if (!hasReloaded) {
+      sessionStorage.setItem('vite_preload_error_reload', 'true');
+      window.location.reload();
+    }
+  });
+
+  // Clear reload markers on successful clean load
+  window.addEventListener('load', () => {
+    sessionStorage.removeItem('vite_preload_error_reload');
+    sessionStorage.removeItem('chunk_retry_refreshed');
+    sessionStorage.removeItem('chunk_error_autoreload');
+  });
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ThemeProvider>
