@@ -404,7 +404,7 @@ export function useScenePersistence({
         remote_comfyui_root: data.config.remote_comfyui_root || (cfg.remote_input_dir ? cfg.remote_input_dir.replace(/\/input\/?$/, "") : null) || prev.remote_comfyui_root || "/workspace/runpod-slim/ComfyUI"
       }));
     }
-    setSelectedWorkflowFile((data as any).selectedWorkflowFile || "");
+    setSelectedWorkflowFile((data as any).selectedWorkflowFile || (data as any).workflow_file || "");
     setSelectedPromptNodeId((data as any).selectedPromptNodeId || "");
     setNodeMappings((data as any).nodeMappings || {});
     setBypassMissing((data as any).bypassMissing ?? true);
@@ -431,7 +431,7 @@ export function useScenePersistence({
     if (delegate?.setExpandedPrompt) delegate.setExpandedPrompt((data as any).expandedPrompt || "");
     setCurrentProjectName(filename.replace(/\.json$/i, ""));
     
-    await fetchWorkflows();
+    await fetchWorkflows(data.scene_name || filename.replace(/\.json$/i, ""));
     
     setTimeout(() => {
       isLoadingProjectRef.current = false;
@@ -448,7 +448,7 @@ export function useScenePersistence({
       schema_version: "1.0",
       scene_id: newSceneId,
       scene_name: sceneName,
-      workflow_file: selectedWorkflowFile || "",
+      workflow_file: "",
       shared_assets: [],
       assets: [],
       subjects: [],
@@ -471,6 +471,8 @@ export function useScenePersistence({
     const cleanFilename = sceneName.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_").replace(/_+/g, "_") || "untitled_scene";
     
     // Initialize clean in-memory state without writing to disk
+    setSelectedWorkflowFile("");
+    setSelectedPromptNodeId("");
     setNodeMappings({});
     setParameterNodeMappings({ steps: "", megapixels: "", frames: "" });
     if (delegate?.setBasicStub) delegate.setBasicStub("");
@@ -483,8 +485,9 @@ export function useScenePersistence({
     setHasLoadedProject(true);
     setIsDirty(false);
     
+    await fetchWorkflows(sceneName);
     addToast(`New scene "${sceneName}" created in-memory. Save when ready!`, "info");
-  }, [selectedWorkflowFile, config, defaultLlmProvider, setNodeMappings, setParameterNodeMappings, addToast, getShotOperationsDelegate]);
+  }, [config, defaultLlmProvider, setSelectedWorkflowFile, setSelectedPromptNodeId, setNodeMappings, setParameterNodeMappings, fetchWorkflows, addToast, getShotOperationsDelegate]);
 
   const initialRestoreExecutedRef = useRef(false);
   const handleLoadProjectRef = useRef(handleLoadProject);

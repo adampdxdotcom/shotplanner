@@ -2,7 +2,7 @@ import { Router, Request, Response } from "express";
 import fs from "fs";
 import path from "path";
 import { upload, LEGACY_WORKFLOWS_DIR, WORKFLOWS_DIR, formatSceneFolderName, getSceneDirectories, ASSETS_DIR } from "../config/constants";
-import { listWorkflows, deleteWorkflow, parseWorkflowData } from "../services/workflowService";
+import { listWorkflows, deleteWorkflow, parseWorkflowData, resolveWorkflowTemplate } from "../services/workflowService";
 import { processAssetTransfer, processSceneTransfer } from "../services/executionService";
 import { listRemoteWorkflows, fetchRemoteWorkflowJson, syncRemoteWorkflowToLocal, getRemoteComfyObjectInfo } from "../services/remoteComfyService";
 import { safeUnlinkSync } from "../utils/fileCleanup";
@@ -133,64 +133,19 @@ router.post("/parse", (req: Request, res: Response) => {
     const { filename, scene_name } = req.body;
     if (!filename) return res.status(400).json({ error: "Filename is required" });
 
-    // Look in scene-specific directory first, then fallback to root workflows
     const cleanFilename = path.basename(filename);
-    const sceneFolder = formatSceneFolderName(scene_name);
-    
-    const candidatePaths: string[] = [];
-    if (scene_name) {
-      candidatePaths.push(path.join(getSceneDirectories(scene_name).workflows, cleanFilename));
-    }
-    
-    // Add all scene folders
-    if (fs.existsSync(ASSETS_DIR)) {
-      const allSubdirs = fs.readdirSync(ASSETS_DIR, { withFileTypes: true })
-        .filter(d => d.isDirectory() && d.name.startsWith("scene"));
-      
-      allSubdirs.forEach(d => {
-        candidatePaths.push(path.join(ASSETS_DIR, d.name, "workflows", cleanFilename));
-      });
+    const resolved = resolveWorkflowTemplate(cleanFilename, scene_name);
+
+    if (!resolved || !resolved.rawWorkflow) {
+      return res.status(404).json({ error: `Workflow file '${cleanFilename}' not found for scene '${scene_name || "global"}'.` });
     }
 
-    // Add legacy
-    candidatePaths.push(path.join(LEGACY_WORKFLOWS_DIR, cleanFilename));
-    if (fs.existsSync(LEGACY_WORKFLOWS_DIR)) {
-      const legacySubdirs = fs.readdirSync(LEGACY_WORKFLOWS_DIR, { withFileTypes: true })
-        .filter(d => d.isDirectory());
-      legacySubdirs.forEach(d => {
-        candidatePaths.push(path.join(LEGACY_WORKFLOWS_DIR, d.name, cleanFilename));
-      });
-    }
-
-    let foundPath: string | undefined = candidatePaths.find(p => fs.existsSync(p));
-
-    // Recursive search across ASSETS_DIR if not found in candidate paths
-    if (!foundPath && fs.existsSync(ASSETS_DIR)) {
-      const searchRecursively = (dir: string): string | null => {
-        const entries = fs.readdirSync(dir, { withFileTypes: true });
-        for (const entry of entries) {
-          const fullPath = path.join(dir, entry.name);
-          if (entry.isDirectory()) {
-            const res = searchRecursively(fullPath);
-            if (res) return res;
-          } else if (entry.isFile() && (entry.name === cleanFilename || entry.name.toLowerCase() === cleanFilename.toLowerCase())) {
-            return fullPath;
-          }
-        }
-        return null;
-      };
-      foundPath = searchRecursively(ASSETS_DIR) || undefined;
-    }
-
-    if (!foundPath || !fs.existsSync(foundPath)) {
-      return res.status(404).json({ error: `Workflow file '${cleanFilename}' not found.` });
-    }
-
-    const workflow = JSON.parse(fs.readFileSync(foundPath, "utf-8"));
+    const workflow = resolved.rawWorkflow;
     const parsed = parseWorkflowData(workflow);
     
     res.json({
-      filename: cleanFilename,
+      filename: resolved.resolvedFilename || cleanFilename,
+      path: resolved.resolvedPath,
       detected_nodes: parsed.detectedNodes,
       detected_values: parsed.detectedValues,
       nodes_info: {

@@ -65,28 +65,31 @@ export function listWorkflows(sceneName?: string) {
     scanDir(topLevelWfDir, undefined, "/workflows");
   }
 
-  // 3. Scan all project and scene directories in ASSETS_DIR and WORKFLOWS_DIR so any uploaded workflow is discoverable
-  if (fs.existsSync(ASSETS_DIR)) {
-    try {
-      const dirs = fs.readdirSync(ASSETS_DIR, { withFileTypes: true });
-      for (const d of dirs) {
-        if (d.isDirectory() && d.name !== "workflows" && d.name !== "uploads" && d.name !== "tmp_uploads" && d.name !== ".aistudio") {
-          const sceneWfDir = path.join(ASSETS_DIR, d.name, "workflows");
-          scanDir(sceneWfDir, d.name, `/assets/${d.name}/workflows`);
+  // 3. ONLY if NO sceneName was specified (global explorer mode), scan all project directories.
+  // When a sceneName IS specified, we do NOT scan sibling project directories so each project only sees its own workflows.
+  if (!sceneName) {
+    if (fs.existsSync(ASSETS_DIR)) {
+      try {
+        const dirs = fs.readdirSync(ASSETS_DIR, { withFileTypes: true });
+        for (const d of dirs) {
+          if (d.isDirectory() && d.name !== "workflows" && d.name !== "uploads" && d.name !== "tmp_uploads" && d.name !== ".aistudio") {
+            const sceneWfDir = path.join(ASSETS_DIR, d.name, "workflows");
+            scanDir(sceneWfDir, d.name, `/assets/${d.name}/workflows`);
+          }
         }
-      }
-    } catch {}
-  }
+      } catch {}
+    }
 
-  if (fs.existsSync(WORKFLOWS_DIR)) {
-    try {
-      const dirs = fs.readdirSync(WORKFLOWS_DIR, { withFileTypes: true });
-      for (const d of dirs) {
-        if (d.isDirectory() && d.name !== "workflows") {
-          scanDir(path.join(WORKFLOWS_DIR, d.name), d.name, `/assets/workflows/${d.name}`);
+    if (fs.existsSync(WORKFLOWS_DIR)) {
+      try {
+        const dirs = fs.readdirSync(WORKFLOWS_DIR, { withFileTypes: true });
+        for (const d of dirs) {
+          if (d.isDirectory() && d.name !== "workflows") {
+            scanDir(path.join(WORKFLOWS_DIR, d.name), d.name, `/assets/workflows/${d.name}`);
+          }
         }
-      }
-    } catch {}
+      } catch {}
+    }
   }
 
   const workflowItems = Array.from(workflowMap.values());
@@ -96,7 +99,7 @@ export function listWorkflows(sceneName?: string) {
 
 /**
  * Resiliently resolve and parse a ComfyUI workflow JSON template from disk.
- * Searches scene-specific directories, global workflows dir, and standard templates.
+ * Searches scene-specific directories and global workflows dir.
  */
 export function resolveWorkflowTemplate(
   requestedFilename?: string,
@@ -126,27 +129,15 @@ export function resolveWorkflowTemplate(
     candidates.push(path.join(WORKFLOWS_DIR, cleanRequested));
     candidates.push(path.join(ASSETS_DIR, "workflows", cleanRequested));
     candidates.push(path.join(process.cwd(), "workflows", cleanRequested));
-
-    // Check all other scene workflow directories for the requested file
-    if (fs.existsSync(ASSETS_DIR)) {
-      try {
-        const dirs = fs.readdirSync(ASSETS_DIR, { withFileTypes: true });
-        for (const d of dirs) {
-          if (d.isDirectory() && d.name !== "workflows" && d.name !== "uploads" && d.name !== "tmp_uploads" && d.name !== ".aistudio") {
-            candidates.push(path.join(ASSETS_DIR, d.name, "workflows", cleanRequested));
-          }
-        }
-      } catch {}
-    }
   }
 
   // Fallback candidate templates
   if (cleanScene) {
     candidates.push(path.join(getSceneDirectories(cleanScene).workflows, "minimax_video_workflow.json"));
     candidates.push(path.join(ASSETS_DIR, cleanScene, "workflows", "minimax_video_workflow.json"));
+    candidates.push(path.join(WORKFLOWS_DIR, cleanScene, "minimax_video_workflow.json"));
   }
   candidates.push(path.join(WORKFLOWS_DIR, "minimax_video_workflow.json"));
-  candidates.push(path.join(WORKFLOWS_DIR, "scene01", "minimax_video_workflow.json"));
   candidates.push(path.join(process.cwd(), "workflows", "minimax_video_workflow.json"));
 
   // Check candidates in order
@@ -165,13 +156,14 @@ export function resolveWorkflowTemplate(
     }
   }
 
-  // Search directory tree for any valid workflow json file
+  // Search directory tree for any valid workflow json file strictly within the project or global workflows
   const searchDirs = [
     cleanScene ? getSceneDirectories(cleanScene).workflows : null,
+    cleanScene ? path.join(ASSETS_DIR, cleanScene, "workflows") : null,
+    cleanScene ? path.join(WORKFLOWS_DIR, cleanScene) : null,
     WORKFLOWS_DIR,
-    path.join(WORKFLOWS_DIR, "scene01"),
     path.join(ASSETS_DIR, "workflows"),
-    ASSETS_DIR
+    !cleanScene ? ASSETS_DIR : null
   ].filter(Boolean) as string[];
 
   for (const searchDir of searchDirs) {
@@ -207,14 +199,14 @@ export function resolveWorkflowTemplate(
   }
 
   throw new Error(
-    `Workflow template "${cleanRequested || "default"}" could not be found or loaded from workspace assets. Please upload or select a valid ComfyUI workflow JSON.`
+    `Workflow template "${cleanRequested || "default"}" could not be found or loaded for scene "${cleanScene || "global"}". Please upload or select a valid ComfyUI workflow JSON for this project.`
   );
 }
 
 
 /**
  * Safely delete a workflow JSON template from disk.
- * Removes matching copies across scene workflows, global workflows dir, and project directories.
+ * Removes matching copies within the specified scene workflows or global workflows dir.
  */
 export function deleteWorkflow(
   filename: string,
@@ -237,37 +229,14 @@ export function deleteWorkflow(
     targetsToDelete.add(path.join(getSceneDirectories(cleanScene).workflows, cleanFilename));
     targetsToDelete.add(path.join(ASSETS_DIR, cleanScene, "workflows", cleanFilename));
     targetsToDelete.add(path.join(WORKFLOWS_DIR, cleanScene, cleanFilename));
-  }
-
-  targetsToDelete.add(path.join(WORKFLOWS_DIR, cleanFilename));
-  targetsToDelete.add(path.join(ASSETS_DIR, "workflows", cleanFilename));
-  const topLevelWfDir = path.join(process.cwd(), "workflows");
-  if (fs.existsSync(topLevelWfDir)) {
-    targetsToDelete.add(path.join(topLevelWfDir, cleanFilename));
-  }
-
-  // Also check all scene directories in ASSETS_DIR
-  if (fs.existsSync(ASSETS_DIR)) {
-    try {
-      const dirs = fs.readdirSync(ASSETS_DIR, { withFileTypes: true });
-      for (const d of dirs) {
-        if (d.isDirectory() && d.name !== "uploads" && d.name !== "tmp_uploads" && d.name !== ".aistudio") {
-          targetsToDelete.add(path.join(ASSETS_DIR, d.name, "workflows", cleanFilename));
-        }
-      }
-    } catch {}
-  }
-
-  // Also check all subdirectories in WORKFLOWS_DIR
-  if (fs.existsSync(WORKFLOWS_DIR)) {
-    try {
-      const dirs = fs.readdirSync(WORKFLOWS_DIR, { withFileTypes: true });
-      for (const d of dirs) {
-        if (d.isDirectory() && d.name !== "workflows") {
-          targetsToDelete.add(path.join(WORKFLOWS_DIR, d.name, cleanFilename));
-        }
-      }
-    } catch {}
+  } else {
+    // If no scene specified, check global and legacy
+    targetsToDelete.add(path.join(WORKFLOWS_DIR, cleanFilename));
+    targetsToDelete.add(path.join(ASSETS_DIR, "workflows", cleanFilename));
+    const topLevelWfDir = path.join(process.cwd(), "workflows");
+    if (fs.existsSync(topLevelWfDir)) {
+      targetsToDelete.add(path.join(topLevelWfDir, cleanFilename));
+    }
   }
 
   let deletedCount = 0;
@@ -284,7 +253,7 @@ export function deleteWorkflow(
   }
 
   if (deletedCount === 0) {
-    log.warn(`No existing workflow files found to delete for "${cleanFilename}"`);
+    log.warn(`No existing workflow files found to delete for "${cleanFilename}" in scene "${cleanScene || "global"}"`);
   }
 
   return {

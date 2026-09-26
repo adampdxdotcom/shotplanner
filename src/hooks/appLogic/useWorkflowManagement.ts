@@ -93,15 +93,29 @@ export function useWorkflowManagement({
         };
       });
       setWorkflows(normalized);
-      if (normalized.length > 0 && !selectedWorkflowFile) {
-        setSelectedWorkflowFile(normalized[0].filename);
+      if (normalized.length > 0) {
+        setSelectedWorkflowFile(prev => {
+          if (prev && normalized.some(w => w.filename === prev)) {
+            return prev;
+          }
+          return normalized[0].filename;
+        });
+      } else {
+        setSelectedWorkflowFile("");
+        setParsedWorkflow(null);
       }
       return normalized;
     } catch (e) {
       console.error("Failed to load workflows", e);
       return [];
     }
-  }, [activeSceneName, getActiveSceneName, selectedWorkflowFile]);
+  }, [activeSceneName, getActiveSceneName]);
+
+  // Refresh workflows automatically when active scene changes
+  useEffect(() => {
+    const scene = (getActiveSceneName ? getActiveSceneName() : activeSceneName) || "Untitled_Scene";
+    fetchWorkflows(scene);
+  }, [activeSceneName]);
 
   // Parse workflow when selection changes
   useEffect(() => {

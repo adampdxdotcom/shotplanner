@@ -92,14 +92,17 @@ export function useAutoWorkflowSync({
                 const parsedShotNum = extractShotNumberFromFilename(fnameLower);
                 if (parsedShotNum !== shotNum) return false;
 
-                // Also check if scene name matches if scene is named
+                // Check if scene name matches if scene is named
                 if (cleanSceneName && cleanSceneName !== "untitledscene" && cleanSceneName !== "scene") {
                   const cleanedWfName = fnameLower.replace(/[^a-z0-9]/g, "");
                   if (cleanedWfName.includes(cleanSceneName) || (w.folder && w.folder.toLowerCase().includes(cleanSceneName))) {
                     return true;
                   }
+                  // Do not match workflows belonging to other projects
+                  return false;
                 }
-                return true; // Match on shot number if in user workflows
+                // If scene has generic untitled name, only match if workflow is generic (e.g. "Shot_01.json")
+                return !fnameLower.includes("_shot_") || fnameLower.startsWith("shot_");
               });
 
               if (matchingWf && (matchingWf.path !== shot.monitored_workflow || !shot.workflow_file)) {
