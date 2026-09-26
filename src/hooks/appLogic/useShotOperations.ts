@@ -91,7 +91,11 @@ export function useShotOperations({
       if (shot) {
         setBasicStub(shot.basic_stub || "");
         setExpandedPrompt(shot.expanded_prompt || "");
-        if (shot.workflow_file !== undefined) setSelectedWorkflowFile(shot.workflow_file);
+        if (shot.workflow_file) {
+          setSelectedWorkflowFile(shot.workflow_file);
+        } else if (sceneProject?.workflow_file) {
+          setSelectedWorkflowFile(sceneProject.workflow_file);
+        }
         if (shot.prompt_node_id !== undefined) setSelectedPromptNodeId(shot.prompt_node_id);
         setNodeMappings(shot.node_mappings || {});
         if (shot.generation_params) {

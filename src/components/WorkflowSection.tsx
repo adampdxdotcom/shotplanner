@@ -271,6 +271,14 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
     }
   };
 
+  const handleSelectWorkflow = (filename: string) => {
+    onSelectWorkflow(filename);
+    if (activeShotId) {
+      onUpdateShot(prev => ({ ...prev, workflow_file: filename }));
+    }
+    onUpdateProject?.(prev => ({ ...prev, workflow_file: filename }));
+  };
+
   const handleDeleteWorkflow = async (filename: string) => {
     if (!onDeleteWorkflow) return;
     try {
@@ -279,6 +287,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
       if (activeShotId && activeShot?.workflow_file === filename) {
         onUpdateShot(prev => ({ ...prev, workflow_file: "" }));
       }
+      onUpdateProject?.(prev => ({ ...prev, workflow_file: prev.workflow_file === filename ? "" : prev.workflow_file }));
     } catch (err: any) {
       setUploadError(err.message || "Failed to delete workflow");
       throw err;
@@ -293,7 +302,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
           parsedWorkflow={parsedWorkflow}
           workflows={workflows}
           selectedWorkflowFile={selectedWorkflowFile}
-          onSelectWorkflow={onSelectWorkflow}
+          onSelectWorkflow={handleSelectWorkflow}
           onRefreshWorkflows={onRefreshWorkflows}
           onDeleteWorkflow={onDeleteWorkflow ? handleDeleteWorkflow : undefined}
           handleFileUpload={handleFileUpload}

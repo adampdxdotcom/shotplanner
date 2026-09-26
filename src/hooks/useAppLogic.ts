@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 import { LLMProvider } from '../types';
 import { useToastNotification } from './appLogic/useToastNotification';
 import { useAppConfig } from './appLogic/useAppConfig';
@@ -116,7 +116,13 @@ export function useAppLogic() {
   });
 
   // Keep activeSceneNameRef synchronized with live project scene name
-  activeSceneNameRef.current = sceneProject?.scene_name || currentProjectName || "";
+  useEffect(() => {
+    const scene = sceneProject?.scene_name || currentProjectName || "";
+    activeSceneNameRef.current = scene;
+    if (scene) {
+      fetchWorkflows(scene);
+    }
+  }, [sceneProject?.scene_name, currentProjectName, fetchWorkflows]);
 
   // 5. Cast & Character Management
   const {
