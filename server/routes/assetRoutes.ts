@@ -69,19 +69,16 @@ export function serveThumbnailFile(req: Request, res: Response) {
 router.get("/file/:filename", serveAssetFile);
 router.get("/thumb/:filename", serveThumbnailFile);
 
-// Delete an asset
-router.delete("/:filename", (req: Request, res: Response) => {
-  const { filename } = req.params;
-  assetService.deleteAsset(filename);
-  res.json({ success: true });
-});
-
 // Update asset metadata helper supporting both JSON updates and optional file replacements
 async function handleAssetUpdate(req: Request, res: Response) {
   try {
     const targetFilename = req.params.filename && req.params.filename !== "update"
       ? req.params.filename
       : (req.body.original_filename || req.body.filename || "asset");
+
+    if (["upload", "upload_chunk", "sync", "update"].includes(targetFilename)) {
+      return res.status(400).json({ error: `Invalid asset filename '${targetFilename}'` });
+    }
 
     if (req.file && targetFilename) {
       const existingPath = assetService.getAssetFilePath(targetFilename);
@@ -100,23 +97,6 @@ async function handleAssetUpdate(req: Request, res: Response) {
     if (req.file?.path) safeUnlinkSync(req.file.path);
   }
 }
-
-// Update asset metadata - support PUT, POST, and PATCH on both /update and /:filename
-router.put("/update", upload.single("file"), handleAssetUpdate);
-router.post("/update", upload.single("file"), handleAssetUpdate);
-router.put("/:filename", upload.single("file"), handleAssetUpdate);
-router.post("/:filename", upload.single("file"), handleAssetUpdate);
-router.patch("/:filename", upload.single("file"), handleAssetUpdate);
-
-// Sync assets array from client
-router.post("/sync", (req: Request, res: Response) => {
-  try {
-    const { assets } = req.body;
-    res.json({ success: true, assets: assets });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
 // Single asset upload
 router.post("/upload", upload.single("file"), async (req: Request, res: Response) => {
@@ -181,5 +161,30 @@ router.post("/upload_chunk/cancel", (req: Request, res: Response) => {
     res.status(500).json({ error: err.message || "Failed to cancel chunk upload" });
   }
 });
+
+// Sync assets array from client
+router.post("/sync", (req: Request, res: Response) => {
+  try {
+    const { assets } = req.body;
+    res.json({ success: true, assets: assets });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update asset metadata on concrete /update path
+router.put("/update", upload.single("file"), handleAssetUpdate);
+router.post("/update", upload.single("file"), handleAssetUpdate);
+
+// Parameterized /:filename routes LAST
+router.delete("/:filename", (req: Request, res: Response) => {
+  const { filename } = req.params;
+  assetService.deleteAsset(filename);
+  res.json({ success: true });
+});
+
+router.put("/:filename", upload.single("file"), handleAssetUpdate);
+router.post("/:filename", upload.single("file"), handleAssetUpdate);
+router.patch("/:filename", upload.single("file"), handleAssetUpdate);
 
 export default router;
