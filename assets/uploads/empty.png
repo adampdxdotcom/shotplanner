@@ -1,3 +1,0 @@
-# Safe placeholder for bypassed or optional input nodes
-# When a workflow node (e.g. LoadImage) has no mapped user asset,
-# this placeholder is injected to prevent ComfyUI execution failure.

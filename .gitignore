@@ -6,3 +6,23 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# User runtime databases & state
+assets/assets_db.json
+assets/config/*.json
+!assets/config/*.example.json
+
+# User project scenes, uploads & temp storage
+assets/new_scene/
+assets/uploads/
+assets/tmp_uploads/
+tmp/
+data/
+
+# Automatic backups and temp files
+*.bak
+*/*.bak
+**/*.bak
+*.tmp
+*/*.tmp
+**/*.tmp

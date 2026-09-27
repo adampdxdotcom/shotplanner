@@ -163,6 +163,12 @@ export function initDirectories(): void {
       writeJsonAtomicSync(UNIVERSE_CHARACTERS_FILE, {});
     } catch (e) {}
   }
+
+  if (!fs.existsSync(ASSET_DB_FILE)) {
+    try {
+      writeJsonAtomicSync(ASSET_DB_FILE, []);
+    } catch (e) {}
+  }
 }
 
 // Multer upload handler using the temporary directory with 500MB limit for large archives and 4K media
