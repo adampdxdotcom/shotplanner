@@ -205,6 +205,7 @@ export default function App() {
             shots={sceneProject.shots || []}
             activeShotId={activeShotId}
             onSelectShot={setActiveShotId}
+            onUpdateShot={updateShot}
             assets={assets}
             sceneName={sceneProject.scene_name || currentProjectName || "Scene"}
             onNewShot={handleAddBlankShot}

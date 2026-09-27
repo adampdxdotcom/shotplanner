@@ -3,6 +3,11 @@ import { ShotItem, MediaAsset } from "../types";
 import { getAssetMediaUrl } from "../utils/assetUrl";
 import { copyToClipboard } from "../utils/clipboard";
 import { 
+  CAMERA_MOVEMENTS, 
+  SHOT_TYPES, 
+  LENS_PRESETS 
+} from "../utils/cameraPresets";
+import { 
   Film, 
   Camera, 
   Move, 
@@ -10,6 +15,7 @@ import {
   RectangleHorizontal, 
   ChevronLeft, 
   ChevronRight, 
+  ChevronDown,
   Plus, 
   Copy, 
   Check, 
@@ -18,10 +24,23 @@ import {
   Compass
 } from "lucide-react";
 
+const DOSSIER_ASPECT_RATIOS = [
+  { label: "16:9 Widescreen", value: "16:9 Widescreen" },
+  { label: "2.39:1 Anamorphic Scope", value: "2.39:1 Anamorphic Scope" },
+  { label: "3:2 Landscape", value: "3:2 Landscape" },
+  { label: "4:3 Classic", value: "4:3 Classic" },
+  { label: "1:1 Square", value: "1:1 Square" },
+  { label: "2:3 Portrait", value: "2:3 Portrait" },
+  { label: "9:16 Vertical (Reels)", value: "9:16 Vertical (Reels)" },
+  { label: "9:16 Vertical", value: "9:16 Vertical" },
+  { label: "2.39:1 Anamorphic", value: "2.39:1 Anamorphic" }
+];
+
 export interface ShotDossierCardProps {
   shots: ShotItem[];
   activeShotId: string | null;
   onSelectShot: (id: string | null) => void;
+  onUpdateShot?: (shotId: string, updater: (prev: ShotItem) => ShotItem) => void;
   assets?: MediaAsset[];
   sceneName?: string;
   onNewShot?: () => void;
@@ -36,6 +55,7 @@ export const ShotDossierCard: React.FC<ShotDossierCardProps> = ({
   shots = [],
   activeShotId,
   onSelectShot,
+  onUpdateShot,
   assets = [],
   sceneName = "Scene",
   onNewShot,
@@ -53,6 +73,15 @@ export const ShotDossierCard: React.FC<ShotDossierCardProps> = ({
   }, [shots, activeShotId]);
 
   const activeShot = activeShotIndex >= 0 ? shots[activeShotIndex] : null;
+
+  // Helper to update a field specifically on the active shot
+  const handleUpdateActiveShotField = (field: keyof ShotItem, value: any) => {
+    if (!activeShotId || !onUpdateShot) return;
+    onUpdateShot(activeShotId, prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
 
   // Previous and next shot navigation handlers
   const hasPrevious = activeShotIndex > 0;
@@ -293,42 +322,118 @@ export const ShotDossierCard: React.FC<ShotDossierCardProps> = ({
         {/* DOSSIER CONTENT: SPEC CHIPS + PROMPT STUB */}
         <div className="flex-1 flex flex-col justify-between gap-2.5 min-w-0">
           
-          {/* SPECS & METADATA CHIPS */}
+          {/* SPECS & METADATA CHIPS (Interactive Pulldowns) */}
           <div className="flex items-center gap-2 flex-wrap">
-            {/* SHOT TYPE CHIP */}
-            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-zinc-100 dark:bg-zinc-800/90 rounded-md border border-zinc-200 dark:border-zinc-700 text-xs">
-              <Camera className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400 shrink-0" />
-              <span className="text-zinc-500 dark:text-zinc-400 font-medium">Type:</span>
-              <span className="text-zinc-900 dark:text-zinc-100 font-semibold truncate max-w-[140px]" title={activeShot?.shot_type || "N/A"}>
-                {activeShot?.shot_type || "N/A"}
+            {/* SHOT TYPE PULLDOWN */}
+            <div className="relative flex items-center gap-1.5 px-2.5 py-1 bg-zinc-100 hover:bg-zinc-200/80 dark:bg-zinc-800/90 dark:hover:bg-zinc-750 rounded-md border border-zinc-200 dark:border-zinc-700 text-xs transition-colors cursor-pointer group shadow-2xs focus-within:ring-1 focus-within:ring-indigo-500/50">
+              <Camera className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400 shrink-0 pointer-events-none" />
+              <span className="text-zinc-500 dark:text-zinc-400 font-medium pointer-events-none">Type:</span>
+              <span className="text-zinc-900 dark:text-zinc-100 font-semibold truncate max-w-[130px] pointer-events-none" title={activeShot?.shot_type || "Medium Shot"}>
+                {activeShot?.shot_type || "Medium Shot"}
               </span>
+              <ChevronDown className="w-3 h-3 text-zinc-400 dark:text-zinc-500 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 shrink-0 transition-colors pointer-events-none" />
+              <select
+                value={activeShot?.shot_type || "Medium Shot"}
+                onChange={(e) => handleUpdateActiveShotField("shot_type", e.target.value)}
+                disabled={!activeShot || !onUpdateShot}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed bg-transparent text-xs"
+                title="Change Shot Type"
+              >
+                {activeShot?.shot_type && !SHOT_TYPES.some(t => t.value === activeShot.shot_type || t.label === activeShot.shot_type) && (
+                  <option value={activeShot.shot_type} className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">
+                    {activeShot.shot_type} (Custom)
+                  </option>
+                )}
+                {SHOT_TYPES.map((type) => (
+                  <option key={type.value} value={type.value} className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">
+                    {type.label}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            {/* CAMERA MOVEMENT CHIP */}
-            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-zinc-100 dark:bg-zinc-800/90 rounded-md border border-zinc-200 dark:border-zinc-700 text-xs">
-              <Move className="w-3.5 h-3.5 text-cyan-500 dark:text-cyan-400 shrink-0" />
-              <span className="text-zinc-500 dark:text-zinc-400 font-medium">Movement:</span>
-              <span className="text-zinc-900 dark:text-zinc-100 font-semibold truncate max-w-[140px]" title={activeShot?.camera_movement || "N/A"}>
-                {activeShot?.camera_movement || "N/A"}
+            {/* CAMERA MOVEMENT PULLDOWN */}
+            <div className="relative flex items-center gap-1.5 px-2.5 py-1 bg-zinc-100 hover:bg-zinc-200/80 dark:bg-zinc-800/90 dark:hover:bg-zinc-750 rounded-md border border-zinc-200 dark:border-zinc-700 text-xs transition-colors cursor-pointer group shadow-2xs focus-within:ring-1 focus-within:ring-cyan-500/50">
+              <Move className="w-3.5 h-3.5 text-cyan-500 dark:text-cyan-400 shrink-0 pointer-events-none" />
+              <span className="text-zinc-500 dark:text-zinc-400 font-medium pointer-events-none">Movement:</span>
+              <span className="text-zinc-900 dark:text-zinc-100 font-semibold truncate max-w-[130px] pointer-events-none" title={activeShot?.camera_movement || "Locked Off"}>
+                {activeShot?.camera_movement || "Locked Off"}
               </span>
+              <ChevronDown className="w-3 h-3 text-zinc-400 dark:text-zinc-500 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 shrink-0 transition-colors pointer-events-none" />
+              <select
+                value={activeShot?.camera_movement || "Locked Off"}
+                onChange={(e) => handleUpdateActiveShotField("camera_movement", e.target.value)}
+                disabled={!activeShot || !onUpdateShot}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed bg-transparent text-xs"
+                title="Change Camera Movement"
+              >
+                {activeShot?.camera_movement && !CAMERA_MOVEMENTS.some(m => m.value === activeShot.camera_movement || m.label === activeShot.camera_movement) && (
+                  <option value={activeShot.camera_movement} className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">
+                    {activeShot.camera_movement} (Custom)
+                  </option>
+                )}
+                {CAMERA_MOVEMENTS.map((mov) => (
+                  <option key={mov.value} value={mov.value} className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">
+                    {mov.label}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            {/* LENS / FOCAL LENGTH CHIP */}
-            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-zinc-100 dark:bg-zinc-800/90 rounded-md border border-zinc-200 dark:border-zinc-700 text-xs">
-              <Aperture className="w-3.5 h-3.5 text-purple-500 dark:text-purple-400 shrink-0" />
-              <span className="text-zinc-500 dark:text-zinc-400 font-medium">Lens:</span>
-              <span className="text-zinc-900 dark:text-zinc-100 font-semibold truncate max-w-[140px]" title={activeShot?.lens_focal_length || "N/A"}>
-                {activeShot?.lens_focal_length || "N/A"}
+            {/* LENS / FOCAL LENGTH PULLDOWN */}
+            <div className="relative flex items-center gap-1.5 px-2.5 py-1 bg-zinc-100 hover:bg-zinc-200/80 dark:bg-zinc-800/90 dark:hover:bg-zinc-750 rounded-md border border-zinc-200 dark:border-zinc-700 text-xs transition-colors cursor-pointer group shadow-2xs focus-within:ring-1 focus-within:ring-purple-500/50">
+              <Aperture className="w-3.5 h-3.5 text-purple-500 dark:text-purple-400 shrink-0 pointer-events-none" />
+              <span className="text-zinc-500 dark:text-zinc-400 font-medium pointer-events-none">Lens:</span>
+              <span className="text-zinc-900 dark:text-zinc-100 font-semibold truncate max-w-[130px] pointer-events-none" title={activeShot?.lens_focal_length || "50mm Standard Prime"}>
+                {activeShot?.lens_focal_length || "50mm Standard Prime"}
               </span>
+              <ChevronDown className="w-3 h-3 text-zinc-400 dark:text-zinc-500 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 shrink-0 transition-colors pointer-events-none" />
+              <select
+                value={activeShot?.lens_focal_length || "50mm Standard Prime"}
+                onChange={(e) => handleUpdateActiveShotField("lens_focal_length", e.target.value)}
+                disabled={!activeShot || !onUpdateShot}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed bg-transparent text-xs"
+                title="Change Lens / Focal Length"
+              >
+                {activeShot?.lens_focal_length && !LENS_PRESETS.some(l => l.value === activeShot.lens_focal_length || l.label === activeShot.lens_focal_length) && (
+                  <option value={activeShot.lens_focal_length} className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">
+                    {activeShot.lens_focal_length} (Custom)
+                  </option>
+                )}
+                {LENS_PRESETS.map((lens) => (
+                  <option key={lens.value} value={lens.value} className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">
+                    {lens.label}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            {/* ASPECT RATIO CHIP */}
-            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-zinc-100 dark:bg-zinc-800/90 rounded-md border border-zinc-200 dark:border-zinc-700 text-xs">
-              <RectangleHorizontal className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 shrink-0" />
-              <span className="text-zinc-500 dark:text-zinc-400 font-medium">Ratio:</span>
-              <span className="text-zinc-900 dark:text-zinc-100 font-semibold">
-                {activeShot?.aspect_ratio || "N/A"}
+            {/* ASPECT RATIO PULLDOWN */}
+            <div className="relative flex items-center gap-1.5 px-2.5 py-1 bg-zinc-100 hover:bg-zinc-200/80 dark:bg-zinc-800/90 dark:hover:bg-zinc-750 rounded-md border border-zinc-200 dark:border-zinc-700 text-xs transition-colors cursor-pointer group shadow-2xs focus-within:ring-1 focus-within:ring-amber-500/50">
+              <RectangleHorizontal className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 shrink-0 pointer-events-none" />
+              <span className="text-zinc-500 dark:text-zinc-400 font-medium pointer-events-none">Ratio:</span>
+              <span className="text-zinc-900 dark:text-zinc-100 font-semibold truncate max-w-[130px] pointer-events-none" title={activeShot?.aspect_ratio || "16:9 Widescreen"}>
+                {activeShot?.aspect_ratio || "16:9 Widescreen"}
               </span>
+              <ChevronDown className="w-3 h-3 text-zinc-400 dark:text-zinc-500 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 shrink-0 transition-colors pointer-events-none" />
+              <select
+                value={activeShot?.aspect_ratio || "16:9 Widescreen"}
+                onChange={(e) => handleUpdateActiveShotField("aspect_ratio", e.target.value)}
+                disabled={!activeShot || !onUpdateShot}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed bg-transparent text-xs"
+                title="Change Aspect Ratio"
+              >
+                {activeShot?.aspect_ratio && !DOSSIER_ASPECT_RATIOS.some(r => r.value === activeShot.aspect_ratio || r.label === activeShot.aspect_ratio) && (
+                  <option value={activeShot.aspect_ratio} className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">
+                    {activeShot.aspect_ratio} (Custom)
+                  </option>
+                )}
+                {DOSSIER_ASPECT_RATIOS.map((ratio) => (
+                  <option key={ratio.value} value={ratio.value} className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">
+                    {ratio.label}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 

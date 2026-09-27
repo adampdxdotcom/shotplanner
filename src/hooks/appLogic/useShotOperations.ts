@@ -174,7 +174,7 @@ export function useShotOperations({
         
         // Auto-revert to "unstaged" if specific fields changed
         const fieldsToCheck: (keyof ShotItem)[] = [
-          "basic_stub", "expanded_prompt", "camera_movement", 
+          "shot_type", "basic_stub", "expanded_prompt", "camera_movement", 
           "lens_focal_length", "aspect_ratio", "assigned_slots", "generation_params"
         ];
         
