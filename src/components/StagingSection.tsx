@@ -13,6 +13,7 @@ import {
   StagingViewportCard,
   FirstFrameTab
 } from "./staging";
+import { duplicateShotItem } from "../utils/shotDuplication";
 import { StagingWorkspaceTab } from "../utils/workspaceSessionStore";
 
 export type { StagedActor };
@@ -156,18 +157,7 @@ export const StagingSection: React.FC<StagingSectionProps> = ({
     const newId = "shot_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
     onUpdateProject((prev: SceneProjectFile) => {
       const idx = (prev.shots || []).findIndex(s => s.id === activeShot.id);
-      const duplicatedShot: ShotItem = {
-        ...activeShot,
-        id: newId,
-        shot_number: activeShot.shot_number + 1,
-        shot_name: activeShot.shot_name ? `${activeShot.shot_name} (Copy)` : undefined,
-        status: "unstaged",
-        takes: [],
-        hero_take_id: undefined,
-        assigned_slots: { ...(activeShot.assigned_slots || {}) },
-        characters: activeShot.characters ? [...activeShot.characters] : [],
-        updated_at: new Date().toISOString()
-      };
+      const duplicatedShot = duplicateShotItem(activeShot, activeShot.shot_number + 1, newId);
       const shots = [...(prev.shots || [])];
       shots.splice(idx + 1, 0, duplicatedShot);
       shots.forEach((s, i) => s.shot_number = i + 1);

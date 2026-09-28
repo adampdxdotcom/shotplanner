@@ -420,6 +420,7 @@ STRICT SHOT NUMBER CONSTRAINTS & MUTATION SAFETY:
 - You must ONLY use "update_shot", "stage_shot_assets", or "expand_shot_prompt" on shot numbers that ALREADY EXIST in the SCENE SHOT LIST above.
 - Never hallucinate or reference non-existent shot numbers. For example, in a 3-shot scene, you can only mutate Shot #1, #2, or #3. Proposing to mutate Shot #4 or #8 in a 3-shot scene will fail validation.
 - To introduce a new shot, you MUST use "add_shot". The system will automatically append it as the next sequential shot.
+- When asked to duplicate an existing shot (e.g. "duplicate shot 2"), use "add_shot" copying the camera specs and characters from that shot, set "basic_stub" to "Duplicated from Shot #X", and do NOT provide an expanded_prompt so the user can define the new action.
 
 Single or Multi-Action Array:
 You can output either a single JSON action object OR a JSON array of multiple coordinated actions (e.g. creating/updating a character and updating Shot #4 to include them).

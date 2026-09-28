@@ -12,6 +12,7 @@ import { AiReferenceStagingStudioModal } from "./cast/AiReferenceStagingStudioMo
 import { SceneSketchImportModal } from "./scenes/SceneSketchImportModal";
 import { ScenePlanModal } from "./scenes/ScenePlanModal";
 import { fetchUniverseCharacters, fetchUniverseAssets } from "../utils/universeApi";
+import { duplicateShotItem } from "../utils/shotDuplication";
 import { Film, Sparkles, Plus, Compass, ShieldCheck } from "lucide-react";
 
 interface Props {
@@ -124,15 +125,7 @@ export default function SceneProjectHub({
     e.stopPropagation();
     onUpdateProject((prev) => {
       const idx = prev.shots.findIndex(s => s.id === shot.id);
-      const newShot: ShotItem = {
-        ...shot,
-        id: "shot_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7),
-        shot_number: shot.shot_number + 1,
-        lens_focal_length: shot.lens_focal_length || "50mm Standard Prime",
-        aspect_ratio: shot.aspect_ratio || "16:9 Widescreen",
-        status: "unstaged",
-        updated_at: new Date().toISOString()
-      };
+      const newShot = duplicateShotItem(shot, shot.shot_number + 1);
       const shots = [...prev.shots];
       shots.splice(idx + 1, 0, newShot);
       shots.forEach((s, i) => s.shot_number = i + 1);
@@ -145,18 +138,7 @@ export default function SceneProjectHub({
     const newId = "shot_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
     onUpdateProject((prev) => {
       const idx = prev.shots.findIndex(s => s.id === activeShot.id);
-      const duplicatedShot: ShotItem = {
-        ...activeShot,
-        id: newId,
-        shot_number: activeShot.shot_number + 1,
-        shot_name: activeShot.shot_name ? `${activeShot.shot_name} (Copy)` : undefined,
-        status: "unstaged",
-        takes: [],
-        hero_take_id: undefined,
-        assigned_slots: { ...(activeShot.assigned_slots || {}) },
-        characters: activeShot.characters ? [...activeShot.characters] : [],
-        updated_at: new Date().toISOString()
-      };
+      const duplicatedShot = duplicateShotItem(activeShot, activeShot.shot_number + 1, newId);
       const shots = [...prev.shots];
       shots.splice(idx + 1, 0, duplicatedShot);
       shots.forEach((s, i) => s.shot_number = i + 1);

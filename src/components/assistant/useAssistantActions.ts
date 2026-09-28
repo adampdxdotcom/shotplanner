@@ -56,22 +56,35 @@ export function applyPromptVariationToShot(
   labelSuffix: string = "Assistant Expansion"
 ): ShotItem {
   const currentVariations = [...(shot.prompt_variations || [])];
+  const effectiveStub = newStub !== undefined ? newStub : shot.basic_stub;
 
-  // Baseline original prompt as Variation 1 if no variations exist yet but shot has an existing prompt/stub
-  if (currentVariations.length === 0 && (shot.expanded_prompt || shot.basic_stub)) {
-    const baselineVariation: PromptVariation = {
-      id: "var_1_" + Date.now().toString(36),
+  // Determine if this is the shot's first prompt expansion (no previous expanded prompt exists)
+  const isInitialExpansion = 
+    currentVariations.length === 0 || 
+    (!shot.expanded_prompt?.trim() && currentVariations.length === 1 && !currentVariations[0].expanded_prompt?.trim());
+
+  if (isInitialExpansion) {
+    const var1: PromptVariation = {
+      id: currentVariations[0]?.id || ("var_1_" + Date.now().toString(36)),
       variation_number: 1,
-      created_at: shot.updated_at || new Date().toISOString(),
-      basic_stub: shot.basic_stub,
-      expanded_prompt: shot.expanded_prompt || "",
-      label: "Variation 1 (Original)"
+      created_at: new Date().toISOString(),
+      basic_stub: effectiveStub,
+      expanded_prompt: newExpandedPrompt,
+      label: "Variation 1"
     };
-    currentVariations.push(baselineVariation);
+
+    return {
+      ...shot,
+      basic_stub: effectiveStub,
+      expanded_prompt: newExpandedPrompt,
+      prompt_variations: [var1],
+      active_variation_id: var1.id,
+      status: "unstaged",
+      updated_at: new Date().toISOString()
+    };
   }
 
   const nextVarNum = currentVariations.length + 1;
-  const effectiveStub = newStub !== undefined ? newStub : shot.basic_stub;
 
   const newVariation: PromptVariation = {
     id: "var_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
@@ -343,7 +356,7 @@ export function useAssistantActions({
           updated_at: new Date().toISOString()
         };
 
-        if (newShot.expanded_prompt || newShot.basic_stub) {
+        if (newShot.expanded_prompt?.trim()) {
           const initVar: PromptVariation = {
             id: "var_1_" + Date.now().toString(36),
             variation_number: 1,
@@ -354,6 +367,9 @@ export function useAssistantActions({
           };
           newShot.prompt_variations = [initVar];
           newShot.active_variation_id = initVar.id;
+        } else {
+          newShot.prompt_variations = [];
+          newShot.active_variation_id = undefined;
         }
 
         return {

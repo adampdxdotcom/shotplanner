@@ -206,11 +206,20 @@ export function usePromptExpansion({
         let createdVariationNumber = 1;
         const updatedShotUpdater = (prev: ShotItem): ShotItem => {
           const currentVariations = prev.prompt_variations || [];
-          const nextVarNum = currentVariations.length + 1;
+          
+          // Determine if this is the shot's first prompt expansion:
+          // 1. No variations exist yet, OR
+          // 2. Exactly 1 variation exists but has no expanded prompt (or was an unexpanded placeholder), OR
+          // 3. The shot itself has no previous expanded_prompt
+          const isInitialExpansion = 
+            currentVariations.length === 0 || 
+            (!prev.expanded_prompt?.trim() && currentVariations.length === 1 && !currentVariations[0].expanded_prompt?.trim());
+
+          const nextVarNum = isInitialExpansion ? 1 : currentVariations.length + 1;
           createdVariationNumber = nextVarNum;
 
           const newVariation: PromptVariation = {
-            id: "var_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
+            id: isInitialExpansion && currentVariations[0]?.id ? currentVariations[0].id : ("var_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6)),
             variation_number: nextVarNum,
             created_at: new Date().toISOString(),
             basic_stub: stubToUse,
@@ -219,10 +228,14 @@ export function usePromptExpansion({
             label: `Variation ${nextVarNum}`
           };
 
+          const updatedVariations = isInitialExpansion
+            ? [newVariation]
+            : [...currentVariations, newVariation];
+
           return {
             ...prev,
             expanded_prompt: data.expanded_prompt,
-            prompt_variations: [...currentVariations, newVariation],
+            prompt_variations: updatedVariations,
             active_variation_id: newVariation.id,
             status: "unstaged",
             updated_at: new Date().toISOString()

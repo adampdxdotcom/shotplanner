@@ -17,6 +17,7 @@ import {
 } from "./assetManager";
 import { useTransfer } from "../context/TransferContext";
 import { RecentUpdatedAssetsCard } from "./execution/RecentUpdatedAssetsCard";
+import { duplicateShotItem } from "../utils/shotDuplication";
 
 interface AssetManagerSectionProps {
   assets: MediaAsset[];
@@ -144,18 +145,7 @@ export const AssetManagerSection: React.FC<AssetManagerSectionProps> = ({
     if (!activeShot) return;
     const newId = "shot_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
     onUpdateProject(prev => {
-      const duplicatedShot: ShotItem = {
-        ...activeShot,
-        id: newId,
-        shot_number: prev.shots.length + 1,
-        shot_name: activeShot.shot_name ? `${activeShot.shot_name} (Copy)` : undefined,
-        status: "unstaged",
-        takes: [],
-        hero_take_id: undefined,
-        assigned_slots: { ...(activeShot.assigned_slots || {}) },
-        characters: activeShot.characters ? [...activeShot.characters] : [],
-        updated_at: new Date().toISOString()
-      };
+      const duplicatedShot = duplicateShotItem(activeShot, prev.shots.length + 1, newId);
       return { ...prev, shots: [...prev.shots, duplicatedShot] };
     });
     onSelectShot(newId);

@@ -10,6 +10,7 @@ import { getLastConfigTab, setLastConfigTab } from "./utils/workspaceSessionStor
 import { TransferProvider } from "./context/TransferContext";
 import { GlobalTransferBanner } from "./components/execution/GlobalTransferBanner";
 import { lazyWithRetry } from "./utils/lazyWithRetry";
+import { duplicateShotItem } from "./utils/shotDuplication";
 
 // Lazy-loaded top-level sections with automatic retry/recovery for stale build chunks
 const SceneProjectHub = lazyWithRetry(() => import("./components/SceneProjectHub"));
@@ -150,18 +151,7 @@ export default function App() {
     setSceneProject((prev) => {
       const idx = prev.shots.findIndex((s) => s.id === activeShot.id);
       if (idx === -1) return prev;
-      const duplicatedShot: ShotItem = {
-        ...activeShot,
-        id: newId,
-        shot_number: activeShot.shot_number + 1,
-        shot_name: activeShot.shot_name ? `${activeShot.shot_name} (Copy)` : undefined,
-        status: "unstaged",
-        takes: [],
-        hero_take_id: undefined,
-        assigned_slots: { ...(activeShot.assigned_slots || {}) },
-        characters: activeShot.characters ? [...activeShot.characters] : [],
-        updated_at: new Date().toISOString()
-      };
+      const duplicatedShot = duplicateShotItem(activeShot, activeShot.shot_number + 1, newId);
       const shots = [...prev.shots];
       shots.splice(idx + 1, 0, duplicatedShot);
       shots.forEach((s, i) => (s.shot_number = i + 1));
